@@ -20,6 +20,12 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 
+try:
+    from pandas_datareader import data as web
+    FRED_AVAILABLE = True
+except ImportError:
+    FRED_AVAILABLE = False
+
 
 # ----------------------------------------------------------
 # Try to import ib_insync; if unavailable we’ll silently skip
@@ -30,13 +36,27 @@ try:
 except ImportError:
     IB_AVAILABLE = False
 
+# Always‑included macro tickers
+EXTRA_TICKERS = [
+    # Treasury yields (intraday CBOE + FRED daily)
+    "^IRX", "^FVX", "^TNX", "^TYX",     # 13‑w, 5‑y, 10‑y, 30‑y live
+    "US2Y", "US10Y", "US20Y", "US30Y", # daily constant‑maturity from FRED
+    # Commodity front‑month futures
+    "GC=F", "SI=F", "CL=F", "BZ=F"
+]
+
 # --------------------------- CONFIG ------------------------
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 TR_TZ = ZoneInfo("Europe/Istanbul")
 now_tr = datetime.now(TR_TZ)
 DATE_TAG = now_tr.strftime("%Y%m%d")
 TIME_TAG = now_tr.strftime("%H%M")
-OUTPUT_CSV = f"live_quotes_{DATE_TAG}_{TIME_TAG}.csv"
+
+# Save snapshots to iCloud Drive ▸ Downloads
+OUTPUT_DIR = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"live_quotes_{DATE_TAG}_{TIME_TAG}.csv")
 
 IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 2     # separate clientId
 IB_TIMEOUT = 4.0                                     # seconds to wait per batch
@@ -45,7 +65,25 @@ IB_TIMEOUT = 4.0                                     # seconds to wait per batch
 PROXY_MAP = {
     "VIX":  "^VIX",
     "VVIX": "^VVIX",
-    "DXY":  "DX-Y.NYB"
+    "DXY":  "DX-Y.NYB",
+    # commodities / yields map to themselves (clarity)
+    "GC=F": "GC=F",
+    "SI=F": "SI=F",
+    "CL=F": "CL=F",
+    "BZ=F": "BZ=F",
+    "US2Y=RR": "US2Y=RR",
+    "US10Y=RR": "US10Y=RR",
+    "US20Y=RR": "US20Y=RR",
+    "US30Y=RR": "US30Y=RR",
+    "^IRX": "^IRX",
+    "^FVX": "^FVX",
+}
+
+YIELD_MAP = {
+    "US2Y":  "DGS2",
+    "US10Y": "DGS10",
+    "US20Y": "DGS20",
+    "US30Y": "DGS30"
 }
 
 # Index mapping for IBKR (futures removed; will fall back to yfinance)
@@ -54,7 +92,13 @@ SYMBOL_MAP = {
     "VVIX": (Index,  dict(symbol="VVIX", exchange="CBOE")),
     "^TNX": (Index,  dict(symbol="TNX",  exchange="CBOE")),   # 10‑yr yield
     "^TYX": (Index,  dict(symbol="TYX",  exchange="CBOE")),   # 30‑yr yield
-    # Remove futures from IB pull – they will fall back to yfinance
+    "^IRX": (Index,  dict(symbol="IRX", exchange="CBOE")),   # 13‑week yield
+    "^FVX": (Index,  dict(symbol="FVX", exchange="CBOE")),   # 5‑year yield
+    # "^UST2Y": (Index, dict(symbol="UST2Y", exchange="CBOE")),
+    # "^UST20Y": (Index, dict(symbol="UST20Y", exchange="CBOE")),
+    # "XAUUSD=X": (Index, dict(symbol="XAUUSD", exchange="FOREX")),
+    # "XAGUSD=X": (Index, dict(symbol="XAGUSD", exchange="FOREX")),
+    # leave CL=F and BZ=F to fall back to yfinance (skip continuous futures)
 }
 
 logging.basicConfig(level=logging.INFO,
@@ -89,13 +133,17 @@ def fetch_ib_quotes(tickers: list[str]) -> pd.DataFrame:
         logging.warning("IBKR Gateway not reachable — skipping IB pull.")
         return pd.DataFrame()
 
-    rows, reqs = [], {}
+    rows: list[dict] = []
+    reqs: dict[str, any] = {}
 
     # Build contracts & request market data
     for tk in tickers:
-        # Skip generic continuous futures (e.g. GC=F) – will fall back to yfinance
-        if tk.endswith("=F"):
+        # Skip continuous futures (=F) and Yahoo-only yield symbols – use yfinance
+        if tk.endswith("=F") or tk in YIELD_MAP:
             continue
+        # Skip symbols IB cannot serve (metals spot & some yields)
+        # if tk in {"XAUUSD=X", "XAGUSD=X", "^UST2Y", "^UST20Y"}:
+        #     continue
         if tk in SYMBOL_MAP:
             cls, kw = SYMBOL_MAP[tk]
             con = cls(**kw)
@@ -115,13 +163,13 @@ def fetch_ib_quotes(tickers: list[str]) -> pd.DataFrame:
     for tk, md in reqs.items():
         rows.append({
             "ticker":     tk,
-            "last":       md.last,
-            "bid":        md.bid,
-            "ask":        md.ask,
-            "open":       md.open,
-            "high":       md.high,
-            "low":        md.low,
-            "prev_close": md.close,
+            "last":       md.last/10 if tk in {"^IRX","^FVX","^TNX","^TYX"} and md.last else md.last,
+            "bid":        md.bid/10 if tk in {"^IRX","^FVX","^TNX","^TYX"} and md.bid else md.bid,
+            "ask":        md.ask/10 if tk in {"^IRX","^FVX","^TNX","^TYX"} and md.ask else md.ask,
+            "open":       md.open/10 if tk in {"^IRX","^FVX","^TNX","^TYX"} and md.open else md.open,
+            "high":       md.high/10 if tk in {"^IRX","^FVX","^TNX","^TYX"} and md.high else md.high,
+            "low":        md.low/10 if tk in {"^IRX","^FVX","^TNX","^TYX"} and md.low else md.low,
+            "prev_close": md.close/10 if tk in {"^IRX","^FVX","^TNX","^TYX"} and md.close else md.close,
             "volume":     md.volume,
             "source":     "IB"
         })
@@ -134,39 +182,87 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
     rows = []
     ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     for t in tickers:
+        if t in YIELD_MAP:
+            continue  # yields fetched via FRED
         yf_tkr = PROXY_MAP.get(t, t)
         try:
             info = yf.Ticker(yf_tkr).info
+            price = info.get("regularMarketPrice")
+            bid   = info.get("bid")
+            ask   = info.get("ask")
+            day_high = info.get("dayHigh")
+            day_low  = info.get("dayLow")
+            prev_close = info.get("previousClose")
+            vol   = info.get("volume")
+        except Exception as e:
+            # fallback to fast download (1d) if info API stalls
+            try:
+                hist = yf.download(yf_tkr, period="2d", interval="1d", progress=False)
+                price = hist["Close"].iloc[-1] if not hist.empty else np.nan
+                prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else np.nan
+                bid = ask = day_high = day_low = vol = np.nan
+                logging.warning("yfinance info fail %s, used download(): %s", t, e)
+            except Exception as e2:
+                logging.warning("yfinance miss %s: %s", t, e2)
+                continue
+        # Yahoo yields like ^TNX return 10× the percentage; rescale
+        if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and price is not None:
+            price = price / 10.0
+        rows.append({
+            "ticker":     t,
+            "last":       price,
+            "bid":        bid,
+            "ask":        ask,
+            "open":       info.get("open") if 'info' in locals() else np.nan,
+            "high":       day_high,
+            "low":        day_low,
+            "prev_close": prev_close,
+            "volume":     vol,
+            "source":     "YF"
+        })
+        time.sleep(0.1)
+    return pd.DataFrame(rows)
+
+def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
+    if not FRED_AVAILABLE:
+        return pd.DataFrame()
+    rows = []
+    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    for t in tickers:
+        series = YIELD_MAP.get(t)
+        if not series:
+            continue
+        try:
+            val = web.DataReader(series, "fred").iloc[-1].values[0]
             rows.append({
-                "ticker":     t,
-                "last":       info.get("regularMarketPrice"),
-                "bid":        info.get("bid"),
-                "ask":        info.get("ask"),
-                "open":       info.get("open"),
-                "high":       info.get("dayHigh"),
-                "low":        info.get("dayLow"),
-                "prev_close": info.get("previousClose"),
-                "volume":     info.get("volume"),
-                "source":     "YF"
+                "ticker": t,
+                "last": val, "bid": np.nan, "ask": np.nan,
+                "open": np.nan, "high": np.nan, "low": np.nan,
+                "prev_close": np.nan, "volume": np.nan, "source": "FRED"
             })
         except Exception as e:
-            logging.warning("yfinance miss %s: %s", t, e)
+            logging.warning("FRED miss %s: %s", t, e)
     return pd.DataFrame(rows)
 
 # -------------------------- MAIN ---------------------------
 def main():
     tickers = load_tickers()
+    tickers = sorted(set(tickers + EXTRA_TICKERS))
+
     if not tickers:
         return
 
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S+03:00")
     df_ib  = fetch_ib_quotes(tickers)
     served  = set(df_ib["ticker"]) if not df_ib.empty else set()
-    remaining = [t for t in tickers if t not in served]
+    remaining = [t for t in tickers if t not in served and t not in YIELD_MAP]
 
     df_yf = fetch_yf_quotes(remaining) if remaining else pd.DataFrame()
 
-    df = pd.concat([df_ib, df_yf], ignore_index=True)
+    remaining_yields = [t for t in remaining if t in YIELD_MAP]
+    df_fred = fetch_fred_yields(remaining_yields) if remaining_yields else pd.DataFrame()
+
+    df = pd.concat([df_ib, df_yf, df_fred], ignore_index=True)
     df.insert(0, "timestamp", ts_now)
     df.to_csv(OUTPUT_CSV, index=False)
     logging.info("Saved %d quotes → %s", len(df), OUTPUT_CSV)

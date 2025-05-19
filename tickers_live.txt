@@ -6,6 +6,7 @@ VIX
 VVIX
 ^TNX
 ^TYX
+MOVE
 
 GC=F
 SI=F

@@ -13,16 +13,19 @@ import os, sys, time, logging
 from math import log, sqrt, erf
 from datetime import datetime
 
+# Additional import for yfinance fallback
 import numpy as np
 import pandas as pd
 from ib_insync import IB, Stock, Option, util
+import yfinance as yf
 # Symbol → (Contract class, kwargs) for non‑stock underlyings
-from ib_insync import Index, Future  # already imported IB, Stock, Option, util
+from ib_insync import Index, Future, ContFuture  # already imported IB, Stock, Option, util
 SYMBOL_MAP = {
     "VIX":  (Index,  dict(symbol="VIX",  exchange="CBOE")),
     "VVIX": (Index,  dict(symbol="VVIX", exchange="CBOE")),
     "^TNX": (Index,  dict(symbol="TNX",  exchange="CBOE")),
     "^TYX": (Index,  dict(symbol="TYX",  exchange="CBOE")),
+    # Futures entries in SYMBOL_MAP are not used for contract selection anymore
     "GC=F": (Future, dict(symbol="GC", lastTradeDateOrContractMonth="", exchange="COMEX")),
     "SI=F": (Future, dict(symbol="SI", lastTradeDateOrContractMonth="", exchange="COMEX")),
     "CL=F": (Future, dict(symbol="CL", lastTradeDateOrContractMonth="", exchange="NYMEX")),
@@ -30,10 +33,22 @@ SYMBOL_MAP = {
     "NG=F": (Future, dict(symbol="NG", lastTradeDateOrContractMonth="", exchange="NYMEX")),
 }
 
+# Map yfinance-style futures tickers to (root symbol, exchange)
+FUTURE_ROOTS = {
+    "GC=F": ("GC", "COMEX"),
+    "SI=F": ("SI", "COMEX"),
+    "CL=F": ("CL", "NYMEX"),
+    "HG=F": ("HG", "COMEX"),
+    "NG=F": ("NG", "NYMEX"),
+}
+
 # ───────────────────────── CONFIG ──────────────────────────
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
-OUTPUT_CSV = f"tech_signals_{DATE_TAG}.csv"
+# save to iCloud Drive Downloads
+OUTPUT_DIR = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"tech_signals_{DATE_TAG}.csv")
 
 HIST_DAYS       = 300          # enough for SMA200 / ADX
 SPAN_PCT        = 0.05       # ±5 % strike window
@@ -67,6 +82,35 @@ def load_tickers():
     with open(p) as f:
         return [l.strip().upper() for l in f if l.strip()]
 
+# Helper to robustly parse IBKR lastTradeDateOrContractMonth and fetch nearest active future
+def _parse_ib_month(dt_str: str) -> datetime:
+    """
+    IB future strings are either YYYYMM or YYYYMMDD.
+    Return a datetime representing the first day of that month/contract.
+    """
+    try:
+        if len(dt_str) == 6:
+            return datetime.strptime(dt_str, "%Y%m")
+        elif len(dt_str) == 8:
+            return datetime.strptime(dt_str, "%Y%m%d")
+    except ValueError:
+        pass
+    # unknown format → far past so it's considered expired
+    return datetime(1900, 1, 1)
+
+def front_future(root: str, exch: str) -> Future:
+    """Return the nearest non‑expired future contract for root/exchange."""
+    details = ib.reqContractDetails(Future(root, exchange=exch))
+    if not details:
+        raise ValueError("no contract details")
+    # sort by maturity and return first future that hasn't expired
+    for det in sorted(details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)):
+        dt = _parse_ib_month(det.contract.lastTradeDateOrContractMonth)
+        if dt > datetime.utcnow():
+            return det.contract
+    # fallback to first detail if all expired
+    return details[0].contract
+
 # ────────────────────── connect IB ─────────────────────────
 ib = IB()
 ib.connect(IB_HOST, IB_PORT, clientId=IB_CID)
@@ -86,8 +130,18 @@ if spy_bars:
 
 for tk in tickers:
     logging.info("▶ %s", tk)
-    # Choose contract type
-    if tk in SYMBOL_MAP:
+    if tk == "MOVE":
+        logging.info("Skipping option chain for MOVE index (no options).")
+        continue
+    # ----- contract selection -----
+    if tk in FUTURE_ROOTS:
+        root, exch = FUTURE_ROOTS[tk]
+        try:
+            stk = front_future(root, exch)
+        except Exception as e:
+            logging.warning("Front future lookup failed for %s: %s", tk, e)
+            continue
+    elif tk in SYMBOL_MAP:
         cls, kw = SYMBOL_MAP[tk]
         stk = cls(**kw)
     else:
@@ -100,15 +154,30 @@ for tk in tickers:
     bar_type = "TRADES"
     if isinstance(stk, Index):
         bar_type = "MIDPOINT"   # indices don’t have prints
-    bars = ib.reqHistoricalData(stk, "", f"{HIST_DAYS} D",
-                                "1 day", bar_type, useRTH=True)
-    if not bars:
-        logging.warning("No bars for %s", tk)
-        continue
-    df = util.df(bars)
+    if tk in {"VIX", "VVIX", "^TNX", "^TYX"}:
+        bar_type = "TRADES"
+
+    try:
+        bars = ib.reqHistoricalData(stk, "", f"{HIST_DAYS} D",
+                                    "1 day", bar_type, useRTH=True)
+        df = util.df(bars) if bars else pd.DataFrame()
+    except Exception as e:
+        logging.warning("IB hist error %s: %s", tk, e)
+        df = pd.DataFrame()
+
+    # If IB failed, try yfinance
     if df.empty:
-        logging.warning("Empty bars for %s", tk)
-        continue
+        try:
+            yf_df = yf.download(tk, period=f"{HIST_DAYS}d", interval="1d", progress=False)
+            yf_df.rename(columns=str.lower, inplace=True)  # align column names
+            yf_df.reset_index(inplace=True)
+            yf_df.rename(columns={"date": "date"}, inplace=True)
+            df = yf_df
+            logging.info("Used yfinance bars for %s", tk)
+        except Exception as e:
+            logging.warning("yfinance hist error %s: %s", tk, e)
+            continue
+
     df.set_index("date", inplace=True)
     c, h, l = df["close"], df["high"], df["low"]
     c_ff = c.ffill()   # forward‑fill so today’s partial bar isn’t NaN
@@ -130,102 +199,107 @@ for tk in tickers:
     adx14 = ((pdi-mdi).abs()/(pdi+mdi)*100).rolling(14).mean().iloc[-1]
     ADV30 = df["volume"].tail(30).mean()
 
-    # option chain
-    iv_now, oi_near, earn_dt = np.nan, np.nan, np.nan
-    try:
-        chains = ib.reqSecDefOptParams(tk, "", "STK", stk.conId)
-        if not chains:
-            raise Exception("No option‑chain data")
+    # -------------------------------- option chain section ------------------------------
+    # Only run option‑chain logic for *stock or ETF underlyings*.
+    # Anything with secType other than 'STK' (futures, indexes, cash, etc.)
+    # is skipped to avoid 322 / 200 errors and hangs.
+    if stk.secType != "STK":
+        iv_now = oi_near = earn_dt = np.nan
+    else:
+        try:
+            chains = ib.reqSecDefOptParams(tk, "", "STK", stk.conId)
+            if not chains:
+                raise Exception("No option‑chain data")
 
-        expirations = sorted(chains[0].expirations)
-        if not expirations:
-            raise Exception("No expirations")
+            expirations = sorted(chains[0].expirations)
+            if not expirations:
+                raise Exception("No expirations")
 
-        today_d = datetime.utcnow().date()
-        # Prefer the nearest expiry ≤ 7 days (weekly); else fallback to first Friday; else earliest
-        expiry = next((e for e in expirations
-                       if (datetime.strptime(e, "%Y%m%d").date() - today_d).days <= 7),
-                  next((e for e in expirations
-                       if datetime.strptime(e, "%Y%m%d").weekday() == 4),
-                       expirations[0]))
+            today_d = datetime.utcnow().date()
+            # Prefer the nearest expiry ≤ 7 days (weekly); else fallback to first Friday; else earliest
+            expiry = next((e for e in expirations
+                           if (datetime.strptime(e, "%Y%m%d").date() - today_d).days <= 7),
+                      next((e for e in expirations
+                           if datetime.strptime(e, "%Y%m%d").weekday() == 4),
+                           expirations[0]))
 
-        trading_classes = getattr(chains[0], "tradingClasses", [])
-        root_tc = trading_classes[0] if trading_classes else tk
+            trading_classes = getattr(chains[0], "tradingClasses", [])
+            root_tc = trading_classes[0] if trading_classes else tk
 
-        strikes_full = sorted(chains[0].strikes)
-        spot = c_ff.iloc[-1]
+            strikes_full = sorted(chains[0].strikes)
+            spot = c_ff.iloc[-1]
 
-        # Keep only strikes within ±5 % of spot and snap to 0.50 increments
-        strikes = []
-        for s in strikes_full:
-            if s <= 0 or abs(s - spot) > SPAN_PCT * spot:
-                continue
-            s_snap = round(s * 2) / 2      # nearest 0.50 increment
-            if abs(s_snap*2 - round(s_snap*2)) < 1e-4:   # ensure .00 or .50
-                strikes.append(s_snap)
-        strikes = sorted(set(strikes), key=lambda x: abs(x - spot))[:12]   # 12 closest strikes
+            # Keep only strikes within ±5 % of spot and snap to 0.50 increments
+            strikes = []
+            for s in strikes_full:
+                if s <= 0 or abs(s - spot) > SPAN_PCT * spot:
+                    continue
+                s_snap = round(s * 2) / 2      # nearest 0.50 increment
+                if abs(s_snap*2 - round(s_snap*2)) < 1e-4:   # ensure .00 or .50
+                    strikes.append(s_snap)
+            strikes = sorted(set(strikes), key=lambda x: abs(x - spot))[:12]   # 12 closest strikes
 
-        # Build contracts; add tradingClass to improve recognition
-        contracts = []
-        for s in strikes:
-            for r in ("C", "P"):
-                contracts.append(
-                    Option(tk, expiry, s, r,
-                           exchange="SMART", currency="USD", tradingClass=root_tc)
-                )
+            # Build contracts; add tradingClass to improve recognition
+            contracts = []
+            for s in strikes:
+                for r in ("C", "P"):
+                    contracts.append(
+                        Option(tk, expiry, s, r,
+                               exchange="SMART", currency="USD", tradingClass=root_tc)
+                    )
 
-        # Qualify contracts; drop the ones that fail immediately
-        qual = []
-        for con in contracts:
-            try:
-                ql = ib.qualifyContracts(con)
-                if ql and ql[0].conId:
-                    qual.append(ql[0])
-            except Exception:
-                continue
-        if not qual:
-            raise Exception("No valid contracts after qualification")
+            # Qualify contracts; drop the ones that fail immediately
+            qual = []
+            for con in contracts:
+                try:
+                    ql = ib.qualifyContracts(con)
+                    if ql and ql[0].conId:
+                        qual.append(ql[0])
+                except Exception:
+                    continue
+            if not qual:
+                raise Exception("No valid contracts after qualification")
 
-        # Request market data snapshots
-        for con in qual:
-            try:
-                # openInterest only arrives on streaming market data → snapshot must be False
-                ib.reqMktData(con, "101,106", False, False)   # 101=openInt,106=impVol
-            except Exception:
-                continue    # silently skip rejects
-        ib.sleep(2.0)   # give snapshots time to populate
-        # Cancel streaming to avoid dangling subscriptions
-        for con in qual:
-            ib.cancelMktData(con)
-        # Allow IB gateway a brief breather to clear errors
-        ib.sleep(0.5)
+            # Request market data snapshots
+            for con in qual:
+                try:
+                    # openInterest only arrives on streaming market data → snapshot must be False
+                    ib.reqMktData(con, "101,106", False, False)   # 101=openInt,106=impVol
+                except Exception:
+                    continue    # silently skip rejects
+            time.sleep(3.0)   # give snapshots time to populate
+            # Cancel streaming to avoid dangling subscriptions
+            for con in qual:
+                ib.cancelMktData(con)
+            # Allow IB gateway a brief breather to clear errors
+            time.sleep(0.5)
 
-        # collect IV & OI
-        iv_now = np.nan
-        min_diff = 1e9
-        T = max((datetime.strptime(expiry, "%Y%m%d") - datetime.utcnow()).days, 1) / 365
-        oi_sum = 0
-        for con in qual:
-            tk_data = ib.ticker(con)
-            iv_ = getattr(tk_data, "impliedVolatility", None)
-            oi_ = getattr(tk_data, "openInterest", None)
-            if iv_ is None or oi_ is None:
-                continue
-            diff = abs(con.strike - spot)
-            if con.right == "C" and diff < min_diff:
-                min_diff, iv_now = diff, iv_
-            delta = _bs_delta(spot, con.strike, T, RISK_FREE_RATE,
-                              iv_, con.right == "C")
-            if abs(delta) <= ATM_DELTA_BAND:
-                oi_sum += oi_
-        oi_near = oi_sum
+            # collect IV & OI
+            iv_now = np.nan
+            min_diff = 1e9
+            T = max((datetime.strptime(expiry, "%Y%m%d") - datetime.utcnow()).days, 1) / 365
+            oi_sum = 0
+            for con in qual:
+                tk_data = ib.ticker(con)
+                iv_ = getattr(tk_data, "impliedVolatility", None)
+                oi_ = getattr(tk_data, "openInterest", None)
+                if iv_ is None or oi_ is None:
+                    continue
+                diff = abs(con.strike - spot)
+                if con.right == "C" and diff < min_diff:
+                    min_diff, iv_now = diff, iv_
+                delta = _bs_delta(spot, con.strike, T, RISK_FREE_RATE,
+                                  iv_, con.right == "C")
+                if abs(delta) <= ATM_DELTA_BAND:
+                    oi_sum += oi_
+            oi_near = oi_sum
 
-        # earnings date  – skipped to avoid News‑feed permission errors
-        earn_dt = np.nan
+            # earnings date  – skipped to avoid News‑feed permission errors
+            earn_dt = np.nan
 
-    except Exception as e:
-        logging.warning("Chain/OI/IV fail for %s: %s", tk, e)
-        # iv_now, oi_near, earn_dt remain NaN
+        except Exception as e:
+            logging.warning("Chain/OI/IV fail for %s: %s", tk, e)
+            # iv_now, oi_near, earn_dt remain NaN
 
     # IV rank
     fn = os.path.join(DATA_DIR,f"{tk}.csv")
@@ -239,12 +313,24 @@ for tk in tickers:
     iv_rank = np.nan if iv_hist.empty or iv_hist.max()==iv_hist.min() \
               else (iv_now-iv_hist.min())/(iv_hist.max()-iv_hist.min())*100
 
-    # beta
+    # --- beta vs SPY (align on common dates) ---
     beta = np.nan
     if not spy_ret.empty:
         ret = c_ff.pct_change().dropna()
-        if not ret.empty:
-            beta = ret.cov(spy_ret) / spy_ret.var()
+        common = spy_ret.index.intersection(ret.index)
+        if len(common) > 10:            # need some overlap
+            beta = np.cov(ret.loc[common], spy_ret.loc[common])[0, 1] / spy_ret.loc[common].var()
+
+    # Fallback: pull next earnings date from yfinance if still NaN
+    if earn_dt is np.nan or pd.isna(earn_dt):
+        try:
+            cal = yf.Ticker(tk).calendar
+            if not cal.empty and 'Earnings Date' in cal.index:
+                edm = cal.loc['Earnings Date'][0]
+                if not pd.isna(edm):
+                    earn_dt = pd.to_datetime(edm).date().isoformat()
+        except Exception:
+            pass
 
     rows.append(dict(timestamp=ts_now, ticker=tk,
                      ADX=adx14, ATR=atr14,
