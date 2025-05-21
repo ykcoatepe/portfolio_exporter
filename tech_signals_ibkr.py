@@ -17,9 +17,16 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from ib_insync import IB, Stock, Option, util
+# Additional import for yfinance fallback
 import yfinance as yf
+# optional progress bar
+try:
+    from tqdm import tqdm
+    PROGRESS = True
+except ImportError:
+    PROGRESS = False
 # Symbol → (Contract class, kwargs) for non‑stock underlyings
-from ib_insync import Index, Future, ContFuture  # already imported IB, Stock, Option, util
+from ib_insync import Index, Future  # already imported IB, Stock, Option, util
 SYMBOL_MAP = {
     "VIX":  (Index,  dict(symbol="VIX",  exchange="CBOE")),
     "VVIX": (Index,  dict(symbol="VVIX", exchange="CBOE")),
@@ -128,7 +135,8 @@ if spy_bars:
     if not _df.empty:
         spy_ret = _df["close"].pct_change().dropna()
 
-for tk in tickers:
+iterable = tqdm(tickers, desc="tech signals") if PROGRESS else tickers
+for tk in iterable:
     logging.info("▶ %s", tk)
     if tk == "MOVE":
         logging.info("Skipping option chain for MOVE index (no options).")
