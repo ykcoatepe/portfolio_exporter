@@ -148,6 +148,16 @@ else:
         logging.warning("yfinance hist error SPY: %s", e)
         spy_ret = pd.Series(dtype=float)
 
+# If IB was used but spy_ret is still empty, fallback to yfinance
+if spy_ret.empty:
+    try:
+        spy_df = yf.download("SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False)
+        if not spy_df.empty:
+            spy_df.rename(columns=str.lower, inplace=True)
+            spy_ret = spy_df["close"].pct_change().dropna()
+    except Exception as e:
+        logging.warning("secondary yfinance SPY error: %s", e)
+
 if not spy_ret.empty:
     # drop timezone info so date intersections succeed
     spy_ret.index = pd.to_datetime(spy_ret.index).tz_localize(None)
@@ -268,15 +278,15 @@ for tk in iterable:
             strikes_full = sorted(chains[0].strikes)
             spot = c_ff.iloc[-1]
 
-            # Keep only strikes within ±5 % of spot and snap to 0.50 increments
+            # Keep strikes within ±5 % of spot and snap each to the nearest 0.50
             strikes = []
             for s in strikes_full:
                 if s <= 0 or abs(s - spot) > SPAN_PCT * spot:
                     continue
                 s_snap = round(s * 2) / 2      # nearest 0.50 increment
-                if abs(s_snap*2 - round(s_snap*2)) < 1e-4:   # ensure .00 or .50
+                if abs(s_snap * 2 - round(s_snap * 2)) < 1e-4:   # ensure .00 or .50
                     strikes.append(s_snap)
-            strikes = sorted(set(strikes), key=lambda x: abs(x - spot))[:12]   # 12 closest strikes
+            strikes = sorted(set(strikes), key=lambda x: abs(x - spot))[:12]  # 12 closest
 
             # Build contracts; add tradingClass to improve recognition
             contracts = []
