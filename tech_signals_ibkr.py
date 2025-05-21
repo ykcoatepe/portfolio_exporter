@@ -59,6 +59,7 @@ OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"tech_signals_{DATE_TAG}.csv")
 
 HIST_DAYS       = 300          # enough for SMA200 / ADX
 SPAN_PCT        = 0.05       # ±5 % strike window
+N_ATM_STRIKES   = 20          # number of strikes on each side of ATM to keep
 ATM_DELTA_BAND  = 0.10         # |Δ| ≤ 0.10
 RISK_FREE_RATE  = 0.01
 DATA_DIR        = "iv_history"
@@ -139,11 +140,17 @@ if USE_IB:
     if spy_bars:
         _df = util.df(spy_bars)
         if not _df.empty:
+            # Ensure we have a proper datetime index
+            if "date" in _df.columns:
+                _df.set_index("date", inplace=True)
+            _df.index = pd.to_datetime(_df.index).tz_localize(None)
             spy_ret = _df["close"].pct_change().dropna()
 else:
     try:
         spy_df = yf.download("SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False)
-        spy_ret = spy_df["Close"].pct_change().dropna() if not spy_df.empty else pd.Series(dtype=float)
+        spy_df.rename(columns=str.lower, inplace=True)
+        spy_df.index = pd.to_datetime(spy_df.index).tz_localize(None)
+        spy_ret = spy_df["close"].pct_change().dropna() if not spy_df.empty else pd.Series(dtype=float)
     except Exception as e:
         logging.warning("yfinance hist error SPY: %s", e)
         spy_ret = pd.Series(dtype=float)
@@ -275,39 +282,52 @@ for tk in iterable:
             trading_classes = getattr(chains[0], "tradingClasses", [])
             root_tc = trading_classes[0] if trading_classes else tk
 
+            # --- keep ±N_ATM_STRIKES strikes around the ATM strike ---
             strikes_full = sorted(chains[0].strikes)
             spot = c_ff.iloc[-1]
 
-            # Keep strikes within ±5 % of spot and snap each to the nearest 0.50
-            strikes = []
-            for s in strikes_full:
-                if s <= 0 or abs(s - spot) > SPAN_PCT * spot:
-                    continue
-                s_snap = round(s * 2) / 2      # nearest 0.50 increment
-                if abs(s_snap * 2 - round(s_snap * 2)) < 1e-4:   # ensure .00 or .50
-                    strikes.append(s_snap)
-            strikes = sorted(set(strikes), key=lambda x: abs(x - spot))[:12]  # 12 closest
+            # determine exchange tick‐spacing (smallest positive gap)
+            if len(strikes_full) >= 2:
+                diffs = np.diff(strikes_full)
+                tick = min(d for d in diffs if d > 0)
+            else:
+                tick = 0.5  # sensible fallback if list is tiny
 
-            # Build contracts; add tradingClass to improve recognition
+            # nearest tradable strike to spot
+            atm = round(spot / tick) * tick
+
+            # Generate symmetric ladder around ATM
+            candidate_strikes = [round(atm + i * tick, 2)
+                                 for i in range(-N_ATM_STRIKES,
+                                                N_ATM_STRIKES + 1)]
+
+            # Retain only strikes IB actually lists
+            strikes = [s for s in candidate_strikes if s in strikes_full]
+
+            if not strikes:
+                raise Exception("No candidate strikes found in chain")
+
+            # Build contracts only for strikes that actually exist *at this expiry*.
+            # We query IBKR for each candidate strike/right and keep only those that
+            # return at least one ContractDetail – this eliminates “No security definition” (Error 200).
             contracts = []
             for s in strikes:
                 for r in ("C", "P"):
-                    contracts.append(
-                        Option(tk, expiry, s, r,
-                               exchange="SMART", currency="USD", tradingClass=root_tc)
-                    )
+                    opt = Option(tk, expiry, s, r,
+                                 exchange="SMART", currency="USD", tradingClass=root_tc)
+                    try:
+                        det = ib.reqContractDetails(opt)
+                        if det and det[0].contract.conId:
+                            contracts.append(det[0].contract)
+                    except Exception:
+                        # skip strikes that IBKR does not recognise for this expiry
+                        continue
 
-            # Qualify contracts; drop the ones that fail immediately
-            qual = []
-            for con in contracts:
-                try:
-                    ql = ib.qualifyContracts(con)
-                    if ql and ql[0].conId:
-                        qual.append(ql[0])
-                except Exception:
-                    continue
-            if not qual:
-                raise Exception("No valid contracts after qualification")
+            if not contracts:
+                raise Exception("No valid option contracts at selected expiry")
+
+            # Already qualified via reqContractDetails
+            qual = contracts
 
             # Request market data snapshots
             for con in qual:
