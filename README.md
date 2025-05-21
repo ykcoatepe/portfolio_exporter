@@ -48,3 +48,7 @@ Scripts that use `ib_insync` (`historic_prices.py`, `live_feed.py` and
 running locally with API access enabled (default host `127.0.0.1` and port
 `7497`). Ensure your IBKR configuration allows API connections from your machine
 and that the account is logged in before running these scripts.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
