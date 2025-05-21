@@ -148,6 +148,10 @@ else:
         logging.warning("yfinance hist error SPY: %s", e)
         spy_ret = pd.Series(dtype=float)
 
+if not spy_ret.empty:
+    # drop timezone info so date intersections succeed
+    spy_ret.index = pd.to_datetime(spy_ret.index).tz_localize(None)
+
 iterable = tqdm(tickers, desc="tech signals") if PROGRESS else tickers
 for tk in iterable:
     logging.info("▶ %s", tk)
@@ -214,6 +218,8 @@ for tk in iterable:
         iv_now = oi_near = earn_dt = np.nan
 
     df.set_index("date", inplace=True)
+    # drop timezone info so date intersections succeed
+    df.index = pd.to_datetime(df.index).tz_localize(None)
     c, h, l = df["close"], df["high"], df["low"]
     c_ff = c.ffill()   # forward‑fill so today’s partial bar isn’t NaN
 
