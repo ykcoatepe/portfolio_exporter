@@ -197,7 +197,8 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
             ql = ib.qualifyContracts(opt)
             if not ql:
                 continue
-            md = ib.reqMktData(ql[0], "", False, True)  # regulatory snapshot
+            # Use a normal snapshot (regulatorySnapshot=False) to avoid 10170 permission errors
+            md = ib.reqMktData(ql[0], "", False, False)
             reqs[opt.localSymbol] = md
         except Exception:
             continue
