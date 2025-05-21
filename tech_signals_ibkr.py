@@ -120,20 +120,33 @@ def front_future(root: str, exch: str) -> Future:
 
 # ────────────────────── connect IB ─────────────────────────
 ib = IB()
-ib.connect(IB_HOST, IB_PORT, clientId=IB_CID)
+try:
+    ib.connect(IB_HOST, IB_PORT, clientId=IB_CID)
+    USE_IB = True
+except Exception:
+    logging.warning("IBKR Gateway not reachable – using yfinance only.")
+    USE_IB = False
 
 rows, tickers = [], load_tickers()
 ts_now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # pull SPY once for beta
-spy = Stock("SPY", "SMART", "USD")
-spy_bars = ib.reqHistoricalData(spy, "", f"{HIST_DAYS} D",
-                                "1 day", "TRADES", useRTH=True)
-spy_ret = pd.Series(dtype=float)
-if spy_bars:
-    _df = util.df(spy_bars)
-    if not _df.empty:
-        spy_ret = _df["close"].pct_change().dropna()
+if USE_IB:
+    spy = Stock("SPY", "SMART", "USD")
+    spy_bars = ib.reqHistoricalData(spy, "", f"{HIST_DAYS} D",
+                                    "1 day", "TRADES", useRTH=True)
+    spy_ret = pd.Series(dtype=float)
+    if spy_bars:
+        _df = util.df(spy_bars)
+        if not _df.empty:
+            spy_ret = _df["close"].pct_change().dropna()
+else:
+    try:
+        spy_df = yf.download("SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False)
+        spy_ret = spy_df["Close"].pct_change().dropna() if not spy_df.empty else pd.Series(dtype=float)
+    except Exception as e:
+        logging.warning("yfinance hist error SPY: %s", e)
+        spy_ret = pd.Series(dtype=float)
 
 iterable = tqdm(tickers, desc="tech signals") if PROGRESS else tickers
 for tk in iterable:
@@ -141,50 +154,64 @@ for tk in iterable:
     if tk == "MOVE":
         logging.info("Skipping option chain for MOVE index (no options).")
         continue
-    # ----- contract selection -----
-    if tk in FUTURE_ROOTS:
-        root, exch = FUTURE_ROOTS[tk]
-        try:
-            stk = front_future(root, exch)
-        except Exception as e:
-            logging.warning("Front future lookup failed for %s: %s", tk, e)
+
+    if USE_IB:
+        # ----- contract selection -----
+        if tk in FUTURE_ROOTS:
+            root, exch = FUTURE_ROOTS[tk]
+            try:
+                stk = front_future(root, exch)
+            except Exception as e:
+                logging.warning("Front future lookup failed for %s: %s", tk, e)
+                continue
+        elif tk in SYMBOL_MAP:
+            cls, kw = SYMBOL_MAP[tk]
+            stk = cls(**kw)
+        else:
+            stk = Stock(tk, "SMART", "USD")
+        ib.qualifyContracts(stk)
+        if not stk.conId:
+            logging.warning("Could not qualify %s – skipping", tk)
             continue
-    elif tk in SYMBOL_MAP:
-        cls, kw = SYMBOL_MAP[tk]
-        stk = cls(**kw)
-    else:
-        stk = Stock(tk, "SMART", "USD")
-    ib.qualifyContracts(stk)
-    if not stk.conId:
-        logging.warning("Could not qualify %s – skipping", tk)
-        continue
 
-    bar_type = "TRADES"
-    if isinstance(stk, Index):
-        bar_type = "MIDPOINT"   # indices don’t have prints
-    if tk in {"VIX", "VVIX", "^TNX", "^TYX"}:
         bar_type = "TRADES"
+        if isinstance(stk, Index):
+            bar_type = "MIDPOINT"   # indices don’t have prints
+        if tk in {"VIX", "VVIX", "^TNX", "^TYX"}:
+            bar_type = "TRADES"
 
-    try:
-        bars = ib.reqHistoricalData(stk, "", f"{HIST_DAYS} D",
-                                    "1 day", bar_type, useRTH=True)
-        df = util.df(bars) if bars else pd.DataFrame()
-    except Exception as e:
-        logging.warning("IB hist error %s: %s", tk, e)
-        df = pd.DataFrame()
+        try:
+            bars = ib.reqHistoricalData(stk, "", f"{HIST_DAYS} D",
+                                        "1 day", bar_type, useRTH=True)
+            df = util.df(bars) if bars else pd.DataFrame()
+        except Exception as e:
+            logging.warning("IB hist error %s: %s", tk, e)
+            df = pd.DataFrame()
 
-    # If IB failed, try yfinance
-    if df.empty:
+        # If IB failed, try yfinance
+        if df.empty:
+            try:
+                yf_df = yf.download(tk, period=f"{HIST_DAYS}d", interval="1d", progress=False)
+                yf_df.rename(columns=str.lower, inplace=True)  # align column names
+                yf_df.reset_index(inplace=True)
+                yf_df.rename(columns={"date": "date"}, inplace=True)
+                df = yf_df
+                logging.info("Used yfinance bars for %s", tk)
+            except Exception as e:
+                logging.warning("yfinance hist error %s: %s", tk, e)
+                continue
+    else:
         try:
             yf_df = yf.download(tk, period=f"{HIST_DAYS}d", interval="1d", progress=False)
-            yf_df.rename(columns=str.lower, inplace=True)  # align column names
+            yf_df.rename(columns=str.lower, inplace=True)
             yf_df.reset_index(inplace=True)
             yf_df.rename(columns={"date": "date"}, inplace=True)
             df = yf_df
-            logging.info("Used yfinance bars for %s", tk)
         except Exception as e:
             logging.warning("yfinance hist error %s: %s", tk, e)
             continue
+        stk = None
+        iv_now = oi_near = earn_dt = np.nan
 
     df.set_index("date", inplace=True)
     c, h, l = df["close"], df["high"], df["low"]
@@ -211,9 +238,7 @@ for tk in iterable:
     # Only run option‑chain logic for *stock or ETF underlyings*.
     # Anything with secType other than 'STK' (futures, indexes, cash, etc.)
     # is skipped to avoid 322 / 200 errors and hangs.
-    if stk.secType != "STK":
-        iv_now = oi_near = earn_dt = np.nan
-    else:
+    if USE_IB and stk is not None and stk.secType == "STK":
         try:
             chains = ib.reqSecDefOptParams(tk, "", "STK", stk.conId)
             if not chains:
@@ -308,6 +333,8 @@ for tk in iterable:
         except Exception as e:
             logging.warning("Chain/OI/IV fail for %s: %s", tk, e)
             # iv_now, oi_near, earn_dt remain NaN
+    else:
+        iv_now = oi_near = earn_dt = np.nan
 
     # IV rank
     fn = os.path.join(DATA_DIR,f"{tk}.csv")
@@ -351,4 +378,5 @@ for tk in iterable:
 
 pd.DataFrame(rows).to_csv(OUTPUT_CSV,index=False)
 logging.info("Saved %d rows → %s", len(rows), OUTPUT_CSV)
-ib.disconnect()
+if USE_IB:
+    ib.disconnect()
