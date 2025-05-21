@@ -26,7 +26,7 @@ try:
 except ImportError:
     PROGRESS = False
 # Symbol → (Contract class, kwargs) for non‑stock underlyings
-from ib_insync import Index, Future, ContFuture  # already imported IB, Stock, Option, util
+from ib_insync import Index, Future  # already imported IB, Stock, Option, util
 SYMBOL_MAP = {
     "VIX":  (Index,  dict(symbol="VIX",  exchange="CBOE")),
     "VVIX": (Index,  dict(symbol="VVIX", exchange="CBOE")),
