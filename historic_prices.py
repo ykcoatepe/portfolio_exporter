@@ -1,4 +1,10 @@
 import os, sys, pandas as pd, yfinance as yf
+# optional progress bar
+try:
+    from tqdm import tqdm
+    PROGRESS = True
+except ImportError:
+    PROGRESS = False
 from datetime import datetime
 
 # ---------- IBKR optional integration ----------
@@ -73,7 +79,8 @@ def fetch_and_prepare_data(tickers):
         return pd.DataFrame(columns=columns)
     dfs = []
     if isinstance(data.columns, pd.MultiIndex):
-        for ticker in tickers:
+        iterable = tqdm(tickers, desc="split") if PROGRESS else tickers
+        for ticker in iterable:
             if ticker in data:
                 df_t = data[ticker].reset_index()
                 df_t["Ticker"] = ticker
