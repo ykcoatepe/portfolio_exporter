@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 import pandas as pd
 
+
 import historic_prices as hp
 
 

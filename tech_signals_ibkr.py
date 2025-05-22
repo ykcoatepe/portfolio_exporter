@@ -336,12 +336,12 @@ for tk in iterable:
                     ib.reqMktData(con, "101,106", False, False)   # 101=openInt,106=impVol
                 except Exception:
                     continue    # silently skip rejects
-            time.sleep(3.0)   # give snapshots time to populate
+            ib.sleep(3.0)     # give snapshots time to populate while allowing the event loop to run
             # Cancel streaming to avoid dangling subscriptions
             for con in qual:
                 ib.cancelMktData(con)
             # Allow IB gateway a brief breather to clear errors
-            time.sleep(0.5)
+            ib.sleep(0.5)
 
             # collect IV & OI
             iv_now = np.nan
@@ -444,7 +444,7 @@ for tk in iterable:
                      beta_SPY=beta, ADV30=ADV30,
                      next_earnings=earn_dt, OI_near_ATM=oi_near))
 
-    time.sleep(0.25)
+    ib.sleep(0.25)
 
 pd.DataFrame(rows).to_csv(OUTPUT_CSV,index=False)
 logging.info("Saved %d rows → %s", len(rows), OUTPUT_CSV)
