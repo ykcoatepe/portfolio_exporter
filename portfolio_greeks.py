@@ -28,7 +28,50 @@ from math import erf, log, sqrt
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-import pandas as pd
+import pandas as pd   # keep only one import if pandas already imported
+
+# ─────────────────────────  draw‑down helpers  ──────────────────────────
+def _running_drawdown(path: pd.Series) -> pd.Series:
+    """
+    Running percentage draw‑down from the cumulative peak of the series.
+    """
+    cum_max = path.cummax()
+    return (cum_max - path) / cum_max
+
+
+def eddr(path: pd.Series,
+         horizon_days: int = 252,
+         alpha: float = 0.99) -> tuple[float, float]:
+    """
+    Extreme Downside Draw‑down Risk (DaR & CDaR).
+
+    Parameters
+    ----------
+    path : pd.Series
+        Daily net‑liq / NAV indexed by date.
+    horizon_days : int
+        Look‑back window (rolling) for maximum draw‑down.
+    alpha : float
+        Tail quantile (e.g. 0.99 → 99‑percent extreme).
+
+    Returns
+    -------
+    tuple (dar, cdar)
+        dar  – DaR₍α₎
+        cdar – Conditional DaR, mean draw‑down beyond DaR.
+    """
+    window_dd = (
+        path
+        .rolling(window=horizon_days, min_periods=horizon_days)
+        .apply(lambda w: _running_drawdown(w).max(), raw=False)
+        .dropna()
+    )
+    if window_dd.empty:
+        return np.nan, np.nan
+
+    dar_val  = float(np.quantile(window_dd, alpha))
+    cdar_val = float(window_dd[window_dd >= dar_val].mean())
+    return dar_val, cdar_val
 from ib_insync import (Future, IB, Index, Option, Position, Stock, Ticker,
                        util)
 from ib_insync.contract import Contract
@@ -366,11 +409,25 @@ def main() -> None:
     totals = df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]].sum().to_frame().T
     totals.insert(0, "timestamp", ts_iso)
 
+    # Example net_liq/NAV series – in your actual exporter, replace this with real NAV series
+    # nav_series = df['net_liq'].astype(float)
+    # For demonstration, we'll use delta_exposure as a dummy series if net_liq doesn't exist
+    if "net_liq" in df.columns:
+        nav_series = df["net_liq"].astype(float)
+    else:
+        nav_series = df["delta_exposure"].astype(float)
+    dar_99, cdar_99 = eddr(nav_series, horizon_days=252, alpha=0.99)
+    logger.info(f"EDDR computed – DaR₉₉: {dar_99:.4%},  CDaR₉₉: {cdar_99:.4%}")
+
     date_tag = ts_utc.strftime("%Y%m%d")
     fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
     fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
 
     df.to_csv(fn_pos, index=False, float_format="%.6f")
+    # Add EDDR to summary/totals output
+    totals["DaR_99"] = dar_99
+    totals["CDaR_99"] = cdar_99
+
     totals.to_csv(fn_tot, index=False, float_format="%.2f")
     logger.info(f"Saved {len(df)} rows  → {fn_pos}")
     logger.info(f"Saved totals         → {fn_tot}")
