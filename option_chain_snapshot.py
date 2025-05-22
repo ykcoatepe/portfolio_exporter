@@ -25,7 +25,7 @@ from typing import List, Sequence
 
 import numpy as np
 import pandas as pd
-from ib_insync import IB, Stock, Option, util
+from ib_insync import IB, Stock, Option
 
 # ───────────────────────── CONFIG ──────────────────────────
 OUTPUT_DIR = (
@@ -77,6 +77,15 @@ def choose_expiry(expirations: Sequence[str]) -> str:
     return expirations[0]
 
 
+def _wait_for_snapshots(ib: IB, snapshots: list[tuple]) -> None:
+    """Wait until snapshot tickers have data or timeout."""
+    deadline = time.time() + 10.0
+    while time.time() < deadline:
+        if all(tk.time is not None for _, tk in snapshots):
+            break
+        ib.sleep(0.2)
+
+
 def snapshot_chain(ib: IB, symbol: str) -> pd.DataFrame:
     """Return a DataFrame with the option-chain snapshot for one underlying."""
     logger.info("Snapshot %s", symbol)
@@ -114,10 +123,14 @@ def snapshot_chain(ib: IB, symbol: str) -> pd.DataFrame:
     # Request regulatory snapshots (one shot – non-streaming)
     snapshots = []
     for c in contracts:
-        snapshot = ib.reqMktData(c, "101,106,100,101,104",  # OI=101, IV=106, greeks=100-104
-                                 snapshot=True, regulatorySnapshot=True)
+        snapshot = ib.reqMktData(
+            c,
+            "100,101,104,106",  # OI=101, IV=106, greeks=100-104
+            snapshot=True,
+            regulatorySnapshot=True,
+        )
         snapshots.append((c, snapshot))
-    ib.sleep(2.5)  # wait for all snapshots
+    _wait_for_snapshots(ib, snapshots)
     # Cancel just in case (should be auto-cancelled for snapshots)
     for _, snap in snapshots:
         ib.cancelMktData(snap.contract)
