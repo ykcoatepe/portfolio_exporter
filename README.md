@@ -24,6 +24,7 @@ pip install -r requirements.txt
 ```
 
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.
+`pandas_datareader` is needed for downloading FRED data in `live_feed.py`.
 
 ## Usage Examples
 
