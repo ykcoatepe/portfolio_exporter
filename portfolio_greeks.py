@@ -170,10 +170,11 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
         if not c.exchange:
             c.exchange = "SMART"
 
-        # 100 = open interest, 106 = option implied‑volatility
+        # 100=volume, 101=open‑interest, 104/105=model greeks, 106=option IV
         tk = ib.reqMktData(
             c,
-            genericTickList="100,106",
+            # 100=volume, 101=open‑interest, 104/105=model greeks, 106=option IV
+            genericTickList="100,101,104,106",
             snapshot=False,
             regulatorySnapshot=False
         )
@@ -308,7 +309,26 @@ def main() -> None:
         if all(math.isnan(v) for v in greeks.values()):
             continue
 
-        option_price = tk.marketPrice or tk.last or tk.close
+        # ---- robust open‑interest ----
+        open_int = getattr(tk, "openInterest", np.nan)
+        if open_int is None or (isinstance(open_int, float) and math.isnan(open_int)):
+            try:
+                snap = ib.reqMktData(c, "101", snapshot=True, regulatorySnapshot=False)
+                ib.sleep(0.5)
+                open_int = getattr(snap, "openInterest", np.nan)
+                if snap.contract:
+                    ib.cancelMktData(snap.contract)
+            except Exception as e:
+                logger.debug(f"OI snapshot failed for {c.localSymbol}: {e}")
+        if open_int is None:
+            open_int = np.nan
+
+        # ---- robust option price (mid ▸ last ▸ close) ----
+        option_price = tk.marketPrice()                # call as method
+        if option_price is None or math.isnan(option_price):
+            option_price = tk.last
+        if option_price is None or math.isnan(option_price):
+            option_price = tk.close
 
         rows.append(
             {
@@ -322,7 +342,7 @@ def main() -> None:
                 "multiplier": mult,
                 "option_price": option_price,
                 "underlying_price": und_price,
-                "open_interest": getattr(tk, "openInterest", np.nan),
+                "open_interest": open_int,
                 "iv": iv_from_greeks if not math.isnan(iv_from_greeks) else tk.impliedVolatility,
                 **greeks,
                 "delta_exposure": greeks["delta"] * qty * mult,
