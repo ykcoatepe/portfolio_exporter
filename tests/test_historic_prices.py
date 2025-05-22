@@ -59,7 +59,6 @@ OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"tech_signals_{DATE_TAG}.csv")
 
 HIST_DAYS       = 300          # enough for SMA200 / ADX
 SPAN_PCT        = 0.05       # ±5 % strike window
-N_ATM_STRIKES   = 20          # number of strikes on each side of ATM to keep
 ATM_DELTA_BAND  = 0.10         # |Δ| ≤ 0.10
 RISK_FREE_RATE  = 0.01
 DATA_DIR        = "iv_history"
@@ -140,34 +139,14 @@ if USE_IB:
     if spy_bars:
         _df = util.df(spy_bars)
         if not _df.empty:
-            # Ensure we have a proper datetime index
-            if "date" in _df.columns:
-                _df.set_index("date", inplace=True)
-            _df.index = pd.to_datetime(_df.index).tz_localize(None)
             spy_ret = _df["close"].pct_change().dropna()
 else:
     try:
         spy_df = yf.download("SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False)
-        spy_df.rename(columns=str.lower, inplace=True)
-        spy_df.index = pd.to_datetime(spy_df.index).tz_localize(None)
-        spy_ret = spy_df["close"].pct_change().dropna() if not spy_df.empty else pd.Series(dtype=float)
+        spy_ret = spy_df["Close"].pct_change().dropna() if not spy_df.empty else pd.Series(dtype=float)
     except Exception as e:
         logging.warning("yfinance hist error SPY: %s", e)
         spy_ret = pd.Series(dtype=float)
-
-# If IB was used but spy_ret is still empty, fallback to yfinance
-if spy_ret.empty:
-    try:
-        spy_df = yf.download("SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False)
-        if not spy_df.empty:
-            spy_df.rename(columns=str.lower, inplace=True)
-            spy_ret = spy_df["close"].pct_change().dropna()
-    except Exception as e:
-        logging.warning("secondary yfinance SPY error: %s", e)
-
-if not spy_ret.empty:
-    # drop timezone info so date intersections succeed
-    spy_ret.index = pd.to_datetime(spy_ret.index).tz_localize(None)
 
 iterable = tqdm(tickers, desc="tech signals") if PROGRESS else tickers
 for tk in iterable:
@@ -235,8 +214,6 @@ for tk in iterable:
         iv_now = oi_near = earn_dt = np.nan
 
     df.set_index("date", inplace=True)
-    # drop timezone info so date intersections succeed
-    df.index = pd.to_datetime(df.index).tz_localize(None)
     c, h, l = df["close"], df["high"], df["low"]
     c_ff = c.ffill()   # forward‑fill so today’s partial bar isn’t NaN
 
@@ -282,52 +259,39 @@ for tk in iterable:
             trading_classes = getattr(chains[0], "tradingClasses", [])
             root_tc = trading_classes[0] if trading_classes else tk
 
-            # --- keep ±N_ATM_STRIKES strikes around the ATM strike ---
             strikes_full = sorted(chains[0].strikes)
             spot = c_ff.iloc[-1]
 
-            # determine exchange tick‐spacing (smallest positive gap)
-            if len(strikes_full) >= 2:
-                diffs = np.diff(strikes_full)
-                tick = min(d for d in diffs if d > 0)
-            else:
-                tick = 0.5  # sensible fallback if list is tiny
+            # Keep only strikes within ±5 % of spot and snap to 0.50 increments
+            strikes = []
+            for s in strikes_full:
+                if s <= 0 or abs(s - spot) > SPAN_PCT * spot:
+                    continue
+                s_snap = round(s * 2) / 2      # nearest 0.50 increment
+                if abs(s_snap*2 - round(s_snap*2)) < 1e-4:   # ensure .00 or .50
+                    strikes.append(s_snap)
+            strikes = sorted(set(strikes), key=lambda x: abs(x - spot))[:12]   # 12 closest strikes
 
-            # nearest tradable strike to spot
-            atm = round(spot / tick) * tick
-
-            # Generate symmetric ladder around ATM
-            candidate_strikes = [round(atm + i * tick, 2)
-                                 for i in range(-N_ATM_STRIKES,
-                                                N_ATM_STRIKES + 1)]
-
-            # Retain only strikes IB actually lists
-            strikes = [s for s in candidate_strikes if s in strikes_full]
-
-            if not strikes:
-                raise Exception("No candidate strikes found in chain")
-
-            # Build contracts only for strikes that actually exist *at this expiry*.
-            # We query IBKR for each candidate strike/right and keep only those that
-            # return at least one ContractDetail – this eliminates “No security definition” (Error 200).
+            # Build contracts; add tradingClass to improve recognition
             contracts = []
             for s in strikes:
                 for r in ("C", "P"):
-                    opt = Option(tk, expiry, s, r,
-                                 exchange="SMART", currency="USD", tradingClass=root_tc)
-                    try:
-                        det = ib.reqContractDetails(opt)
-                        if det and det[0].contract.conId:
-                            contracts.append(det[0].contract)
-                    except Exception:
-                        # skip strikes that IBKR does not recognise for this expiry
-                        continue
+                    contracts.append(
+                        Option(tk, expiry, s, r,
+                               exchange="SMART", currency="USD", tradingClass=root_tc)
+                    )
 
-            if not contracts:
-                raise Exception("No valid option contracts at selected expiry")
-
-            # Already qualified via reqContractDetails
-            qual = contracts
+            # Qualify contracts; drop the ones that fail immediately
+            qual = []
+            for con in contracts:
+                try:
+                    ql = ib.qualifyContracts(con)
+                    if ql and ql[0].conId:
+                        qual.append(ql[0])
+                except Exception:
+                    continue
+            if not qual:
+                raise Exception("No valid contracts after qualification")
 
             # Request market data snapshots
             for con in qual:
@@ -369,34 +333,6 @@ for tk in iterable:
         except Exception as e:
             logging.warning("Chain/OI/IV fail for %s: %s", tk, e)
             # iv_now, oi_near, earn_dt remain NaN
-
-        # ---------- yfinance fallback for OI / IV ----------
-        if (np.isnan(oi_near) or oi_near == 0 or np.isnan(iv_now)) and stk is not None:
-            try:
-                yft = yf.Ticker(tk)
-                # pick the expiry that is nearest in time
-                if yft.options:
-                    yf_expiry = min(
-                        yft.options,
-                        key=lambda d: abs((pd.to_datetime(d) - pd.to_datetime('today')).days)
-                    )
-                    oc = yft.option_chain(yf_expiry)
-
-                    spot = c_ff.iloc[-1]
-
-                    def _near(df):
-                        return df.loc[(df["strike"] - spot).abs() / spot <= SPAN_PCT]
-
-                    calls, puts = _near(oc.calls), _near(oc.puts)
-
-                    if (np.isnan(oi_near) or oi_near == 0) and (not calls.empty or not puts.empty):
-                        oi_near = calls["openInterest"].fillna(0).sum() + puts["openInterest"].fillna(0).sum()
-
-                    # If IV is still missing, grab the ATM call IV from yfinance
-                    if np.isnan(iv_now) and not calls.empty:
-                        iv_now = calls.loc[(calls["strike"] - spot).abs().idxmin(), "impliedVolatility"]
-            except Exception as e:
-                logging.debug("yfinance option fallback error for %s: %s", tk, e)
     else:
         iv_now = oi_near = earn_dt = np.nan
 
@@ -423,19 +359,13 @@ for tk in iterable:
     # Fallback: pull next earnings date from yfinance if still NaN
     if earn_dt is np.nan or pd.isna(earn_dt):
         try:
-            ed_df = yf.Ticker(tk).get_earnings_dates(limit=1)
-            if not ed_df.empty:
-                earn_dt = pd.to_datetime(ed_df["Earnings Date"].iloc[0]).date().isoformat()
+            cal = yf.Ticker(tk).calendar
+            if not cal.empty and 'Earnings Date' in cal.index:
+                edm = cal.loc['Earnings Date'][0]
+                if not pd.isna(edm):
+                    earn_dt = pd.to_datetime(edm).date().isoformat()
         except Exception:
-            # final fallback: use calendar attribute if available
-            try:
-                cal = yf.Ticker(tk).calendar
-                if not cal.empty and "Earnings Date" in cal.index:
-                    edm = cal.loc["Earnings Date"][0]
-                    if not pd.isna(edm):
-                        earn_dt = pd.to_datetime(edm).date().isoformat()
-            except Exception:
-                pass
+            pass
 
     rows.append(dict(timestamp=ts_now, ticker=tk,
                      ADX=adx14, ATR=atr14,
