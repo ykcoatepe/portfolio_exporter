@@ -20,6 +20,12 @@ import os
 import sys
 import time
 import logging
+# optional progress bar
+try:
+    from tqdm import tqdm
+    PROGRESS = True
+except ImportError:
+    PROGRESS = False
 from datetime import datetime, timezone
 from typing import List, Sequence
 
@@ -63,6 +69,7 @@ def get_portfolio_tickers(ib: IB) -> List[str]:
     return sorted(tickers)
 
 
+
 def choose_expiry(expirations: Sequence[str]) -> str:
     """Pick the best expiry: weekly ≤7 days, else first Friday, else earliest."""
     today = datetime.utcnow().date()
@@ -77,16 +84,65 @@ def choose_expiry(expirations: Sequence[str]) -> str:
     return expirations[0]
 
 
+# ────────────── Expiry picker with user hint ──────────────
+def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
+    """
+    If *hint* is supplied try to pick an expiry that matches it:
+    • 8‑digit YYYYMMDD -> exact match
+    • 6‑digit YYYYMM   -> first expiry that starts with that prefix
+    • Month name/abbr  -> first expiry whose month matches (case‑insensitive)
+    Falls back to choose_expiry() if nothing matches.
+    """
+    if not hint:
+        return choose_expiry(expirations)
+
+    hint = hint.strip()
+    if not hint:
+        return choose_expiry(expirations)
+
+    # exact YYYYMMDD
+    if len(hint) == 8 and hint.isdigit() and hint in expirations:
+        return hint
+
+    # YYYYMM prefix
+    if len(hint) == 6 and hint.isdigit():
+        for e in expirations:
+            if e.startswith(hint):
+                return e
+
+    # month name
+    try:
+        month_idx = datetime.strptime(hint[:3], "%b").month  # Jan, Feb, …
+    except ValueError:
+        month_idx = None
+
+    if month_idx:
+        for e in expirations:
+            if int(e[4:6]) == month_idx:
+                return e
+
+    # nothing matched – use default logic
+    return choose_expiry(expirations)
+
+
 def _wait_for_snapshots(ib: IB, snapshots: list[tuple]) -> None:
-    """Wait until snapshot tickers have data or timeout."""
-    deadline = time.time() + 10.0
+    """Wait up to ~8 s until all snapshots have non‑None time stamp."""
+    deadline = time.time() + 8.0
     while time.time() < deadline:
-        if all(tk.time is not None for _, tk in snapshots):
+        if all(getattr(tk, "time", None) for _, tk in snapshots):
             break
-        ib.sleep(0.2)
+        time.sleep(0.25)
 
 
-def snapshot_chain(ib: IB, symbol: str) -> pd.DataFrame:
+def _g(tk, field: str):
+    """Return greek/IV attribute if present – else NaN."""
+    if hasattr(tk, field):
+        return getattr(tk, field)
+    mg = getattr(tk, "modelGreeks", None)
+    return getattr(mg, field, np.nan) if mg else np.nan
+
+
+def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.DataFrame:
     """Return a DataFrame with the option-chain snapshot for one underlying."""
     logger.info("Snapshot %s", symbol)
 
@@ -100,16 +156,59 @@ def snapshot_chain(ib: IB, symbol: str) -> pd.DataFrame:
         raise RuntimeError("No option-chain data")
 
     chain = chains[0]
-    expiry = choose_expiry(sorted(chain.expirations))
+    expiry = pick_expiry_with_hint(sorted(chain.expirations), expiry_hint)
+
+    # Determine the correct trading class field (plural, singular, or fallback)
+    if hasattr(chain, "tradingClasses") and chain.tradingClasses:
+        root_tc = chain.tradingClasses[0]
+    elif hasattr(chain, "tradingClass") and getattr(chain, "tradingClass"):
+        root_tc = chain.tradingClass
+    else:
+        root_tc = symbol  # fallback to the underlying ticker
+
+    logger.debug(f"Using trading class '{root_tc}' for {symbol} options on expiry {expiry}.")
+
+    # ── obtain spot price & trim strike list if chain is huge ──────────────────
+    spot = None
+    try:
+        spot_tk = ib.reqMktData(stk, "", True, False)  # snapshot
+        ib.sleep(0.5)  # brief wait; util.waitUntilComplete would be faster intraday
+        spot = spot_tk.marketPrice() or spot_tk.last or spot_tk.close
+    finally:
+        if spot_tk.contract:
+            ib.cancelMktData(spot_tk.contract)
+
+    # ── build strike list: ±20 strikes around spot ───────────────────────────
+    strikes_all = sorted(chain.strikes)
+    if spot:
+        # find index of strike closest to the underlying price
+        try:
+            spot_idx = min(range(len(strikes_all)),
+                           key=lambda i: abs(strikes_all[i] - spot))
+        except ValueError:      # strikes_all empty safeguard
+            spot_idx = 0
+        lower = max(0, spot_idx - 20)
+        upper = min(len(strikes_all), spot_idx + 21)   # upper bound is exclusive
+        strikes = strikes_all[lower:upper]
+    else:
+        # fallback: no underlying price – keep full chain
+        strikes = strikes_all
+
+    # ── sanity‑check strikes against what IB really lists for this expiry ──
+    valid_strikes_set = set(chain.strikes)
+    strikes = [s for s in strikes if s in valid_strikes_set]
+    if len(strikes) < len(strikes_all):
+        logger.debug("Filtered to %d valid strikes (from %d) to avoid 200‑errors",
+                     len(strikes), len(strikes_all))
 
     # Build every C & P strike at that expiry,
     # keeping only contracts that IBKR recognises.
     contracts = []
-    for strike in chain.strikes:
+    for strike in strikes:
         for right in ("C", "P"):
             opt = Option(symbol, expiry, strike, right,
                          exchange="SMART", currency="USD",
-                         tradingClass=chain.tradingClasses[0])
+                         tradingClass=root_tc)
             try:
                 det = ib.reqContractDetails(opt)
                 if det and det[0].contract.conId:
@@ -120,18 +219,18 @@ def snapshot_chain(ib: IB, symbol: str) -> pd.DataFrame:
     if not contracts:
         raise RuntimeError("No valid option contracts found")
 
-    # Request regulatory snapshots (one shot – non-streaming)
+    # Request streaming market data (required for generic-tick 101)
     snapshots = []
     for c in contracts:
         snapshot = ib.reqMktData(
             c,
-            "100,101,104,106",  # OI=101, IV=106, greeks=100-104
-            snapshot=True,
-            regulatorySnapshot=True,
+            "101,104,106",     # OI, modelGreeks, IV
+            snapshot=False,    # streaming required for generic‑tick 101
+            regulatorySnapshot=False,
         )
         snapshots.append((c, snapshot))
     _wait_for_snapshots(ib, snapshots)
-    # Cancel just in case (should be auto-cancelled for snapshots)
+    # Cancel just in case
     for _, snap in snapshots:
         ib.cancelMktData(snap.contract)
 
@@ -147,12 +246,12 @@ def snapshot_chain(ib: IB, symbol: str) -> pd.DataFrame:
             "bid": tk.bid,
             "ask": tk.ask,
             "mid": np.nan if any(np.isnan([tk.bid, tk.ask])) else (tk.bid + tk.ask) / 2,
-            "iv": tk.impliedVolatility,
-            "delta": tk.delta,
-            "gamma": tk.gamma,
-            "vega": tk.vega,
-            "theta": tk.theta,
-            "open_interest": tk.openInterest,
+            "iv": _g(tk, "impliedVolatility"),
+            "delta": _g(tk, "delta"),
+            "gamma": _g(tk, "gamma"),
+            "vega": _g(tk, "vega"),
+            "theta": _g(tk, "theta"),
+            "open_interest": _g(tk, "openInterest"),
         })
 
     df = pd.DataFrame(rows).sort_values(["right", "strike"]).reset_index(drop=True)
@@ -169,7 +268,8 @@ def main():
     # ── connect ────────────────────────────────────────────
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=5)
+        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=10)  # Increased timeout
+        ib.reqMarketDataType(4)          # fall‑back to delayed quotes after hours
     except Exception as exc:
         logger.error("IBKR connection failed: %s", exc)
         sys.exit(1)
@@ -193,18 +293,43 @@ def main():
         sys.exit(1)
 
     logger.info("Symbols: %s", ", ".join(symbols))
+    iterable = tqdm(symbols, desc="Option snapshots") if PROGRESS else symbols
+
+    # ── expiry hint logic ───────────────────────────────
+    portfolio_mode = not args.symbols and not raw
+    expiry_hint = None
+    if not portfolio_mode:
+        expiry_hint = input("Desired option expiry (YYYYMMDD / YYYYMM / month name), "
+                            "leave empty for automatic: ").strip()
+        if not expiry_hint:
+            expiry_hint = None
 
     # ── fetch and write CSVs ───────────────────────────────
     date_tag = datetime.utcnow().strftime("%Y%m%d")
-    for sym in symbols:
+    combined = []            # collect dfs when portfolio_mode
+    for sym in iterable:
         try:
-            df = snapshot_chain(ib, sym)
-            out_path = os.path.join(OUTPUT_DIR,
-                                    f"option_chain_{sym}_{date_tag}.csv")
-            df.to_csv(out_path, index=False, quoting=csv.QUOTE_MINIMAL)
-            logger.info("Saved %s (%d rows)", out_path, len(df))
+            df = snapshot_chain(ib, sym, expiry_hint)
+            if df.empty:
+                logger.warning("%s – no data", sym)
+                continue
+            if portfolio_mode:
+                combined.append(df)
+            else:
+                out_path = os.path.join(OUTPUT_DIR,
+                                        f"option_chain_{sym}_{date_tag}.csv")
+                df.to_csv(out_path, index=False, quoting=csv.QUOTE_MINIMAL)
+                logger.info("Saved %s (%d rows)", out_path, len(df))
         except Exception as e:
             logger.warning("%s – skipped: %s", sym, e)
+
+    if portfolio_mode and combined:
+        df_all = pd.concat(combined, ignore_index=True)
+        out_path = os.path.join(OUTPUT_DIR,
+                                f"option_chain_portfolio_{date_tag}.csv")
+        df_all.to_csv(out_path, index=False, quoting=csv.QUOTE_MINIMAL)
+        logger.info("Saved consolidated portfolio snapshot → %s (%d rows)",
+                    out_path, len(df_all))
 
     ib.disconnect()
 
