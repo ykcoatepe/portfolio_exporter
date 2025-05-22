@@ -369,6 +369,34 @@ for tk in iterable:
         except Exception as e:
             logging.warning("Chain/OI/IV fail for %s: %s", tk, e)
             # iv_now, oi_near, earn_dt remain NaN
+
+        # ---------- yfinance fallback for OI / IV ----------
+        if (np.isnan(oi_near) or oi_near == 0 or np.isnan(iv_now)) and stk is not None:
+            try:
+                yft = yf.Ticker(tk)
+                # pick the expiry that is nearest in time
+                if yft.options:
+                    yf_expiry = min(
+                        yft.options,
+                        key=lambda d: abs((pd.to_datetime(d) - pd.to_datetime('today')).days)
+                    )
+                    oc = yft.option_chain(yf_expiry)
+
+                    spot = c_ff.iloc[-1]
+
+                    def _near(df):
+                        return df.loc[(df["strike"] - spot).abs() / spot <= SPAN_PCT]
+
+                    calls, puts = _near(oc.calls), _near(oc.puts)
+
+                    if (np.isnan(oi_near) or oi_near == 0) and (not calls.empty or not puts.empty):
+                        oi_near = calls["openInterest"].fillna(0).sum() + puts["openInterest"].fillna(0).sum()
+
+                    # If IV is still missing, grab the ATM call IV from yfinance
+                    if np.isnan(iv_now) and not calls.empty:
+                        iv_now = calls.loc[(calls["strike"] - spot).abs().idxmin(), "impliedVolatility"]
+            except Exception as e:
+                logging.debug("yfinance option fallback error for %s: %s", tk, e)
     else:
         iv_now = oi_near = earn_dt = np.nan
 
@@ -395,13 +423,19 @@ for tk in iterable:
     # Fallback: pull next earnings date from yfinance if still NaN
     if earn_dt is np.nan or pd.isna(earn_dt):
         try:
-            cal = yf.Ticker(tk).calendar
-            if not cal.empty and 'Earnings Date' in cal.index:
-                edm = cal.loc['Earnings Date'][0]
-                if not pd.isna(edm):
-                    earn_dt = pd.to_datetime(edm).date().isoformat()
+            ed_df = yf.Ticker(tk).get_earnings_dates(limit=1)
+            if not ed_df.empty:
+                earn_dt = pd.to_datetime(ed_df["Earnings Date"].iloc[0]).date().isoformat()
         except Exception:
-            pass
+            # final fallback: use calendar attribute if available
+            try:
+                cal = yf.Ticker(tk).calendar
+                if not cal.empty and "Earnings Date" in cal.index:
+                    edm = cal.loc["Earnings Date"][0]
+                    if not pd.isna(edm):
+                        earn_dt = pd.to_datetime(edm).date().isoformat()
+            except Exception:
+                pass
 
     rows.append(dict(timestamp=ts_now, ticker=tk,
                      ADX=adx14, ATR=atr14,
