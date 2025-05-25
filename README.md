@@ -25,7 +25,7 @@ pip install -r requirements.txt
 ```
 
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.
-`pandas_datareader` is needed for downloading FRED data in `live_feed.py`.
+`pandas_datareader` is needed for downloading FRED data in `live_feed.py`, and `requests` is required by `net_liq_history_export.py` for accessing the IBKR Client Portal API.
 
 ## Usage Examples
 
