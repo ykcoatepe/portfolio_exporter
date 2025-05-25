@@ -12,9 +12,11 @@ connectivity.
 | ------ | ----------- |
 | `historic_prices.py` | Downloads the last 60 days of daily OHLCV data for tickers read from `tickers_live.txt` or `tickers.txt`. If IBKR is reachable, the current account holdings are used as the ticker list. The output is a timestamped CSV in `~/Library/Mobile\ Documents/.../Downloads`. |
 | `live_feed.py` | Takes a snapshot of real‑time quotes for tickers listed in `tickers_live.txt` (falling back to `tickers.txt`). Quotes are pulled from IBKR when available, otherwise from yfinance and FRED. Results are written to `live_quotes_YYYYMMDD_HHMM.csv`. |
-| `tech_signals.py` | Fetches historical bars via yfinance only and calculates indicators such as ADX, ATR, moving averages, IV rank and RSI. Output goes to `tech_signals.csv`. |
-| `tech_signals_ibkr.py` | Similar to `tech_signals.py` but pulls data via IBKR and includes option chain information like open interest and near‑ATM implied volatility. |
+| `tech_signals_ibkr.py` | Calculates technical indicators using IBKR data and includes option chain details like open interest and near‑ATM implied volatility. |
 | `update_tickers.py` | Writes the current IBKR stock positions to `tickers_live.txt` so other scripts always use a fresh portfolio. |
+| `portfolio_greeks.py` | Exports per-position Greeks and account totals using IBKR market data, producing `portfolio_greeks_<YYYYMMDD>.csv` and a totals file. |
+| `option_chain_snapshot.py` | Saves a complete IBKR option chain to CSV for the entire portfolio or specified symbols, handling live and delayed data automatically. |
+| `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. |
 
 ## Installation
 
@@ -37,10 +39,6 @@ python historic_prices.py
 python live_feed.py
 # Refresh tickers_live.txt from IBKR
 python update_tickers.py
-
-
-# Calculate technical indicators with yfinance
-python tech_signals.py
 
 # Calculate technical indicators using IBKR data
 python tech_signals_ibkr.py
