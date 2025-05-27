@@ -14,7 +14,7 @@ connectivity.
 | `live_feed.py` | Takes a snapshot of real‑time quotes for tickers listed in `tickers_live.txt` (falling back to `tickers.txt`). Quotes are pulled from IBKR when available, otherwise from yfinance and FRED. Results are written to `live_quotes_YYYYMMDD_HHMM.csv`. |
 | `tech_signals_ibkr.py` | Calculates technical indicators using IBKR data and includes option chain details like open interest and near‑ATM implied volatility. |
 | `update_tickers.py` | Writes the current IBKR stock positions to `tickers_live.txt` so other scripts always use a fresh portfolio. |
-| `portfolio_greeks.py` | Exports per-position Greeks and account totals using IBKR market data, producing `portfolio_greeks_<YYYYMMDD>.csv` and a totals file. |
+| `portfolio_greeks.py` | Exports per-position Greeks and account totals using IBKR market data, producing `portfolio_greeks_<YYYYMMDD_HHMM>.csv` and a totals file. |
 | `option_chain_snapshot.py` | Saves a complete IBKR option chain to CSV for the entire portfolio or specified symbols, handling live and delayed data automatically. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. |
 

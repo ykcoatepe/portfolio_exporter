@@ -3,7 +3,7 @@
 tech_signals_ibkr.py — Pull live technical indicators via IBKR / TWS Gateway
 ----------------------------------------------------------------------------
 
-Outputs: tech_signals.csv
+Outputs: tech_signals_YYYYMMDD_HHMM.csv
 Columns:
     timestamp · ticker · ADX · ATR · 20dma · 50dma · 200dma · IV_rank · RSI
     · beta_SPY · ADV30 · next_earnings · OI_near_ATM
@@ -50,12 +50,16 @@ FUTURE_ROOTS = {
 }
 
 # ───────────────────────── CONFIG ──────────────────────────
+# Include time in file names to avoid overwriting when run multiple times a day
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
+TIME_TAG = datetime.utcnow().strftime("%H%M")
 # save to iCloud Drive Downloads
 OUTPUT_DIR = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"tech_signals_{DATE_TAG}.csv")
+OUTPUT_CSV = os.path.join(
+    OUTPUT_DIR, f"tech_signals_{DATE_TAG}_{TIME_TAG}.csv"
+)
 
 HIST_DAYS       = 300          # enough for SMA200 / ADX
 SPAN_PCT        = 0.05       # ±5 % strike window

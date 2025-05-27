@@ -8,8 +8,8 @@ portfolio_greeks.py  –  Export per-position option Greeks and account-level to
 • Computes *exposure* greeks → raw greek × contract multiplier × position size
   so that numbers reflect portfolio impact (e.g. Delta $ equivalent).
 • Produces **two** CSV files in the same Downloads folder used by the other tools:
-    1. portfolio_greeks_<YYYYMMDD>.csv          – one row per contract / underlying.
-    2. portfolio_greeks_totals_<YYYYMMDD>.csv   – a single row with summed totals.
+    1. portfolio_greeks_<YYYYMMDD_HHMM>.csv          – one row per contract / underlying.
+    2. portfolio_greeks_totals_<YYYYMMDD_HHMM>.csv   – a single row with summed totals.
 
 Usage
 =====
@@ -371,7 +371,7 @@ def main() -> None:
     dar_99, cdar_99 = eddr(nav_series, horizon_days=252, alpha=0.99)
     logger.info(f"EDDR computed – DaR₉₉: {dar_99:.4%},  CDaR₉₉: {cdar_99:.4%}")
 
-    date_tag = ts_utc.strftime("%Y%m%d")
+    date_tag = ts_utc.strftime("%Y%m%d_%H%M")
     fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
     fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
 

@@ -41,12 +41,15 @@ def _tickers_from_ib() -> list[str]:
 
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]      # first existing file wins
 
- # Timestamped output (date only, UTC)
+# Timestamped output (UTC). Includes time so repeated runs don't overwrite.
 DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
+TIME_TAG = datetime.utcnow().strftime("%H%M")
 # Save to iCloud Drive ▸ Downloads
 OUTPUT_DIR = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"historic_prices_{DATE_TAG}.csv")
+OUTPUT_CSV = os.path.join(
+    OUTPUT_DIR, f"historic_prices_{DATE_TAG}_{TIME_TAG}.csv"
+)
 
 def load_tickers() -> list[str]:
     """Return unique tickers prioritising IBKR holdings; otherwise text file."""
