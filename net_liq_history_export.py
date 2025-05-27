@@ -7,7 +7,7 @@ net_liq_history_export.py  –  Export end-of-day Net-Liq / equity curve
 • If not present – or if you pass  --cp-download  – it pulls the same data
   from IBKR Client-Portal > PortfolioAnalyst (“Performance – Time Weighted”).
 • Writes a cleaned CSV into the standard iCloud Downloads folder:
-      net_liq_history_<YYYYMMDD-YYYYMMDD>.csv
+      net_liq_history_<YYYYMMDD-YYYYMMDD_HHMM>.csv
 • With  --plot  it also drops a PNG equity-curve chart beside the CSV.
 
 Usage
@@ -38,6 +38,7 @@ OUTPUT_DIR = Path(
     "com~apple~CloudDocs/Downloads"
 )
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+TIME_TAG = datetime.utcnow().strftime("%H%M")
 
 # ---  1️⃣  where TWS writes dailyNetLiq.csv -----------------
 # If you changed the “Export Directory” in TWS, edit here OR
@@ -107,7 +108,7 @@ def _filter_range(df: pd.DataFrame, start: str | None, end: str | None) -> pd.Da
     return df
 
 def _save_csv(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
-    out_name = f"net_liq_history_{start_label}-{end_label}.csv"
+    out_name = f"net_liq_history_{start_label}-{end_label}_{TIME_TAG}.csv"
     out_path = OUTPUT_DIR / out_name
     df.to_csv(out_path, index_label="date", quoting=csv.QUOTE_MINIMAL, float_format="%.2f")
     return out_path
