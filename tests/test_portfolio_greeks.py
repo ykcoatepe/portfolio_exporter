@@ -15,17 +15,18 @@ setattr(contract_mod, 'Contract', type('Contract', (), {}))
 sys.modules.setdefault('ib_insync.contract', contract_mod)
 
 pg = importlib.import_module('portfolio_greeks')
+bs = importlib.import_module('utils.bs')
 
 class BSGreeksTests(unittest.TestCase):
     def test_bs_greeks_call(self):
-        g = pg._bs_greeks(100, 100, 0.5, 0.01, 0.2, True)
+        g = bs.bs_greeks(100, 100, 0.5, 0.01, 0.2, True)
         self.assertAlmostEqual(g['delta'], 0.5422, places=4)
         self.assertAlmostEqual(g['gamma'], 0.02805, places=5)
         self.assertAlmostEqual(g['vega'], 0.2805, places=4)
         self.assertAlmostEqual(g['theta'], -0.0167, places=4)
 
     def test_bs_greeks_invalid(self):
-        g = pg._bs_greeks(-10, 100, 0.5, 0.01, 0.2, True)
+        g = bs.bs_greeks(-10, 100, 0.5, 0.01, 0.2, True)
         for val in g.values():
             self.assertTrue(math.isnan(val))
 

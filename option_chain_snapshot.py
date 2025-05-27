@@ -29,6 +29,7 @@ from typing import List, Sequence
 import numpy as np
 import pandas as pd
 from ib_insync import IB, Option, Stock
+from utils.bs import bs_greeks
 
 # ───────────────────────── CONFIG ──────────────────────────
 OUTPUT_DIR = (
@@ -140,29 +141,6 @@ def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
 
 
 # ─────────── Black–Scholes fallback (for delayed feeds) ───────────
-def _norm_cdf(x: float) -> float:
-    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
-
-
-def _bs_greeks(S, K, T, r, sigma, call=True):
-    """
-    Closed-form Black–Scholes Greeks (per contract).
-    Vega per 1 % IV; theta per calendar-day.
-    """
-    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0 or any(map(math.isnan, (S, K, T, sigma))):
-        return dict(delta=np.nan, gamma=np.nan, vega=np.nan, theta=np.nan)
-    d1 = (math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
-    d2 = d1 - sigma * math.sqrt(T)
-    pdf = math.exp(-0.5 * d1 * d1) / math.sqrt(2 * math.pi)
-    if call:
-        delta = _norm_cdf(d1)
-        theta = (-S * pdf * sigma / (2 * math.sqrt(T)) - r * K * math.exp(-r * T) * _norm_cdf(d2)) / 365.0
-    else:
-        delta = _norm_cdf(d1) - 1
-        theta = (-S * pdf * sigma / (2 * math.sqrt(T)) + r * K * math.exp(-r * T) * _norm_cdf(-d2)) / 365.0
-    gamma = pdf / (S * sigma * math.sqrt(T))
-    vega = S * pdf * math.sqrt(T) / 100.0
-    return dict(delta=delta, gamma=gamma, vega=vega, theta=theta)
 
 
 # ─────────── snapshot helpers ───────────
@@ -298,7 +276,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             if spot and iv_val and not np.isnan(iv_val):
                 exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(tzinfo=timezone.utc)
                 T = max((exp_dt - datetime.now(timezone.utc)).total_seconds() / (365 * 24 * 3600), 1 / (365 * 24))
-                bs = _bs_greeks(spot, con.strike, T, 0.01, iv_val, con.right == "C")
+                bs = bs_greeks(spot, con.strike, T, 0.01, iv_val, con.right == "C")
                 delta_val = bs["delta"] if np.isnan(delta_val) else delta_val
                 gamma_val = bs["gamma"] if np.isnan(gamma_val) else gamma_val
                 vega_val = bs["vega"] if np.isnan(vega_val) else vega_val
