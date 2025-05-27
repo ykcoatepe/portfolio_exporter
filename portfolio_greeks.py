@@ -24,8 +24,9 @@ import math
 import os
 import sys
 from datetime import datetime, timezone
-from math import erf, log, sqrt
 from typing import Any, Dict, List, Tuple
+
+from utils.bs import bs_greeks
 
 import numpy as np
 import pandas as pd   # keep only one import if pandas already imported
@@ -129,55 +130,6 @@ def _multiplier(c: Contract) -> int:
 
 
 # ────────────── Black–Scholes helpers ──────────────
-def _norm_cdf(x: float) -> float:
-    return 0.5 * (1.0 + erf(x / sqrt(2.0)))
-
-
-def _bs_greeks(
-    S: float,
-    K: float,
-    T: float,
-    r: float,
-    sigma: float,
-    call: bool = True,
-) -> Dict[str, float]:
-    """
-    Closed-form Black–Scholes Greeks (per contract).
-    vega shown per 1 % IV; theta per calendar-day.
-    """
-    if (
-        S <= 0
-        or K <= 0
-        or T <= 0
-        or sigma <= 0
-        or math.isnan(S)
-        or math.isnan(K)
-        or math.isnan(T)
-        or math.isnan(sigma)
-    ):
-        return dict(delta=np.nan, gamma=np.nan, vega=np.nan, theta=np.nan)
-
-    d1 = (log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * sqrt(T))
-    d2 = d1 - sigma * sqrt(T)
-    pdf_d1 = math.exp(-0.5 * d1**2) / sqrt(2 * math.pi)
-
-    if call:
-        delta = _norm_cdf(d1)
-        theta = (
-            -S * pdf_d1 * sigma / (2 * sqrt(T))
-            - r * K * math.exp(-r * T) * _norm_cdf(d2)
-        ) / 365.0
-    else:
-        delta = _norm_cdf(d1) - 1.0
-        theta = (
-            -S * pdf_d1 * sigma / (2 * sqrt(T))
-            + r * K * math.exp(-r * T) * _norm_cdf(-d2)
-        ) / 365.0
-
-    gamma = pdf_d1 / (S * sigma * sqrt(T))
-    vega = S * pdf_d1 * sqrt(T) / 100.0
-
-    return dict(delta=delta, gamma=gamma, vega=vega, theta=theta)
 
 
 def _has_any_greeks_populated(ticker: Ticker) -> bool:
@@ -344,7 +296,7 @@ def main() -> None:
                 sigma = DEFAULT_SIGMA
 
             if not any(math.isnan(x) for x in (S, K, T, sigma)):
-                bs = _bs_greeks(S, K, T, RISK_FREE_RATE, sigma, c.right == "C")
+                bs = bs_greeks(S, K, T, RISK_FREE_RATE, sigma, c.right == "C")
                 for k in greeks:
                     if math.isnan(greeks[k]):
                         greeks[k] = bs[k]
