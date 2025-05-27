@@ -1,6 +1,10 @@
 import unittest
 from unittest.mock import patch
-import pandas as pd
+
+try:  # optional dependency
+    import pandas as pd
+except Exception as e:  # pragma: no cover - skip if pandas missing
+    raise unittest.SkipTest("pandas is not installed") from e
 
 
 import historic_prices as hp

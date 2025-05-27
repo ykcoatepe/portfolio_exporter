@@ -1,7 +1,35 @@
+import sys
+import types
 import unittest
 from datetime import datetime, timedelta
 
-import option_chain_snapshot as oc
+# Provide minimal stubs so import works without optional packages
+try:
+    import pandas  # noqa: F401
+except Exception:
+    pd_stub = types.ModuleType("pandas")
+    pd_stub.DataFrame = type("DataFrame", (), {})
+    sys.modules.setdefault("pandas", pd_stub)
+
+try:
+    import numpy  # noqa: F401
+except Exception:
+    np_stub = types.ModuleType("numpy")
+    np_stub.nan = float("nan")
+    np_stub.isnan = lambda x: x != x
+    sys.modules.setdefault("numpy", np_stub)
+
+try:
+    import ib_insync  # noqa: F401
+except Exception:
+    ib_stub = types.ModuleType("ib_insync")
+    for cls in ["IB", "Option", "Stock"]:
+        setattr(ib_stub, cls, type(cls, (), {}))
+    sys.modules.setdefault("ib_insync", ib_stub)
+
+import importlib
+
+oc = importlib.import_module("option_chain_snapshot")
 
 class ChooseExpiryTests(unittest.TestCase):
     def test_weekly_within_seven_days(self):
