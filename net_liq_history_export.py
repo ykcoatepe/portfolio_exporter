@@ -27,6 +27,7 @@ import sys
 from datetime import datetime, date
 from pathlib import Path
 from typing import Optional
+import io
 
 import pandas as pd                     #  pandas ≥1.2
 import requests                         #  pip install requests
@@ -90,7 +91,7 @@ def _pa_rest_download() -> pd.DataFrame:
     r.raise_for_status()
 
     # CSV arrives as text
-    df_all = pd.read_csv(pd.compat.StringIO(r.text))
+    df_all = pd.read_csv(io.StringIO(r.text))
     if {"Date", "NetLiquidation"}.issubset(df_all.columns):
         df = df_all[["Date", "NetLiquidation"]]\
                .rename(columns={"NetLiquidation": "net_liq"})\
