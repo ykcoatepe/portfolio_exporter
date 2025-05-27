@@ -3,7 +3,12 @@ import types
 import importlib
 import math
 import unittest
-import pandas as pd
+
+try:  # optional deps
+    import pandas as pd
+    import numpy as np  # noqa: F401
+except Exception as e:  # pragma: no cover - skip if missing
+    raise unittest.SkipTest("pandas/numpy is not installed") from e
 
 # Provide minimal ib_insync stub for module import
 ib_mod = types.ModuleType('ib_insync')
