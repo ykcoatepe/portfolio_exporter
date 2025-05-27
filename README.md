@@ -18,6 +18,15 @@ connectivity.
 | `option_chain_snapshot.py` | Saves a complete IBKR option chain to CSV for the entire portfolio or specified symbols, handling live and delayed data automatically. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. |
 
+### CP_REFRESH_TOKEN
+`net_liq_history_export.py` looks for the environment variable `CP_REFRESH_TOKEN` when pulling data from the Client Portal API. Set it before running the script:
+
+```bash
+export CP_REFRESH_TOKEN=<your refresh token>
+```
+
+If the token is not present, the script will attempt to read `dailyNetLiq.csv` from Trader Workstation instead.
+
 ## Installation
 
 ```bash
