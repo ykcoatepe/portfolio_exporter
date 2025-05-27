@@ -1,4 +1,6 @@
-import os, sys, pandas as pd, yfinance as yf
+import os
+import pandas as pd
+import yfinance as yf
 # optional progress bar
 try:
     from tqdm import tqdm
