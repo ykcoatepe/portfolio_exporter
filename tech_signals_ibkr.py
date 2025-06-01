@@ -63,7 +63,7 @@ OUTPUT_CSV = os.path.join(
 
 HIST_DAYS       = 300          # enough for SMA200 / ADX
 SPAN_PCT        = 0.05       # ±5 % strike window
-N_ATM_STRIKES   = 20          # number of strikes on each side of ATM to keep
+N_ATM_STRIKES   = 4           # number of strikes on each side of ATM to keep (reduced for speed)
 ATM_DELTA_BAND  = 0.10         # |Δ| ≤ 0.10
 RISK_FREE_RATE  = 0.01
 DATA_DIR        = "iv_history"
@@ -75,9 +75,9 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 
 # quiet ib_insync chatter
-logging.getLogger("ib_insync.wrapper").setLevel(logging.WARNING)
-logging.getLogger("ib_insync.client").setLevel(logging.WARNING)
-logging.getLogger("ib_insync.ib").setLevel(logging.ERROR)
+logging.getLogger("ib_insync.wrapper").setLevel(logging.CRITICAL)
+logging.getLogger("ib_insync.client").setLevel(logging.CRITICAL)
+logging.getLogger("ib_insync.ib").setLevel(logging.CRITICAL)
 
 # ────────────────────── helpers ────────────────────────────
 def _norm_cdf(x): return 0.5 * (1.0 + erf(x / sqrt(2)))
@@ -110,6 +110,26 @@ def _parse_ib_month(dt_str: str) -> datetime:
     # unknown format → far past so it's considered expired
     return datetime(1900, 1, 1)
 
+# ──────────────────────────── Option expiry validation ─────────────────────────────
+def _first_valid_expiry(symbol: str, expirations: list[str], spot: float,
+                        root_tc: str) -> str:
+    """
+    Return the first expiry whose chain has a *valid* ATM contract.
+    Falls back to earliest expiry if none validate.
+    """
+    for exp in sorted(expirations, key=lambda d: pd.to_datetime(d)):
+        atm = round(spot)  # simple ATM guess, refined later
+        try:
+            test = Option(symbol, exp, atm, "C",
+                          exchange="SMART", currency="USD",
+                          tradingClass=root_tc)
+            det = ib.reqContractDetails(test)
+            if det and det[0].contract.conId:
+                return exp
+        except Exception:
+            continue
+    return expirations[0]  # last‑ditch fallback
+
 def front_future(root: str, exch: str) -> Future:
     """Return the nearest non‑expired future contract for root/exchange."""
     details = ib.reqContractDetails(Future(root, exchange=exch))
@@ -125,6 +145,12 @@ def front_future(root: str, exch: str) -> Future:
 
 # ────────────────────── connect IB ─────────────────────────
 ib = IB()
+# Suppress repetitive "No security definition" errors (code 200)
+def _quiet_error_handler(reqId, errorCode, errorString, contract):
+    if errorCode == 200:
+        return  # silently ignore
+    print(f"IB ERROR {errorCode}: {errorString}")
+ib.errorEvent += _quiet_error_handler
 try:
     ib.connect(IB_HOST, IB_PORT, clientId=IB_CID)
     USE_IB = True
@@ -275,16 +301,11 @@ for tk in iterable:
             if not expirations:
                 raise Exception("No expirations")
 
-            today_d = datetime.utcnow().date()
-            # Prefer the nearest expiry ≤ 7 days (weekly); else fallback to first Friday; else earliest
-            expiry = next((e for e in expirations
-                           if (datetime.strptime(e, "%Y%m%d").date() - today_d).days <= 7),
-                      next((e for e in expirations
-                           if datetime.strptime(e, "%Y%m%d").weekday() == 4),
-                           expirations[0]))
-
+            # Pick the first expiry that actually has a valid ATM contract
             trading_classes = getattr(chains[0], "tradingClasses", [])
             root_tc = trading_classes[0] if trading_classes else tk
+            expiry = _first_valid_expiry(tk, expirations, c_ff.iloc[-1], root_tc)
+            logging.info("Selected validated expiry %s for %s", expiry, tk)
 
             # --- keep ±N_ATM_STRIKES strikes around the ATM strike ---
             strikes_full = sorted(chains[0].strikes)
@@ -316,9 +337,10 @@ for tk in iterable:
             # return at least one ContractDetail – this eliminates “No security definition” (Error 200).
             contracts = []
             for s in strikes:
+                s_float = float(s)           # ensure pure Python float
                 for r in ("C", "P"):
-                    opt = Option(tk, expiry, s, r,
-                                 exchange="SMART", currency="USD", tradingClass=root_tc)
+                    opt = Option(tk, expiry, s_float, r,
+                                 exchange="SMART", currency="USD")   # let IB auto‑select tradingClass
                     try:
                         det = ib.reqContractDetails(opt)
                         if det and det[0].contract.conId:
@@ -340,12 +362,12 @@ for tk in iterable:
                     ib.reqMktData(con, "101,106", False, False)   # 101=openInt,106=impVol
                 except Exception:
                     continue    # silently skip rejects
-            ib.sleep(3.0)     # give snapshots time to populate while allowing the event loop to run
+            ib.sleep(1.0)     # give snapshots ~1 s to populate while allowing the event loop to run
             # Cancel streaming to avoid dangling subscriptions
             for con in qual:
                 ib.cancelMktData(con)
             # Allow IB gateway a brief breather to clear errors
-            ib.sleep(0.5)
+            ib.sleep(0.1)
 
             # collect IV & OI
             iv_now = np.nan
@@ -448,7 +470,7 @@ for tk in iterable:
                      beta_SPY=beta, ADV30=ADV30,
                      next_earnings=earn_dt, OI_near_ATM=oi_near))
 
-    ib.sleep(0.25)
+    ib.sleep(0.05)
 
 pd.DataFrame(rows).to_csv(OUTPUT_CSV,index=False)
 logging.info("Saved %d rows → %s", len(rows), OUTPUT_CSV)
