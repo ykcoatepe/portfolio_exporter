@@ -20,6 +20,7 @@ import argparse
 import csv
 import logging
 import math
+from typing import Any
 import os
 import sys
 import time
@@ -30,6 +31,28 @@ import numpy as np
 import pandas as pd
 from ib_insync import IB, Option, Stock
 from utils.bs import bs_greeks
+
+from bisect import bisect_left
+
+# ─────────── contract resolution helper ───────────
+def _resolve_contract(ib: IB, template: Option):
+    """
+    Return a fully‑qualified Contract for the given template, choosing a sensible
+    candidate when IB reports an *ambiguous* match (e.g. NVDA vs 2NVDA tradingClass).
+    Preference order:
+    1. tradingClass exactly equal to the underlying symbol (common for equities)
+    2. first result returned by IB.
+    Returns None if no contract details are found.
+    """
+    cds = ib.reqContractDetails(template)
+    if not cds:
+        return None
+    if len(cds) == 1:
+        return cds[0].contract
+    for cd in cds:
+        if cd.contract.tradingClass == template.symbol:
+            return cd.contract
+    return cds[0].contract
 
 # ───────────────────────── CONFIG ──────────────────────────
 OUTPUT_DIR = (
@@ -189,39 +212,46 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         if getattr(chain, "tradingClasses", None)
         else getattr(chain, "tradingClass", symbol) or symbol
     )
+    use_trading_class = bool(root_tc and root_tc != symbol)
 
-    # ── spot price and ±20 strikes ──
+    # ── spot price and ±20 strikes (take from master strike list) ──
+    strikes_all = sorted(chain.strikes)
+
     spot_tk = ib.reqMktData(stk, "", True, False)
     ib.sleep(0.5)
     spot = spot_tk.marketPrice() or spot_tk.last or spot_tk.close
     if spot_tk.contract:
         ib.cancelMktData(spot_tk.contract)
 
-    strikes_all = sorted(chain.strikes)
-    if spot:
-        idx = min(range(len(strikes_all)), key=lambda i: abs(strikes_all[i] - spot))
-        strikes = strikes_all[max(0, idx - 20) : min(len(strikes_all), idx + 21)]
+    if spot and strikes_all:
+        # find index of the strike closest to spot
+        idx = bisect_left(strikes_all, spot)
+        # slice ±20 strikes around ATM
+        start = max(0, idx - 20)
+        end = min(len(strikes_all), idx + 21)
+        strikes = strikes_all[start:end]
     else:
+        # fallback to full list if spot or strikes_all is missing
         strikes = strikes_all
 
-    # keep only valid strikes in case list came from previous expiry
-    strikes = [s for s in strikes if s in chain.strikes]
     if not strikes:
-        raise RuntimeError("No valid strike list")
+        raise RuntimeError("No strikes available after ATM slicing")
 
-    # build contracts
+    # ── build contracts and resolve ambiguities ──
+    raw_templates = [
+        Option(symbol, expiry, strike, right, exchange="SMART", currency="USD")
+        for strike in strikes
+        for right in ("C", "P")
+    ]
+
     contracts = []
-    for strike in strikes:
-        for right in ("C", "P"):
-            opt = Option(symbol, expiry, strike, right, exchange="SMART", currency="USD", tradingClass=root_tc)
-            try:
-                det = ib.reqContractDetails(opt)
-                if det and det[0].contract.conId:
-                    contracts.append(det[0].contract)
-            except Exception:
-                continue
+    for tmpl in raw_templates:
+        c = _resolve_contract(ib, tmpl)
+        if c:
+            contracts.append(c)
+
     if not contracts:
-        raise RuntimeError("No valid option contracts found")
+        raise RuntimeError("No option contracts qualified for the chosen strikes / expiry")
 
     # stream market data (need streaming for generic-tick 101)
     snapshots = [
@@ -229,7 +259,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             c,
             ib.reqMktData(
                 c,
-                "101,104,106",  # OI, modelGreeks, IV
+                "",            # let IB decide tick types; avoids eid errors
                 snapshot=False,
                 regulatorySnapshot=False,
             ),
@@ -248,8 +278,8 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         iv_missing = math.isnan(_g(tk, "impliedVolatility"))
         oi_missing = math.isnan(_g(tk, "openInterest"))
         if price_missing or iv_missing or oi_missing:
-            snap = ib.reqMktData(con, "101,104,106", True, False)
-            ib.sleep(0.30)
+            snap = ib.reqMktData(con, "", True, False)  # snapshot: genericTickList must be empty
+            ib.sleep(0.35)
             for fld in ("bid", "ask", "last", "close", "impliedVolatility"):
                 val = getattr(snap, fld, None)
                 if val not in (None, -1):

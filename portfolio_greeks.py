@@ -24,6 +24,7 @@ import math
 import os
 import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Tuple
 
 from utils.bs import bs_greeks
@@ -225,8 +226,9 @@ def main() -> None:
             ib.disconnect()
             sys.exit(0)
 
-    ts_utc = datetime.now(timezone.utc)
-    ts_iso = ts_utc.isoformat()
+    ts_utc   = datetime.now(timezone.utc)                 # still used for UTC maths
+    ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # Türkiye (UTC+3) clock
+    ts_iso   = ts_local.isoformat()                       # what we write to CSV
     rows: List[Dict[str, Any]] = []
 
     iterable = tqdm(pkgs, desc="Processing portfolio greeks") if PROGRESS else pkgs
@@ -371,7 +373,7 @@ def main() -> None:
     dar_99, cdar_99 = eddr(nav_series, horizon_days=252, alpha=0.99)
     logger.info(f"EDDR computed – DaR₉₉: {dar_99:.4%},  CDaR₉₉: {cdar_99:.4%}")
 
-    date_tag = ts_utc.strftime("%Y%m%d_%H%M")
+    date_tag = ts_local.strftime("%Y%m%d_%H%M")
     fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
     fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
 
