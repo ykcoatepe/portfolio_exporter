@@ -34,16 +34,58 @@ from utils.bs import bs_greeks
 
 from bisect import bisect_left
 
+# ── helper: get reliable split‑adjusted spot ──
+def _safe_spot(ib: IB, stk: Stock, streaming_tk):
+    """
+    Return a trustworthy spot:
+      • live/frozen bid/ask or last if available
+      • else previous regular‑session close (split‑adjusted).
+    """
+    spot_val = streaming_tk.marketPrice() or streaming_tk.last
+    if spot_val and spot_val > 0:
+        return spot_val
+    # pull adjusted close (1‑day bar, regular trading hours)
+    bars = ib.reqHistoricalData(
+        stk,
+        endDateTime='',
+        durationStr='1 D',
+        barSizeSetting='1 day',
+        whatToShow='TRADES',
+        useRTH=True,
+        formatDate=1,
+    )
+    return bars[-1].close if bars else np.nan
+
 # ─────────── contract resolution helper ───────────
 def _resolve_contract(ib: IB, template: Option):
     """
-    Return a fully‑qualified Contract for the given template, choosing a sensible
-    candidate when IB reports an *ambiguous* match (e.g. NVDA vs 2NVDA tradingClass).
-    Preference order:
-    1. tradingClass exactly equal to the underlying symbol (common for equities)
-    2. first result returned by IB.
-    Returns None if no contract details are found.
+    Return a fully‑qualified Contract for the given template, handling
+    ambiguous matches via `ib.qualifyContracts` first (fast‑path) and
+    falling back to `reqContractDetails` only if qualification fails.
+
+    Preference order for ambiguous matches:
+      1. tradingClass equal to the underlying symbol
+      2. first contract returned by IB
+
+    Returns None if no contract can be qualified.
     """
+    # --- fast path: qualifyContracts ----------------------------------------------------
+    try:
+        ql = ib.qualifyContracts(template)
+        if ql:
+            # If there is only one qualified contract, use it immediately
+            if len(ql) == 1:
+                return ql[0]
+            # More than one – pick by tradingClass heuristics
+            for c in ql:
+                if c.tradingClass == template.symbol:
+                    return c
+            return ql[0]
+    except Exception:
+        # qualification can raise when template is too fuzzy – fall through
+        pass
+
+    # --- slow path: reqContractDetails --------------------------------------------------
     cds = ib.reqContractDetails(template)
     if not cds:
         return None
@@ -203,7 +245,20 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     if not chains:
         raise RuntimeError("No option-chain data")
 
-    chain = chains[0]
+    # choose the chain with the richest strike list (the “real” OPRA feed),
+    # fall back to the first one if all are empty
+    chain = max(
+        (c for c in chains if c.strikes),
+        key=lambda c: len(c.strikes),
+        default=chains[0],
+    )
+    logger.info(
+        "Using chain %s (exchange=%s, strikes=%d, expiries=%d)",
+        getattr(chain, "tradingClass", "<n/a>"),
+        getattr(chain, "exchange", "<n/a>"),
+        len(chain.strikes),
+        len(chain.expirations),
+    )
     expiry = pick_expiry_with_hint(sorted(chain.expirations), expiry_hint)
 
     # trading class
@@ -214,39 +269,82 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     )
     use_trading_class = bool(root_tc and root_tc != symbol)
 
-    # ── spot price and ±20 strikes (take from master strike list) ──
+    # ── spot price and ±20 strikes ────────────────────────────────
     strikes_all = sorted(chain.strikes)
 
     spot_tk = ib.reqMktData(stk, "", True, False)
     ib.sleep(0.5)
-    spot = spot_tk.marketPrice() or spot_tk.last or spot_tk.close
+
+    spot = _safe_spot(ib, stk, spot_tk)
+
     if spot_tk.contract:
         ib.cancelMktData(spot_tk.contract)
 
-    if spot and strikes_all:
-        # find index of the strike closest to spot
-        idx = bisect_left(strikes_all, spot)
-        # slice ±20 strikes around ATM
-        start = max(0, idx - 20)
-        end = min(len(strikes_all), idx + 21)
-        strikes = strikes_all[start:end]
-    else:
-        # fallback to full list if spot or strikes_all is missing
+    if np.isnan(spot):
+        logger.warning("Could not obtain reliable spot price – using full strike list")
         strikes = strikes_all
-
-    if not strikes:
-        raise RuntimeError("No strikes available after ATM slicing")
+    else:
+        # if spot lies outside the strike lattice (e.g. right after a split) warn & keep full list
+        if spot < strikes_all[0] or spot > strikes_all[-1]:
+            logger.warning(
+                "Spot %.2f is outside strike range %s‑%s (possible recent split); using full strike list.",
+                spot,
+                strikes_all[0],
+                strikes_all[-1],
+            )
+            strikes = strikes_all
+        else:
+            idx = bisect_left(strikes_all, spot)
+            start = max(0, idx - 20)
+            end = min(len(strikes_all), idx + 21)
+            strikes = strikes_all[start:end]
+            logger.info("Spot %.2f → selected %d strikes (%s‑%s)", spot, len(strikes), strikes[0], strikes[-1])
 
     # ── build contracts and resolve ambiguities ──
     raw_templates = [
-        Option(symbol, expiry, strike, right, exchange="SMART", currency="USD")
+        Option(
+            symbol,
+            expiry,
+            strike,
+            right,
+            exchange="SMART",
+            currency="USD",
+            tradingClass=root_tc,   # <‑‑ add this
+        )
         for strike in strikes
         for right in ("C", "P")
     ]
 
-    contracts = []
+    contracts: list[Option] = []
     for tmpl in raw_templates:
+        # --- first try with tradingClass as provided (root_tc) -----------------
         c = _resolve_contract(ib, tmpl)
+
+        # --- fallback #1: strip tradingClass if first attempt failed -----------
+        if c is None and use_trading_class:
+            tmpl_no_tc = Option(
+                tmpl.symbol,
+                tmpl.lastTradeDateOrContractMonth,
+                tmpl.strike,
+                tmpl.right,
+                exchange=tmpl.exchange,
+                currency=tmpl.currency,
+            )
+            c = _resolve_contract(ib, tmpl_no_tc)
+
+        # --- fallback #2: use the underlying symbol as tradingClass ------------
+        if c is None and use_trading_class and root_tc != symbol:
+            tmpl_sym_tc = Option(
+                tmpl.symbol,
+                tmpl.lastTradeDateOrContractMonth,
+                tmpl.strike,
+                tmpl.right,
+                exchange=tmpl.exchange,
+                currency=tmpl.currency,
+                tradingClass=symbol,  # use the underlying itself
+            )
+            c = _resolve_contract(ib, tmpl_sym_tc)
+
         if c:
             contracts.append(c)
 
@@ -289,7 +387,16 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             # Copy openInterest if present
             if getattr(snap, "openInterest", None) not in (None, -1):
                 tk.openInterest = snap.openInterest
-            ib.cancelMktData(snap.contract)
+            # second pass just for open‑interest if it's still missing
+            if math.isnan(_g(tk, "openInterest")):
+                snap_oi = ib.reqMktData(con, "101", True, False)  # generic‑tick 101 = OI
+                ib.sleep(0.35)
+                if getattr(snap_oi, "openInterest", None) not in (None, -1):
+                    tk.openInterest = snap_oi.openInterest
+                if snap_oi.contract:
+                    ib.cancelMktData(snap_oi.contract)
+            if snap.contract:
+                ib.cancelMktData(snap.contract)
 
     # build rows
     ts = datetime.now(timezone.utc).isoformat()
