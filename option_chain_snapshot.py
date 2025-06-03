@@ -26,6 +26,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from typing import List, Sequence
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -399,7 +400,8 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                 ib.cancelMktData(snap.contract)
 
     # build rows
-    ts = datetime.now(timezone.utc).isoformat()
+    ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))
+    ts = ts_local.isoformat()
     rows = []
     for con, tk in snapshots:
         iv_val = _g(tk, "impliedVolatility")
@@ -429,6 +431,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             {
                 "timestamp": ts,
                 "symbol": symbol,
+                "spot": spot,
                 "expiry": expiry,
                 "strike": con.strike,
                 "right": con.right,
