@@ -500,7 +500,7 @@ def main():
     logger.info("Symbols: %s", ", ".join(symbols))
     iterable = tqdm(symbols, desc="Option snapshots") if PROGRESS else symbols
 
-    date_tag = datetime.utcnow().strftime("%Y%m%d_%H%M")
+    date_tag = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     combined = []
     for sym in iterable:
         try:
