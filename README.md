@@ -33,6 +33,13 @@ If the token is not present, the script will attempt to read `dailyNetLiq.csv` f
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+Run the unit tests with:
+
+```bash
+pytest
 ```
 
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.
