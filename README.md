@@ -4,7 +4,8 @@ This repository contains a collection of small helper scripts used to export quo
 and technical data for a personal trading workflow. The scripts rely mostly on
 [yfinance](https://github.com/ranaroussi/yfinance) and optionally on
 [ib_insync](https://github.com/erdewit/ib_insync) for Interactive Brokers (IBKR)
-connectivity.
+connectivity. A high level overview of the design and how the tools use IBKR and
+yfinance can be found in [docs/PDR.md](docs/PDR.md).
 
 ## Script Overview
 
