@@ -9,10 +9,17 @@ import csv
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from typing import Iterable, List, Tuple
 
 import pandas as pd
+
+try:  # optional dependency
+    from ib_insync import IB, ExecutionFilter  # type: ignore
+except Exception:  # pragma: no cover - optional
+    IB = None  # type: ignore
+    ExecutionFilter = None  # type: ignore
 
 
 @dataclass
@@ -22,6 +29,15 @@ class Trade:
     side: str
     qty: int
     price: float
+
+
+# ───────────────────────── CONFIG ──────────────────────────
+TIME_TAG = datetime.utcnow().strftime("%H%M")
+OUTPUT_DIR = Path(
+    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
+)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 5  # dedicated clientId
 
 
 MONTH_MAP = {m.lower(): i for i, m in enumerate(calendar.month_name) if m}
@@ -62,6 +78,51 @@ def filter_trades(trades: Iterable[Trade], start: date, end: date) -> List[Trade
     return [t for t in trades if start <= t.date <= end]
 
 
+def fetch_trades_ib(start: date, end: date) -> List[Trade]:
+    """Return trades between start and end dates from IBKR."""
+    if IB is None or ExecutionFilter is None:
+        return []
+    ib = IB()
+    try:
+        ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=5)
+    except Exception:
+        return []
+
+    filt = ExecutionFilter(time=start.strftime("%Y%m%d %H:%M:%S"))
+    details = ib.reqExecutions(filt)
+    trades: List[Trade] = []
+    for det in details:
+        exec_time = pd.to_datetime(det.execution.time).to_pydatetime()
+        d = exec_time.date()
+        if not (start <= d <= end):
+            continue
+        side = "BUY" if det.execution.side.upper() == "BOT" else "SELL"
+        trades.append(
+            Trade(
+                d,
+                det.contract.symbol,
+                side,
+                int(det.execution.shares),
+                det.execution.price,
+            )
+        )
+    ib.disconnect()
+    return trades
+
+
+def save_csv(trades: Iterable[Trade], start: date, end: date) -> Path:
+    out_name = f"trades_report_{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}_{TIME_TAG}.csv"
+    out_path = OUTPUT_DIR / out_name
+    with open(out_path, "w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["date", "ticker", "side", "qty", "price"])
+        for t in trades:
+            writer.writerow(
+                [t.date.isoformat(), t.ticker, t.side, t.qty, f"{t.price:.2f}"]
+            )
+    return out_path
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Filter trade history")
     g = p.add_mutually_exclusive_group()
@@ -90,4 +151,15 @@ def main() -> None:
         p.print_help()
         return
 
+    trades = fetch_trades_ib(start, end)
+    if not trades:
+        print("No trades retrieved from IBKR.")
+        return
+
+    trades = filter_trades(trades, start, end)
+    out_file = save_csv(trades, start, end)
+    print(f"\u2705  Saved {len(trades)} trades to {out_file}")
+
+
+if __name__ == "__main__":
     main()
