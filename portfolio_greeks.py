@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Tuple
 from pathlib import Path
 
 from utils.bs import bs_greeks
+from option_chain_snapshot import fetch_yf_open_interest
 
 import numpy as np
 import pandas as pd
@@ -39,6 +40,7 @@ from ib_insync.contract import Contract
 
 try:
     from tqdm import tqdm
+
     # Re‑enable progress‑bar printing
     PROGRESS = True
 except ImportError:
@@ -472,6 +474,13 @@ def main() -> None:
                 ib.cancelMktData(c)
             except Exception as e:
                 logger.debug(f"OI stream failed for {c.localSymbol}: {e}")
+        if open_int is None or (isinstance(open_int, float) and math.isnan(open_int)):
+            yf_map = fetch_yf_open_interest(
+                c.symbol, getattr(c, "lastTradeDateOrContractMonth", "")
+            )
+            open_int = yf_map.get(
+                (getattr(c, "strike", np.nan), getattr(c, "right", "")), np.nan
+            )
         if open_int is None:
             open_int = np.nan
 
