@@ -309,6 +309,16 @@ def _wait_for_snapshots(ib: IB, snaps: list[tuple], timeout=8.0):
         time.sleep(0.25)
 
 
+def _wait_attr(tk, field: str, timeout: float = 2.0) -> None:
+    """Poll ticker until attribute present or timeout."""
+    end = time.time() + timeout
+    while time.time() < end:
+        val = getattr(tk, field, None)
+        if val not in (None, -1):
+            break
+        time.sleep(0.25)
+
+
 # ─────────── core chain routine ───────────
 def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.DataFrame:
     logger.info("Snapshot %s", symbol)
@@ -486,7 +496,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                     snapshot=False,
                     regulatorySnapshot=False,
                 )
-                ib.sleep(0.8)
+                _wait_attr(snap_oi, "openInterest")
                 if getattr(snap_oi, "openInterest", None) not in (None, -1):
                     tk.openInterest = snap_oi.openInterest
                 if snap_oi.contract:
