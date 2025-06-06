@@ -11,7 +11,7 @@ from datetime import datetime
 
 # ---------- IBKR optional integration ----------
 try:
-    from ib_insync import IB, Stock
+    from ib_insync import IB
     IB_AVAILABLE = True
 except ImportError:
     IB_AVAILABLE = False

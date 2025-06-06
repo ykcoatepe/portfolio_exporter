@@ -21,10 +21,9 @@ $ python net_liq_history_export.py --cp-download       # force CP REST fetch
 from __future__ import annotations
 import argparse
 import csv
-import json
 import os
 import sys
-from datetime import datetime, date
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import io

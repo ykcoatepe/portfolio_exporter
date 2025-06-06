@@ -20,7 +20,6 @@ import argparse
 import csv
 import logging
 import math
-from typing import Any
 import os
 import sys
 import time

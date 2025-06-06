@@ -12,7 +12,9 @@ Columns:
     timestamp · ticker · last · bid · ask · open · high · low · prev_close · volume · source
 """
 
-import os, sys, time, logging
+import logging
+import os
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -38,7 +40,7 @@ except ImportError:
 # Try to import ib_insync; if unavailable we’ll silently skip
 # ----------------------------------------------------------
 try:
-    from ib_insync import IB, Stock, Index, Future, Option
+    from ib_insync import IB, Stock, Index, Option
     IB_AVAILABLE = True
 except ImportError:
     IB_AVAILABLE = False
@@ -273,7 +275,6 @@ def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
     if not FRED_AVAILABLE:
         return pd.DataFrame()
     rows = []
-    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     iterable = tqdm(tickers, desc="FRED") if PROGRESS else tickers
     for t in iterable:
         series = YIELD_MAP.get(t)

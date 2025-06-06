@@ -16,12 +16,10 @@ $ python portfolio_greeks.py --symbols MSFT,QQQ    # restrict to subset
 """
 
 import argparse
-import csv
 import logging
 import math
 import os
 import sys
-import json
 import requests
 import time
 from datetime import datetime, timezone
@@ -34,7 +32,14 @@ from utils.bs import bs_greeks
 import numpy as np
 import pandas as pd
 
-from ib_insync import (Future, IB, Index, Option, Position, Stock, Ticker, util)
+from ib_insync import (
+    Future,
+    IB,
+    Index,
+    Position,
+    Stock,
+    Ticker,
+)
 from ib_insync.contract import Contract
 
 try:

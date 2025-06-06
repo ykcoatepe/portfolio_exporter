@@ -9,8 +9,10 @@ Columns:
     · beta_SPY · ADV30 · next_earnings · OI_near_ATM
 """
 
-import os, sys, time, logging
-from math import log, sqrt, erf
+import logging
+import os
+import sys
+from math import erf, log, sqrt
 from datetime import datetime
 
 # Additional import for yfinance fallback
@@ -80,10 +82,14 @@ logging.getLogger("ib_insync.client").setLevel(logging.CRITICAL)
 logging.getLogger("ib_insync.ib").setLevel(logging.CRITICAL)
 
 # ────────────────────── helpers ────────────────────────────
-def _norm_cdf(x): return 0.5 * (1.0 + erf(x / sqrt(2)))
+def _norm_cdf(x):
+    return 0.5 * (1.0 + erf(x / sqrt(2)))
+
+
 def _bs_delta(S, K, T, r, sigma, call=True):
-    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0: return 0.0
-    d1 = (log(S / K) + (r + 0.5*sigma**2)*T)/(sigma*sqrt(T))
+    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+        return 0.0
+    d1 = (log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrt(T))
     return _norm_cdf(d1) if call else _norm_cdf(d1) - 1.0
 
 def load_tickers():
@@ -92,7 +98,7 @@ def load_tickers():
         logging.error("Portfolio file not found; aborting.")
         sys.exit(1)
     with open(p) as f:
-        return [l.strip().upper() for l in f if l.strip()]
+        return [line.strip().upper() for line in f if line.strip()]
 
 # Helper to robustly parse IBKR lastTradeDateOrContractMonth and fetch nearest active future
 def _parse_ib_month(dt_str: str) -> datetime:
@@ -267,7 +273,7 @@ for tk in iterable:
     df.set_index("date", inplace=True)
     # drop timezone info so date intersections succeed
     df.index = pd.to_datetime(df.index).tz_localize(None)
-    c, h, l = df["close"], df["high"], df["low"]
+    c, h, low = df["close"], df["high"], df["low"]
     c_ff = c.ffill()   # forward‑fill so today’s partial bar isn’t NaN
 
     sma20  = float(c_ff.rolling(20,  min_periods=1).mean().iloc[-1])
@@ -277,10 +283,10 @@ for tk in iterable:
     gain  = delta.clip(lower=0).rolling(14, min_periods=1).mean()
     loss  = (-delta.clip(upper=0)).rolling(14, min_periods=1).mean()
     rsi14 = 100 - 100 / (1 + gain / (loss + 1e-9))
-    tr = pd.concat([h-l,(h-c.shift()).abs(),(l-c.shift()).abs()], axis=1).max(axis=1)
+    tr = pd.concat([h-low, (h-c.shift()).abs(), (low-c.shift()).abs()], axis=1).max(axis=1)
     atr14 = tr.rolling(14).mean().iloc[-1]
-    plus_dm = (h.diff()).where((h.diff()>l.diff().abs())&(h.diff()>0),0)
-    minus_dm= (l.diff()).where((l.diff()>h.diff().abs())&(l.diff()>0),0)
+    plus_dm = (h.diff()).where((h.diff() > low.diff().abs()) & (h.diff() > 0), 0)
+    minus_dm = (low.diff()).where((low.diff() > h.diff().abs()) & (low.diff() > 0), 0)
     tr14 = tr.rolling(14).sum()
     pdi = 100*plus_dm.rolling(14).sum()/tr14
     mdi = 100*minus_dm.rolling(14).sum()/tr14

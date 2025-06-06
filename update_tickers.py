@@ -2,7 +2,6 @@
 """Update tickers_live.txt from current IBKR portfolio."""
 
 from __future__ import annotations
-import os
 from typing import List
 
 try:
