@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
+import yfinance as yf
 from ib_insync import IB, Option, Stock
 from utils.bs import bs_greeks
 
@@ -298,11 +299,11 @@ def _g(tk, field):
     return np.nan
 
 
-
 def _attr(tk, field):
     """Return a numeric ticker attribute or NaN if unavailable."""
     val = getattr(tk, field, np.nan)
     return np.nan if val in (None, -1) else val
+
 
 # ── helper: robust open‑interest getter ──
 def _open_interest_value(tk, right: str):
@@ -321,6 +322,26 @@ def _open_interest_value(tk, right: str):
         if not np.isnan(val):
             return val
     return np.nan
+
+
+def fetch_yf_open_interest(symbol: str, expiry: str) -> dict[tuple[float, str], int]:
+    """Return {(strike, right): open_interest} from Yahoo Finance."""
+    try:
+        oc = yf.Ticker(symbol).option_chain(expiry)
+    except Exception as e:  # pragma: no cover - network failures
+        logger.debug("yfinance OI fetch fail %s %s: %s", symbol, expiry, e)
+        return {}
+
+    mapping: dict[tuple[float, str], int] = {}
+    for right, df in ("C", oc.calls), ("P", oc.puts):
+        if getattr(df, "empty", True):
+            continue
+        for _, row in df[["strike", "openInterest"]].dropna().iterrows():
+            try:
+                mapping[(float(row["strike"]), right)] = int(row["openInterest"])
+            except Exception:
+                continue
+    return mapping
 
 
 def _wait_for_snapshots(ib: IB, snaps: list[tuple], timeout=8.0):
@@ -490,7 +511,11 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
 
     # ── one-shot snapshot fallback for missing price / IV / OI ──
     for con, tk in snapshots:
-        oi_names = ("callOpenInterest", "openInterest") if con.right == "C" else ("putOpenInterest", "openInterest")
+        oi_names = (
+            ("callOpenInterest", "openInterest")
+            if con.right == "C"
+            else ("putOpenInterest", "openInterest")
+        )
         price_missing = (tk.bid in (None, -1)) and (tk.last in (None, -1))
         iv_missing = math.isnan(_g(tk, "impliedVolatility"))
         oi_missing = math.isnan(_open_interest_value(tk, con.right))
@@ -581,11 +606,24 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             }
         )
 
-    return (
+    df = (
         pd.DataFrame(rows).sort_values(["right", "strike"]).reset_index(drop=True)
         if rows
         else pd.DataFrame()
     )
+
+    if not df.empty and df["open_interest"].isna().any():
+        yf_map = fetch_yf_open_interest(symbol, expiry)
+        for (strike, right), oi in yf_map.items():
+            mask = (
+                (df["strike"] == strike)
+                & (df["right"] == right)
+                & df["open_interest"].isna()
+            )
+            if mask.any():
+                df.loc[mask, "open_interest"] = oi
+
+    return df
 
 
 # ─────────────────────────── MAIN ──────────────────────────
