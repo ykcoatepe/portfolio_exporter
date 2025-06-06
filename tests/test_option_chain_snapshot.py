@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta
 
 # Provide minimal stubs so import works without optional packages
@@ -49,6 +50,20 @@ class ChooseExpiryTests(unittest.TestCase):
         other = (today + timedelta(days=days+2)).strftime('%Y%m%d')
         result = oc.choose_expiry([other, friday])
         self.assertEqual(result, friday)
+
+
+class PromptSymbolExpiriesTests(unittest.TestCase):
+    def test_prompt_symbol_expiries(self):
+        seq = iter([
+            "AAPL",
+            "20240101,20240108",
+            "TSLA",
+            "",
+            "",
+        ])
+        with patch("builtins.input", lambda _: next(seq)):
+            result = oc.prompt_symbol_expiries()
+        self.assertEqual(result, {"AAPL": ["20240101", "20240108"], "TSLA": []})
 
 
 
