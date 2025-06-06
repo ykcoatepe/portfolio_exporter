@@ -27,7 +27,7 @@ from typing import Any
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import List, Sequence
 from zoneinfo import ZoneInfo
 
@@ -163,10 +163,13 @@ def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
     """
     Smart expiry picker that honours a user *hint*.
 
-    • exact YYYYMMDD → use if available
-    • YYYYMM prefix → choose 3rd Friday of that month, else first expiry
-    • month name/abbr (“july”) → same logic across any year
-    • otherwise falls back to `choose_expiry`.
+    Supported hint formats:
+    • exact ``YYYYMMDD`` → use if available
+    • ``YYYYMM`` prefix → choose 3rd Friday of that month, else first expiry
+    • month name/abbr (``july``) → same logic across any year
+    • ``day month`` (``26 jun``/``jun 26``/``26/06``) → nearest expiry on or
+      after that date
+    • otherwise falls back to :func:`choose_expiry`.
     """
     if not expirations:
         raise ValueError("Expirations list cannot be empty.")
@@ -196,6 +199,31 @@ def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
             return fridays[0] if fridays else m[0]
 
     # month name / abbr
+    # day + month input
+    def parse_day_month(h: str) -> tuple[int, int] | tuple[None, None]:
+        fmts = ["%d %b", "%d %B", "%b %d", "%B %d", "%d/%m", "%d-%m", "%d.%m"]
+        for fmt in fmts:
+            try:
+                dt = datetime.strptime(h, fmt)
+                return dt.day, dt.month
+            except ValueError:
+                continue
+        return None, None
+
+    day, month = parse_day_month(hint)
+    if day:
+        first_year = datetime.strptime(expirations[0], "%Y%m%d").year
+        candidate = date(first_year, month, day)
+        for e in expirations:
+            ed = datetime.strptime(e, "%Y%m%d").date()
+            if ed >= candidate:
+                return e
+        candidate = date(first_year + 1, month, day)
+        for e in expirations:
+            ed = datetime.strptime(e, "%Y%m%d").date()
+            if ed >= candidate:
+                return e
+
     try:
         month_idx = datetime.strptime(hint[:3], "%b").month
     except ValueError:
@@ -551,7 +579,7 @@ def main():
     expiry_hint = None
     if not portfolio_mode and not args.symbol_expiries and not interactive:
         hint = input(
-            "Desired expiry (YYYYMMDD / YYYYMM / month name), leave empty for auto: "
+            "Desired expiry (YYYYMMDD / YYYYMM / month name / day month), leave empty for auto: "
         ).strip()
         expiry_hint = hint or None
 
