@@ -294,6 +294,12 @@ def _g(tk, field):
     return np.nan
 
 
+def _attr(tk, field):
+    """Return a numeric ticker attribute or NaN if unavailable."""
+    val = getattr(tk, field, np.nan)
+    return np.nan if val in (None, -1) else val
+
+
 def _wait_for_snapshots(ib: IB, snaps: list[tuple], timeout=8.0):
     """Wait until all tickers have a non-None timestamp or timeout."""
     end = time.time() + timeout
@@ -453,7 +459,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     for con, tk in snapshots:
         price_missing = (tk.bid in (None, -1)) and (tk.last in (None, -1))
         iv_missing = math.isnan(_g(tk, "impliedVolatility"))
-        oi_missing = math.isnan(_g(tk, "openInterest"))
+        oi_missing = math.isnan(_attr(tk, "openInterest"))
         if price_missing or iv_missing or oi_missing:
             snap = ib.reqMktData(
                 con, "", True, False
@@ -468,8 +474,11 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             # Copy openInterest if present
             if getattr(snap, "openInterest", None) not in (None, -1):
                 tk.openInterest = snap.openInterest
+            # Copy volume if present
+            if getattr(snap, "volume", None) not in (None, -1):
+                tk.volume = snap.volume
             # second pass just for open‑interest if it's still missing
-            if math.isnan(_g(tk, "openInterest")):
+            if math.isnan(_attr(tk, "openInterest")):
                 # stream OI via generic tick 101
                 snap_oi = ib.reqMktData(
                     con,
@@ -531,7 +540,8 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                 "gamma": gamma_val,
                 "vega": vega_val,
                 "theta": theta_val,
-                "open_interest": _g(tk, "openInterest"),
+                "open_interest": _attr(tk, "openInterest"),
+                "volume": _attr(tk, "volume"),
             }
         )
 
