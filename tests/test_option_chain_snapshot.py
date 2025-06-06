@@ -50,5 +50,32 @@ class ChooseExpiryTests(unittest.TestCase):
         result = oc.choose_expiry([other, friday])
         self.assertEqual(result, friday)
 
+
+class PickExpiryWithHintTests(unittest.TestCase):
+    def test_yyyymm_hint_third_friday(self):
+        expirations = [
+            "20240607",
+            "20240614",
+            "20240621",
+            "20240628",
+        ]
+        result = oc.pick_expiry_with_hint(expirations, "202406")
+        self.assertEqual(result, "20240621")
+
+    def test_month_name_hint(self):
+        expirations = [
+            "20240517",
+            "20240621",
+            "20250620",
+        ]
+        result = oc.pick_expiry_with_hint(expirations, "June")
+        self.assertEqual(result, "20240621")
+
+    def test_fallback_when_hint_missing(self):
+        expirations = ["20251205", "20251212", "20251219"]
+        expected = oc.choose_expiry(sorted(expirations))
+        result = oc.pick_expiry_with_hint(expirations, "March")
+        self.assertEqual(result, expected)
+
 if __name__ == '__main__':
     unittest.main()
