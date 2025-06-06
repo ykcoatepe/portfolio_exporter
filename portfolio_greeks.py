@@ -23,6 +23,7 @@ import os
 import sys
 import json
 import requests
+import calendar
 import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -179,6 +180,20 @@ DEFAULT_MULT = {
     "STK": 1,
     "CASH": 100_000,  # treat FX as notional per lot
 }
+
+# ───────────────────── expiry normaliser for Yahoo OI ─────────────────────
+def _normalised_expiry(exp_str: str) -> str:
+    """
+    Convert IB expiry (YYYYMMDD or YYYYMM) to a canonical key so that we
+    hit the right cache entry when calling fetch_yf_open_interest.
+    YYYYMM    → YYYYMM   (monthly)
+    YYYYMMDD  → YYYYMMDD (weekly)
+    """
+    if len(exp_str) == 6 and exp_str.isdigit():          # monthly
+        return exp_str
+    elif len(exp_str) >= 8 and exp_str[:8].isdigit():    # weekly/full
+        return exp_str[:8]
+    return exp_str
 
 # tunables
 TIMEOUT_SECONDS = 40  # seconds to wait for model-Greeks before falling back
@@ -465,12 +480,15 @@ def main() -> None:
                     if math.isnan(greeks[k]):
                         greeks[k] = bs[k]
 
-        # ---- open-interest from Yahoo Finance ----
-        oi_key = (c.symbol, getattr(c, "lastTradeDateOrContractMonth", ""))
+        # ---- open‑interest from Yahoo Finance (cached) ----
+        raw_exp = getattr(c, "lastTradeDateOrContractMonth", "")
+        exp_key = _normalised_expiry(raw_exp)
+        oi_key = (c.symbol, exp_key)
         if oi_key not in yf_oi_cache:
             yf_oi_cache[oi_key] = fetch_yf_open_interest(oi_key[0], oi_key[1])
         open_int = yf_oi_cache[oi_key].get(
-            (getattr(c, "strike", np.nan), getattr(c, "right", "")), np.nan
+            (getattr(c, "strike", np.nan), getattr(c, "right", "")),
+            np.nan,
         )
 
         # ---- robust volume ----
