@@ -17,6 +17,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+from typing import List, Dict
 import numpy as np
 import yfinance as yf
 
@@ -66,6 +67,7 @@ OUTPUT_DIR = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"live_quotes_{DATE_TAG}_{TIME_TAG}.csv")
+OUTPUT_POS_CSV = os.path.join(OUTPUT_DIR, f"live_positions_{DATE_TAG}_{TIME_TAG}.csv")
 
 IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 2     # separate clientId
 IB_TIMEOUT = 4.0                                     # seconds to wait per batch
@@ -291,6 +293,54 @@ def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
             logging.warning("FRED miss %s: %s", t, e)
     return pd.DataFrame(rows)
 
+# -------------------- POSITION P&L SNAPSHOT --------------------
+def fetch_live_positions(ib: 'IB') -> pd.DataFrame:
+    """
+    Return a DataFrame with real‑time P&L for ALL open positions in the account.
+
+    Columns: timestamp · symbol · secType · position · avg_cost · last ·
+             market_value · unrealized_pnl
+    """
+    try:
+        positions = ib.positions()
+    except Exception as e:
+        logging.warning("IB positions() failed: %s", e)
+        return pd.DataFrame()
+
+    rows: List[Dict] = []
+    ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+    # prepare market‑data requests
+    md_reqs = {}
+    for pos in positions:
+        con = pos.contract
+        try:
+            ql, = ib.qualifyContracts(con)
+            md = ib.reqMktData(ql, "", False, False)
+            md_reqs[con.conId] = (con, md, pos.avgCost, pos.position)
+        except Exception:
+            continue
+
+    ib.sleep(IB_TIMEOUT)  # allow quotes to update
+
+    for conId, (con, md, avg_cost, qty) in md_reqs.items():
+        last = md.last or md.close or np.nan
+        market_val = last * qty * (int(con.multiplier) if con.multiplier else 1)
+        unreal_pnl = (last - avg_cost) * qty * (int(con.multiplier) if con.multiplier else 1)
+        rows.append({
+            "timestamp": ts_now,
+            "symbol": con.symbol,
+            "secType": con.secType,
+            "position": qty,
+            "avg_cost": avg_cost,
+            "last": last,
+            "market_value": market_val,
+            "unrealized_pnl": unreal_pnl
+        })
+        ib.cancelMktData(md.contract)
+
+    return pd.DataFrame(rows)
+
 # -------------------------- MAIN ---------------------------
 def main():
     tickers = load_tickers()
@@ -322,6 +372,19 @@ def main():
     df.insert(0, "timestamp", ts_now)
     df.to_csv(OUTPUT_CSV, index=False)
     logging.info("Saved %d quotes → %s", len(df), OUTPUT_CSV)
+
+    # --- live positions snapshot ---------------------------------
+    if IB_AVAILABLE:
+        ib_live = IB()
+        try:
+            ib_live.connect(IB_HOST, IB_PORT, clientId=98, timeout=3)
+            df_pos = fetch_live_positions(ib_live)
+            ib_live.disconnect()
+            if not df_pos.empty:
+                df_pos.to_csv(OUTPUT_POS_CSV, index=False)
+                logging.info("Saved %d live positions → %s", len(df_pos), OUTPUT_POS_CSV)
+        except Exception as e:
+            logging.warning("Live position snapshot failed: %s", e)
 
 if __name__ == "__main__":
     main()
