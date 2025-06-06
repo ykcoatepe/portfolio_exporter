@@ -1,3 +1,7 @@
 # Ignore large dataset files
 historic_prices.csv
 portfolio_*.csv
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
