@@ -229,6 +229,23 @@ def parse_symbol_expiries(spec: str) -> dict[str, list[str]]:
     return mapping
 
 
+def prompt_symbol_expiries() -> dict[str, list[str]]:
+    """Interactively build a symbol→expiry map."""
+    result: dict[str, list[str]] = {}
+    while True:
+        symbol = input("Symbol (blank to finish): ").strip()
+        if not symbol:
+            break
+        symbol = symbol.upper()
+        exp = input(
+            f"Expiries for {symbol} (comma-separated, blank for auto): "
+        ).strip()
+        entry = parse_symbol_expiries(f"{symbol}:{exp}" if exp else symbol)
+        for sym, vals in entry.items():
+            result.setdefault(sym, []).extend(vals)
+    return result
+
+
 # ─────────── Black–Scholes fallback (for delayed feeds) ───────────
 
 
@@ -506,32 +523,33 @@ def main():
         sys.exit(1)
 
     # decide symbols / expiries
+    interactive = False
     if args.symbol_expiries:
         if args.symbols:
             parser.error("--symbols cannot be used with --symbol-expiries")
         se_map = parse_symbol_expiries(args.symbol_expiries)
         symbols = list(se_map)
-        raw = None
+        interactive = False
     elif args.symbols:
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
         se_map = {s: [] for s in symbols}
-        raw = None
+        interactive = False
     else:
-        raw = input("Symbols to snapshot (comma separated) — leave empty for portfolio: ").strip()
-        symbols = (
-            [s.strip().upper() for s in raw.split(",") if s.strip()]
-            if raw
-            else get_portfolio_tickers(ib) or load_tickers_from_files()
-        )
-        se_map = {s: [] for s in symbols}
+        se_map = prompt_symbol_expiries()
+        interactive = True
+        if se_map:
+            symbols = list(se_map)
+        else:
+            symbols = get_portfolio_tickers(ib) or load_tickers_from_files()
+            se_map = {s: [] for s in symbols}
 
     if not symbols:
         logger.error("No symbols to process — aborting.")
         sys.exit(1)
 
-    portfolio_mode = not args.symbols and not args.symbol_expiries and not raw
+    portfolio_mode = not args.symbols and not args.symbol_expiries and not se_map
     expiry_hint = None
-    if not portfolio_mode and not args.symbol_expiries:
+    if not portfolio_mode and not args.symbol_expiries and not interactive:
         hint = input(
             "Desired expiry (YYYYMMDD / YYYYMM / month name), leave empty for auto: "
         ).strip()
