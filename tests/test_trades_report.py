@@ -63,11 +63,32 @@ class FilterTradesTests(unittest.TestCase):
         ]
         self.trades = [
             tr.Trade(
-                pd.to_datetime(r["date"]).date(),
-                r["ticker"],
-                r["side"],
-                r["qty"],
-                r["price"],
+                exec_id="0",
+                perm_id=0,
+                order_id=0,
+                symbol=r["ticker"],
+                sec_type="STK",
+                currency="USD",
+                expiry=None,
+                strike=None,
+                right=None,
+                multiplier=None,
+                exchange="",
+                primary_exchange=None,
+                trading_class=None,
+                datetime=pd.to_datetime(r["date"]),
+                side=r["side"],
+                qty=r["qty"],
+                price=r["price"],
+                avg_price=r["price"],
+                cum_qty=r["qty"],
+                last_liquidity="",
+                commission=None,
+                commission_currency=None,
+                realized_pnl=None,
+                account=None,
+                model_code=None,
+                order_ref=None,
             )
             for r in data
         ]
@@ -76,9 +97,8 @@ class FilterTradesTests(unittest.TestCase):
         start, end = date(2024, 6, 1), date(2024, 6, 30)
         res = tr.filter_trades(self.trades, start, end)
         self.assertEqual(len(res), 2)
-        self.assertEqual(res[0].ticker, "A")
-        self.assertEqual(res[1].ticker, "B")
-
+        self.assertEqual(res[0].symbol, "A")
+        self.assertEqual(res[1].symbol, "B")
 
 
 if __name__ == "__main__":
