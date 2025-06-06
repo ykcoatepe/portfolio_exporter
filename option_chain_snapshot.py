@@ -114,7 +114,11 @@ PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 10
 LOG_FMT = "%(asctime)s %(levelname)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FMT)
+
 logger = logging.getLogger(__name__)
+# silence routine IBKR chatter – only show CRITICAL
+for _n in ("ib_insync", "ib_insync.ib", "ib_insync.wrapper"):
+    logging.getLogger(_n).setLevel(logging.CRITICAL)
 
 # optional progress bar
 try:
@@ -294,10 +298,29 @@ def _g(tk, field):
     return np.nan
 
 
+
 def _attr(tk, field):
     """Return a numeric ticker attribute or NaN if unavailable."""
     val = getattr(tk, field, np.nan)
     return np.nan if val in (None, -1) else val
+
+# ── helper: robust open‑interest getter ──
+def _open_interest_value(tk, right: str):
+    """
+    Return the first non‑NaN open‑interest value available for this option.
+    For calls we prefer `callOpenInterest`, for puts `putOpenInterest`,
+    but we gracefully fall back to the generic `openInterest` field if
+    the side‑specific attribute isn’t populated (older API / data source).
+    """
+    if right == "C":
+        names = ("callOpenInterest", "openInterest")
+    else:
+        names = ("putOpenInterest", "openInterest")
+    for nm in names:
+        val = _attr(tk, nm)
+        if not np.isnan(val):
+            return val
+    return np.nan
 
 
 def _wait_for_snapshots(ib: IB, snaps: list[tuple], timeout=8.0):
@@ -467,9 +490,10 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
 
     # ── one-shot snapshot fallback for missing price / IV / OI ──
     for con, tk in snapshots:
+        oi_names = ("callOpenInterest", "openInterest") if con.right == "C" else ("putOpenInterest", "openInterest")
         price_missing = (tk.bid in (None, -1)) and (tk.last in (None, -1))
         iv_missing = math.isnan(_g(tk, "impliedVolatility"))
-        oi_missing = math.isnan(_attr(tk, "openInterest"))
+        oi_missing = math.isnan(_open_interest_value(tk, con.right))
         if price_missing or iv_missing or oi_missing:
             snap = ib.reqMktData(
                 con, "", True, False
@@ -481,14 +505,15 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                     setattr(tk, fld, val)
             if getattr(snap, "modelGreeks", None):
                 tk.modelGreeks = snap.modelGreeks
-            # Copy openInterest if present
-            if getattr(snap, "openInterest", None) not in (None, -1):
-                tk.openInterest = snap.openInterest
+            # Copy open‑interest (try both side‑specific and generic)
+            for nm in oi_names:
+                if getattr(snap, nm, None) not in (None, -1):
+                    setattr(tk, nm, getattr(snap, nm))
             # Copy volume if present
             if getattr(snap, "volume", None) not in (None, -1):
                 tk.volume = snap.volume
             # second pass just for open‑interest if it's still missing
-            if math.isnan(_attr(tk, "openInterest")):
+            if math.isnan(_open_interest_value(tk, con.right)):
                 # stream OI via generic tick 101
                 snap_oi = ib.reqMktData(
                     con,
@@ -496,9 +521,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                     snapshot=False,
                     regulatorySnapshot=False,
                 )
-                _wait_attr(snap_oi, "openInterest")
-                if getattr(snap_oi, "openInterest", None) not in (None, -1):
-                    tk.openInterest = snap_oi.openInterest
+                _wait_attr(snap_oi, oi_names[0])
+                if getattr(snap_oi, oi_names[0], None) not in (None, -1):
+                    setattr(tk, oi_names[0], getattr(snap_oi, oi_names[0]))
                 if snap_oi.contract:
                     ib.cancelMktData(snap_oi.contract)
             if snap.contract:
@@ -509,6 +534,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     ts = ts_local.isoformat()
     rows = []
     for con, tk in snapshots:
+        oi_attr = "callOpenInterest" if con.right == "C" else "putOpenInterest"
         iv_val = _g(tk, "impliedVolatility")
         delta_val = _g(tk, "delta")
         gamma_val = _g(tk, "gamma")
@@ -550,7 +576,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                 "gamma": gamma_val,
                 "vega": vega_val,
                 "theta": theta_val,
-                "open_interest": _attr(tk, "openInterest"),
+                "open_interest": _open_interest_value(tk, con.right),
                 "volume": _attr(tk, "volume"),
             }
         )

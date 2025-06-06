@@ -39,15 +39,19 @@ from ib_insync.contract import Contract
 
 try:
     from tqdm import tqdm
-
+    # Re‑enable progress‑bar printing
     PROGRESS = True
 except ImportError:
     PROGRESS = False
 
 # ────────────────────── logging setup (must precede helpers) ─────────────────────
 LOG_FMT = "%(asctime)s %(levelname)s %(name)s %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FMT)
+# Default to WARNING to keep console noise down
+logging.basicConfig(level=logging.WARNING, format=LOG_FMT)
 logger = logging.getLogger(__name__)
+# Silence verbose ib_insync chatter – only show truly critical issues
+for _n in ("ib_insync", "ib_insync.ib", "ib_insync.wrapper"):
+    logging.getLogger(_n).setLevel(logging.CRITICAL)
 
 # ─────────────────────────  draw-down helpers  ──────────────────────────
 
