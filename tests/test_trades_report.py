@@ -3,6 +3,7 @@ from datetime import date
 
 import pandas as pd
 
+
 import trades_report as tr
 
 
@@ -77,6 +78,7 @@ class FilterTradesTests(unittest.TestCase):
         self.assertEqual(len(res), 2)
         self.assertEqual(res[0].ticker, "A")
         self.assertEqual(res[1].ticker, "B")
+
 
 
 if __name__ == "__main__":

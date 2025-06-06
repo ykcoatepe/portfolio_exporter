@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Trade history filter with convenient date phrases."""
+
 
 from __future__ import annotations
 
@@ -8,10 +8,11 @@ import calendar
 import csv
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-import re
+
 from typing import Iterable, List, Tuple
 
 import pandas as pd
+
 
 
 @dataclass
@@ -26,14 +27,6 @@ class Trade:
 MONTH_MAP = {m.lower(): i for i, m in enumerate(calendar.month_name) if m}
 MONTH_MAP.update({m.lower(): i for i, m in enumerate(calendar.month_abbr) if m})
 
-
-def load_trades(path: str) -> List[Trade]:
-    df = pd.read_csv(path, parse_dates=["date"])
-    trades = [
-        Trade(r.date.date(), r.ticker, r.side, int(r.qty), float(r.price))
-        for r in df.itertuples(index=False)
-    ]
-    return trades
 
 
 def date_range_from_phrase(phrase: str, ref: date | None = None) -> Tuple[date, date]:
@@ -79,7 +72,7 @@ def main() -> None:
     g.add_argument("--phrase", help="Custom date phrase, e.g. 'June 2024'")
     g.add_argument("--start")
     p.add_argument("--end")
-    p.add_argument("--file", default="sample_trades.csv", help="CSV file")
+
     args = p.parse_args()
 
     if args.today:
@@ -98,15 +91,5 @@ def main() -> None:
         p.print_help()
         return
 
-    trades = load_trades(args.file)
-    selected = filter_trades(trades, start, end)
-    writer = csv.writer(sys.stdout)
-    writer.writerow(["date", "ticker", "side", "qty", "price"])
-    for t in selected:
-        writer.writerow([t.date.isoformat(), t.ticker, t.side, t.qty, f"{t.price:.2f}"])
-
-
-if __name__ == "__main__":
-    import sys
 
     main()
