@@ -59,7 +59,26 @@ python update_tickers.py
 
 # Calculate technical indicators using IBKR data
 python tech_signals_ibkr.py
+
+# Interactively choose symbols and expiries
+python option_chain_snapshot.py
+
+# Option-chain snapshot for specific symbols and expiries
+python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL:20250620'
 ```
+
+### Expiry hint formats
+
+When prompted for an expiry, you may provide:
+
+* Exact date ``YYYYMMDD``
+* ``YYYYMM`` to select the third Friday of that month (or the first listed expiry)
+* Month name or abbreviation (e.g. ``June`` or ``Jun``)
+* Day and month like ``26 Jun``, ``Jun 26`` or ``26/06``. The script picks the
+  nearest available expiry on or after that date.
+
+Leaving the field blank automatically chooses the next weekly expiry within a
+week or the first Friday that is available.
 
 ## IBKR Setup
 

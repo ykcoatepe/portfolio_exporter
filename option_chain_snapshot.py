@@ -14,6 +14,9 @@ $ python option_chain_snapshot.py
 
 # snapshot only MSFT and QQQ
 $ python option_chain_snapshot.py --symbols MSFT,QQQ
+
+# snapshot TSLA for two expiries and AAPL for one
+$ python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL:20250620'
 """
 
 import argparse
@@ -24,7 +27,7 @@ from typing import Any
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import List, Sequence
 from zoneinfo import ZoneInfo
 
@@ -34,6 +37,7 @@ from ib_insync import IB, Option, Stock
 from utils.bs import bs_greeks
 
 from bisect import bisect_left
+
 
 # ── helper: get reliable split‑adjusted spot ──
 def _safe_spot(ib: IB, stk: Stock, streaming_tk):
@@ -48,14 +52,15 @@ def _safe_spot(ib: IB, stk: Stock, streaming_tk):
     # pull adjusted close (1‑day bar, regular trading hours)
     bars = ib.reqHistoricalData(
         stk,
-        endDateTime='',
-        durationStr='1 D',
-        barSizeSetting='1 day',
-        whatToShow='TRADES',
+        endDateTime="",
+        durationStr="1 D",
+        barSizeSetting="1 day",
+        whatToShow="TRADES",
         useRTH=True,
         formatDate=1,
     )
     return bars[-1].close if bars else np.nan
+
 
 # ─────────── contract resolution helper ───────────
 def _resolve_contract(ib: IB, template: Option):
@@ -97,10 +102,10 @@ def _resolve_contract(ib: IB, template: Option):
             return cd.contract
     return cds[0].contract
 
+
 # ───────────────────────── CONFIG ──────────────────────────
 OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/"
-    "com~apple~CloudDocs/Downloads"
+    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
 )
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -160,10 +165,13 @@ def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
     """
     Smart expiry picker that honours a user *hint*.
 
-    • exact YYYYMMDD → use if available
-    • YYYYMM prefix → choose 3rd Friday of that month, else first expiry
-    • month name/abbr (“july”) → same logic across any year
-    • otherwise falls back to `choose_expiry`.
+    Supported hint formats:
+    • exact ``YYYYMMDD`` → use if available
+    • ``YYYYMM`` prefix → choose 3rd Friday of that month, else first expiry
+    • month name/abbr (``july``) → same logic across any year
+    • ``day month`` (``26 jun``/``jun 26``/``26/06``) → nearest expiry on or
+      after that date
+    • otherwise falls back to :func:`choose_expiry`.
     """
     if not expirations:
         raise ValueError("Expirations list cannot be empty.")
@@ -193,6 +201,31 @@ def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
             return fridays[0] if fridays else m[0]
 
     # month name / abbr
+    # day + month input
+    def parse_day_month(h: str) -> tuple[int, int] | tuple[None, None]:
+        fmts = ["%d %b", "%d %B", "%b %d", "%B %d", "%d/%m", "%d-%m", "%d.%m"]
+        for fmt in fmts:
+            try:
+                dt = datetime.strptime(h, fmt)
+                return dt.day, dt.month
+            except ValueError:
+                continue
+        return None, None
+
+    day, month = parse_day_month(hint)
+    if day:
+        first_year = datetime.strptime(expirations[0], "%Y%m%d").year
+        candidate = date(first_year, month, day)
+        for e in expirations:
+            ed = datetime.strptime(e, "%Y%m%d").date()
+            if ed >= candidate:
+                return e
+        candidate = date(first_year + 1, month, day)
+        for e in expirations:
+            ed = datetime.strptime(e, "%Y%m%d").date()
+            if ed >= candidate:
+                return e
+
     try:
         month_idx = datetime.strptime(hint[:3], "%b").month
     except ValueError:
@@ -204,6 +237,43 @@ def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
             return fridays[0] if fridays else same_month[0]
 
     return choose_expiry(expirations)
+
+
+# ──────── per-symbol expiry map parser ────────
+def parse_symbol_expiries(spec: str) -> dict[str, list[str]]:
+    """Parse 'TSLA:20250620,20250703;AAPL:20250620' style strings."""
+    mapping: dict[str, list[str]] = {}
+    for part in spec.split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            sym, exp_str = part.split(":", 1)
+            expiries = [e.strip() for e in exp_str.split(",") if e.strip()]
+        else:
+            sym, expiries = part, []
+        sym = sym.strip().upper()
+        if not sym:
+            continue
+        mapping.setdefault(sym, []).extend(expiries)
+    return mapping
+
+
+def prompt_symbol_expiries() -> dict[str, list[str]]:
+    """Interactively build a symbol→expiry map."""
+    result: dict[str, list[str]] = {}
+    while True:
+        symbol = input("Symbol (blank to finish): ").strip()
+        if not symbol:
+            break
+        symbol = symbol.upper()
+        exp = input(
+            f"Expiries for {symbol} (comma-separated, blank for auto): "
+        ).strip()
+        entry = parse_symbol_expiries(f"{symbol}:{exp}" if exp else symbol)
+        for sym, vals in entry.items():
+            result.setdefault(sym, []).extend(vals)
+    return result
 
 
 # ─────────── Black–Scholes fallback (for delayed feeds) ───────────
@@ -299,7 +369,13 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             start = max(0, idx - 20)
             end = min(len(strikes_all), idx + 21)
             strikes = strikes_all[start:end]
-            logger.info("Spot %.2f → selected %d strikes (%s‑%s)", spot, len(strikes), strikes[0], strikes[-1])
+            logger.info(
+                "Spot %.2f → selected %d strikes (%s‑%s)",
+                spot,
+                len(strikes),
+                strikes[0],
+                strikes[-1],
+            )
 
     # ── build contracts and resolve ambiguities ──
     raw_templates = [
@@ -310,7 +386,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             right,
             exchange="SMART",
             currency="USD",
-            tradingClass=root_tc,   # <‑‑ add this
+            tradingClass=root_tc,  # <‑‑ add this
         )
         for strike in strikes
         for right in ("C", "P")
@@ -350,7 +426,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             contracts.append(c)
 
     if not contracts:
-        raise RuntimeError("No option contracts qualified for the chosen strikes / expiry")
+        raise RuntimeError(
+            "No option contracts qualified for the chosen strikes / expiry"
+        )
 
     # stream market data (need streaming for generic-tick 101)
     snapshots = [
@@ -358,7 +436,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             c,
             ib.reqMktData(
                 c,
-                "",            # let IB decide tick types; avoids eid errors
+                "",  # let IB decide tick types; avoids eid errors
                 snapshot=False,
                 regulatorySnapshot=False,
             ),
@@ -373,11 +451,13 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
 
     # ── one-shot snapshot fallback for missing price / IV / OI ──
     for con, tk in snapshots:
-        price_missing = ((tk.bid in (None, -1)) and (tk.last in (None, -1)))
+        price_missing = (tk.bid in (None, -1)) and (tk.last in (None, -1))
         iv_missing = math.isnan(_g(tk, "impliedVolatility"))
         oi_missing = math.isnan(_g(tk, "openInterest"))
         if price_missing or iv_missing or oi_missing:
-            snap = ib.reqMktData(con, "", True, False)  # snapshot: genericTickList must be empty
+            snap = ib.reqMktData(
+                con, "", True, False
+            )  # snapshot: genericTickList must be empty
             ib.sleep(0.35)
             for fld in ("bid", "ask", "last", "close", "impliedVolatility"):
                 val = getattr(snap, fld, None)
@@ -390,8 +470,14 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                 tk.openInterest = snap.openInterest
             # second pass just for open‑interest if it's still missing
             if math.isnan(_g(tk, "openInterest")):
-                snap_oi = ib.reqMktData(con, "101", True, False)  # generic‑tick 101 = OI
-                ib.sleep(0.35)
+                # stream OI via generic tick 101
+                snap_oi = ib.reqMktData(
+                    con,
+                    "101",
+                    snapshot=False,
+                    regulatorySnapshot=False,
+                )
+                ib.sleep(0.8)
                 if getattr(snap_oi, "openInterest", None) not in (None, -1):
                     tk.openInterest = snap_oi.openInterest
                 if snap_oi.contract:
@@ -413,19 +499,21 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         # Black-Scholes fallback if still NaN
         if any(np.isnan(x) for x in (delta_val, gamma_val, vega_val, theta_val)):
             if spot and iv_val and not np.isnan(iv_val):
-                exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(tzinfo=timezone.utc)
-                T = max((exp_dt - datetime.now(timezone.utc)).total_seconds() / (365 * 24 * 3600), 1 / (365 * 24))
+                exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(
+                    tzinfo=timezone.utc
+                )
+                T = max(
+                    (exp_dt - datetime.now(timezone.utc)).total_seconds()
+                    / (365 * 24 * 3600),
+                    1 / (365 * 24),
+                )
                 bs = bs_greeks(spot, con.strike, T, 0.01, iv_val, con.right == "C")
                 delta_val = bs["delta"] if np.isnan(delta_val) else delta_val
                 gamma_val = bs["gamma"] if np.isnan(gamma_val) else gamma_val
                 vega_val = bs["vega"] if np.isnan(vega_val) else vega_val
                 theta_val = bs["theta"] if np.isnan(theta_val) else theta_val
 
-        mid_price = (
-            np.nan
-            if any(np.isnan([tk.bid, tk.ask]))
-            else (tk.bid + tk.ask) / 2
-        )
+        mid_price = np.nan if any(np.isnan([tk.bid, tk.ask])) else (tk.bid + tk.ask) / 2
 
         rows.append(
             {
@@ -457,7 +545,16 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
 # ─────────────────────────── MAIN ──────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Option-chain snapshot exporter")
-    parser.add_argument("--symbols", type=str, help="Comma-separated tickers (overrides portfolio).")
+    parser.add_argument(
+        "--symbols", type=str, help="Comma-separated tickers (overrides portfolio)."
+    )
+    parser.add_argument(
+        "--symbol-expiries",
+        type=str,
+        help=(
+            "Semi-colon separated SYM:EXP list, e.g. 'TSLA:20250620,20250703;AAPL:20250620'."
+        ),
+    )
     args = parser.parse_args()
 
     ib = IB()
@@ -475,26 +572,37 @@ def main():
         logger.error("IBKR connection failed: %s", exc)
         sys.exit(1)
 
-    # decide symbols
-    if args.symbols:
+    # decide symbols / expiries
+    interactive = False
+    if args.symbol_expiries:
+        if args.symbols:
+            parser.error("--symbols cannot be used with --symbol-expiries")
+        se_map = parse_symbol_expiries(args.symbol_expiries)
+        symbols = list(se_map)
+        interactive = False
+    elif args.symbols:
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-        raw = None
+        se_map = {s: [] for s in symbols}
+        interactive = False
     else:
-        raw = input("Symbols to snapshot (comma separated) — leave empty for portfolio: ").strip()
-        symbols = (
-            [s.strip().upper() for s in raw.split(",") if s.strip()]
-            if raw
-            else get_portfolio_tickers(ib) or load_tickers_from_files()
-        )
+        se_map = prompt_symbol_expiries()
+        interactive = True
+        if se_map:
+            symbols = list(se_map)
+        else:
+            symbols = get_portfolio_tickers(ib) or load_tickers_from_files()
+            se_map = {s: [] for s in symbols}
 
     if not symbols:
         logger.error("No symbols to process — aborting.")
         sys.exit(1)
 
-    portfolio_mode = not args.symbols and not raw
+    portfolio_mode = not args.symbols and not args.symbol_expiries and not se_map
     expiry_hint = None
-    if not portfolio_mode:
-        hint = input("Desired expiry (YYYYMMDD / YYYYMM / month name), leave empty for auto: ").strip()
+    if not portfolio_mode and not args.symbol_expiries and not interactive:
+        hint = input(
+            "Desired expiry (YYYYMMDD / YYYYMM / month name / day month), leave empty for auto: "
+        ).strip()
         expiry_hint = hint or None
 
     logger.info("Symbols: %s", ", ".join(symbols))
@@ -503,25 +611,43 @@ def main():
     date_tag = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     combined = []
     for sym in iterable:
-        try:
-            df = snapshot_chain(ib, sym, expiry_hint)
-            if df.empty:
-                logger.warning("%s – no data", sym)
-                continue
-            if portfolio_mode:
-                combined.append(df)
-            else:
-                out_path = os.path.join(OUTPUT_DIR, f"option_chain_{sym}_{date_tag}.csv")
-                df.to_csv(out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f")
-                logger.info("Saved %s (%d rows)", out_path, len(df))
-        except Exception as e:
-            logger.warning("%s – skipped: %s", sym, e)
+        hints = se_map.get(sym, [expiry_hint])
+        hints = hints or [expiry_hint]
+        for hint in hints:
+            try:
+                df = snapshot_chain(ib, sym, hint)
+                if df.empty:
+                    logger.warning("%s %s – no data", sym, hint)
+                    continue
+                if portfolio_mode:
+                    combined.append(df)
+                else:
+                    label = hint if hint else "auto"
+                    out_path = os.path.join(
+                        OUTPUT_DIR,
+                        f"option_chain_{sym}_{label}_{date_tag}.csv",
+                    )
+                    df.to_csv(
+                        out_path,
+                        index=False,
+                        quoting=csv.QUOTE_MINIMAL,
+                        float_format="%.4f",
+                    )
+                    logger.info("Saved %s (%d rows)", out_path, len(df))
+            except Exception as e:
+                logger.warning("%s %s – skipped: %s", sym, hint, e)
 
     if portfolio_mode and combined:
         df_all = pd.concat(combined, ignore_index=True)
         out_path = os.path.join(OUTPUT_DIR, f"option_chain_portfolio_{date_tag}.csv")
-        df_all.to_csv(out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f")
-        logger.info("Saved consolidated portfolio snapshot → %s (%d rows)", out_path, len(df_all))
+        df_all.to_csv(
+            out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f"
+        )
+        logger.info(
+            "Saved consolidated portfolio snapshot → %s (%d rows)",
+            out_path,
+            len(df_all),
+        )
 
     ib.disconnect()
 

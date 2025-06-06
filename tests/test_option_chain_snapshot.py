@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta
 
 # Provide minimal stubs so import works without optional packages
@@ -49,6 +50,38 @@ class ChooseExpiryTests(unittest.TestCase):
         other = (today + timedelta(days=days+2)).strftime('%Y%m%d')
         result = oc.choose_expiry([other, friday])
         self.assertEqual(result, friday)
+
+
+class PromptSymbolExpiriesTests(unittest.TestCase):
+    def test_prompt_symbol_expiries(self):
+        seq = iter([
+            "AAPL",
+            "20240101,20240108",
+            "TSLA",
+            "",
+            "",
+        ])
+        with patch("builtins.input", lambda _: next(seq)):
+            result = oc.prompt_symbol_expiries()
+        self.assertEqual(result, {"AAPL": ["20240101", "20240108"], "TSLA": []})
+
+
+class PickExpiryHintTests(unittest.TestCase):
+    def test_day_month_hint(self):
+        expirations = [
+            "20240621",
+            "20240628",
+            "20240705",
+        ]
+        res1 = oc.pick_expiry_with_hint(expirations, "26 Jun")
+        res2 = oc.pick_expiry_with_hint(expirations, "Jun 26")
+        res3 = oc.pick_expiry_with_hint(expirations, "26/06")
+        self.assertEqual(res1, "20240628")
+        self.assertEqual(res2, "20240628")
+        self.assertEqual(res3, "20240628")
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
