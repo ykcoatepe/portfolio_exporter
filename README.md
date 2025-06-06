@@ -67,6 +67,9 @@ python option_chain_snapshot.py
 python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL:20250620'
 ```
 
+If open interest is missing from the IBKR feed, the script automatically pulls
+the value from Yahoo Finance.
+
 ### Expiry hint formats
 
 When prompted for an expiry, you may provide:

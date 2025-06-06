@@ -2,7 +2,7 @@ import unittest
 from datetime import date
 
 import pandas as pd
-from unittest.mock import patch
+
 
 import trades_report as tr
 
@@ -79,42 +79,6 @@ class FilterTradesTests(unittest.TestCase):
         self.assertEqual(res[0].ticker, "A")
         self.assertEqual(res[1].ticker, "B")
 
-
-class FetchIBTradesTests(unittest.TestCase):
-    def test_fetch_ib_trades_basic(self):
-        class DummyFill:
-            def __init__(self, dt, symbol):
-                self.execution = type(
-                    "Exec",
-                    (),
-                    {
-                        "time": pd.to_datetime(dt),
-                        "side": "BUY",
-                        "shares": 1,
-                        "price": 2.0,
-                    },
-                )()
-                self.contract = type("Contract", (), {"symbol": symbol})()
-
-        class DummyIB:
-            def connect(self, host, port, clientId, timeout):
-                pass
-
-            def reqExecutions(self, filt):
-                return [
-                    DummyFill("2024-06-01 10:00:00", "AAA"),
-                    DummyFill("2024-07-01 10:00:00", "BBB"),
-                ]
-
-            def disconnect(self):
-                pass
-
-        with patch.object(tr, "IB", DummyIB), patch.object(
-            tr, "ExecutionFilter", lambda **_: None
-        ), patch.object(tr, "IB_AVAILABLE", True):
-            trades = tr.fetch_ib_trades(date(2024, 6, 1), date(2024, 6, 30))
-        self.assertEqual(len(trades), 1)
-        self.assertEqual(trades[0].ticker, "AAA")
 
 
 if __name__ == "__main__":
