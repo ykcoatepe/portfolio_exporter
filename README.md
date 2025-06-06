@@ -59,6 +59,9 @@ python update_tickers.py
 
 # Calculate technical indicators using IBKR data
 python tech_signals_ibkr.py
+
+# Option-chain snapshot for specific symbols and expiries
+python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL:20250620'
 ```
 
 ## IBKR Setup

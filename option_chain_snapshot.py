@@ -14,6 +14,9 @@ $ python option_chain_snapshot.py
 
 # snapshot only MSFT and QQQ
 $ python option_chain_snapshot.py --symbols MSFT,QQQ
+
+# snapshot TSLA for two expiries and AAPL for one
+$ python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL:20250620'
 """
 
 import argparse
@@ -204,6 +207,26 @@ def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
             return fridays[0] if fridays else same_month[0]
 
     return choose_expiry(expirations)
+
+
+# ──────── per-symbol expiry map parser ────────
+def parse_symbol_expiries(spec: str) -> dict[str, list[str]]:
+    """Parse 'TSLA:20250620,20250703;AAPL:20250620' style strings."""
+    mapping: dict[str, list[str]] = {}
+    for part in spec.split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            sym, exp_str = part.split(":", 1)
+            expiries = [e.strip() for e in exp_str.split(",") if e.strip()]
+        else:
+            sym, expiries = part, []
+        sym = sym.strip().upper()
+        if not sym:
+            continue
+        mapping.setdefault(sym, []).extend(expiries)
+    return mapping
 
 
 # ─────────── Black–Scholes fallback (for delayed feeds) ───────────
@@ -458,6 +481,13 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
 def main():
     parser = argparse.ArgumentParser(description="Option-chain snapshot exporter")
     parser.add_argument("--symbols", type=str, help="Comma-separated tickers (overrides portfolio).")
+    parser.add_argument(
+        "--symbol-expiries",
+        type=str,
+        help=(
+            "Semi-colon separated SYM:EXP list, e.g. 'TSLA:20250620,20250703;AAPL:20250620'."
+        ),
+    )
     args = parser.parse_args()
 
     ib = IB()
@@ -475,9 +505,16 @@ def main():
         logger.error("IBKR connection failed: %s", exc)
         sys.exit(1)
 
-    # decide symbols
-    if args.symbols:
+    # decide symbols / expiries
+    if args.symbol_expiries:
+        if args.symbols:
+            parser.error("--symbols cannot be used with --symbol-expiries")
+        se_map = parse_symbol_expiries(args.symbol_expiries)
+        symbols = list(se_map)
+        raw = None
+    elif args.symbols:
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+        se_map = {s: [] for s in symbols}
         raw = None
     else:
         raw = input("Symbols to snapshot (comma separated) — leave empty for portfolio: ").strip()
@@ -486,15 +523,18 @@ def main():
             if raw
             else get_portfolio_tickers(ib) or load_tickers_from_files()
         )
+        se_map = {s: [] for s in symbols}
 
     if not symbols:
         logger.error("No symbols to process — aborting.")
         sys.exit(1)
 
-    portfolio_mode = not args.symbols and not raw
+    portfolio_mode = not args.symbols and not args.symbol_expiries and not raw
     expiry_hint = None
-    if not portfolio_mode:
-        hint = input("Desired expiry (YYYYMMDD / YYYYMM / month name), leave empty for auto: ").strip()
+    if not portfolio_mode and not args.symbol_expiries:
+        hint = input(
+            "Desired expiry (YYYYMMDD / YYYYMM / month name), leave empty for auto: "
+        ).strip()
         expiry_hint = hint or None
 
     logger.info("Symbols: %s", ", ".join(symbols))
@@ -503,19 +543,31 @@ def main():
     date_tag = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     combined = []
     for sym in iterable:
-        try:
-            df = snapshot_chain(ib, sym, expiry_hint)
-            if df.empty:
-                logger.warning("%s – no data", sym)
-                continue
-            if portfolio_mode:
-                combined.append(df)
-            else:
-                out_path = os.path.join(OUTPUT_DIR, f"option_chain_{sym}_{date_tag}.csv")
-                df.to_csv(out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f")
-                logger.info("Saved %s (%d rows)", out_path, len(df))
-        except Exception as e:
-            logger.warning("%s – skipped: %s", sym, e)
+        hints = se_map.get(sym, [expiry_hint])
+        hints = hints or [expiry_hint]
+        for hint in hints:
+            try:
+                df = snapshot_chain(ib, sym, hint)
+                if df.empty:
+                    logger.warning("%s %s – no data", sym, hint)
+                    continue
+                if portfolio_mode:
+                    combined.append(df)
+                else:
+                    label = hint if hint else "auto"
+                    out_path = os.path.join(
+                        OUTPUT_DIR,
+                        f"option_chain_{sym}_{label}_{date_tag}.csv",
+                    )
+                    df.to_csv(
+                        out_path,
+                        index=False,
+                        quoting=csv.QUOTE_MINIMAL,
+                        float_format="%.4f",
+                    )
+                    logger.info("Saved %s (%d rows)", out_path, len(df))
+            except Exception as e:
+                logger.warning("%s %s – skipped: %s", sym, hint, e)
 
     if portfolio_mode and combined:
         df_all = pd.concat(combined, ignore_index=True)

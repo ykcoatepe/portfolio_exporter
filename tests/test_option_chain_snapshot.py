@@ -50,5 +50,18 @@ class ChooseExpiryTests(unittest.TestCase):
         result = oc.choose_expiry([other, friday])
         self.assertEqual(result, friday)
 
+
+class ParseSymbolExpiriesTests(unittest.TestCase):
+    def test_parse_basic(self):
+        spec = "TSLA:20250620,20250703;AAPL:20250620"
+        result = oc.parse_symbol_expiries(spec)
+        self.assertEqual(result, {"TSLA": ["20250620", "20250703"], "AAPL": ["20250620"]})
+
+    def test_parse_empty(self):
+        spec = "TSLA;AAPL:20240101"
+        result = oc.parse_symbol_expiries(spec)
+        self.assertEqual(result["TSLA"], [])
+        self.assertEqual(result["AAPL"], ["20240101"])
+
 if __name__ == '__main__':
     unittest.main()
