@@ -6,13 +6,13 @@ from __future__ import annotations
 import argparse
 import calendar
 import csv
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from typing import Iterable, List, Tuple
 
 import pandas as pd
-
 
 
 @dataclass
@@ -26,7 +26,6 @@ class Trade:
 
 MONTH_MAP = {m.lower(): i for i, m in enumerate(calendar.month_name) if m}
 MONTH_MAP.update({m.lower(): i for i, m in enumerate(calendar.month_abbr) if m})
-
 
 
 def date_range_from_phrase(phrase: str, ref: date | None = None) -> Tuple[date, date]:
@@ -90,6 +89,5 @@ def main() -> None:
     else:
         p.print_help()
         return
-
 
     main()
