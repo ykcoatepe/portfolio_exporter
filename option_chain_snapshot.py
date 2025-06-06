@@ -38,6 +38,7 @@ from utils.bs import bs_greeks
 
 from bisect import bisect_left
 
+
 # ── helper: get reliable split‑adjusted spot ──
 def _safe_spot(ib: IB, stk: Stock, streaming_tk):
     """
@@ -51,14 +52,15 @@ def _safe_spot(ib: IB, stk: Stock, streaming_tk):
     # pull adjusted close (1‑day bar, regular trading hours)
     bars = ib.reqHistoricalData(
         stk,
-        endDateTime='',
-        durationStr='1 D',
-        barSizeSetting='1 day',
-        whatToShow='TRADES',
+        endDateTime="",
+        durationStr="1 D",
+        barSizeSetting="1 day",
+        whatToShow="TRADES",
         useRTH=True,
         formatDate=1,
     )
     return bars[-1].close if bars else np.nan
+
 
 # ─────────── contract resolution helper ───────────
 def _resolve_contract(ib: IB, template: Option):
@@ -100,10 +102,10 @@ def _resolve_contract(ib: IB, template: Option):
             return cd.contract
     return cds[0].contract
 
+
 # ───────────────────────── CONFIG ──────────────────────────
 OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/"
-    "com~apple~CloudDocs/Downloads"
+    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
 )
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -367,7 +369,13 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             start = max(0, idx - 20)
             end = min(len(strikes_all), idx + 21)
             strikes = strikes_all[start:end]
-            logger.info("Spot %.2f → selected %d strikes (%s‑%s)", spot, len(strikes), strikes[0], strikes[-1])
+            logger.info(
+                "Spot %.2f → selected %d strikes (%s‑%s)",
+                spot,
+                len(strikes),
+                strikes[0],
+                strikes[-1],
+            )
 
     # ── build contracts and resolve ambiguities ──
     raw_templates = [
@@ -378,7 +386,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             right,
             exchange="SMART",
             currency="USD",
-            tradingClass=root_tc,   # <‑‑ add this
+            tradingClass=root_tc,  # <‑‑ add this
         )
         for strike in strikes
         for right in ("C", "P")
@@ -418,7 +426,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             contracts.append(c)
 
     if not contracts:
-        raise RuntimeError("No option contracts qualified for the chosen strikes / expiry")
+        raise RuntimeError(
+            "No option contracts qualified for the chosen strikes / expiry"
+        )
 
     # stream market data (need streaming for generic-tick 101)
     snapshots = [
@@ -426,7 +436,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             c,
             ib.reqMktData(
                 c,
-                "",            # let IB decide tick types; avoids eid errors
+                "",  # let IB decide tick types; avoids eid errors
                 snapshot=False,
                 regulatorySnapshot=False,
             ),
@@ -441,11 +451,13 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
 
     # ── one-shot snapshot fallback for missing price / IV / OI ──
     for con, tk in snapshots:
-        price_missing = ((tk.bid in (None, -1)) and (tk.last in (None, -1)))
+        price_missing = (tk.bid in (None, -1)) and (tk.last in (None, -1))
         iv_missing = math.isnan(_g(tk, "impliedVolatility"))
         oi_missing = math.isnan(_g(tk, "openInterest"))
         if price_missing or iv_missing or oi_missing:
-            snap = ib.reqMktData(con, "", True, False)  # snapshot: genericTickList must be empty
+            snap = ib.reqMktData(
+                con, "", True, False
+            )  # snapshot: genericTickList must be empty
             ib.sleep(0.35)
             for fld in ("bid", "ask", "last", "close", "impliedVolatility"):
                 val = getattr(snap, fld, None)
@@ -458,8 +470,14 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                 tk.openInterest = snap.openInterest
             # second pass just for open‑interest if it's still missing
             if math.isnan(_g(tk, "openInterest")):
-                snap_oi = ib.reqMktData(con, "101", True, False)  # generic‑tick 101 = OI
-                ib.sleep(0.35)
+                # stream OI via generic tick 101
+                snap_oi = ib.reqMktData(
+                    con,
+                    "101",
+                    snapshot=False,
+                    regulatorySnapshot=False,
+                )
+                ib.sleep(0.8)
                 if getattr(snap_oi, "openInterest", None) not in (None, -1):
                     tk.openInterest = snap_oi.openInterest
                 if snap_oi.contract:
@@ -481,19 +499,21 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         # Black-Scholes fallback if still NaN
         if any(np.isnan(x) for x in (delta_val, gamma_val, vega_val, theta_val)):
             if spot and iv_val and not np.isnan(iv_val):
-                exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(tzinfo=timezone.utc)
-                T = max((exp_dt - datetime.now(timezone.utc)).total_seconds() / (365 * 24 * 3600), 1 / (365 * 24))
+                exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(
+                    tzinfo=timezone.utc
+                )
+                T = max(
+                    (exp_dt - datetime.now(timezone.utc)).total_seconds()
+                    / (365 * 24 * 3600),
+                    1 / (365 * 24),
+                )
                 bs = bs_greeks(spot, con.strike, T, 0.01, iv_val, con.right == "C")
                 delta_val = bs["delta"] if np.isnan(delta_val) else delta_val
                 gamma_val = bs["gamma"] if np.isnan(gamma_val) else gamma_val
                 vega_val = bs["vega"] if np.isnan(vega_val) else vega_val
                 theta_val = bs["theta"] if np.isnan(theta_val) else theta_val
 
-        mid_price = (
-            np.nan
-            if any(np.isnan([tk.bid, tk.ask]))
-            else (tk.bid + tk.ask) / 2
-        )
+        mid_price = np.nan if any(np.isnan([tk.bid, tk.ask])) else (tk.bid + tk.ask) / 2
 
         rows.append(
             {
@@ -525,7 +545,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
 # ─────────────────────────── MAIN ──────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Option-chain snapshot exporter")
-    parser.add_argument("--symbols", type=str, help="Comma-separated tickers (overrides portfolio).")
+    parser.add_argument(
+        "--symbols", type=str, help="Comma-separated tickers (overrides portfolio)."
+    )
     parser.add_argument(
         "--symbol-expiries",
         type=str,
@@ -618,8 +640,14 @@ def main():
     if portfolio_mode and combined:
         df_all = pd.concat(combined, ignore_index=True)
         out_path = os.path.join(OUTPUT_DIR, f"option_chain_portfolio_{date_tag}.csv")
-        df_all.to_csv(out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f")
-        logger.info("Saved consolidated portfolio snapshot → %s (%d rows)", out_path, len(df_all))
+        df_all.to_csv(
+            out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f"
+        )
+        logger.info(
+            "Saved consolidated portfolio snapshot → %s (%d rows)",
+            out_path,
+            len(df_all),
+        )
 
     ib.disconnect()
 
