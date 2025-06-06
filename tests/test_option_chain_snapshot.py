@@ -66,6 +66,21 @@ class PromptSymbolExpiriesTests(unittest.TestCase):
         self.assertEqual(result, {"AAPL": ["20240101", "20240108"], "TSLA": []})
 
 
+class PickExpiryHintTests(unittest.TestCase):
+    def test_day_month_hint(self):
+        expirations = [
+            "20240621",
+            "20240628",
+            "20240705",
+        ]
+        res1 = oc.pick_expiry_with_hint(expirations, "26 Jun")
+        res2 = oc.pick_expiry_with_hint(expirations, "Jun 26")
+        res3 = oc.pick_expiry_with_hint(expirations, "26/06")
+        self.assertEqual(res1, "20240628")
+        self.assertEqual(res2, "20240628")
+        self.assertEqual(res3, "20240628")
+
+
 
 
 if __name__ == '__main__':
