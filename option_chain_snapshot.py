@@ -309,15 +309,28 @@ def _attr(tk, field):
 
 
 def fetch_yf_open_interest(symbol: str, expiry: str) -> dict[tuple[float, str], int]:
-    """Return {(strike, right): open_interest} from Yahoo Finance."""
+    """
+    Return {(strike, right): open_interest} for a given symbol‑expiry pair
+    using yfinance.
+
+    yfinance expects the expiry in 'YYYY‑MM‑DD' format, whereas IB returns
+    'YYYYMMDD'.  We normalise the string first, then attempt to fetch.
+    Falls back to {} on any error or if the dataframe is empty.
+    """
+    # normalise expiry to YYYY‑MM‑DD for yfinance
+    if len(expiry) == 8 and expiry.isdigit():
+        expiry_fmt = f"{expiry[:4]}-{expiry[4:6]}-{expiry[6:]}"
+    else:
+        expiry_fmt = expiry
+
     try:
-        oc = yf.Ticker(symbol).option_chain(expiry)
-    except Exception as e:  # pragma: no cover - network failures
-        logger.debug("yfinance OI fetch fail %s %s: %s", symbol, expiry, e)
+        oc = yf.Ticker(symbol).option_chain(expiry_fmt)
+    except Exception as e:  # pragma: no cover – network failures
+        logger.debug("yfinance OI fetch fail %s %s: %s", symbol, expiry_fmt, e)
         return {}
 
     mapping: dict[tuple[float, str], int] = {}
-    for right, df in ("C", oc.calls), ("P", oc.puts):
+    for right, df in (("C", oc.calls), ("P", oc.puts)):
         if getattr(df, "empty", True):
             continue
         for _, row in df[["strike", "openInterest"]].dropna().iterrows():
