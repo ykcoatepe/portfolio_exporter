@@ -34,11 +34,12 @@ from utils.bs import bs_greeks
 import numpy as np
 import pandas as pd
 
-from ib_insync import (Future, IB, Index, Option, Position, Stock, Ticker, util)
+from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
 from ib_insync.contract import Contract
 
 try:
     from tqdm import tqdm
+
     PROGRESS = True
 except ImportError:
     PROGRESS = False
@@ -50,6 +51,7 @@ logger = logging.getLogger(__name__)
 
 # ─────────────────────────  draw-down helpers  ──────────────────────────
 
+
 def _running_drawdown(path: pd.Series) -> pd.Series:
     """
     Running percentage draw-down from the cumulative peak of the series.
@@ -57,10 +59,12 @@ def _running_drawdown(path: pd.Series) -> pd.Series:
     cum_max = path.cummax()
     return (cum_max - path) / cum_max
 
+
 # ───────────────────── NAV bootstrap via Client Portal ─────────────────────
 
-CP_URL  = "https://localhost:5000/v1/pa/performance"
+CP_URL = "https://localhost:5000/v1/pa/performance"
 IB_ACCOUNT = os.getenv("IB_ACCOUNT") or "U4380392"
+
 
 def bootstrap_nav(ib: "IB", days: int = 365) -> pd.Series:
     """
@@ -72,14 +76,16 @@ def bootstrap_nav(ib: "IB", days: int = 365) -> pd.Series:
     # ---- 1) Client-Portal REST ----
     try:
         parms = {"period": "all", "fields": "nav"}
-        resp = requests.get(f"{CP_URL}/{IB_ACCOUNT}", params=parms,
-                            verify=False, timeout=20)
+        resp = requests.get(
+            f"{CP_URL}/{IB_ACCOUNT}", params=parms, verify=False, timeout=20
+        )
         resp.raise_for_status()
         data = resp.json().get("nav", [])
         ks = ("value", "nav")
         nav_dict = {
             pd.to_datetime(r["date"]): next(r[k] for k in ks if k in r)
-            for r in data if any(k in r for k in ks)
+            for r in data
+            if any(k in r for k in ks)
         }
         series = pd.Series(nav_dict, dtype=float).sort_index()
         if not series.empty:
@@ -97,8 +103,7 @@ def bootstrap_nav(ib: "IB", days: int = 365) -> pd.Series:
             pnl_df = pd.DataFrame(pnl_obj.dailyPnLSeries)
             # pnl_df has columns date, dailyPnL, unrealizedPnL, realizedPnL, value
             series = (
-                pnl_df
-                .assign(date=lambda d: pd.to_datetime(d.date))
+                pnl_df.assign(date=lambda d: pd.to_datetime(d.date))
                 .set_index("date")["value"]
                 .astype(float)
                 .sort_index()
@@ -114,9 +119,10 @@ def bootstrap_nav(ib: "IB", days: int = 365) -> pd.Series:
 
     return pd.Series(dtype=float)
 
-def eddr(path: pd.Series,
-         horizon_days: int = 252,
-         alpha: float = 0.99) -> tuple[float, float]:
+
+def eddr(
+    path: pd.Series, horizon_days: int = 252, alpha: float = 0.99
+) -> tuple[float, float]:
     """
     Extreme Downside Draw-down Risk (DaR & CDaR).
 
@@ -136,23 +142,22 @@ def eddr(path: pd.Series,
         cdar – Conditional DaR, mean draw-down beyond DaR.
     """
     window_dd = (
-        path
-        .rolling(window=horizon_days, min_periods=horizon_days)
+        path.rolling(window=horizon_days, min_periods=horizon_days)
         .apply(lambda w: _running_drawdown(w).max(), raw=False)
         .dropna()
     )
     if window_dd.empty:
         return np.nan, np.nan
 
-    dar_val  = float(np.quantile(window_dd, alpha))
+    dar_val = float(np.quantile(window_dd, alpha))
     cdar_val = float(window_dd[window_dd >= dar_val].mean())
     return dar_val, cdar_val
+
 
 # ───────────────────────── CONFIG ──────────────────────────
 
 OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/"
-    "com~apple~CloudDocs/Downloads"
+    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
 )
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -163,19 +168,20 @@ IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 11  # separate clientId from snaps
 # contract multipliers by secType (IB doesn't always fill this field)
 DEFAULT_MULT = {
     "OPT": 100,
-    "FOP": 50,   # common default – varies by product
+    "FOP": 50,  # common default – varies by product
     "FUT": 1,
     "STK": 1,
-    "CASH": 100_000,   # treat FX as notional per lot
+    "CASH": 100_000,  # treat FX as notional per lot
 }
 
 # tunables
-TIMEOUT_SECONDS = 40      # seconds to wait for model-Greeks before falling back
-DEFAULT_SIGMA    = 0.40   # fallback IV if IB does not provide one
+TIMEOUT_SECONDS = 40  # seconds to wait for model-Greeks before falling back
+DEFAULT_SIGMA = 0.40  # fallback IV if IB does not provide one
 
-RISK_FREE_RATE = 0.01   # annualised risk-free rate for BS fallback
+RISK_FREE_RATE = 0.01  # annualised risk-free rate for BS fallback
 
 # ───────────────────── helpers ──────────────────────
+
 
 def _net_liq(ib: "IB") -> float:
     """Return current NetLiquidation as float or np.nan on failure."""
@@ -187,7 +193,9 @@ def _net_liq(ib: "IB") -> float:
         logger.warning(f"Could not fetch NetLiquidation: {exc}")
     return np.nan
 
+
 # ────────────── underlying resolution ──────────────
+
 
 def _underlying_contract(c: Contract) -> Contract | None:
     """
@@ -204,9 +212,11 @@ def _underlying_contract(c: Contract) -> Contract | None:
         return Future(sym, "", exchange="GLOBEX")
     return None
 
+
 # ────────── underlying qualification with cache (sync) ──────────
 
 UNDER_CACHE: dict[str, Contract] = {}
+
 
 def _get_underlying(ib: IB, c: Contract) -> Contract | None:
     """
@@ -248,6 +258,7 @@ def _multiplier(c: Contract) -> int:
         logger.warning(f"Error determining multiplier for {c.localSymbol}: {e}")
         return DEFAULT_MULT.get(c.secType, 1)
 
+
 def _has_any_greeks_populated(ticker: Ticker) -> bool:
     """Return True if *any* of the standard greek sets have a non-NaN delta."""
     for name in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks"):
@@ -256,14 +267,17 @@ def _has_any_greeks_populated(ticker: Ticker) -> bool:
             return True
     return False
 
+
 # ───────────────── pull positions & request data ─────────────────
+
 
 def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
     """
     Retrieve option/FOP positions and fetch live market data streams for Greeks.
     """
     positions = [
-        p for p in ib.portfolio()
+        p
+        for p in ib.portfolio()
         if p.position != 0 and p.contract.secType in {"OPT", "FOP"}
     ]
     if not positions:
@@ -286,7 +300,7 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
 
         tk = ib.reqMktData(
             c,
-            genericTickList="106",        # IV only; greeks auto-populate via MODEL_OPTION
+            genericTickList="106",  # IV only; greeks auto-populate via MODEL_OPTION
             snapshot=False,
             regulatorySnapshot=False,
         )
@@ -303,7 +317,9 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
 
     return bundles
 
+
 # ─────────────────────────── MAIN ──────────────────────────
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
@@ -345,9 +361,9 @@ def main() -> None:
             ib.disconnect()
             sys.exit(0)
 
-    ts_utc   = datetime.now(timezone.utc)                 # for option T calculation
+    ts_utc = datetime.now(timezone.utc)  # for option T calculation
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
-    ts_iso   = ts_local.isoformat()                       # what we write to CSV
+    ts_iso = ts_local.isoformat()  # what we write to CSV
     rows: List[Dict[str, Any]] = []
 
     iterable = tqdm(pkgs, desc="Processing portfolio greeks") if PROGRESS else pkgs
@@ -361,7 +377,8 @@ def main() -> None:
             (
                 getattr(tk, name)
                 for name in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks")
-                if getattr(tk, name, None) and getattr(getattr(tk, name), "delta") is not None
+                if getattr(tk, name, None)
+                and getattr(getattr(tk, name), "delta") is not None
             ),
             None,
         )
@@ -382,7 +399,9 @@ def main() -> None:
                 try:
                     under = _get_underlying(ib, c)
                     if under:
-                        snap = ib.reqMktData(under, "", snapshot=True, regulatorySnapshot=False)
+                        snap = ib.reqMktData(
+                            under, "", snapshot=True, regulatorySnapshot=False
+                        )
                         ib.sleep(1.0)
                         prices = [
                             snap.midpoint(),
@@ -392,7 +411,11 @@ def main() -> None:
                             snap.ask,
                         ]
                         S = next(
-                            (p for p in prices if p is not None and not math.isnan(p) and p > 0),
+                            (
+                                p
+                                for p in prices
+                                if p is not None and not math.isnan(p) and p > 0
+                            ),
                             np.nan,
                         )
                         ib.cancelMktData(under)
@@ -408,9 +431,18 @@ def main() -> None:
                 else:
                     exp_naive = datetime.strptime(exp_str, "%Y%m")
                 exp = datetime(
-                    exp_naive.year, exp_naive.month, exp_naive.day, 23, 59, 59, tzinfo=timezone.utc
+                    exp_naive.year,
+                    exp_naive.month,
+                    exp_naive.day,
+                    23,
+                    59,
+                    59,
+                    tzinfo=timezone.utc,
                 )
-                T = max((exp - ts_utc).total_seconds() / (365 * 24 * 3600), 1 / (365 * 24 * 3600))
+                T = max(
+                    (exp - ts_utc).total_seconds() / (365 * 24 * 3600),
+                    1 / (365 * 24 * 3600),
+                )
             except Exception:
                 pass
 
@@ -431,13 +463,32 @@ def main() -> None:
         if open_int is None or (isinstance(open_int, float) and math.isnan(open_int)):
             try:
                 snap = ib.reqMktData(c, "101", snapshot=False, regulatorySnapshot=False)
-                ib.sleep(0.8)   # short-lived stream for OI
+                ib.sleep(0.8)  # short-lived stream for OI
                 open_int = getattr(snap, "openInterest", np.nan)
                 ib.cancelMktData(c)
             except Exception as e:
                 logger.debug(f"OI stream failed for {c.localSymbol}: {e}")
         if open_int is None:
             open_int = np.nan
+
+        # ---- robust volume ----
+        volume = getattr(tk, "volume", np.nan)
+        if (
+            volume is None
+            or (isinstance(volume, float) and math.isnan(volume))
+            or volume == -1
+        ):
+            try:
+                snap_vol = ib.reqMktData(c, "", snapshot=True, regulatorySnapshot=False)
+                ib.sleep(0.8)
+                vol_attr = getattr(snap_vol, "volume", np.nan)
+                if vol_attr not in (None, -1):
+                    volume = vol_attr
+                ib.cancelMktData(c)
+            except Exception as e:
+                logger.debug(f"Volume snapshot failed for {c.localSymbol}: {e}")
+        if volume is None:
+            volume = np.nan
 
         # ---- robust option price (mid ▸ last ▸ close) ----
         option_price = tk.marketPrice()  # call as method
@@ -459,7 +510,12 @@ def main() -> None:
                 "option_price": option_price,
                 "underlying_price": und_price,
                 "open_interest": open_int,
-                "iv": iv_from_greeks if not math.isnan(iv_from_greeks) else tk.impliedVolatility,
+                "volume": volume,
+                "iv": (
+                    iv_from_greeks
+                    if not math.isnan(iv_from_greeks)
+                    else tk.impliedVolatility
+                ),
                 **greeks,
                 "delta_exposure": greeks["delta"] * qty * mult,
                 "gamma_exposure": greeks["gamma"] * qty * mult,
@@ -482,7 +538,12 @@ def main() -> None:
         sys.exit(0)
 
     df = pd.DataFrame(rows)
-    totals = df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]].sum().to_frame().T
+    totals = (
+        df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
+        .sum()
+        .to_frame()
+        .T
+    )
     totals.insert(0, "timestamp", ts_iso)
 
     # ────────── pick NAV series for EDDR ──────────
@@ -521,7 +582,7 @@ def main() -> None:
         nav_series.to_csv(NAV_LOG, header=True)
 
     # Guard EDDR calculation for short history
-    if len(nav_series) >= 30:   # need some history; full 252 for valid DaR
+    if len(nav_series) >= 30:  # need some history; full 252 for valid DaR
         dar_99, cdar_99 = eddr(nav_series, horizon_days=252, alpha=0.99)
     else:
         dar_99 = cdar_99 = np.nan
