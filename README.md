@@ -18,6 +18,7 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `portfolio_greeks.py` | Exports per-position Greeks and account totals using IBKR market data, producing `portfolio_greeks_<YYYYMMDD_HHMM>.csv` and a totals file. |
 | `option_chain_snapshot.py` | Saves a complete IBKR option chain to CSV for the entire portfolio or specified symbols, handling live and delayed data automatically. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. |
+| `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. |
 
 ### CP_REFRESH_TOKEN
 `net_liq_history_export.py` looks for the environment variable `CP_REFRESH_TOKEN` when pulling data from the Client Portal API. Set it before running the script:
@@ -44,7 +45,7 @@ pytest
 ```
 
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.
-`pandas_datareader` is needed for downloading FRED data in `live_feed.py`, and `requests` is required by `net_liq_history_export.py` for accessing the IBKR Client Portal API.
+`pandas_datareader` is needed for downloading FRED data in `live_feed.py`, and `requests` is required by `net_liq_history_export.py` for accessing the IBKR Client Portal API. `matplotlib` is optional and only needed when using the `--plot` flag with `net_liq_history_export.py`.
 
 ## Usage Examples
 
@@ -65,6 +66,8 @@ python option_chain_snapshot.py
 
 # Option-chain snapshot for specific symbols and expiries
 python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL:20250620'
+# Export today's executions and open orders
+python trades_report.py --today
 ```
 
 Open interest values are sourced from Yahoo Finance rather than the IBKR feed.
