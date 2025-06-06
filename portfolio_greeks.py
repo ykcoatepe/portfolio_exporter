@@ -23,6 +23,7 @@ import os
 import sys
 import json
 import requests
+import calendar
 import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -30,6 +31,7 @@ from typing import Any, Dict, List, Tuple
 from pathlib import Path
 
 from utils.bs import bs_greeks
+from option_chain_snapshot import fetch_yf_open_interest
 
 import numpy as np
 import pandas as pd
@@ -39,6 +41,7 @@ from ib_insync.contract import Contract
 
 try:
     from tqdm import tqdm
+
     # Re‑enable progress‑bar printing
     PROGRESS = True
 except ImportError:
@@ -177,6 +180,20 @@ DEFAULT_MULT = {
     "STK": 1,
     "CASH": 100_000,  # treat FX as notional per lot
 }
+
+# ───────────────────── expiry normaliser for Yahoo OI ─────────────────────
+def _normalised_expiry(exp_str: str) -> str:
+    """
+    Convert IB expiry (YYYYMMDD or YYYYMM) to a canonical key so that we
+    hit the right cache entry when calling fetch_yf_open_interest.
+    YYYYMM    → YYYYMM   (monthly)
+    YYYYMMDD  → YYYYMMDD (weekly)
+    """
+    if len(exp_str) == 6 and exp_str.isdigit():          # monthly
+        return exp_str
+    elif len(exp_str) >= 8 and exp_str[:8].isdigit():    # weekly/full
+        return exp_str[:8]
+    return exp_str
 
 # tunables
 TIMEOUT_SECONDS = 40  # seconds to wait for model-Greeks before falling back
@@ -369,6 +386,7 @@ def main() -> None:
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
     ts_iso = ts_local.isoformat()  # what we write to CSV
     rows: List[Dict[str, Any]] = []
+    yf_oi_cache: Dict[tuple[str, str], dict[tuple[float, str], int]] = {}
 
     iterable = tqdm(pkgs, desc="Processing portfolio greeks") if PROGRESS else pkgs
     for pos, tk in iterable:
@@ -462,18 +480,16 @@ def main() -> None:
                     if math.isnan(greeks[k]):
                         greeks[k] = bs[k]
 
-        # ---- robust open-interest ----
-        open_int = getattr(tk, "openInterest", np.nan)
-        if open_int is None or (isinstance(open_int, float) and math.isnan(open_int)):
-            try:
-                snap = ib.reqMktData(c, "101", snapshot=False, regulatorySnapshot=False)
-                ib.sleep(0.8)  # short-lived stream for OI
-                open_int = getattr(snap, "openInterest", np.nan)
-                ib.cancelMktData(c)
-            except Exception as e:
-                logger.debug(f"OI stream failed for {c.localSymbol}: {e}")
-        if open_int is None:
-            open_int = np.nan
+        # ---- open‑interest from Yahoo Finance (cached) ----
+        raw_exp = getattr(c, "lastTradeDateOrContractMonth", "")
+        exp_key = _normalised_expiry(raw_exp)
+        oi_key = (c.symbol, exp_key)
+        if oi_key not in yf_oi_cache:
+            yf_oi_cache[oi_key] = fetch_yf_open_interest(oi_key[0], oi_key[1])
+        open_int = yf_oi_cache[oi_key].get(
+            (getattr(c, "strike", np.nan), getattr(c, "right", "")),
+            np.nan,
+        )
 
         # ---- robust volume ----
         volume = getattr(tk, "volume", np.nan)

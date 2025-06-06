@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
+import yfinance as yf
 from ib_insync import IB, Option, Stock
 from utils.bs import bs_greeks
 
@@ -298,29 +299,46 @@ def _g(tk, field):
     return np.nan
 
 
-
 def _attr(tk, field):
     """Return a numeric ticker attribute or NaN if unavailable."""
     val = getattr(tk, field, np.nan)
     return np.nan if val in (None, -1) else val
 
+
 # ── helper: robust open‑interest getter ──
-def _open_interest_value(tk, right: str):
+
+
+def fetch_yf_open_interest(symbol: str, expiry: str) -> dict[tuple[float, str], int]:
     """
-    Return the first non‑NaN open‑interest value available for this option.
-    For calls we prefer `callOpenInterest`, for puts `putOpenInterest`,
-    but we gracefully fall back to the generic `openInterest` field if
-    the side‑specific attribute isn’t populated (older API / data source).
+    Return {(strike, right): open_interest} for a given symbol‑expiry pair
+    using yfinance.
+
+    yfinance expects the expiry in 'YYYY‑MM‑DD' format, whereas IB returns
+    'YYYYMMDD'.  We normalise the string first, then attempt to fetch.
+    Falls back to {} on any error or if the dataframe is empty.
     """
-    if right == "C":
-        names = ("callOpenInterest", "openInterest")
+    # normalise expiry to YYYY‑MM‑DD for yfinance
+    if len(expiry) == 8 and expiry.isdigit():
+        expiry_fmt = f"{expiry[:4]}-{expiry[4:6]}-{expiry[6:]}"
     else:
-        names = ("putOpenInterest", "openInterest")
-    for nm in names:
-        val = _attr(tk, nm)
-        if not np.isnan(val):
-            return val
-    return np.nan
+        expiry_fmt = expiry
+
+    try:
+        oc = yf.Ticker(symbol).option_chain(expiry_fmt)
+    except Exception as e:  # pragma: no cover – network failures
+        logger.debug("yfinance OI fetch fail %s %s: %s", symbol, expiry_fmt, e)
+        return {}
+
+    mapping: dict[tuple[float, str], int] = {}
+    for right, df in (("C", oc.calls), ("P", oc.puts)):
+        if getattr(df, "empty", True):
+            continue
+        for _, row in df[["strike", "openInterest"]].dropna().iterrows():
+            try:
+                mapping[(float(row["strike"]), right)] = int(row["openInterest"])
+            except Exception:
+                continue
+    return mapping
 
 
 def _wait_for_snapshots(ib: IB, snaps: list[tuple], timeout=8.0):
@@ -370,6 +388,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         len(chain.expirations),
     )
     expiry = pick_expiry_with_hint(sorted(chain.expirations), expiry_hint)
+
+    # always fetch open interest from Yahoo Finance
+    yf_open_interest = fetch_yf_open_interest(symbol, expiry)
 
     # trading class
     root_tc = (
@@ -488,13 +509,11 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     for _, snap in snapshots:
         ib.cancelMktData(snap.contract)
 
-    # ── one-shot snapshot fallback for missing price / IV / OI ──
+    # ── one-shot snapshot fallback for missing price/IV ──
     for con, tk in snapshots:
-        oi_names = ("callOpenInterest", "openInterest") if con.right == "C" else ("putOpenInterest", "openInterest")
         price_missing = (tk.bid in (None, -1)) and (tk.last in (None, -1))
         iv_missing = math.isnan(_g(tk, "impliedVolatility"))
-        oi_missing = math.isnan(_open_interest_value(tk, con.right))
-        if price_missing or iv_missing or oi_missing:
+        if price_missing or iv_missing:
             snap = ib.reqMktData(
                 con, "", True, False
             )  # snapshot: genericTickList must be empty
@@ -505,27 +524,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                     setattr(tk, fld, val)
             if getattr(snap, "modelGreeks", None):
                 tk.modelGreeks = snap.modelGreeks
-            # Copy open‑interest (try both side‑specific and generic)
-            for nm in oi_names:
-                if getattr(snap, nm, None) not in (None, -1):
-                    setattr(tk, nm, getattr(snap, nm))
             # Copy volume if present
             if getattr(snap, "volume", None) not in (None, -1):
                 tk.volume = snap.volume
-            # second pass just for open‑interest if it's still missing
-            if math.isnan(_open_interest_value(tk, con.right)):
-                # stream OI via generic tick 101
-                snap_oi = ib.reqMktData(
-                    con,
-                    "101",
-                    snapshot=False,
-                    regulatorySnapshot=False,
-                )
-                _wait_attr(snap_oi, oi_names[0])
-                if getattr(snap_oi, oi_names[0], None) not in (None, -1):
-                    setattr(tk, oi_names[0], getattr(snap_oi, oi_names[0]))
-                if snap_oi.contract:
-                    ib.cancelMktData(snap_oi.contract)
             if snap.contract:
                 ib.cancelMktData(snap.contract)
 
@@ -576,16 +577,18 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                 "gamma": gamma_val,
                 "vega": vega_val,
                 "theta": theta_val,
-                "open_interest": _open_interest_value(tk, con.right),
+                "open_interest": yf_open_interest.get((con.strike, con.right), np.nan),
                 "volume": _attr(tk, "volume"),
             }
         )
 
-    return (
+    df = (
         pd.DataFrame(rows).sort_values(["right", "strike"]).reset_index(drop=True)
         if rows
         else pd.DataFrame()
     )
+
+    return df
 
 
 # ─────────────────────────── MAIN ──────────────────────────
