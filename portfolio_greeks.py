@@ -371,6 +371,7 @@ def main() -> None:
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
     ts_iso = ts_local.isoformat()  # what we write to CSV
     rows: List[Dict[str, Any]] = []
+    yf_oi_cache: Dict[tuple[str, str], dict[tuple[float, str], int]] = {}
 
     iterable = tqdm(pkgs, desc="Processing portfolio greeks") if PROGRESS else pkgs
     for pos, tk in iterable:
@@ -464,25 +465,13 @@ def main() -> None:
                     if math.isnan(greeks[k]):
                         greeks[k] = bs[k]
 
-        # ---- robust open-interest ----
-        open_int = getattr(tk, "openInterest", np.nan)
-        if open_int is None or (isinstance(open_int, float) and math.isnan(open_int)):
-            try:
-                snap = ib.reqMktData(c, "101", snapshot=False, regulatorySnapshot=False)
-                ib.sleep(0.8)  # short-lived stream for OI
-                open_int = getattr(snap, "openInterest", np.nan)
-                ib.cancelMktData(c)
-            except Exception as e:
-                logger.debug(f"OI stream failed for {c.localSymbol}: {e}")
-        if open_int is None or (isinstance(open_int, float) and math.isnan(open_int)):
-            yf_map = fetch_yf_open_interest(
-                c.symbol, getattr(c, "lastTradeDateOrContractMonth", "")
-            )
-            open_int = yf_map.get(
-                (getattr(c, "strike", np.nan), getattr(c, "right", "")), np.nan
-            )
-        if open_int is None:
-            open_int = np.nan
+        # ---- open-interest from Yahoo Finance ----
+        oi_key = (c.symbol, getattr(c, "lastTradeDateOrContractMonth", ""))
+        if oi_key not in yf_oi_cache:
+            yf_oi_cache[oi_key] = fetch_yf_open_interest(oi_key[0], oi_key[1])
+        open_int = yf_oi_cache[oi_key].get(
+            (getattr(c, "strike", np.nan), getattr(c, "right", "")), np.nan
+        )
 
         # ---- robust volume ----
         volume = getattr(tk, "volume", np.nan)
