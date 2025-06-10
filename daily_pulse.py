@@ -41,6 +41,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Save reports to iCloud Drive ▸ Downloads (same as other scripts)
+OUTPUT_DIR = (
+    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
+)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 
 # ----------------------------------------------------------------------
 # Data fetching helpers
@@ -152,38 +158,18 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def generate_report(df: pd.DataFrame, output_path: str) -> None:
+    """Write latest ticker metrics to ``output_path`` as CSV."""
     latest = df.sort_values("date").groupby("ticker").tail(1)
-    html = [
-        f"<h1>Daily Pulse - {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</h1>"
-    ]
-    html.append(
-        "<table><tr><th>Ticker</th><th>Close</th><th>%Chg</th>"
-        "<th>RSI</th><th>ATR</th></tr>"
-    )
-    for _, row in latest.iterrows():
-        color = "green" if row["pct_change"] >= 0 else "red"
-        html.append(
-            f"<tr><td>{row['ticker']}</td>"
-            f"<td>{row['close']:.2f}</td>"
-            f"<td style='color:{color}'>{row['pct_change']:.2f}%</td>"
-            f"<td>{row['rsi14']:.2f}</td>"
-            f"<td>{row['atr14']:.2f}</td></tr>"
-        )
-    html.append("</table>")
-
-    returns = (
-        df.pivot(index="date", columns="ticker", values="close").pct_change().dropna()
-    )
-    corr = returns.corr()
-    html.append("<h2>Correlation Matrix</h2>")
-    html.append(corr.to_html())
-    if {"^VIX", "^VIX3M"}.issubset(set(latest["ticker"])):
-        vix = latest.loc[latest["ticker"] == "^VIX", "close"].iloc[0]
-        vix3m = latest.loc[latest["ticker"] == "^VIX3M", "close"].iloc[0]
-        ts = vix3m / vix - 1
-        html.append(f"<p>VIX term structure (3M/1M - 1): {ts:.2%}</p>")
-    with open(output_path, "w") as f:
-        f.write("\n".join(html))
+    table = latest[
+        [
+            "ticker",
+            "close",
+            "pct_change",
+            "rsi14",
+            "atr14",
+        ]
+    ].sort_values("ticker")
+    table.to_csv(output_path, index=False)
 
 
 # ----------------------------------------------------------------------
@@ -192,15 +178,16 @@ def generate_report(df: pd.DataFrame, output_path: str) -> None:
 
 
 def main() -> None:
-    out_name = datetime.utcnow().strftime("daily_pulse_%Y%m%d_%H%M.html")
+    out_name = datetime.utcnow().strftime("daily_pulse_%Y%m%d_%H%M.cvs")
+    out_path = os.path.join(OUTPUT_DIR, out_name)
     try:
         data = fetch_prices(TICKERS)
         if data.empty:
             logger.error("No data fetched.")
             return
         data = compute_indicators(data)
-        generate_report(data, out_name)
-        logger.info("Report written to %s", out_name)
+        generate_report(data, out_path)
+        logger.info("Report written to %s", out_path)
     except Exception as e:  # pragma: no cover - entry point
         logger.exception("daily_pulse failed: %s", e)
 
