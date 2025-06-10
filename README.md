@@ -36,13 +36,11 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
-```
-
-Run the unit tests with:
-
-```bash
 pytest
 ```
+
+The included *Makefile* provides `make setup` and `make test` targets to automate
+these steps if desired.
 
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.
 `pandas_datareader` is needed for downloading FRED data in `live_feed.py`, and `requests` is required by `net_liq_history_export.py` for accessing the IBKR Client Portal API. `matplotlib` is optional and only needed when using the `--plot` flag with `net_liq_history_export.py`.
