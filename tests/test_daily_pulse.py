@@ -1,6 +1,8 @@
 import unittest
 import pandas as pd
 import numpy as np
+import tempfile
+from pathlib import Path
 
 import daily_pulse as dp
 
@@ -42,6 +44,15 @@ class DailyPulseTests(unittest.TestCase):
         df.loc[0, "close"] = np.nan
         result = dp.compute_indicators(df)
         self.assertEqual(len(result), len(df))
+
+    def test_generate_report_file(self):
+        df_ind = dp.compute_indicators(self.df)
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "pulse.csv"
+            dp.generate_report(df_ind, str(out))
+            self.assertTrue(out.exists())
+            saved = pd.read_csv(out, index_col=0)
+            self.assertIn("close", saved.columns)
 
 
 if __name__ == "__main__":
