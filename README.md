@@ -15,6 +15,7 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `live_feed.py` | Takes a snapshot of real‑time quotes for tickers listed in `tickers_live.txt` (falling back to `tickers.txt`). Quotes are pulled from IBKR when available, otherwise from yfinance and FRED. Results are written to `live_quotes_YYYYMMDD_HHMM.csv`. |
 | `tech_signals_ibkr.py` | Calculates technical indicators using IBKR data and includes option chain details like open interest (fetched from Yahoo Finance) and near‑ATM implied volatility. |
 | `update_tickers.py` | Writes the current IBKR stock positions to `tickers_live.txt` so other scripts always use a fresh portfolio. |
+| `daily_pulse.py` | Generates a one-row-per-ticker summary of technical indicators from an OHLCV CSV. Defaults to CSV output; use `--excel` or `--pdf` for other formats. |
 | `portfolio_greeks.py` | Exports per-position Greeks and account totals using IBKR market data, producing `portfolio_greeks_<YYYYMMDD_HHMM>.csv` and a totals file. Pass `--excel` or `--pdf` for alternative formats. |
 | `option_chain_snapshot.py` | Saves a complete IBKR option chain for the portfolio or given symbols. Defaults to CSV; use `--excel` or `--pdf` to change the output type. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. Supports `--excel` and `--pdf` outputs. |
