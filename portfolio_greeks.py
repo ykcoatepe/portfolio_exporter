@@ -438,13 +438,25 @@ def main() -> None:
         action="store_true",
         help="Save the detailed rows and totals into a landscape PDF report.",
     )
+    group.add_argument(
+        "--txt",
+        action="store_true",
+        help="Save the detailed rows and totals as plain text.",
+    )
     args = parser.parse_args()
 
     # ─── interactive prompt if no output flag was provided ───
-    if not args.flat_csv and not args.excel and not getattr(args, "pdf", False):
+    if (
+        not args.flat_csv
+        and not args.excel
+        and not getattr(args, "pdf", False)
+        and not getattr(args, "txt", False)
+    ):
         try:
             choice = (
-                input("Select output format [csv / flat / excel / pdf] (default csv): ")
+                input(
+                    "Select output format [csv / flat / excel / pdf / txt] (default csv): "
+                )
                 .strip()
                 .lower()
             )
@@ -457,6 +469,8 @@ def main() -> None:
             args.excel = True
         elif choice in {"pdf"}:
             args.pdf = True
+        elif choice in {"txt"}:
+            args.txt = True
         # else default to CSV files
 
     ib = IB()
@@ -773,6 +787,13 @@ def main() -> None:
         fn_pdf = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.pdf")
         _save_pdf(df, totals, fn_pdf)
         logger.info(f"Saved PDF report    → {fn_pdf}")
+    elif getattr(args, "txt", False):
+        fn_txt = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.txt")
+        with open(fn_txt, "w") as fh:
+            fh.write(df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+            fh.write("\n\n")
+            fh.write(totals.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+        logger.info(f"Saved text file     → {fn_txt}")
     else:
         fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
         fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")

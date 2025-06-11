@@ -178,6 +178,14 @@ def _save_pdf(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
     return out_path
 
 
+def _save_txt(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
+    out_name = f"net_liq_history_{start_label}-{end_label}_{TIME_TAG}.txt"
+    out_path = OUTPUT_DIR / out_name
+    with open(out_path, "w") as fh:
+        fh.write(df.to_string(index=True, float_format=lambda x: f"{x:.3f}"))
+    return out_path
+
+
 def _plot(df: pd.DataFrame, out_csv: Path):
     try:
         import matplotlib.pyplot as plt
@@ -217,12 +225,17 @@ def main():
         action="store_true",
         help="Save the output as a PDF report instead of CSV.",
     )
+    out_grp.add_argument(
+        "--txt",
+        action="store_true",
+        help="Save the output as a plain text report instead of CSV.",
+    )
     args = p.parse_args()
 
-    if not args.excel and not args.pdf:
+    if not args.excel and not args.pdf and not args.txt:
         try:
             choice = (
-                input("Select output format [csv / excel / pdf] (default csv): ")
+                input("Select output format [csv / excel / pdf / txt] (default csv): ")
                 .strip()
                 .lower()
             )
@@ -232,6 +245,8 @@ def main():
             args.excel = True
         elif choice == "pdf":
             args.pdf = True
+        elif choice == "txt":
+            args.txt = True
 
     # 1) pick data source
     df: Optional[pd.DataFrame] = None
@@ -257,6 +272,9 @@ def main():
     elif args.pdf:
         out_path = _save_pdf(df, start_lbl, end_lbl)
         print(f"💾  Saved PDF report   → {out_path}")
+    elif args.txt:
+        out_path = _save_txt(df, start_lbl, end_lbl)
+        print(f"💾  Saved text report  → {out_path}")
     else:
         out_path = _save_csv(df, start_lbl, end_lbl)
         print(f"💾  Saved {len(df):,} rows → {out_path}")

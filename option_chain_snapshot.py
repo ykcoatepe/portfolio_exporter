@@ -636,6 +636,11 @@ def _save_pdf(df: pd.DataFrame, path: str) -> None:
     doc.build([table])
 
 
+def _save_txt(df: pd.DataFrame, path: str) -> None:
+    with open(path, "w") as fh:
+        fh.write(df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+
+
 # ─────────────────────────── MAIN ──────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Option-chain snapshot exporter")
@@ -660,12 +665,17 @@ def main():
         action="store_true",
         help="Save the snapshot(s) as a PDF report instead of CSV.",
     )
+    out_grp.add_argument(
+        "--txt",
+        action="store_true",
+        help="Save the snapshot(s) as plain text instead of CSV.",
+    )
     args = parser.parse_args()
 
-    if not args.excel and not args.pdf:
+    if not args.excel and not args.pdf and not args.txt:
         try:
             choice = (
-                input("Select output format [csv / excel / pdf] (default csv): ")
+                input("Select output format [csv / excel / pdf / txt] (default csv): ")
                 .strip()
                 .lower()
             )
@@ -675,6 +685,8 @@ def main():
             args.excel = True
         elif choice == "pdf":
             args.pdf = True
+        elif choice == "txt":
+            args.txt = True
 
     ib = IB()
     try:
@@ -751,6 +763,9 @@ def main():
                     elif args.pdf:
                         path = f"{out_base}.pdf"
                         _save_pdf(df, path)
+                    elif args.txt:
+                        path = f"{out_base}.txt"
+                        _save_txt(df, path)
                     else:
                         path = f"{out_base}.csv"
                         df.to_csv(
@@ -772,6 +787,9 @@ def main():
         elif args.pdf:
             out_path = f"{out_base}.pdf"
             _save_pdf(df_all, out_path)
+        elif args.txt:
+            out_path = f"{out_base}.txt"
+            _save_txt(df_all, out_path)
         else:
             out_path = f"{out_base}.csv"
             df_all.to_csv(

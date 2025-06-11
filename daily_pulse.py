@@ -302,20 +302,12 @@ def main():
     parser.add_argument(
         "-f",
         "--filetype",
-        choices=["xlsx", "csv", "flatcsv", "pdf"],
-        help="Output file type (default: ask interactively, csv if blank)",
+        choices=["xlsx", "csv", "flatcsv", "pdf", "txt"],
+        default="csv",
+        help="Output file type",
     )
     args = parser.parse_args()
     filetype = args.filetype
-    if not filetype:
-        filetype = (
-            input("Output file type (xlsx/csv/flatcsv/pdf) [csv]: ").strip().lower()
-        )
-        if filetype == "":
-            filetype = "csv"
-        elif filetype not in ("xlsx", "csv", "flatcsv", "pdf"):
-            print("Unknown type. Falling back to csv.")
-            filetype = "csv"
 
     # 1. positions
     pos = load_ib_positions_ib()  # live connection to IB/TWS
@@ -376,6 +368,16 @@ def main():
             float_format="%.3f",
         )
         print(f"✅ Saved CSVs → {base.parent}")
+    elif filetype == "txt":
+        out_file = base.with_suffix(".txt")
+        with open(out_file, "w") as fh:
+            fh.write("Holdings\n")
+            fh.write(pos.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+            fh.write("\n\nMacro\n")
+            fh.write(macro_px.to_string(index=True, float_format=lambda x: f"{x:.3f}"))
+            fh.write("\n\nTech\n")
+            fh.write(tech_last.to_string(index=True, float_format=lambda x: f"{x:.3f}"))
+        print(f"✅ Saved → {out_file}")
     elif filetype == "pdf":
         out_file = base.with_suffix(".pdf")
         # reportlab 3.x expects a str or file‑like, not a pathlib.Path

@@ -417,6 +417,14 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
 
 # -------------------------- MAIN ---------------------------
 def main():
+    parser = argparse.ArgumentParser(description="Snapshot live quotes")
+    parser.add_argument(
+        "--txt",
+        action="store_true",
+        help="Save a plain text copy alongside the CSV files.",
+    )
+    args = parser.parse_args()
+
     tickers = load_tickers()
     opt_list, opt_under = ([], set())
     if IB_AVAILABLE:
@@ -462,6 +470,13 @@ def main():
                     quoting=csv.QUOTE_MINIMAL,
                     float_format="%.3f",
                 )
+                if args.txt:
+                    with open(OUTPUT_POS_CSV.replace(".csv", ".txt"), "w") as fh:
+                        fh.write(
+                            df_pos.to_string(
+                                index=False, float_format=lambda x: f"{x:.3f}"
+                            )
+                        )
                 logging.info(
                     "Saved %d live positions → %s", len(df_pos), OUTPUT_POS_CSV
                 )
@@ -504,6 +519,9 @@ def main():
         quoting=csv.QUOTE_MINIMAL,
         float_format="%.3f",
     )
+    if args.txt:
+        with open(OUTPUT_CSV.replace(".csv", ".txt"), "w") as fh:
+            fh.write(df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
     logging.info("Saved %d quotes → %s", len(df), OUTPUT_CSV)
 
 
