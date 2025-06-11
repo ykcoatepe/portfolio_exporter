@@ -471,7 +471,12 @@ def main() -> None:
     if not NAV_LOG.exists() or NAV_LOG.stat().st_size == 0:
         nav_boot = bootstrap_nav(ib)
         if not nav_boot.empty:
-            nav_boot.to_csv(NAV_LOG, header=True)
+            nav_boot.to_csv(
+                NAV_LOG,
+                header=True,
+                quoting=csv.QUOTE_MINIMAL,
+                float_format="%.2f",
+            )
         else:
             NAV_LOG.write_text("timestamp,nav\n")
 
@@ -684,7 +689,12 @@ def main() -> None:
         # Also write to a file in OUTPUT_DIR
         date_tag = ts_local.strftime("%Y%m%d_%H%M")
         fn_flat = os.path.join(OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv")
-        df_flat.to_csv(fn_flat, index=False, float_format="%.6f")
+        df_flat.to_csv(
+            fn_flat,
+            index=False,
+            float_format="%.6f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
         logger.info(f"Flat CSV saved → {fn_flat} (and printed to STDOUT).")
     totals = (
         df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
@@ -727,7 +737,12 @@ def main() -> None:
         # write back to CSV (create header if missing)
         if not NAV_LOG.exists():
             NAV_LOG.write_text("timestamp,nav\n")
-        nav_series.to_csv(NAV_LOG, header=True)
+        nav_series.to_csv(
+            NAV_LOG,
+            header=True,
+            quoting=csv.QUOTE_MINIMAL,
+            float_format="%.2f",
+        )
 
     # Guard EDDR calculation for short history
     if len(nav_series) >= 30:  # need some history; full 252 for valid DaR
@@ -761,8 +776,18 @@ def main() -> None:
     else:
         fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
         fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
-        df.to_csv(fn_pos, index=False, float_format="%.6f")
-        totals.to_csv(fn_tot, index=False, float_format="%.2f")
+        df.to_csv(
+            fn_pos,
+            index=False,
+            float_format="%.6f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
+        totals.to_csv(
+            fn_tot,
+            index=False,
+            float_format="%.2f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
         logger.info(f"Saved {len(df)} rows → {fn_pos}")
         logger.info(f"Saved totals         → {fn_tot}")
 

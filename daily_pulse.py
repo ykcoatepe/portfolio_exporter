@@ -8,15 +8,16 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import pandas as pd
-import yfinance as yf   # pip install yfinance
+import yfinance as yf  # pip install yfinance
 
 import argparse
+import csv
 import logging
 import warnings
 import io
 import contextlib
-from tqdm import tqdm                           # progress bar
-from reportlab.lib.pagesizes import letter, landscape      # PDF output (landscape added)
+from tqdm import tqdm  # progress bar
+from reportlab.lib.pagesizes import letter, landscape  # PDF output (landscape added)
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
 from reportlab.lib import colors
 
@@ -41,24 +42,35 @@ IB_CSV = Path(
 # 2.  Macro/technical watch‑list & indicators
 MARKET_OVERVIEW = {
     #   Ticker   : Friendly name
-    "SPY":  "S&P 500",
-    "QQQ":  "Nasdaq 100",
-    "IWM":  "Russell 2000",
-    "VIX":  "VIX Index",
-    "DXY":  "US Dollar",
-    "TLT":  "US 20Y Bond",
-    "IEF":  "US 7‑10Y Bond",
+    "SPY": "S&P 500",
+    "QQQ": "Nasdaq 100",
+    "IWM": "Russell 2000",
+    "VIX": "VIX Index",
+    "DXY": "US Dollar",
+    "TLT": "US 20Y Bond",
+    "IEF": "US 7‑10Y Bond",
     "GC=F": "Gold Futures",
     "CL=F": "WTI Oil",
     "BTC-USD": "Bitcoin",
 }
 
-INDICATORS = ["pct_change", "sma20", "ema20", "rsi14", "macd", "macd_signal",
-              "atr14", "bb_upper", "bb_lower", "real_vol_30"]
+INDICATORS = [
+    "pct_change",
+    "sma20",
+    "ema20",
+    "rsi14",
+    "macd",
+    "macd_signal",
+    "atr14",
+    "bb_upper",
+    "bb_lower",
+    "real_vol_30",
+]
 
 # --------------------------------------------------------------------------- #
 # HELPER FUNCTIONS                                                            #
 # --------------------------------------------------------------------------- #
+
 
 def load_ib_positions_ib(
     host: str = "127.0.0.1",
@@ -132,12 +144,19 @@ def load_ib_positions_ib(
     ib.disconnect()
     return df
 
+
 def fetch_ohlc(tickers, days_back=60) -> pd.DataFrame:
     """Download daily OHLCV plus today’s pre‑market quote."""
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=days_back)
-    data = yf.download(tickers, start=start.date(), end=end.date()+timedelta(days=1),
-                       group_by="ticker", auto_adjust=False, progress=False)
+    data = yf.download(
+        tickers,
+        start=start.date(),
+        end=end.date() + timedelta(days=1),
+        group_by="ticker",
+        auto_adjust=False,
+        progress=False,
+    )
     rows = []
     for t in tqdm(tickers, desc="Processing tickers"):
         d = data[t].dropna().reset_index()
@@ -145,6 +164,7 @@ def fetch_ohlc(tickers, days_back=60) -> pd.DataFrame:
         d["ticker"] = t
         rows.append(d)
     return pd.concat(rows, ignore_index=True)
+
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """(Same logic as your original, condensed & vectorised)"""
@@ -170,7 +190,8 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     # ATR14
     tr = (
-        (df["high"] - df["low"]).abs()
+        (df["high"] - df["low"])
+        .abs()
         .to_frame("hl")
         .join((df["high"] - grp["close"].shift()).abs().to_frame("hc"))
         .join((df["low"] - grp["close"].shift()).abs().to_frame("lc"))
@@ -184,18 +205,91 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["bb_upper"] = m20 + 2 * std20
     df["bb_lower"] = m20 - 2 * std20
 
+    df["vwap"] = (df["close"] * df["volume"]).groupby(df["ticker"]).cumsum() / df[
+        "volume"
+    ].groupby(df["ticker"]).cumsum()
+
     # Realised vol 30d
     df["real_vol_30"] = grp["pct_change"].transform(
-        lambda s: s.rolling(30).std() * (252 ** 0.5)
+        lambda s: s.rolling(30).std() * (252**0.5)
     )
     return df
+
 
 def last_row(df: pd.DataFrame) -> pd.DataFrame:
     return df.sort_values("date").groupby("ticker").tail(1).set_index("ticker")
 
+
+def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> None:
+    """Write the latest metrics for each ticker to ``output_path``."""
+    latest = (
+        df.sort_values("date")
+        .groupby("ticker", as_index=False)
+        .tail(1)
+        .set_index("ticker", drop=True)
+    )
+
+    cols = [
+        "close",
+        "pct_change",
+        "sma20",
+        "ema20",
+        "atr14",
+        "rsi14",
+        "macd",
+        "macd_signal",
+        "bb_upper",
+        "bb_lower",
+        "vwap",
+        "real_vol_30",
+    ]
+
+    cols = [c for c in cols if c in latest.columns]
+    latest = latest[cols].round(4)
+
+    if fmt == "excel":
+        with pd.ExcelWriter(
+            output_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
+        ) as writer:
+            latest.reset_index().to_excel(
+                writer, sheet_name="Pulse", index=False, float_format="%.4f"
+            )
+    elif fmt == "pdf":
+        if SimpleDocTemplate is None:
+            raise RuntimeError("reportlab is required for PDF output")
+        rows = [
+            latest.reset_index().columns.tolist()
+        ] + latest.reset_index().values.tolist()
+        doc = SimpleDocTemplate(
+            output_path,
+            pagesize=landscape(letter),
+            rightMargin=18,
+            leftMargin=18,
+            topMargin=18,
+            bottomMargin=18,
+        )
+        table = Table(rows, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                ]
+            )
+        )
+        doc.build([table])
+    else:
+        latest.to_csv(output_path, quoting=csv.QUOTE_MINIMAL, float_format="%.4f")
+
+
 # --------------------------------------------------------------------------- #
 # MAIN                                                                        #
 # --------------------------------------------------------------------------- #
+
 
 def main():
     tz_tr = timezone(timedelta(hours=3))
@@ -214,7 +308,9 @@ def main():
     args = parser.parse_args()
     filetype = args.filetype
     if not filetype:
-        filetype = input("Output file type (xlsx/csv/flatcsv/pdf) [csv]: ").strip().lower()
+        filetype = (
+            input("Output file type (xlsx/csv/flatcsv/pdf) [csv]: ").strip().lower()
+        )
         if filetype == "":
             filetype = "csv"
         elif filetype not in ("xlsx", "csv", "flatcsv", "pdf"):
@@ -222,7 +318,7 @@ def main():
             filetype = "csv"
 
     # 1. positions
-    pos = load_ib_positions_ib()   # live connection to IB/TWS
+    pos = load_ib_positions_ib()  # live connection to IB/TWS
 
     # --- tidy numeric precision ------------------------------------------------
     num_cols_pos = ["cost basis", "mark price", "market_value", "unrealized_pnl"]
@@ -254,16 +350,31 @@ def main():
 
     if filetype == "xlsx":
         out_file = base.with_suffix(".xlsx")
-        with pd.ExcelWriter(out_file, engine="xlsxwriter", datetime_format="yyyy-mm-dd") as xl:
-            pos.to_excel(xl, sheet_name="Holdings", index=False)
-            macro_px.to_excel(xl, sheet_name="Macro")
-            tech_last.to_excel(xl, sheet_name="Tech")
+        with pd.ExcelWriter(
+            out_file, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
+        ) as xl:
+            pos.to_excel(xl, sheet_name="Holdings", index=False, float_format="%.2f")
+            macro_px.to_excel(xl, sheet_name="Macro", float_format="%.2f")
+            tech_last.to_excel(xl, sheet_name="Tech", float_format="%.3f")
         print(f"✅ Saved → {out_file}")
     elif filetype in ("csv", "flatcsv"):
         base_str = str(base)
-        pos.to_csv(f"{base_str}_holdings.csv", index=False)
-        macro_px.to_csv(f"{base_str}_macro.csv")
-        tech_last.to_csv(f"{base_str}_tech.csv")
+        pos.to_csv(
+            f"{base_str}_holdings.csv",
+            index=False,
+            quoting=csv.QUOTE_MINIMAL,
+            float_format="%.2f",
+        )
+        macro_px.to_csv(
+            f"{base_str}_macro.csv",
+            quoting=csv.QUOTE_MINIMAL,
+            float_format="%.2f",
+        )
+        tech_last.to_csv(
+            f"{base_str}_tech.csv",
+            quoting=csv.QUOTE_MINIMAL,
+            float_format="%.3f",
+        )
         print(f"✅ Saved CSVs → {base.parent}")
     elif filetype == "pdf":
         out_file = base.with_suffix(".pdf")
@@ -315,6 +426,7 @@ def main():
 
         doc.build(elements)
         print(f"✅ Saved → {out_file}")
+
 
 if __name__ == "__main__":
     main()

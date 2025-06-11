@@ -1,4 +1,5 @@
 import os
+import csv
 import pandas as pd
 import yfinance as yf
 
@@ -139,7 +140,12 @@ def fetch_and_prepare_data(tickers):
 
 
 def save_to_csv(df: pd.DataFrame):
-    df.to_csv(OUTPUT_CSV, index=False)
+    df.to_csv(
+        OUTPUT_CSV,
+        index=False,
+        quoting=csv.QUOTE_MINIMAL,
+        float_format="%.2f",
+    )
     print(f"✅  Saved {len(df):,} rows → {OUTPUT_CSV}")
 
 
@@ -147,7 +153,12 @@ def save_to_excel(df: pd.DataFrame, path: str) -> None:
     with pd.ExcelWriter(
         path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
     ) as writer:
-        df.to_excel(writer, sheet_name="Prices", index=False)
+        df.to_excel(
+            writer,
+            sheet_name="Prices",
+            index=False,
+            float_format="%.2f",
+        )
 
 
 def save_to_pdf(df: pd.DataFrame, path: str) -> None:
