@@ -11,6 +11,7 @@ Columns:
 
 import os, sys, time, logging
 import csv
+import argparse
 from math import log, sqrt, erf
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -82,8 +83,22 @@ OUTPUT_DIR = (
     "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
 )
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"tech_signals_{DATE_TAG}_{TIME_TAG}.csv")
-OUTPUT_TXT = os.path.join(OUTPUT_DIR, f"tech_signals_{DATE_TAG}_{TIME_TAG}.txt")
+
+parser = argparse.ArgumentParser(description="Tech signal exporter")
+parser.add_argument(
+    "-f",
+    "--filetype",
+    choices=["csv", "txt"],
+    help="Output format",
+)
+args = parser.parse_args()
+if args.filetype:
+    FILETYPE = args.filetype
+else:
+    choice = input("Output type [csv/txt] (default csv): ").strip().lower()
+    FILETYPE = choice if choice in {"csv", "txt"} else "csv"
+
+BASE_PATH = os.path.join(OUTPUT_DIR, f"tech_signals_{DATE_TAG}_{TIME_TAG}")
 
 HIST_DAYS = 300  # enough for SMA200 / ADX
 SPAN_PCT = 0.05  # ±5 % strike window
@@ -576,10 +591,14 @@ for tk in iterable:
     ib.sleep(0.05)
 
 df_out = pd.DataFrame(rows)
-df_out.to_csv(OUTPUT_CSV, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
-with open(OUTPUT_TXT, "w") as fh:
-    fh.write(df_out.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
-logging.info("Saved %d rows → %s", len(rows), OUTPUT_CSV)
-logging.info("Saved plain text → %s", OUTPUT_TXT)
+csv_file = BASE_PATH + ".csv"
+txt_file = BASE_PATH + ".txt"
+if FILETYPE == "txt":
+    with open(txt_file, "w") as fh:
+        fh.write(df_out.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+    logging.info("Saved plain text → %s", txt_file)
+else:
+    df_out.to_csv(csv_file, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
+    logging.info("Saved %d rows → %s", len(rows), csv_file)
 if USE_IB:
     ib.disconnect()

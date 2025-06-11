@@ -303,11 +303,20 @@ def main():
         "-f",
         "--filetype",
         choices=["xlsx", "csv", "flatcsv", "pdf", "txt"],
-        default="csv",
         help="Output file type",
     )
     args = parser.parse_args()
-    filetype = args.filetype
+    if args.filetype:
+        filetype = args.filetype
+    else:
+        choice = (
+            input("Output type [csv/xlsx/flatcsv/pdf/txt] (default csv): ")
+            .strip()
+            .lower()
+        )
+        filetype = (
+            choice if choice in {"xlsx", "csv", "flatcsv", "pdf", "txt"} else "csv"
+        )
 
     # 1. positions
     pos = load_ib_positions_ib()  # live connection to IB/TWS
