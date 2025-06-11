@@ -6,7 +6,7 @@ This document outlines the goals of the project and provides a high level overvi
 
 * Keep a lightweight toolkit to pull snapshots of historical prices, live quotes and portfolio Greeks.
 * Prefer IBKR market data when available but gracefully fall back to yfinance and FRED for public data.
-* Store results as timestamped CSV files under the Downloads directory so they can be easily analysed elsewhere.
+* Store results as timestamped CSV files under the Downloads directory so they can be easily analysed elsewhere. Most scripts also support Excel (`--excel`) and PDF (`--pdf`) output.
 
 ## Script Interaction
 
