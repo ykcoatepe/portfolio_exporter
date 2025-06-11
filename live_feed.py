@@ -473,9 +473,14 @@ def main():
                     float_format="%.3f",
                 )
                 if args.txt:
+                    pos_txt = df_pos.copy()
+                    if "unrealized_pnl_pct" in pos_txt.columns:
+                        pos_txt["unrealized_pnl_pct"] = pos_txt[
+                            "unrealized_pnl_pct"
+                        ].map(lambda x: f"{x:.3f}%")
                     with open(OUTPUT_POS_CSV.replace(".csv", ".txt"), "w") as fh:
                         fh.write(
-                            df_pos.to_string(
+                            pos_txt.to_string(
                                 index=False, float_format=lambda x: f"{x:.3f}"
                             )
                         )
@@ -522,8 +527,13 @@ def main():
         float_format="%.3f",
     )
     if args.txt:
+        df_txt = df.copy()
+        if "unrealized_pnl_pct" in df_txt.columns:
+            df_txt["unrealized_pnl_pct"] = df_txt["unrealized_pnl_pct"].map(
+                lambda x: f"{x:.3f}%"
+            )
         with open(OUTPUT_CSV.replace(".csv", ".txt"), "w") as fh:
-            fh.write(df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+            fh.write(df_txt.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
     logging.info("Saved %d quotes → %s", len(df), OUTPUT_CSV)
 
 

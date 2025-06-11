@@ -333,14 +333,15 @@ def main():
     tech_last = last_row(tech)[INDICATORS].round(3)
 
     # 3. macro overview (price & % chg vs yesterday close)
-    macro_px = tech_last[["pct_change"]].rename(columns={"pct_change": "%Δ"})
+    macro_px = tech_last[["pct_change"]].copy()
+    macro_px.columns = ["pct_change"]
     macro_px.insert(0, "close", last_row(tech)["close"].round(3))
     macro_px.insert(0, "name", [MARKET_OVERVIEW.get(t, t) for t in tech_last.index])
     macro_px.index.name = "ticker"
 
     # round & make % column easier to read
     macro_px["close"] = macro_px["close"].round(3)
-    macro_px["%Δ"] = (macro_px["%Δ"] * 100).round(3)
+    macro_px["pct_change"] = (macro_px["pct_change"] * 100).round(3)
 
     # ------------------------------------------------------------------- #
     # Save results                                                        #
@@ -449,7 +450,7 @@ def main():
         elements.append(Spacer(0, 8))
         # pretty % column with symbol
         macro_pdf = macro_px.copy()
-        macro_pdf["%Δ"] = macro_pdf["%Δ"].map(lambda x: f"{x:.2f}%")
+        macro_pdf["pct_change"] = macro_pdf["pct_change"].map(lambda x: f"{x:.3f}%")
         elements.append(
             df_to_table(macro_pdf.reset_index().rename(columns={"index": "ticker"}))
         )
