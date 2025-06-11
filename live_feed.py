@@ -326,7 +326,8 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
             }
         )
         time.sleep(0.1)
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    return df
 
 
 def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
@@ -365,7 +366,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
     """
     Return a DataFrame with real‑time P&L for ALL open positions in the account.
 
-    Columns: timestamp · symbol · secType · position · avg_cost · last ·
+    Columns: timestamp · ticker · secType · position · avg_cost · last ·
              market_value · cost_basis · unrealized_pnl · unrealized_pnl_pct
     """
     try:
@@ -400,7 +401,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
         rows.append(
             {
                 "timestamp": ts_now,
-                "symbol": con.symbol,
+                "ticker": con.symbol,
                 "secType": con.secType,
                 "position": qty,
                 "avg_cost": avg_cost,
@@ -483,8 +484,8 @@ def main():
                 )
 
                 # aggregate unrealized PnL AND cost basis by underlying symbol
-                pnl_map = df_pos.groupby("symbol")["unrealized_pnl"].sum().to_dict()
-                cost_map = df_pos.groupby("symbol")["cost_basis"].sum().to_dict()
+                pnl_map = df_pos.groupby("ticker")["unrealized_pnl"].sum().to_dict()
+                cost_map = df_pos.groupby("ticker")["cost_basis"].sum().to_dict()
                 pct_map = {
                     s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan
                     for s in pnl_map

@@ -324,9 +324,10 @@ def main():
     # --- tidy numeric precision ------------------------------------------------
     num_cols_pos = ["cost basis", "mark price", "market_value", "unrealized_pnl"]
     pos[num_cols_pos] = pos[num_cols_pos].round(3)
+    pos = pos.rename(columns={"symbol": "ticker"})
 
     # 2. technical data
-    tickers = list(MARKET_OVERVIEW.keys()) + pos["symbol"].unique().tolist()
+    tickers = list(MARKET_OVERVIEW.keys()) + pos["ticker"].unique().tolist()
     ohlc = fetch_ohlc(tickers)
     tech = compute_indicators(ohlc)
     tech_last = last_row(tech)[INDICATORS].round(3)
@@ -334,7 +335,8 @@ def main():
     # 3. macro overview (price & % chg vs yesterday close)
     macro_px = tech_last[["pct_change"]].rename(columns={"pct_change": "%Δ"})
     macro_px.insert(0, "close", last_row(tech)["close"].round(3))
-    macro_px.index = [MARKET_OVERVIEW.get(t, t) for t in macro_px.index]
+    macro_px.insert(0, "name", [MARKET_OVERVIEW.get(t, t) for t in tech_last.index])
+    macro_px.index.name = "ticker"
 
     # round & make % column easier to read
     macro_px["close"] = macro_px["close"].round(3)
@@ -355,8 +357,15 @@ def main():
             out_file, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
         ) as xl:
             pos.to_excel(xl, sheet_name="Holdings", index=False, float_format="%.3f")
-            macro_px.to_excel(xl, sheet_name="Macro", float_format="%.3f")
-            tech_last.to_excel(xl, sheet_name="Tech", float_format="%.3f")
+            macro_px.to_excel(
+                xl,
+                sheet_name="Macro",
+                index_label="ticker",
+                float_format="%.3f",
+            )
+            tech_last.to_excel(
+                xl, sheet_name="Tech", index_label="ticker", float_format="%.3f"
+            )
         print(f"✅ Saved → {out_file}")
     elif filetype in ("csv", "flatcsv"):
         base_str = str(base)
@@ -368,11 +377,13 @@ def main():
         )
         macro_px.to_csv(
             f"{base_str}_macro.csv",
+            index_label="ticker",
             quoting=csv.QUOTE_MINIMAL,
             float_format="%.3f",
         )
         tech_last.to_csv(
             f"{base_str}_tech.csv",
+            index_label="ticker",
             quoting=csv.QUOTE_MINIMAL,
             float_format="%.3f",
         )
@@ -383,9 +394,17 @@ def main():
             fh.write("Holdings\n")
             fh.write(pos.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
             fh.write("\n\nMacro\n")
-            fh.write(macro_px.to_string(index=True, float_format=lambda x: f"{x:.3f}"))
+            fh.write(
+                macro_px.reset_index()
+                .rename(columns={"index": "ticker"})
+                .to_string(index=False, float_format=lambda x: f"{x:.3f}")
+            )
             fh.write("\n\nTech\n")
-            fh.write(tech_last.to_string(index=True, float_format=lambda x: f"{x:.3f}"))
+            fh.write(
+                tech_last.reset_index()
+                .rename(columns={"index": "ticker"})
+                .to_string(index=False, float_format=lambda x: f"{x:.3f}")
+            )
         print(f"✅ Saved → {out_file}")
     elif filetype == "pdf":
         out_file = base.with_suffix(".pdf")
@@ -431,9 +450,13 @@ def main():
         # pretty % column with symbol
         macro_pdf = macro_px.copy()
         macro_pdf["%Δ"] = macro_pdf["%Δ"].map(lambda x: f"{x:.2f}%")
-        elements.append(df_to_table(macro_pdf.reset_index()))
+        elements.append(
+            df_to_table(macro_pdf.reset_index().rename(columns={"index": "ticker"}))
+        )
         elements.append(Spacer(0, 8))
-        elements.append(df_to_table(tech_last.reset_index()))
+        elements.append(
+            df_to_table(tech_last.reset_index().rename(columns={"index": "ticker"}))
+        )
 
         doc.build(elements)
         print(f"✅ Saved → {out_file}")
