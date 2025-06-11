@@ -35,6 +35,7 @@ from option_chain_snapshot import fetch_yf_open_interest
 
 import numpy as np
 import pandas as pd
+import xlsxwriter
 
 from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
 from ib_insync.contract import Contract
@@ -349,7 +350,31 @@ def main() -> None:
         type=str,
         help="Comma-separated tickers to include (filters positions).",
     )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--flat-csv",
+        action="store_true",
+        help="Print the detailed greeks table to STDOUT and ALSO save it as a flat (one‑header) CSV file in the output directory.",
+    )
+    group.add_argument(
+        "--excel",
+        action="store_true",
+        help="Save the detailed rows and totals into a single Excel workbook instead of CSV files.",
+    )
     args = parser.parse_args()
+
+    # ─── interactive prompt if no output flag was provided ───
+    if not args.flat_csv and not args.excel:
+        try:
+            choice = input("Select output format [csv / flat / excel] (default csv): ").strip().lower()
+        except EOFError:
+            # non‑interactive environment (e.g., redirected), default to csv
+            choice = ""
+        if choice in {"flat", "flat‑csv", "flatcsv"}:
+            args.flat_csv = True
+        elif choice in {"excel", "xlsx"}:
+            args.excel = True
+        # else default to CSV files
 
     ib = IB()
     try:
@@ -558,6 +583,28 @@ def main() -> None:
         sys.exit(0)
 
     df = pd.DataFrame(rows)
+    # ─── optionally dump flat CSV to stdout and file ───
+    if args.flat_csv:
+        # Ensure single‑level columns
+        if isinstance(df.columns, pd.MultiIndex):
+            df_flat = df.copy()
+            df_flat.columns = [
+                "_".join([str(s) for s in tup if s != ""]).rstrip("_")
+                for tup in df_flat.columns.values
+            ]
+        else:
+            df_flat = df
+
+        # Print to STDOUT (no index)
+        df_flat.to_csv(sys.stdout, index=False, float_format="%.6f")
+
+        # Also write to a file in OUTPUT_DIR
+        date_tag = ts_local.strftime("%Y%m%d_%H%M")
+        fn_flat = os.path.join(
+            OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv"
+        )
+        df_flat.to_csv(fn_flat, index=False, float_format="%.6f")
+        logger.info(f"Flat CSV saved → {fn_flat} (and printed to STDOUT).")
     totals = (
         df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
         .sum()
@@ -610,17 +657,23 @@ def main() -> None:
     logger.info(f"EDDR computed – DaR₉₉: {dar_99:.4%},  CDaR₉₉: {cdar_99:.4%}")
 
     date_tag = ts_local.strftime("%Y%m%d_%H%M")
-    fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
-    fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
 
-    df.to_csv(fn_pos, index=False, float_format="%.6f")
-    # Add EDDR to summary/totals output
-    totals["DaR_99"] = dar_99
-    totals["CDaR_99"] = cdar_99
-
-    totals.to_csv(fn_tot, index=False, float_format="%.2f")
-    logger.info(f"Saved {len(df)} rows  → {fn_pos}")
-    logger.info(f"Saved totals         → {fn_tot}")
+    if args.flat_csv:
+        fn_flat = os.path.join(OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv")
+        logger.info(f"Flat CSV saved to {fn_flat} and printed to STDOUT (--flat-csv).")
+    elif args.excel:
+        fn_xlsx = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.xlsx")
+        with pd.ExcelWriter(fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
+            df.to_excel(writer, sheet_name="Positions", index=False, float_format="%.6f")
+            totals.to_excel(writer, sheet_name="Totals", index=False, float_format="%.2f")
+        logger.info(f"Saved Excel workbook → {fn_xlsx}")
+    else:
+        fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
+        fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
+        df.to_csv(fn_pos, index=False, float_format="%.6f")
+        totals.to_csv(fn_tot, index=False, float_format="%.2f")
+        logger.info(f"Saved {len(df)} rows → {fn_pos}")
+        logger.info(f"Saved totals         → {fn_tot}")
 
     ib.disconnect()
 

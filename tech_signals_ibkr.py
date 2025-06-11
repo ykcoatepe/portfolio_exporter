@@ -12,6 +12,9 @@ Columns:
 import os, sys, time, logging
 from math import log, sqrt, erf
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+TR_TZ = ZoneInfo("Europe/Istanbul")
 
 # Additional import for yfinance fallback
 import numpy as np
@@ -52,8 +55,8 @@ FUTURE_ROOTS = {
 # ───────────────────────── CONFIG ──────────────────────────
 # Include time in file names to avoid overwriting when run multiple times a day
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
-DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
-TIME_TAG = datetime.utcnow().strftime("%H%M")
+DATE_TAG = datetime.now(TR_TZ).strftime("%Y%m%d")
+TIME_TAG = datetime.now(TR_TZ).strftime("%H%M")
 # save to iCloud Drive Downloads
 OUTPUT_DIR = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -159,7 +162,7 @@ except Exception:
     USE_IB = False
 
 rows, tickers = [], load_tickers()
-ts_now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+ts_now = datetime.now(TR_TZ).isoformat(timespec="seconds")
 
 # pull SPY once for beta
 if USE_IB:
