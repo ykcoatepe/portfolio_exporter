@@ -15,7 +15,18 @@ from typing import Iterable, List, Tuple
 from typing import Optional
 
 import pandas as pd
-import xlsxwriter
+
+try:  # optional dependencies
+    import xlsxwriter  # type: ignore
+except Exception:  # pragma: no cover - optional
+    xlsxwriter = None  # type: ignore
+
+try:
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+except Exception:  # pragma: no cover - optional
+    SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
 import calendar
 
 try:  # optional dependency
@@ -141,6 +152,7 @@ def date_range_from_phrase(phrase: str, ref: date | None = None) -> Tuple[date, 
         return d, d
     raise ValueError(f"Unrecognised date phrase: {phrase}")
 
+
 # ─────────────────── interactive date‑range prompt ───────────────────
 def prompt_date_range() -> Tuple[date, date]:
     """
@@ -195,11 +207,11 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
         return [], []
 
     # --- Capture executions & commission reports ------------------------------
-    comm_map: dict[str, 'CommissionReport'] = {}
+    comm_map: dict[str, "CommissionReport"] = {}
 
     # CommissionReport only comes via callback; cache them by execId
     def _comm(*args):
-        report = args[-1]          # CommissionReport is always last arg
+        report = args[-1]  # CommissionReport is always last arg
         comm_map[report.execId] = report
 
     ib.commissionReportEvent += _comm
@@ -220,7 +232,7 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
 
         # ensure contract is qualified for full fields
         if not contract.conId:
-            qualified, = ib.qualifyContracts(contract)
+            (qualified,) = ib.qualifyContracts(contract)
             contract = qualified
 
         comm = comm_map.get(ex.execId, None)
@@ -235,7 +247,11 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
                 expiry=getattr(contract, "lastTradeDateOrContractMonth", None),
                 strike=getattr(contract, "strike", None),
                 right=getattr(contract, "right", None),
-                multiplier=int(contract.multiplier) if getattr(contract, "multiplier", None) else None,
+                multiplier=(
+                    int(contract.multiplier)
+                    if getattr(contract, "multiplier", None)
+                    else None
+                ),
                 exchange=ex.exchange,
                 primary_exchange=getattr(contract, "primaryExchange", None),
                 trading_class=getattr(contract, "tradingClass", None),
@@ -258,7 +274,7 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
     # --- Capture open orders ---------------------------------------------------
     ib.reqAllOpenOrders()
     ib.sleep(0.6)  # allow gateway to populate the cache
-    open_trades_snapshot: List['Trade'] = ib.openTrades()
+    open_trades_snapshot: List["Trade"] = ib.openTrades()
 
     open_orders: List[OpenOrder] = []
     for tr in open_trades_snapshot:
@@ -323,7 +339,9 @@ def save_csvs(
 
 
 # Helper for Excel export: auto-fit columns
-def _auto_fit_columns(df: pd.DataFrame, writer: pd.ExcelWriter, sheet_name: str) -> None:
+def _auto_fit_columns(
+    df: pd.DataFrame, writer: pd.ExcelWriter, sheet_name: str
+) -> None:
     """
     Auto‑adjust column widths based on the longest value in each column.
     """
@@ -410,7 +428,9 @@ def save_excel(
     ]
     df_open = df_open[[c for c in open_cols_preferred if c in df_open.columns]]
 
-    with pd.ExcelWriter(excel_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
+    with pd.ExcelWriter(
+        excel_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss"
+    ) as writer:
         if not df_trades.empty:
             df_trades.to_excel(writer, sheet_name="Trades", index=False)
             _auto_fit_columns(df_trades, writer, "Trades")
@@ -436,6 +456,71 @@ def save_excel(
     return excel_path
 
 
+def save_pdf(
+    trades: Iterable[Trade], open_orders: Iterable[OpenOrder], start: date, end: date
+) -> Optional[Path]:
+    trades = list(trades)
+    open_orders = list(open_orders)
+    if not trades and not open_orders:
+        return None
+
+    ts = TIME_TAG
+    base = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}_{ts}"
+    pdf_path = OUTPUT_DIR / f"trades_report_{base}.pdf"
+
+    df_trades = pd.DataFrame([t.__dict__ for t in trades])
+    df_open = pd.DataFrame([o.__dict__ for o in open_orders])
+
+    elements = []
+    doc = SimpleDocTemplate(
+        str(pdf_path),
+        pagesize=landscape(letter),
+        rightMargin=18,
+        leftMargin=18,
+        topMargin=18,
+        bottomMargin=18,
+    )
+    if not df_trades.empty:
+        tbl_trades = Table(
+            [df_trades.columns.tolist()] + df_trades.values.tolist(), repeatRows=1
+        )
+        tbl_trades.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 6),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                ]
+            )
+        )
+        elements.append(tbl_trades)
+
+    if not df_open.empty:
+        elements.append(Table([[" "]]))
+        tbl_open = Table(
+            [df_open.columns.tolist()] + df_open.values.tolist(), repeatRows=1
+        )
+        tbl_open.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 6),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                ]
+            )
+        )
+        elements.append(tbl_open)
+
+    doc.build(elements)
+    return pdf_path
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Filter trade history")
     g = p.add_mutually_exclusive_group()
@@ -447,13 +532,33 @@ def main() -> None:
     p.add_argument("--end")
     p.add_argument("--ibport", type=int, help="Override API port (default 7497)")
     p.add_argument("--cid", type=int, help="Override IB clientId (default 5)")
-    p.add_argument(
-        "--no-csv",
+    out_grp = p.add_mutually_exclusive_group()
+    out_grp.add_argument(
+        "--excel",
         action="store_true",
-        help="Skip generating CSV files and only produce the Excel report",
+        help="Save output as an Excel workbook instead of CSV.",
+    )
+    out_grp.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Save output as a PDF report instead of CSV.",
     )
 
     args = p.parse_args()
+
+    if not args.excel and not args.pdf:
+        try:
+            choice = (
+                input("Select output format [csv / excel / pdf] (default csv): ")
+                .strip()
+                .lower()
+            )
+        except EOFError:
+            choice = ""
+        if choice in {"excel", "xlsx"}:
+            args.excel = True
+        elif choice == "pdf":
+            args.pdf = True
 
     global IB_PORT, IB_CID
     if args.ibport:
@@ -484,16 +589,18 @@ def main() -> None:
 
     trades = filter_trades(trades, start, end)
 
-    if args.no_csv:
-        print("ℹ️  CSV generation skipped (--no-csv).")
+    if args.excel:
+        excel_path = save_excel(trades, open_orders, start, end)
+        if excel_path:
+            print(f"\u2705  Saved Excel report to {excel_path}")
+    elif args.pdf:
+        pdf_path = save_pdf(trades, open_orders, start, end)
+        if pdf_path:
+            print(f"\u2705  Saved PDF report to {pdf_path}")
     else:
         trade_path, oo_path = save_csvs(trades, open_orders, start, end)
         print(f"\u2705  Saved {len(trades)} trades to {trade_path}")
         print(f"\u2705  Saved {len(open_orders)} open orders to {oo_path}")
-
-    excel_path = save_excel(trades, open_orders, start, end)
-    if excel_path:
-        print(f"\u2705  Saved Excel report to {excel_path}")
 
 
 if __name__ == "__main__":
