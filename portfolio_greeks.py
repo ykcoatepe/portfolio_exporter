@@ -475,7 +475,7 @@ def main() -> None:
                 NAV_LOG,
                 header=True,
                 quoting=csv.QUOTE_MINIMAL,
-                float_format="%.2f",
+                float_format="%.3f",
             )
         else:
             NAV_LOG.write_text("timestamp,nav\n")
@@ -684,7 +684,7 @@ def main() -> None:
             df_flat = df
 
         # Print to STDOUT (no index)
-        df_flat.to_csv(sys.stdout, index=False, float_format="%.6f")
+        df_flat.to_csv(sys.stdout, index=False, float_format="%.3f")
 
         # Also write to a file in OUTPUT_DIR
         date_tag = ts_local.strftime("%Y%m%d_%H%M")
@@ -692,7 +692,7 @@ def main() -> None:
         df_flat.to_csv(
             fn_flat,
             index=False,
-            float_format="%.6f",
+            float_format="%.3f",
             quoting=csv.QUOTE_MINIMAL,
         )
         logger.info(f"Flat CSV saved → {fn_flat} (and printed to STDOUT).")
@@ -741,7 +741,7 @@ def main() -> None:
             NAV_LOG,
             header=True,
             quoting=csv.QUOTE_MINIMAL,
-            float_format="%.2f",
+            float_format="%.3f",
         )
 
     # Guard EDDR calculation for short history
@@ -763,10 +763,10 @@ def main() -> None:
             fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss"
         ) as writer:
             df.to_excel(
-                writer, sheet_name="Positions", index=False, float_format="%.6f"
+                writer, sheet_name="Positions", index=False, float_format="%.3f"
             )
             totals.to_excel(
-                writer, sheet_name="Totals", index=False, float_format="%.2f"
+                writer, sheet_name="Totals", index=False, float_format="%.3f"
             )
         logger.info(f"Saved Excel workbook → {fn_xlsx}")
     elif getattr(args, "pdf", False):
@@ -779,13 +779,13 @@ def main() -> None:
         df.to_csv(
             fn_pos,
             index=False,
-            float_format="%.6f",
+            float_format="%.3f",
             quoting=csv.QUOTE_MINIMAL,
         )
         totals.to_csv(
             fn_tot,
             index=False,
-            float_format="%.2f",
+            float_format="%.3f",
             quoting=csv.QUOTE_MINIMAL,
         )
         logger.info(f"Saved {len(df)} rows → {fn_pos}")

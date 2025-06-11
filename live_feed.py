@@ -460,7 +460,7 @@ def main():
                     OUTPUT_POS_CSV,
                     index=False,
                     quoting=csv.QUOTE_MINIMAL,
-                    float_format="%.4f",
+                    float_format="%.3f",
                 )
                 logging.info(
                     "Saved %d live positions → %s", len(df_pos), OUTPUT_POS_CSV
@@ -502,7 +502,7 @@ def main():
         OUTPUT_CSV,
         index=False,
         quoting=csv.QUOTE_MINIMAL,
-        float_format="%.4f",
+        float_format="%.3f",
     )
     logging.info("Saved %d quotes → %s", len(df), OUTPUT_CSV)
 

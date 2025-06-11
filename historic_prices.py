@@ -145,7 +145,7 @@ def save_to_csv(df: pd.DataFrame):
         OUTPUT_CSV,
         index=False,
         quoting=csv.QUOTE_MINIMAL,
-        float_format="%.2f",
+        float_format="%.3f",
     )
     print(f"✅  Saved {len(df):,} rows → {OUTPUT_CSV}")
 
@@ -158,7 +158,7 @@ def save_to_excel(df: pd.DataFrame, path: str) -> None:
             writer,
             sheet_name="Prices",
             index=False,
-            float_format="%.2f",
+            float_format="%.3f",
         )
 
 

@@ -131,7 +131,7 @@ def _save_csv(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
     out_name = f"net_liq_history_{start_label}-{end_label}_{TIME_TAG}.csv"
     out_path = OUTPUT_DIR / out_name
     df.to_csv(
-        out_path, index_label="date", quoting=csv.QUOTE_MINIMAL, float_format="%.2f"
+        out_path, index_label="date", quoting=csv.QUOTE_MINIMAL, float_format="%.3f"
     )
     return out_path
 
@@ -143,7 +143,7 @@ def _save_excel(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
         out_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
     ) as writer:
         df.to_excel(
-            writer, sheet_name="NetLiq", index_label="date", float_format="%.2f"
+            writer, sheet_name="NetLiq", index_label="date", float_format="%.3f"
         )
     return out_path
 

@@ -245,14 +245,14 @@ def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> Non
     ]
 
     cols = [c for c in cols if c in latest.columns]
-    latest = latest[cols].round(4)
+    latest = latest[cols].round(3)
 
     if fmt == "excel":
         with pd.ExcelWriter(
             output_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
         ) as writer:
             latest.reset_index().to_excel(
-                writer, sheet_name="Pulse", index=False, float_format="%.4f"
+                writer, sheet_name="Pulse", index=False, float_format="%.3f"
             )
     elif fmt == "pdf":
         if SimpleDocTemplate is None:
@@ -283,7 +283,7 @@ def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> Non
         )
         doc.build([table])
     else:
-        latest.to_csv(output_path, quoting=csv.QUOTE_MINIMAL, float_format="%.4f")
+        latest.to_csv(output_path, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
 
 
 # --------------------------------------------------------------------------- #
@@ -322,7 +322,7 @@ def main():
 
     # --- tidy numeric precision ------------------------------------------------
     num_cols_pos = ["cost basis", "mark price", "market_value", "unrealized_pnl"]
-    pos[num_cols_pos] = pos[num_cols_pos].round(2)
+    pos[num_cols_pos] = pos[num_cols_pos].round(3)
 
     # 2. technical data
     tickers = list(MARKET_OVERVIEW.keys()) + pos["symbol"].unique().tolist()
@@ -332,12 +332,12 @@ def main():
 
     # 3. macro overview (price & % chg vs yesterday close)
     macro_px = tech_last[["pct_change"]].rename(columns={"pct_change": "%Δ"})
-    macro_px.insert(0, "close", last_row(tech)["close"].round(2))
+    macro_px.insert(0, "close", last_row(tech)["close"].round(3))
     macro_px.index = [MARKET_OVERVIEW.get(t, t) for t in macro_px.index]
 
     # round & make % column easier to read
-    macro_px["close"] = macro_px["close"].round(2)
-    macro_px["%Δ"] = (macro_px["%Δ"] * 100).round(2)
+    macro_px["close"] = macro_px["close"].round(3)
+    macro_px["%Δ"] = (macro_px["%Δ"] * 100).round(3)
 
     # ------------------------------------------------------------------- #
     # Save results                                                        #
@@ -353,8 +353,8 @@ def main():
         with pd.ExcelWriter(
             out_file, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
         ) as xl:
-            pos.to_excel(xl, sheet_name="Holdings", index=False, float_format="%.2f")
-            macro_px.to_excel(xl, sheet_name="Macro", float_format="%.2f")
+            pos.to_excel(xl, sheet_name="Holdings", index=False, float_format="%.3f")
+            macro_px.to_excel(xl, sheet_name="Macro", float_format="%.3f")
             tech_last.to_excel(xl, sheet_name="Tech", float_format="%.3f")
         print(f"✅ Saved → {out_file}")
     elif filetype in ("csv", "flatcsv"):
@@ -363,12 +363,12 @@ def main():
             f"{base_str}_holdings.csv",
             index=False,
             quoting=csv.QUOTE_MINIMAL,
-            float_format="%.2f",
+            float_format="%.3f",
         )
         macro_px.to_csv(
             f"{base_str}_macro.csv",
             quoting=csv.QUOTE_MINIMAL,
-            float_format="%.2f",
+            float_format="%.3f",
         )
         tech_last.to_csv(
             f"{base_str}_tech.csv",

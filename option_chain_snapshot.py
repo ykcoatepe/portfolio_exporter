@@ -607,7 +607,7 @@ def _save_excel(df: pd.DataFrame, path: str) -> None:
     with pd.ExcelWriter(
         path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
     ) as writer:
-        df.to_excel(writer, sheet_name="Options", index=False, float_format="%.4f")
+        df.to_excel(writer, sheet_name="Options", index=False, float_format="%.3f")
 
 
 def _save_pdf(df: pd.DataFrame, path: str) -> None:
@@ -757,7 +757,7 @@ def main():
                             path,
                             index=False,
                             quoting=csv.QUOTE_MINIMAL,
-                            float_format="%.4f",
+                            float_format="%.3f",
                         )
                     logger.info("Saved %s (%d rows)", path, len(df))
             except Exception as e:
@@ -775,7 +775,7 @@ def main():
         else:
             out_path = f"{out_base}.csv"
             df_all.to_csv(
-                out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f"
+                out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f"
             )
         logger.info(
             "Saved consolidated portfolio snapshot → %s (%d rows)",
