@@ -438,13 +438,25 @@ def main() -> None:
         action="store_true",
         help="Save the detailed rows and totals into a landscape PDF report.",
     )
+    group.add_argument(
+        "--txt",
+        action="store_true",
+        help="Save the detailed rows and totals as plain text.",
+    )
     args = parser.parse_args()
 
     # ─── interactive prompt if no output flag was provided ───
-    if not args.flat_csv and not args.excel and not getattr(args, "pdf", False):
+    if (
+        not args.flat_csv
+        and not args.excel
+        and not getattr(args, "pdf", False)
+        and not getattr(args, "txt", False)
+    ):
         try:
             choice = (
-                input("Select output format [csv / flat / excel / pdf] (default csv): ")
+                input(
+                    "Select output format [csv / flat / excel / pdf / txt] (default csv): "
+                )
                 .strip()
                 .lower()
             )
@@ -457,6 +469,8 @@ def main() -> None:
             args.excel = True
         elif choice in {"pdf"}:
             args.pdf = True
+        elif choice in {"txt"}:
+            args.txt = True
         # else default to CSV files
 
     ib = IB()
@@ -471,7 +485,12 @@ def main() -> None:
     if not NAV_LOG.exists() or NAV_LOG.stat().st_size == 0:
         nav_boot = bootstrap_nav(ib)
         if not nav_boot.empty:
-            nav_boot.to_csv(NAV_LOG, header=True)
+            nav_boot.to_csv(
+                NAV_LOG,
+                header=True,
+                quoting=csv.QUOTE_MINIMAL,
+                float_format="%.3f",
+            )
         else:
             NAV_LOG.write_text("timestamp,nav\n")
 
@@ -679,12 +698,17 @@ def main() -> None:
             df_flat = df
 
         # Print to STDOUT (no index)
-        df_flat.to_csv(sys.stdout, index=False, float_format="%.6f")
+        df_flat.to_csv(sys.stdout, index=False, float_format="%.3f")
 
         # Also write to a file in OUTPUT_DIR
         date_tag = ts_local.strftime("%Y%m%d_%H%M")
         fn_flat = os.path.join(OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv")
-        df_flat.to_csv(fn_flat, index=False, float_format="%.6f")
+        df_flat.to_csv(
+            fn_flat,
+            index=False,
+            float_format="%.3f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
         logger.info(f"Flat CSV saved → {fn_flat} (and printed to STDOUT).")
     totals = (
         df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
@@ -727,7 +751,12 @@ def main() -> None:
         # write back to CSV (create header if missing)
         if not NAV_LOG.exists():
             NAV_LOG.write_text("timestamp,nav\n")
-        nav_series.to_csv(NAV_LOG, header=True)
+        nav_series.to_csv(
+            NAV_LOG,
+            header=True,
+            quoting=csv.QUOTE_MINIMAL,
+            float_format="%.3f",
+        )
 
     # Guard EDDR calculation for short history
     if len(nav_series) >= 30:  # need some history; full 252 for valid DaR
@@ -748,21 +777,38 @@ def main() -> None:
             fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss"
         ) as writer:
             df.to_excel(
-                writer, sheet_name="Positions", index=False, float_format="%.6f"
+                writer, sheet_name="Positions", index=False, float_format="%.3f"
             )
             totals.to_excel(
-                writer, sheet_name="Totals", index=False, float_format="%.2f"
+                writer, sheet_name="Totals", index=False, float_format="%.3f"
             )
         logger.info(f"Saved Excel workbook → {fn_xlsx}")
     elif getattr(args, "pdf", False):
         fn_pdf = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.pdf")
         _save_pdf(df, totals, fn_pdf)
         logger.info(f"Saved PDF report    → {fn_pdf}")
+    elif getattr(args, "txt", False):
+        fn_txt = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.txt")
+        with open(fn_txt, "w") as fh:
+            fh.write(df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+            fh.write("\n\n")
+            fh.write(totals.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+        logger.info(f"Saved text file     → {fn_txt}")
     else:
         fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
         fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
-        df.to_csv(fn_pos, index=False, float_format="%.6f")
-        totals.to_csv(fn_tot, index=False, float_format="%.2f")
+        df.to_csv(
+            fn_pos,
+            index=False,
+            float_format="%.3f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
+        totals.to_csv(
+            fn_tot,
+            index=False,
+            float_format="%.3f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
         logger.info(f"Saved {len(df)} rows → {fn_pos}")
         logger.info(f"Saved totals         → {fn_tot}")
 

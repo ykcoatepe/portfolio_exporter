@@ -1,4 +1,6 @@
 import os
+import csv
+import argparse
 import pandas as pd
 import yfinance as yf
 
@@ -139,7 +141,12 @@ def fetch_and_prepare_data(tickers):
 
 
 def save_to_csv(df: pd.DataFrame):
-    df.to_csv(OUTPUT_CSV, index=False)
+    df.to_csv(
+        OUTPUT_CSV,
+        index=False,
+        quoting=csv.QUOTE_MINIMAL,
+        float_format="%.3f",
+    )
     print(f"✅  Saved {len(df):,} rows → {OUTPUT_CSV}")
 
 
@@ -147,7 +154,17 @@ def save_to_excel(df: pd.DataFrame, path: str) -> None:
     with pd.ExcelWriter(
         path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
     ) as writer:
-        df.to_excel(writer, sheet_name="Prices", index=False)
+        df.to_excel(
+            writer,
+            sheet_name="Prices",
+            index=False,
+            float_format="%.3f",
+        )
+
+
+def save_to_txt(df: pd.DataFrame, path: str) -> None:
+    with open(path, "w") as fh:
+        fh.write(df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
 
 
 def save_to_pdf(df: pd.DataFrame, path: str) -> None:
@@ -189,12 +206,17 @@ def main() -> None:
         action="store_true",
         help="Save output as PDF instead of CSV.",
     )
+    out_grp.add_argument(
+        "--txt",
+        action="store_true",
+        help="Save output as plain text instead of CSV.",
+    )
     args = p.parse_args()
 
-    if not args.excel and not args.pdf:
+    if not args.excel and not args.pdf and not args.txt:
         try:
             choice = (
-                input("Select output format [csv / excel / pdf] (default csv): ")
+                input("Select output format [csv / excel / pdf / txt] (default csv): ")
                 .strip()
                 .lower()
             )
@@ -204,6 +226,8 @@ def main() -> None:
             args.excel = True
         elif choice == "pdf":
             args.pdf = True
+        elif choice == "txt":
+            args.txt = True
 
     tickers = load_tickers()
     df = fetch_and_prepare_data(tickers)
@@ -213,6 +237,9 @@ def main() -> None:
     elif args.pdf:
         path = OUTPUT_CSV.replace(".csv", ".pdf")
         save_to_pdf(df, path)
+    elif args.txt:
+        path = OUTPUT_CSV.replace(".csv", ".txt")
+        save_to_txt(df, path)
     else:
         save_to_csv(df)
 
