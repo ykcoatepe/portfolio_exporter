@@ -8,11 +8,14 @@ import csv
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from typing import Iterable, List, Tuple
+from typing import Optional
 
 import pandas as pd
+import xlsxwriter
 import calendar
 
 try:  # optional dependency
@@ -96,7 +99,8 @@ class OpenOrder:
 
 
 # ───────────────────────── CONFIG ──────────────────────────
-TIME_TAG = datetime.utcnow().strftime("%H%M")
+# Use Türkiye local time (Europe/Istanbul) for timestamp tags
+TIME_TAG = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%H%M")
 OUTPUT_DIR = Path(
     "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
 )
@@ -318,6 +322,120 @@ def save_csvs(
     return trades_file, oo_file
 
 
+# Helper for Excel export: auto-fit columns
+def _auto_fit_columns(df: pd.DataFrame, writer: pd.ExcelWriter, sheet_name: str) -> None:
+    """
+    Auto‑adjust column widths based on the longest value in each column.
+    """
+    worksheet = writer.sheets[sheet_name]
+    for i, col in enumerate(df.columns):
+        # find length of the column header and the longest cell content
+        max_len = max(
+            df[col].astype(str).map(len).max(),
+            len(col),
+        )
+        # Add a little extra space
+        worksheet.set_column(i, i, max_len + 2)
+
+
+# Save Excel workbook with trades and open orders
+def save_excel(
+    trades: Iterable[Trade],
+    open_orders: Iterable[OpenOrder],
+    start: date,
+    end: date,
+) -> Optional[Path]:
+    """
+    Save trades and open orders to a nicely formatted Excel workbook that is
+    easier to read than raw CSVs. Returns the path to the created workbook,
+    or None if both data sets are empty.
+    """
+    trades = list(trades)
+    open_orders = list(open_orders)
+    if not trades and not open_orders:
+        return None
+
+    ts = TIME_TAG
+    base = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}_{ts}"
+    excel_path = OUTPUT_DIR / f"trades_report_{base}.xlsx"
+
+    # Convert dataclass lists to DataFrames
+    df_trades = pd.DataFrame([t.__dict__ for t in trades])
+    df_open = pd.DataFrame([o.__dict__ for o in open_orders])
+
+    # ── ensure Excel gets timezone‑naive datetimes ─────────────────────────────
+    if "datetime" in df_trades.columns:
+        # pandas raises if we call tz_localize(None) on a naive column, so check dtype first
+        dt_ser = pd.to_datetime(df_trades["datetime"], errors="coerce")
+        if isinstance(dt_ser.dtype, pd.DatetimeTZDtype):
+            dt_ser = dt_ser.dt.tz_localize(None)
+        df_trades["datetime"] = dt_ser
+
+    # Re‑order / hide columns for readability
+    trade_cols_preferred = [
+        "datetime",
+        "symbol",
+        "sec_type",
+        "side",
+        "qty",
+        "price",
+        "avg_price",
+        "realized_pnl",
+        "commission",
+        "currency",
+        "expiry",
+        "strike",
+        "right",
+        "exchange",
+        "order_id",
+        "exec_id",
+    ]
+    df_trades = df_trades[[c for c in trade_cols_preferred if c in df_trades.columns]]
+
+    open_cols_preferred = [
+        "symbol",
+        "sec_type",
+        "side",
+        "total_qty",
+        "lmt_price",
+        "aux_price",
+        "status",
+        "filled",
+        "remaining",
+        "expiry",
+        "strike",
+        "right",
+        "order_type",
+        "order_id",
+    ]
+    df_open = df_open[[c for c in open_cols_preferred if c in df_open.columns]]
+
+    with pd.ExcelWriter(excel_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
+        if not df_trades.empty:
+            df_trades.to_excel(writer, sheet_name="Trades", index=False)
+            _auto_fit_columns(df_trades, writer, "Trades")
+
+            # --- summary sheet, grouped by symbol -------------
+            summary = (
+                df_trades.groupby("symbol")
+                .agg(
+                    trades_count=("exec_id", "count"),
+                    total_qty=("qty", "sum"),
+                    realized_pnl=("realized_pnl", "sum"),
+                )
+                .reset_index()
+                .sort_values("realized_pnl", ascending=False)
+            )
+            summary.to_excel(writer, sheet_name="Summary", index=False)
+            _auto_fit_columns(summary, writer, "Summary")
+
+        if not df_open.empty:
+            df_open.to_excel(writer, sheet_name="OpenOrders", index=False)
+            _auto_fit_columns(df_open, writer, "OpenOrders")
+
+    return excel_path
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Filter trade history")
     g = p.add_mutually_exclusive_group()
@@ -329,6 +447,11 @@ def main() -> None:
     p.add_argument("--end")
     p.add_argument("--ibport", type=int, help="Override API port (default 7497)")
     p.add_argument("--cid", type=int, help="Override IB clientId (default 5)")
+    p.add_argument(
+        "--no-csv",
+        action="store_true",
+        help="Skip generating CSV files and only produce the Excel report",
+    )
 
     args = p.parse_args()
 
@@ -360,9 +483,17 @@ def main() -> None:
         return
 
     trades = filter_trades(trades, start, end)
-    trade_path, oo_path = save_csvs(trades, open_orders, start, end)
-    print(f"\u2705  Saved {len(trades)} trades to {trade_path}")
-    print(f"\u2705  Saved {len(open_orders)} open orders to {oo_path}")
+
+    if args.no_csv:
+        print("ℹ️  CSV generation skipped (--no-csv).")
+    else:
+        trade_path, oo_path = save_csvs(trades, open_orders, start, end)
+        print(f"\u2705  Saved {len(trades)} trades to {trade_path}")
+        print(f"\u2705  Saved {len(open_orders)} open orders to {oo_path}")
+
+    excel_path = save_excel(trades, open_orders, start, end)
+    if excel_path:
+        print(f"\u2705  Saved Excel report to {excel_path}")
 
 
 if __name__ == "__main__":

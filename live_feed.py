@@ -9,7 +9,7 @@ live_feed.py — Hybrid live‑quote snapshot (IBKR first, yfinance fallback)
 • Output file gets a timestamped name:  live_quotes_YYYYMMDD_HHMM.csv
 
 Columns:
-    timestamp · ticker · last · bid · ask · open · high · low · prev_close · volume · source
+    timestamp · ticker · last · bid · ask · open · high · low · prev_close · volume · unrealized_pnl · unrealized_pnl_pct · source
 """
 
 import os, sys, time, logging
@@ -299,7 +299,7 @@ def fetch_live_positions(ib: 'IB') -> pd.DataFrame:
     Return a DataFrame with real‑time P&L for ALL open positions in the account.
 
     Columns: timestamp · symbol · secType · position · avg_cost · last ·
-             market_value · unrealized_pnl
+             market_value · cost_basis · unrealized_pnl · unrealized_pnl_pct
     """
     try:
         positions = ib.positions()
@@ -325,8 +325,11 @@ def fetch_live_positions(ib: 'IB') -> pd.DataFrame:
 
     for conId, (con, md, avg_cost, qty) in md_reqs.items():
         last = md.last or md.close or np.nan
-        market_val = last * qty * (int(con.multiplier) if con.multiplier else 1)
-        unreal_pnl = (last - avg_cost) * qty * (int(con.multiplier) if con.multiplier else 1)
+        mult = int(con.multiplier) if con.multiplier else 1
+        cost_basis = avg_cost * qty * mult
+        market_val = last * qty * mult
+        unreal_pnl = (last - avg_cost) * qty * mult
+        unreal_pct = (unreal_pnl / cost_basis * 100) if cost_basis else np.nan
         rows.append({
             "timestamp": ts_now,
             "symbol": con.symbol,
@@ -335,6 +338,8 @@ def fetch_live_positions(ib: 'IB') -> pd.DataFrame:
             "avg_cost": avg_cost,
             "last": last,
             "market_value": market_val,
+            "cost_basis": cost_basis,
+            "unrealized_pnl_pct": unreal_pct,
             "unrealized_pnl": unreal_pnl
         })
         ib.cancelMktData(md.contract)
@@ -370,10 +375,9 @@ def main():
 
     df = pd.concat([df_ib, df_yf, df_fred], ignore_index=True)
     df.insert(0, "timestamp", ts_now)
-    df.to_csv(OUTPUT_CSV, index=False)
-    logging.info("Saved %d quotes → %s", len(df), OUTPUT_CSV)
-
-    # --- live positions snapshot ---------------------------------
+    # --- live positions snapshot & unrealized PnL merge -----------
+    pnl_map = {}
+    pct_map = {}
     if IB_AVAILABLE:
         ib_live = IB()
         try:
@@ -383,8 +387,28 @@ def main():
             if not df_pos.empty:
                 df_pos.to_csv(OUTPUT_POS_CSV, index=False)
                 logging.info("Saved %d live positions → %s", len(df_pos), OUTPUT_POS_CSV)
+
+                # aggregate unrealized PnL AND cost basis by underlying symbol
+                pnl_map  = df_pos.groupby('symbol')['unrealized_pnl'].sum().to_dict()
+                cost_map = df_pos.groupby('symbol')['cost_basis'].sum().to_dict()
+                pct_map  = {s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan
+                            for s in pnl_map}
         except Exception as e:
             logging.warning("Live position snapshot failed: %s", e)
+
+    # map per-symbol PnL onto the quote rows
+    df['unrealized_pnl']     = df['ticker'].map(pnl_map)
+    df['unrealized_pnl_pct'] = df['ticker'].map(pct_map)
+
+    # reorder columns for clarity
+    quote_cols = ["timestamp", "ticker", "last", "bid", "ask", "open", "high",
+                  "low", "prev_close", "volume", "unrealized_pnl", "unrealized_pnl_pct", "source"]
+    df = df[[c for c in quote_cols if c in df.columns]]
+
+    df.to_csv(OUTPUT_CSV, index=False)
+    logging.info("Saved %d quotes → %s", len(df), OUTPUT_CSV)
+
+
 
 if __name__ == "__main__":
     main()
