@@ -1,198 +1,320 @@
+#!/usr/bin/env python3
+"""
+daily_pulse.py – Yordam's pre‑market overview
+Run at 07:00 Europe/Istanbul. Produces an Excel workbook in iCloud/Downloads.
+"""
+
 import os
-import argparse
-from datetime import datetime
-
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 import pandas as pd
-import numpy as np
+import yfinance as yf   # pip install yfinance
 
-try:  # optional dependencies
-    import xlsxwriter  # type: ignore
-except Exception:  # pragma: no cover - optional
-    xlsxwriter = None  # type: ignore
+import argparse
+import logging
+import warnings
+import io
+import contextlib
+from tqdm import tqdm                           # progress bar
+from reportlab.lib.pagesizes import letter, landscape      # PDF output (landscape added)
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+from reportlab.lib import colors
 
-try:  # optional dependencies
-    from reportlab.lib.pagesizes import letter, landscape
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-except Exception:  # pragma: no cover - optional
-    SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
+# ── Silence noisy libraries ────────────────────────────────────────────────
+logging.getLogger("ib_insync").setLevel(logging.CRITICAL)
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
-TIME_TAG = datetime.utcnow().strftime("%H%M")
-OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+# --- Interactive Brokers live API ---
+# pip install ib_insync (requires TWS or IB Gateway running with API enabled)
+from ib_insync import IB, util
+
+# --------------------------------------------------------------------------- #
+# CONFIG – edit these two blocks only                                         #
+# --------------------------------------------------------------------------- #
+
+# 1.  Where your *latest* IB CSV lives (auto‑export or manual upload).
+IB_CSV = Path(
+    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/IB/Latest/"
 )
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-DEFAULT_OUTPUT = os.path.join(OUTPUT_DIR, f"daily_pulse_{DATE_TAG}_{TIME_TAG}.csv")
 
+# 2.  Macro/technical watch‑list & indicators
+MARKET_OVERVIEW = {
+    #   Ticker   : Friendly name
+    "SPY":  "S&P 500",
+    "QQQ":  "Nasdaq 100",
+    "IWM":  "Russell 2000",
+    "VIX":  "VIX Index",
+    "DXY":  "US Dollar",
+    "TLT":  "US 20Y Bond",
+    "IEF":  "US 7‑10Y Bond",
+    "GC=F": "Gold Futures",
+    "CL=F": "WTI Oil",
+    "BTC-USD": "Bitcoin",
+}
+
+INDICATORS = ["pct_change", "sma20", "ema20", "rsi14", "macd", "macd_signal",
+              "atr14", "bb_upper", "bb_lower", "real_vol_30"]
+
+# --------------------------------------------------------------------------- #
+# HELPER FUNCTIONS                                                            #
+# --------------------------------------------------------------------------- #
+
+def load_ib_positions_ib(
+    host: str = "127.0.0.1",
+    port: int = 7497,
+    client_id: int = 999,
+) -> pd.DataFrame:
+    """
+    Pull current portfolio positions directly from Interactive Brokers via
+    the TWS / IB‑Gateway API (ib_insync wrapper).
+
+    Columns returned: symbol · quantity · cost basis · mark price ·
+    market_value · unrealized_pnl
+    """
+    ib = IB()
+    try:
+        ib.connect(host, port, clientId=client_id)
+        # suppress per‑contract error spam from IB
+        ib.errorEvent += lambda *a, **k: None
+    except Exception as e:
+        raise ConnectionError(
+            f"❌ Cannot connect to IB API at {host}:{port}  →  {e}"
+        ) from e
+
+    positions = ib.positions()
+    if not positions:
+        ib.disconnect()
+        raise RuntimeError(
+            "API returned no positions. Confirm account is logged in and the "
+            "API user has permissions."
+        )
+
+    contracts = [p.contract for p in positions]
+    # Request real‑time market data in a single call
+    tickers = ib.reqTickers(*contracts)
+
+    # Build a quick {conId: last_price} map
+    price_map = {}
+    for t in tickers:
+        # fall back to mid‑point if last==0
+        last = t.last if t.last else (t.bid + t.ask) / 2 if (t.bid and t.ask) else None
+        price_map[t.contract.conId] = last
+
+    rows = []
+    for p in positions:
+        symbol = p.contract.symbol
+        qty = p.position
+        cost_basis = p.avgCost
+        mark_price = price_map.get(p.contract.conId)
+        # --- Fallback: try yfinance close if IB API did not return a price
+        if mark_price is None or pd.isna(mark_price):
+            try:
+                yq = yf.Ticker(symbol).history(period="1d")["Close"]
+                mark_price = float(yq.iloc[-1]) if not yq.empty else None
+            except Exception:
+                mark_price = None
+        side = "Short" if qty < 0 else "Long"
+        rows.append(
+            {
+                "symbol": symbol,
+                "side": side,
+                "quantity": abs(qty),
+                "cost basis": cost_basis,
+                "mark price": mark_price,
+            }
+        )
+
+    df = pd.DataFrame(rows)
+    df["market_value"] = df["quantity"] * df["mark price"]
+    df["unrealized_pnl"] = (df["mark price"] - df["cost basis"]) * df["quantity"]
+
+    ib.disconnect()
+    return df
+
+def fetch_ohlc(tickers, days_back=60) -> pd.DataFrame:
+    """Download daily OHLCV plus today’s pre‑market quote."""
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=days_back)
+    data = yf.download(tickers, start=start.date(), end=end.date()+timedelta(days=1),
+                       group_by="ticker", auto_adjust=False, progress=False)
+    rows = []
+    for t in tqdm(tickers, desc="Processing tickers"):
+        d = data[t].dropna().reset_index()
+        d.columns = ["date", "open", "high", "low", "close", "adj_close", "volume"]
+        d["ticker"] = t
+        rows.append(d)
+    return pd.concat(rows, ignore_index=True)
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Return DataFrame with technical indicators."""
-    df = df.sort_values("date").copy()
-    grp = df.groupby("ticker")
-    df["pct_change"] = grp["close"].pct_change(fill_method=None)
-    df["sma20"] = grp["close"].transform(lambda s: s.rolling(20, min_periods=1).mean())
-    df["ema20"] = grp["close"].transform(lambda s: s.ewm(span=20, min_periods=1).mean())
-    high_low = df["high"] - df["low"]
-    prev_close = grp["close"].shift(1)
-    tr = pd.concat(
-        [
-            high_low,
-            (df["high"] - prev_close).abs(),
-            (df["low"] - prev_close).abs(),
-        ],
-        axis=1,
-    ).max(axis=1)
-    df["tr"] = tr
-    df["atr14"] = grp["tr"].transform(lambda s: s.rolling(14, min_periods=1).mean())
-    df.drop(columns="tr", inplace=True)
+    """(Same logic as your original, condensed & vectorised)"""
+    df = df.sort_values(["ticker", "date"]).copy()
+    grp = df.groupby("ticker", group_keys=False)
+
+    df["pct_change"] = grp["close"].pct_change()
+    df["sma20"] = grp["close"].transform(lambda s: s.rolling(20).mean())
+    df["ema20"] = grp["close"].transform(lambda s: s.ewm(span=20).mean())
+
+    # RSI14
     delta = grp["close"].diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(14, min_periods=1).mean()
-    avg_loss = loss.rolling(14, min_periods=1).mean()
-    rs = avg_gain / avg_loss.replace(0, np.nan)
-    df["rsi14"] = 100 - (100 / (1 + rs))
-    ema12 = grp["close"].transform(lambda s: s.ewm(span=12, min_periods=1).mean())
-    ema26 = grp["close"].transform(lambda s: s.ewm(span=26, min_periods=1).mean())
+    rs = gain.rolling(14).mean() / loss.rolling(14).mean()
+    df["rsi14"] = 100 - 100 / (1 + rs)
+
+    # MACD
+    ema12 = grp["close"].transform(lambda s: s.ewm(span=12).mean())
+    ema26 = grp["close"].transform(lambda s: s.ewm(span=26).mean())
     df["macd"] = ema12 - ema26
-    df["macd_signal"] = grp["macd"].transform(
-        lambda s: s.ewm(span=9, min_periods=1).mean()
+    df["macd_signal"] = grp["macd"].transform(lambda s: s.ewm(span=9).mean())
+
+    # ATR14
+    tr = (
+        (df["high"] - df["low"]).abs()
+        .to_frame("hl")
+        .join((df["high"] - grp["close"].shift()).abs().to_frame("hc"))
+        .join((df["low"] - grp["close"].shift()).abs().to_frame("lc"))
+        .max(axis=1)
     )
-    rolling_mean = grp["close"].transform(lambda s: s.rolling(20, min_periods=1).mean())
-    rolling_std = grp["close"].transform(lambda s: s.rolling(20, min_periods=1).std())
-    df["bb_upper"] = rolling_mean + 2 * rolling_std
-    df["bb_lower"] = rolling_mean - 2 * rolling_std
-    df["vwap"] = (df["close"] * df["volume"]).groupby(df["ticker"]).cumsum() / df[
-        "volume"
-    ].groupby(df["ticker"]).cumsum()
+    df["atr14"] = grp.apply(lambda g: tr.loc[g.index].rolling(14).mean())
+
+    # Bollinger
+    m20 = df["sma20"]
+    std20 = grp["close"].transform(lambda s: s.rolling(20).std())
+    df["bb_upper"] = m20 + 2 * std20
+    df["bb_lower"] = m20 - 2 * std20
+
+    # Realised vol 30d
     df["real_vol_30"] = grp["pct_change"].transform(
-        lambda s: s.rolling(30, min_periods=1).std() * np.sqrt(252)
+        lambda s: s.rolling(30).std() * (252 ** 0.5)
     )
     return df
 
+def last_row(df: pd.DataFrame) -> pd.DataFrame:
+    return df.sort_values("date").groupby("ticker").tail(1).set_index("ticker")
 
-def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> None:
-    """Write the latest metrics for each ticker to ``output_path``."""
-    latest = (
-        df.sort_values("date")
-        .groupby("ticker", as_index=False)
-        .tail(1)
-        .set_index("ticker", drop=True)
+# --------------------------------------------------------------------------- #
+# MAIN                                                                        #
+# --------------------------------------------------------------------------- #
+
+def main():
+    tz_tr = timezone(timedelta(hours=3))
+    stamp = datetime.now(tz_tr).strftime("%Y%m%d_%H%M")
+
+    # ------------------------------------------------------------------- #
+    # CLI / interactive choice for output format                          #
+    # ------------------------------------------------------------------- #
+    parser = argparse.ArgumentParser(description="Generate pre‑market dashboard")
+    parser.add_argument(
+        "-f",
+        "--filetype",
+        choices=["xlsx", "csv", "flatcsv", "pdf"],
+        help="Output file type (default: ask interactively, csv if blank)",
     )
+    args = parser.parse_args()
+    filetype = args.filetype
+    if not filetype:
+        filetype = input("Output file type (xlsx/csv/flatcsv/pdf) [csv]: ").strip().lower()
+        if filetype == "":
+            filetype = "csv"
+        elif filetype not in ("xlsx", "csv", "flatcsv", "pdf"):
+            print("Unknown type. Falling back to csv.")
+            filetype = "csv"
 
-    cols = [
-        "close",
-        "pct_change",
-        "sma20",
-        "ema20",
-        "atr14",
-        "rsi14",
-        "macd",
-        "macd_signal",
-        "bb_upper",
-        "bb_lower",
-        "vwap",
-        "real_vol_30",
-    ]
+    # 1. positions
+    pos = load_ib_positions_ib()   # live connection to IB/TWS
 
-    # keep only existing cols to prevent key errors
-    cols = [c for c in cols if c in latest.columns]
+    # --- tidy numeric precision ------------------------------------------------
+    num_cols_pos = ["cost basis", "mark price", "market_value", "unrealized_pnl"]
+    pos[num_cols_pos] = pos[num_cols_pos].round(2)
 
-    latest = latest[cols].round(4)
+    # 2. technical data
+    tickers = list(MARKET_OVERVIEW.keys()) + pos["symbol"].unique().tolist()
+    ohlc = fetch_ohlc(tickers)
+    tech = compute_indicators(ohlc)
+    tech_last = last_row(tech)[INDICATORS].round(3)
 
-    if fmt == "excel":
-        with pd.ExcelWriter(
-            output_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
-        ) as writer:
-            latest.reset_index().to_excel(writer, sheet_name="Pulse", index=False)
-    elif fmt == "pdf":
-        if SimpleDocTemplate is None:
-            raise RuntimeError("reportlab is required for PDF output")
-        rows = [
-            latest.reset_index().columns.tolist()
-        ] + latest.reset_index().values.tolist()
+    # 3. macro overview (price & % chg vs yesterday close)
+    macro_px = tech_last[["pct_change"]].rename(columns={"pct_change": "%Δ"})
+    macro_px.insert(0, "close", last_row(tech)["close"].round(2))
+    macro_px.index = [MARKET_OVERVIEW.get(t, t) for t in macro_px.index]
+
+    # round & make % column easier to read
+    macro_px["close"] = macro_px["close"].round(2)
+    macro_px["%Δ"] = (macro_px["%Δ"] * 100).round(2)
+
+    # ------------------------------------------------------------------- #
+    # Save results                                                        #
+    # ------------------------------------------------------------------- #
+    out_dir = Path(
+        "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    base = out_dir / f"pre_mkt_{stamp}"
+
+    if filetype == "xlsx":
+        out_file = base.with_suffix(".xlsx")
+        with pd.ExcelWriter(out_file, engine="xlsxwriter", datetime_format="yyyy-mm-dd") as xl:
+            pos.to_excel(xl, sheet_name="Holdings", index=False)
+            macro_px.to_excel(xl, sheet_name="Macro")
+            tech_last.to_excel(xl, sheet_name="Tech")
+        print(f"✅ Saved → {out_file}")
+    elif filetype in ("csv", "flatcsv"):
+        base_str = str(base)
+        pos.to_csv(f"{base_str}_holdings.csv", index=False)
+        macro_px.to_csv(f"{base_str}_macro.csv")
+        tech_last.to_csv(f"{base_str}_tech.csv")
+        print(f"✅ Saved CSVs → {base.parent}")
+    elif filetype == "pdf":
+        out_file = base.with_suffix(".pdf")
+        # reportlab 3.x expects a str or file‑like, not a pathlib.Path
         doc = SimpleDocTemplate(
-            output_path,
+            str(out_file),
             pagesize=landscape(letter),
-            rightMargin=18,
-            leftMargin=18,
-            topMargin=18,
-            bottomMargin=18,
+            rightMargin=20,
+            leftMargin=20,
+            topMargin=20,
+            bottomMargin=20,
         )
-        table = Table(rows, repeatRows=1)
-        table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
-                ]
+        elements = []
+
+        def df_to_table(df):
+            data = [df.columns.tolist()] + df.values.tolist()
+            table = Table(data)
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                        ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                    ]
+                )
             )
+            return table
+
+        # tidy column names
+        pos_ren = pos.rename(
+            columns={
+                "cost basis": "CostBasis",
+                "mark price": "MarkPrice",
+                "market_value": "MktValue",
+                "unrealized_pnl": "UnrlzdPnL",
+            }
         )
-        doc.build([table])
-    else:
-        latest.to_csv(output_path)
+        elements.append(df_to_table(pos_ren))
+        elements.append(Spacer(0, 8))
+        # pretty % column with symbol
+        macro_pdf = macro_px.copy()
+        macro_pdf["%Δ"] = macro_pdf["%Δ"].map(lambda x: f"{x:.2f}%")
+        elements.append(df_to_table(macro_pdf.reset_index()))
+        elements.append(Spacer(0, 8))
+        elements.append(df_to_table(tech_last.reset_index()))
 
-
-def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Generate daily technical summary from OHLC data"
-    )
-    p.add_argument(
-        "csv",
-        nargs="?",
-        default="historic_prices_sample.csv",
-        help="Input OHLCV CSV file",
-    )
-    out_grp = p.add_mutually_exclusive_group()
-    out_grp.add_argument(
-        "--excel",
-        action="store_true",
-        help="Save the summary as an Excel workbook instead of CSV.",
-    )
-    out_grp.add_argument(
-        "--pdf",
-        action="store_true",
-        help="Save the summary as a PDF report instead of CSV.",
-    )
-    p.add_argument(
-        "-o",
-        "--output",
-        default=DEFAULT_OUTPUT,
-        help="Path to save the summary file",
-    )
-    args = p.parse_args()
-
-    if not args.excel and not args.pdf:
-        try:
-            choice = (
-                input("Select output format [csv / excel / pdf] (default csv): ")
-                .strip()
-                .lower()
-            )
-        except EOFError:
-            choice = ""
-        if choice in {"excel", "xlsx"}:
-            args.excel = True
-        elif choice == "pdf":
-            args.pdf = True
-
-    fmt = "excel" if args.excel else "pdf" if args.pdf else "csv"
-    output_path = args.output
-    if fmt == "excel" and output_path.endswith(".csv"):
-        output_path = output_path[:-4] + ".xlsx"
-    elif fmt == "pdf" and output_path.endswith(".csv"):
-        output_path = output_path[:-4] + ".pdf"
-
-    df = pd.read_csv(args.csv, parse_dates=["date"])
-    df = compute_indicators(df)
-    generate_report(df, output_path, fmt)
-    print(f"✅  Saved report → {output_path}")
-
+        doc.build(elements)
+        print(f"✅ Saved → {out_file}")
 
 if __name__ == "__main__":
     main()
