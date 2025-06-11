@@ -354,7 +354,7 @@ def main() -> None:
     group.add_argument(
         "--flat-csv",
         action="store_true",
-        help="Print the detailed greeks table to STDOUT as a flat (one‑header) CSV and skip file output.",
+        help="Print the detailed greeks table to STDOUT and ALSO save it as a flat (one‑header) CSV file in the output directory.",
     )
     group.add_argument(
         "--excel",
@@ -583,19 +583,28 @@ def main() -> None:
         sys.exit(0)
 
     df = pd.DataFrame(rows)
-    # ─── optionally dump flat CSV to stdout ───
+    # ─── optionally dump flat CSV to stdout and file ───
     if args.flat_csv:
-        # Ensure single‑level columns (just in case)
+        # Ensure single‑level columns
         if isinstance(df.columns, pd.MultiIndex):
             df_flat = df.copy()
-            df_flat.columns = ["_".join([str(s) for s in tup if s != ""]).rstrip("_") for tup in df_flat.columns.values]
+            df_flat.columns = [
+                "_".join([str(s) for s in tup if s != ""]).rstrip("_")
+                for tup in df_flat.columns.values
+            ]
         else:
             df_flat = df
-        # write to stdout without the pandas index
+
+        # Print to STDOUT (no index)
         df_flat.to_csv(sys.stdout, index=False, float_format="%.6f")
-        # If the user only wanted flat CSV, skip file output
-        if not PROGRESS:
-            logger.info("Flat CSV printed to STDOUT as requested (--flat-csv).")
+
+        # Also write to a file in OUTPUT_DIR
+        date_tag = ts_local.strftime("%Y%m%d_%H%M")
+        fn_flat = os.path.join(
+            OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv"
+        )
+        df_flat.to_csv(fn_flat, index=False, float_format="%.6f")
+        logger.info(f"Flat CSV saved → {fn_flat} (and printed to STDOUT).")
     totals = (
         df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
         .sum()
@@ -650,7 +659,8 @@ def main() -> None:
     date_tag = ts_local.strftime("%Y%m%d_%H%M")
 
     if args.flat_csv:
-        logger.info("Flat CSV written to STDOUT; no file output (--flat-csv).")
+        fn_flat = os.path.join(OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv")
+        logger.info(f"Flat CSV saved to {fn_flat} and printed to STDOUT (--flat-csv).")
     elif args.excel:
         fn_xlsx = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.xlsx")
         with pd.ExcelWriter(fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
