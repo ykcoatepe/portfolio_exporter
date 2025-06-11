@@ -1,5 +1,17 @@
+import os
+import argparse
+from datetime import datetime
+
 import pandas as pd
 import numpy as np
+
+DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
+TIME_TAG = datetime.utcnow().strftime("%H%M")
+OUTPUT_DIR = (
+    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+DEFAULT_OUTPUT = os.path.join(OUTPUT_DIR, f"daily_pulse_{DATE_TAG}_{TIME_TAG}.csv")
 
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -82,3 +94,31 @@ def generate_report(df: pd.DataFrame, output_path: str) -> None:
 
     latest = latest[cols].round(4)
     latest.to_csv(output_path)
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="Generate daily technical summary from OHLC data"
+    )
+    p.add_argument(
+        "csv",
+        nargs="?",
+        default="historic_prices_sample.csv",
+        help="Input OHLCV CSV file",
+    )
+    p.add_argument(
+        "-o",
+        "--output",
+        default=DEFAULT_OUTPUT,
+        help="Path to save the summary CSV",
+    )
+    args = p.parse_args()
+
+    df = pd.read_csv(args.csv, parse_dates=["date"])
+    df = compute_indicators(df)
+    generate_report(df, args.output)
+    print(f"✅  Saved report → {args.output}")
+
+
+if __name__ == "__main__":
+    main()
