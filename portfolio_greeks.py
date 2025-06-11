@@ -35,12 +35,19 @@ from option_chain_snapshot import fetch_yf_open_interest
 
 import numpy as np
 import pandas as pd
-import xlsxwriter
+
+try:  # optional dependency
+    import xlsxwriter  # type: ignore
+except Exception:  # pragma: no cover - optional
+    xlsxwriter = None  # type: ignore
 
 # PDF export dependencies
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+try:
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+except Exception:  # pragma: no cover - optional
+    SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
 
 from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
 from ib_insync.contract import Contract
@@ -187,6 +194,7 @@ DEFAULT_MULT = {
     "CASH": 100_000,  # treat FX as notional per lot
 }
 
+
 # ───────────────────── expiry normaliser for Yahoo OI ─────────────────────
 def _normalised_expiry(exp_str: str) -> str:
     """
@@ -195,11 +203,12 @@ def _normalised_expiry(exp_str: str) -> str:
     YYYYMM    → YYYYMM   (monthly)
     YYYYMMDD  → YYYYMMDD (weekly)
     """
-    if len(exp_str) == 6 and exp_str.isdigit():          # monthly
+    if len(exp_str) == 6 and exp_str.isdigit():  # monthly
         return exp_str
-    elif len(exp_str) >= 8 and exp_str[:8].isdigit():    # weekly/full
+    elif len(exp_str) >= 8 and exp_str[:8].isdigit():  # weekly/full
         return exp_str[:8]
     return exp_str
+
 
 # tunables
 TIMEOUT_SECONDS = 40  # seconds to wait for model-Greeks before falling back
@@ -405,6 +414,7 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
 
 # ─────────────────────────── MAIN ──────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
     parser.add_argument(
@@ -433,7 +443,11 @@ def main() -> None:
     # ─── interactive prompt if no output flag was provided ───
     if not args.flat_csv and not args.excel and not getattr(args, "pdf", False):
         try:
-            choice = input("Select output format [csv / flat / excel / pdf] (default csv): ").strip().lower()
+            choice = (
+                input("Select output format [csv / flat / excel / pdf] (default csv): ")
+                .strip()
+                .lower()
+            )
         except EOFError:
             # non‑interactive environment (e.g., redirected), default to csv
             choice = ""
@@ -669,9 +683,7 @@ def main() -> None:
 
         # Also write to a file in OUTPUT_DIR
         date_tag = ts_local.strftime("%Y%m%d_%H%M")
-        fn_flat = os.path.join(
-            OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv"
-        )
+        fn_flat = os.path.join(OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv")
         df_flat.to_csv(fn_flat, index=False, float_format="%.6f")
         logger.info(f"Flat CSV saved → {fn_flat} (and printed to STDOUT).")
     totals = (
@@ -732,9 +744,15 @@ def main() -> None:
         logger.info(f"Flat CSV saved to {fn_flat} and printed to STDOUT (--flat-csv).")
     elif args.excel:
         fn_xlsx = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.xlsx")
-        with pd.ExcelWriter(fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
-            df.to_excel(writer, sheet_name="Positions", index=False, float_format="%.6f")
-            totals.to_excel(writer, sheet_name="Totals", index=False, float_format="%.2f")
+        with pd.ExcelWriter(
+            fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss"
+        ) as writer:
+            df.to_excel(
+                writer, sheet_name="Positions", index=False, float_format="%.6f"
+            )
+            totals.to_excel(
+                writer, sheet_name="Totals", index=False, float_format="%.2f"
+            )
         logger.info(f"Saved Excel workbook → {fn_xlsx}")
     elif getattr(args, "pdf", False):
         fn_pdf = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.pdf")

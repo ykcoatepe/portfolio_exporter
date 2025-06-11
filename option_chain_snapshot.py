@@ -37,6 +37,18 @@ import yfinance as yf
 from ib_insync import IB, Option, Stock
 from utils.bs import bs_greeks
 
+try:  # optional dependencies
+    import xlsxwriter  # type: ignore
+except Exception:  # pragma: no cover - optional
+    xlsxwriter = None  # type: ignore
+
+try:
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+except Exception:  # pragma: no cover - optional
+    SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
+
 from bisect import bisect_left
 
 
@@ -591,6 +603,39 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     return df
 
 
+def _save_excel(df: pd.DataFrame, path: str) -> None:
+    with pd.ExcelWriter(
+        path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
+    ) as writer:
+        df.to_excel(writer, sheet_name="Options", index=False, float_format="%.4f")
+
+
+def _save_pdf(df: pd.DataFrame, path: str) -> None:
+    rows_data = [df.columns.tolist()] + df.values.tolist()
+    doc = SimpleDocTemplate(
+        path,
+        pagesize=landscape(letter),
+        rightMargin=18,
+        leftMargin=18,
+        topMargin=18,
+        bottomMargin=18,
+    )
+    table = Table(rows_data, repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 6),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ]
+        )
+    )
+    doc.build([table])
+
+
 # ─────────────────────────── MAIN ──────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Option-chain snapshot exporter")
@@ -604,7 +649,32 @@ def main():
             "Semi-colon separated SYM:EXP list, e.g. 'TSLA:20250620,20250703;AAPL:20250620'."
         ),
     )
+    out_grp = parser.add_mutually_exclusive_group()
+    out_grp.add_argument(
+        "--excel",
+        action="store_true",
+        help="Save the snapshot(s) in an Excel workbook instead of CSV.",
+    )
+    out_grp.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Save the snapshot(s) as a PDF report instead of CSV.",
+    )
     args = parser.parse_args()
+
+    if not args.excel and not args.pdf:
+        try:
+            choice = (
+                input("Select output format [csv / excel / pdf] (default csv): ")
+                .strip()
+                .lower()
+            )
+        except EOFError:
+            choice = ""
+        if choice in {"excel", "xlsx"}:
+            args.excel = True
+        elif choice == "pdf":
+            args.pdf = True
 
     ib = IB()
     try:
@@ -672,26 +742,41 @@ def main():
                     combined.append(df)
                 else:
                     label = hint if hint else "auto"
-                    out_path = os.path.join(
-                        OUTPUT_DIR,
-                        f"option_chain_{sym}_{label}_{date_tag}.csv",
+                    out_base = os.path.join(
+                        OUTPUT_DIR, f"option_chain_{sym}_{label}_{date_tag}"
                     )
-                    df.to_csv(
-                        out_path,
-                        index=False,
-                        quoting=csv.QUOTE_MINIMAL,
-                        float_format="%.4f",
-                    )
-                    logger.info("Saved %s (%d rows)", out_path, len(df))
+                    if args.excel:
+                        path = f"{out_base}.xlsx"
+                        _save_excel(df, path)
+                    elif args.pdf:
+                        path = f"{out_base}.pdf"
+                        _save_pdf(df, path)
+                    else:
+                        path = f"{out_base}.csv"
+                        df.to_csv(
+                            path,
+                            index=False,
+                            quoting=csv.QUOTE_MINIMAL,
+                            float_format="%.4f",
+                        )
+                    logger.info("Saved %s (%d rows)", path, len(df))
             except Exception as e:
                 logger.warning("%s %s – skipped: %s", sym, hint, e)
 
     if portfolio_mode and combined:
         df_all = pd.concat(combined, ignore_index=True)
-        out_path = os.path.join(OUTPUT_DIR, f"option_chain_portfolio_{date_tag}.csv")
-        df_all.to_csv(
-            out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f"
-        )
+        out_base = os.path.join(OUTPUT_DIR, f"option_chain_portfolio_{date_tag}")
+        if args.excel:
+            out_path = f"{out_base}.xlsx"
+            _save_excel(df_all, out_path)
+        elif args.pdf:
+            out_path = f"{out_base}.pdf"
+            _save_pdf(df_all, out_path)
+        else:
+            out_path = f"{out_base}.csv"
+            df_all.to_csv(
+                out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.4f"
+            )
         logger.info(
             "Saved consolidated portfolio snapshot → %s (%d rows)",
             out_path,
