@@ -37,6 +37,11 @@ import numpy as np
 import pandas as pd
 import xlsxwriter
 
+# PDF export dependencies
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+
 from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
 from ib_insync.contract import Contract
 
@@ -340,8 +345,65 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
     return bundles
 
 
-# ─────────────────────────── MAIN ──────────────────────────
+#
+# ───────────────────────── PDF export helper ──────────────────────────
+def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
+    """
+    Save the detailed rows and totals to a single landscape‑letter PDF.
+    """
+    # Convert DataFrames to list‑of‑lists (ReportLab tables)
+    rows_data = [df.columns.tolist()] + df.values.tolist()
+    totals_data = [totals.columns.tolist()] + totals.values.tolist()
 
+    doc = SimpleDocTemplate(
+        path,
+        pagesize=landscape(letter),
+        rightMargin=18,
+        leftMargin=18,
+        topMargin=18,
+        bottomMargin=18,
+    )
+    elements = []
+
+    # Positions table (small font to fit many cols)
+    tbl = Table(rows_data, repeatRows=1)
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 6),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ]
+        )
+    )
+    elements.append(tbl)
+
+    # Spacer row
+    elements.append(Table([[" "]]))
+
+    # Totals table
+    tbl_tot = Table(totals_data, repeatRows=1)
+    tbl_tot.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ]
+        )
+    )
+    elements.append(tbl_tot)
+
+    doc.build(elements)
+
+
+# ─────────────────────────── MAIN ──────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
@@ -361,12 +423,17 @@ def main() -> None:
         action="store_true",
         help="Save the detailed rows and totals into a single Excel workbook instead of CSV files.",
     )
+    group.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Save the detailed rows and totals into a landscape PDF report.",
+    )
     args = parser.parse_args()
 
     # ─── interactive prompt if no output flag was provided ───
-    if not args.flat_csv and not args.excel:
+    if not args.flat_csv and not args.excel and not getattr(args, "pdf", False):
         try:
-            choice = input("Select output format [csv / flat / excel] (default csv): ").strip().lower()
+            choice = input("Select output format [csv / flat / excel / pdf] (default csv): ").strip().lower()
         except EOFError:
             # non‑interactive environment (e.g., redirected), default to csv
             choice = ""
@@ -374,6 +441,8 @@ def main() -> None:
             args.flat_csv = True
         elif choice in {"excel", "xlsx"}:
             args.excel = True
+        elif choice in {"pdf"}:
+            args.pdf = True
         # else default to CSV files
 
     ib = IB()
@@ -667,6 +736,10 @@ def main() -> None:
             df.to_excel(writer, sheet_name="Positions", index=False, float_format="%.6f")
             totals.to_excel(writer, sheet_name="Totals", index=False, float_format="%.2f")
         logger.info(f"Saved Excel workbook → {fn_xlsx}")
+    elif getattr(args, "pdf", False):
+        fn_pdf = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.pdf")
+        _save_pdf(df, totals, fn_pdf)
+        logger.info(f"Saved PDF report    → {fn_pdf}")
     else:
         fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
         fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
