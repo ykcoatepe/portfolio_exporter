@@ -360,9 +360,16 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
     """
     Save the detailed rows and totals to a single landscape‑letter PDF.
     """
-    # Convert DataFrames to list‑of‑lists (ReportLab tables)
-    rows_data = [df.columns.tolist()] + df.values.tolist()
-    totals_data = [totals.columns.tolist()] + totals.values.tolist()
+    # ---- pretty‑print numbers (three decimals, thousands sep) ----
+    df_fmt = df.copy()
+    float_cols = df_fmt.select_dtypes(include=[float]).columns
+    df_fmt[float_cols] = df_fmt[float_cols].applymap(lambda x: f"{x:,.3f}")
+    rows_data = [df_fmt.columns.tolist()] + df_fmt.values.tolist()
+
+    totals_fmt = totals.copy()
+    float_cols_tot = totals_fmt.select_dtypes(include=[float]).columns
+    totals_fmt[float_cols_tot] = totals_fmt[float_cols_tot].applymap(lambda x: f"{x:,.3f}")
+    totals_data = [totals_fmt.columns.tolist()] + totals_fmt.values.tolist()
 
     doc = SimpleDocTemplate(
         path,
@@ -372,38 +379,68 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
         topMargin=18,
         bottomMargin=18,
     )
+    # ---- dynamic column widths to keep wide tables inside the page frame ----
+    page_width = landscape(letter)[0] - doc.leftMargin - doc.rightMargin
+    col_widths_positions = [page_width / len(df.columns)] * len(df.columns)
+    col_widths_totals = [page_width / len(totals.columns)] * len(totals.columns)
     elements = []
 
-    # Positions table (small font to fit many cols)
-    tbl = Table(rows_data, repeatRows=1)
-    tbl.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 6),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
-            ]
-        )
-    )
-    elements.append(tbl)
+    # ---- repeat identifier columns + rotate metric columns for readability ----
+    ID_COLS = [
+        "timestamp",
+        "symbol",
+        "expiry",
+        "strike",
+        "right",
+        "position",
+        "option_price",
+        "underlying_price",
+    ]
+    # Fallback: if any of these columns are missing (filtered dataframe), keep what exists
+    ID_COLS = [c for c in ID_COLS if c in df.columns]
 
-    # Spacer row
-    elements.append(Table([[" "]]))
+    METRIC_COLS = [c for c in df.columns if c not in ID_COLS]
+    METRICS_PER_CHUNK = 6  # how many extra columns to show alongside identifiers
+
+    if not METRIC_COLS:
+        METRIC_COLS = []  # guard against edge‑case
+
+    for start in range(0, len(METRIC_COLS) or 1, METRICS_PER_CHUNK):
+        chunk_metrics = METRIC_COLS[start : start + METRICS_PER_CHUNK]
+        chunk_cols = ID_COLS + chunk_metrics
+        chunk_data = [chunk_cols] + df_fmt[chunk_cols].values.tolist()
+        col_widths = [page_width / len(chunk_cols)] * len(chunk_cols)
+
+        tbl = Table(chunk_data, repeatRows=1, colWidths=col_widths)
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+                    ("TEXTCOLOR",   (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN",       (0, 0), (-1, 0), "CENTER"),
+                    ("ALIGN",       (0, 1), (-1, -1), "RIGHT"),
+                    ("FONTSIZE",    (0, 0), (-1, 0), 8),
+                    ("FONTSIZE",    (0, 1), (-1, -1), 7),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
+                    ("GRID",        (0, 0), (-1, -1), 0.25, colors.black),
+                ]
+            )
+        )
+        elements.append(tbl)
+        elements.append(Table([[" "]]))  # spacer between chunks
 
     # Totals table
-    tbl_tot = Table(totals_data, repeatRows=1)
+    tbl_tot = Table(totals_data, repeatRows=1, colWidths=col_widths_totals)
     tbl_tot.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.darkgreen),
+                ("TEXTCOLOR",   (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN",       (0, 0), (-1, 0), "CENTER"),
+                ("ALIGN",       (0, 1), (-1, -1), "RIGHT"),
+                ("FONTSIZE",    (0, 0), (-1, 0), 9),
+                ("FONTSIZE",    (0, 1), (-1, -1), 8),
+                ("GRID",        (0, 0), (-1, -1), 0.3, colors.black),
             ]
         )
     )

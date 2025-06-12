@@ -480,42 +480,95 @@ def save_pdf(
         topMargin=18,
         bottomMargin=18,
     )
-    if not df_trades.empty:
-        tbl_trades = Table(
-            [df_trades.columns.tolist()] + df_trades.values.tolist(), repeatRows=1
-        )
-        tbl_trades.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 6),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
-                ]
-            )
-        )
-        elements.append(tbl_trades)
+    # ---- compute usable page width and prettify numeric columns ----
+    page_width = landscape(letter)[0] - doc.leftMargin - doc.rightMargin
 
-    if not df_open.empty:
-        elements.append(Table([[" "]]))
-        tbl_open = Table(
-            [df_open.columns.tolist()] + df_open.values.tolist(), repeatRows=1
+    df_trades_fmt = df_trades.copy()
+    if not df_trades_fmt.empty:
+        # -- strip internal identifier fields; they clutter the PDF --
+        drop_trade_cols = ["exec_id", "perm_id", "order_id", "model_code", "order_ref"]
+        df_trades_fmt.drop(
+            columns=[c for c in drop_trade_cols if c in df_trades_fmt.columns],
+            inplace=True,
+            errors="ignore",
         )
-        tbl_open.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 6),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
-                ]
+        num_cols = df_trades_fmt.select_dtypes(include=[float, int]).columns
+        df_trades_fmt[num_cols] = df_trades_fmt[num_cols].applymap(
+            lambda x: f"{x:,.3f}" if isinstance(x, (float, int)) else x
+        )
+
+    df_open_fmt = df_open.copy()
+    if not df_open_fmt.empty:
+        # -- strip ID‑style columns from open‑orders as well --
+        drop_open_cols = ["order_id", "perm_id"]
+        df_open_fmt.drop(
+            columns=[c for c in drop_open_cols if c in df_open_fmt.columns],
+            inplace=True,
+            errors="ignore",
+        )
+        num_cols_open = df_open_fmt.select_dtypes(include=[float, int]).columns
+        df_open_fmt[num_cols_open] = df_open_fmt[num_cols_open].applymap(
+            lambda x: f"{x:,.3f}" if isinstance(x, (float, int)) else x
+        )
+
+    # ---- TRADES TABLES (chunked for readability) ----
+    if not df_trades_fmt.empty:
+        TRADE_ID_COLS = ["datetime", "symbol", "side", "qty", "price", "avg_price"]
+        TRADE_ID_COLS = [c for c in TRADE_ID_COLS if c in df_trades_fmt.columns]
+        trade_metric_cols = [c for c in df_trades_fmt.columns if c not in TRADE_ID_COLS]
+        METRICS_PER_CHUNK = 6
+
+        for start in range(0, len(trade_metric_cols) or 1, METRICS_PER_CHUNK):
+            cols = TRADE_ID_COLS + trade_metric_cols[start : start + METRICS_PER_CHUNK]
+            data = [cols] + df_trades_fmt[cols].values.tolist()
+            col_widths = [page_width / len(cols)] * len(cols)
+
+            tbl = Table(data, repeatRows=1, colWidths=col_widths)
+            tbl.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                        ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                        ("FONTSIZE", (0, 0), (-1, 0), 8),
+                        ("FONTSIZE", (0, 1), (-1, -1), 7),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
+                        ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                    ]
+                )
             )
-        )
-        elements.append(tbl_open)
+            elements.append(tbl)
+            elements.append(Table([[" "]]))  # spacer
+    # ---- OPEN ORDERS TABLES ----
+    if not df_open_fmt.empty:
+        OPEN_ID_COLS = ["symbol", "side", "total_qty", "status", "filled", "remaining"]
+        OPEN_ID_COLS = [c for c in OPEN_ID_COLS if c in df_open_fmt.columns]
+        open_metric_cols = [c for c in df_open_fmt.columns if c not in OPEN_ID_COLS]
+        METRICS_PER_CHUNK = 6
+
+        for start in range(0, len(open_metric_cols) or 1, METRICS_PER_CHUNK):
+            cols = OPEN_ID_COLS + open_metric_cols[start : start + METRICS_PER_CHUNK]
+            data = [cols] + df_open_fmt[cols].values.tolist()
+            col_widths = [page_width / len(cols)] * len(cols)
+
+            tbl = Table(data, repeatRows=1, colWidths=col_widths)
+            tbl.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.darkgreen),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                        ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                        ("FONTSIZE", (0, 0), (-1, 0), 8),
+                        ("FONTSIZE", (0, 1), (-1, -1), 7),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
+                        ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                    ]
+                )
+            )
+            elements.append(tbl)
+            elements.append(Table([[" "]]))  # spacer
 
     doc.build(elements)
     return pdf_path
