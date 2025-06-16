@@ -3,6 +3,9 @@ import types
 import unittest
 from unittest.mock import patch
 from datetime import datetime, timedelta
+from pathlib import Path
+import tempfile
+import zipfile
 
 # Provide minimal stubs so import works without optional packages
 try:
@@ -103,6 +106,23 @@ class YFinanceFallbackTests(unittest.TestCase):
             data = oc.fetch_yf_open_interest("AAA", "20240101")
         self.assertEqual(data[(100.0, "C")], 10)
         self.assertEqual(data[(90.0, "P")], 5)
+
+
+class ZipHelpersTests(unittest.TestCase):
+    def test_create_zip_and_cleanup(self):
+        with tempfile.TemporaryDirectory() as td:
+            p1 = Path(td) / "a.txt"
+            p2 = Path(td) / "b.txt"
+            p1.write_text("1")
+            p2.write_text("2")
+            zip_path = Path(td) / "out.zip"
+            oc.create_zip([str(p1), str(p2)], str(zip_path))
+            self.assertTrue(zip_path.exists())
+            with zipfile.ZipFile(zip_path) as zf:
+                self.assertEqual(set(zf.namelist()), {"a.txt", "b.txt"})
+            oc.cleanup([str(p1), str(p2)])
+            self.assertFalse(p1.exists())
+            self.assertFalse(p2.exists())
 
 
 if __name__ == "__main__":
