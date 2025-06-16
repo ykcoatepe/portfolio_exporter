@@ -29,6 +29,7 @@ import sys
 import time
 from datetime import datetime, timezone, date
 from typing import List, Sequence
+import zipfile
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -142,6 +143,22 @@ except Exception:  # pragma: no cover - optional
     PROGRESS = False
 
 # ---------------------------------------------------------------------------
+
+
+def create_zip(files: List[str], dest: str) -> None:
+    """Create a zip archive containing the given files."""
+    with zipfile.ZipFile(dest, "w") as zf:
+        for path in files:
+            zf.write(path, os.path.basename(path))
+
+
+def cleanup(files: List[str]) -> None:
+    """Delete the given files, ignoring missing paths."""
+    for path in files:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
 
 
 def load_tickers_from_files() -> List[str]:
@@ -740,7 +757,8 @@ def main():
     iterable = iter_progress(symbols, "Option snapshots") if PROGRESS else symbols
 
     date_tag = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
-    combined = []
+    combined: list[pd.DataFrame] = []
+    created_files: list[str] = []
     for sym in iterable:
         hints = se_map.get(sym, [expiry_hint])
         hints = hints or [expiry_hint]
@@ -774,6 +792,7 @@ def main():
                             quoting=csv.QUOTE_MINIMAL,
                             float_format="%.3f",
                         )
+                    created_files.append(path)
                     logger.info("Saved %s (%d rows)", path, len(df))
             except Exception as e:
                 logger.warning("%s %s – skipped: %s", sym, hint, e)
@@ -800,6 +819,13 @@ def main():
             out_path,
             len(df_all),
         )
+        created_files.append(out_path)
+
+    if created_files:
+        zip_path = os.path.join(OUTPUT_DIR, f"option_chain_{date_tag}.zip")
+        create_zip(created_files, zip_path)
+        cleanup(created_files)
+        logger.info("Created %s", zip_path)
 
     ib.disconnect()
 
