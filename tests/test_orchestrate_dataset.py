@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock
 from pathlib import Path
 import tempfile
 
@@ -38,6 +39,28 @@ class OrchestrateTests(unittest.TestCase):
 
             with zipfile.ZipFile(zip_path) as zf:
                 self.assertEqual(set(zf.namelist()), {"a.txt", "b.txt"})
+
+    def test_main_cleans_up_files(self):
+        with tempfile.TemporaryDirectory() as td:
+            od.OUTPUT_DIR = td
+            created: list[Path] = []
+
+            def fake_run_script(cmd):
+                path = Path(td) / f"{cmd[0]}.csv"
+                path.write_text("x")
+                created.append(path)
+                return [str(path)]
+
+            with unittest.mock.patch.object(
+                od, "run_script", side_effect=fake_run_script
+            ):
+                with unittest.mock.patch("builtins.input", return_value=""):
+                    od.main()
+
+            zips = list(Path(td).glob("dataset_*.zip"))
+            self.assertEqual(len(zips), 1)
+            for p in created:
+                self.assertFalse(p.exists())
 
 
 if __name__ == "__main__":
