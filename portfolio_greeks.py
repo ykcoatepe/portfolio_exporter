@@ -53,11 +53,11 @@ from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
 from ib_insync.contract import Contract
 
 try:
-    from tqdm import tqdm
+    from utils.progress import iter_progress
 
     # Re‑enable progress‑bar printing
     PROGRESS = True
-except ImportError:
+except Exception:  # pragma: no cover - optional
     PROGRESS = False
 
 # ────────────────────── logging setup (must precede helpers) ─────────────────────
@@ -368,7 +368,9 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
 
     totals_fmt = totals.copy()
     float_cols_tot = totals_fmt.select_dtypes(include=[float]).columns
-    totals_fmt[float_cols_tot] = totals_fmt[float_cols_tot].applymap(lambda x: f"{x:,.3f}")
+    totals_fmt[float_cols_tot] = totals_fmt[float_cols_tot].applymap(
+        lambda x: f"{x:,.3f}"
+    )
     totals_data = [totals_fmt.columns.tolist()] + totals_fmt.values.tolist()
 
     doc = SimpleDocTemplate(
@@ -416,13 +418,18 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
             TableStyle(
                 [
                     ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
-                    ("TEXTCOLOR",   (0, 0), (-1, 0), colors.whitesmoke),
-                    ("ALIGN",       (0, 0), (-1, 0), "CENTER"),
-                    ("ALIGN",       (0, 1), (-1, -1), "RIGHT"),
-                    ("FONTSIZE",    (0, 0), (-1, 0), 8),
-                    ("FONTSIZE",    (0, 1), (-1, -1), 7),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-                    ("GRID",        (0, 0), (-1, -1), 0.25, colors.black),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                    ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 8),
+                    ("FONTSIZE", (0, 1), (-1, -1), 7),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.whitesmoke, colors.lightgrey],
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                 ]
             )
         )
@@ -435,12 +442,12 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
         TableStyle(
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.darkgreen),
-                ("TEXTCOLOR",   (0, 0), (-1, 0), colors.whitesmoke),
-                ("ALIGN",       (0, 0), (-1, 0), "CENTER"),
-                ("ALIGN",       (0, 1), (-1, -1), "RIGHT"),
-                ("FONTSIZE",    (0, 0), (-1, 0), 9),
-                ("FONTSIZE",    (0, 1), (-1, -1), 8),
-                ("GRID",        (0, 0), (-1, -1), 0.3, colors.black),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                ("FONTSIZE", (0, 0), (-1, 0), 9),
+                ("FONTSIZE", (0, 1), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
             ]
         )
     )
@@ -552,7 +559,7 @@ def main() -> None:
     rows: List[Dict[str, Any]] = []
     yf_oi_cache: Dict[tuple[str, str], dict[tuple[float, str], int]] = {}
 
-    iterable = tqdm(pkgs, desc="Processing portfolio greeks") if PROGRESS else pkgs
+    iterable = iter_progress(pkgs, "Processing portfolio greeks") if PROGRESS else pkgs
     for pos, tk in iterable:
         c: Contract = pos.contract
         mult = _multiplier(c)

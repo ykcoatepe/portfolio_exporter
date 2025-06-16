@@ -18,10 +18,10 @@ except Exception:  # pragma: no cover - optional
 
 # optional progress bar
 try:
-    from tqdm import tqdm
+    from utils.progress import iter_progress
 
     PROGRESS = True
-except ImportError:
+except Exception:  # pragma: no cover - optional
     PROGRESS = False
 from datetime import datetime
 
@@ -111,7 +111,7 @@ def fetch_and_prepare_data(tickers):
         return pd.DataFrame(columns=columns)
     dfs = []
     if isinstance(data.columns, pd.MultiIndex):
-        iterable = tqdm(tickers, desc="split") if PROGRESS else tickers
+        iterable = iter_progress(tickers, "split") if PROGRESS else tickers
         for ticker in iterable:
             if ticker in data:
                 df_t = data[ticker].reset_index()

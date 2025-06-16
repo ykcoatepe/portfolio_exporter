@@ -28,10 +28,10 @@ import yfinance as yf
 
 # optional progress bar
 try:
-    from tqdm import tqdm
+    from utils.progress import iter_progress
 
     PROGRESS = True
-except ImportError:
+except Exception:  # pragma: no cover - optional
     PROGRESS = False
 # Symbol → (Contract class, kwargs) for non‑stock underlyings
 from ib_insync import Index, Future  # already imported IB, Stock, Option, util
@@ -269,7 +269,7 @@ if not spy_ret.empty:
     # drop timezone info so date intersections succeed
     spy_ret.index = pd.to_datetime(spy_ret.index).tz_localize(None)
 
-iterable = tqdm(tickers, desc="tech signals") if PROGRESS else tickers
+iterable = iter_progress(tickers, "tech signals") if PROGRESS else tickers
 for tk in iterable:
     logging.info("▶ %s", tk)
     if tk == "MOVE":
