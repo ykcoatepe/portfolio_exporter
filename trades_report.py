@@ -24,9 +24,26 @@ except Exception:  # pragma: no cover - optional
 try:
     from reportlab.lib.pagesizes import letter, landscape
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+    from reportlab.platypus import (
+        SimpleDocTemplate,
+        Table,
+        TableStyle,
+        Paragraph,
+        Spacer,
+    )
+    from reportlab.lib.styles import getSampleStyleSheet
 except Exception:  # pragma: no cover - optional
-    SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
+    (
+        SimpleDocTemplate,
+        Table,
+        TableStyle,
+        Paragraph,
+        Spacer,
+        getSampleStyleSheet,
+        colors,
+        letter,
+        landscape,
+    ) = (None,) * 9
 import calendar
 
 try:  # optional dependency
@@ -323,6 +340,7 @@ def save_csvs(
     trades_file = OUTPUT_DIR / f"trades_{base}.csv"
     with open(trades_file, "w", newline="") as fh:
         wr = csv.writer(fh)
+        wr.writerow(["# Orders Made"])                 # user‑friendly banner
         wr.writerow(Trade.__annotations__.keys())
         for t in trades:
             wr.writerow([getattr(t, f) for f in Trade.__annotations__])
@@ -331,6 +349,7 @@ def save_csvs(
     oo_file = OUTPUT_DIR / f"open_orders_{base}.csv"
     with open(oo_file, "w", newline="") as fh:
         wr = csv.writer(fh)
+        wr.writerow(["# Open Orders"])                # section banner
         wr.writerow(OpenOrder.__annotations__.keys())
         for o in open_orders:
             wr.writerow([getattr(o, f) for f in OpenOrder.__annotations__])
@@ -472,6 +491,8 @@ def save_pdf(
     df_open = pd.DataFrame([o.__dict__ for o in open_orders])
 
     elements = []
+    styles = getSampleStyleSheet()
+    hdr_style = styles["Heading2"]
     doc = SimpleDocTemplate(
         str(pdf_path),
         pagesize=landscape(letter),
@@ -515,6 +536,8 @@ def save_pdf(
 
     # ---- TRADES TABLES (chunked for readability) ----
     if not df_trades_fmt.empty:
+        elements.append(Paragraph("Orders Made", hdr_style))
+        elements.append(Spacer(1, 6))
         TRADE_ID_COLS = ["datetime", "symbol", "side", "qty", "price", "avg_price"]
         TRADE_ID_COLS = [c for c in TRADE_ID_COLS if c in df_trades_fmt.columns]
         trade_metric_cols = [c for c in df_trades_fmt.columns if c not in TRADE_ID_COLS]
@@ -544,6 +567,8 @@ def save_pdf(
             elements.append(Table([[" "]]))  # spacer
     # ---- OPEN ORDERS TABLES ----
     if not df_open_fmt.empty:
+        elements.append(Paragraph("Open Orders", hdr_style))
+        elements.append(Spacer(1, 6))
         OPEN_ID_COLS = ["symbol", "side", "total_qty", "status", "filled", "remaining"]
         OPEN_ID_COLS = [c for c in OPEN_ID_COLS if c in df_open_fmt.columns]
         open_metric_cols = [c for c in df_open_fmt.columns if c not in OPEN_ID_COLS]
