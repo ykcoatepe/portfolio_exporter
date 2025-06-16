@@ -16,7 +16,7 @@ import logging
 import warnings
 import io
 import contextlib
-from tqdm import tqdm  # progress bar
+from utils.progress import iter_progress
 from reportlab.lib.pagesizes import letter, landscape  # PDF output (landscape added)
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
 from reportlab.lib import colors
@@ -158,7 +158,7 @@ def fetch_ohlc(tickers, days_back=60) -> pd.DataFrame:
         progress=False,
     )
     rows = []
-    for t in tqdm(tickers, desc="Processing tickers"):
+    for t in iter_progress(tickers, "Processing tickers"):
         d = data[t].dropna().reset_index()
         d.columns = ["date", "open", "high", "low", "close", "adj_close", "volume"]
         d["ticker"] = t

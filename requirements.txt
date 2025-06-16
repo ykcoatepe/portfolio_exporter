@@ -2,7 +2,6 @@ yfinance
 pandas
 numpy
 ib_insync
-tqdm
 pandas_datareader
 requests
 rich

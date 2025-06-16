@@ -135,10 +135,10 @@ for _n in ("ib_insync", "ib_insync.ib", "ib_insync.wrapper"):
 
 # optional progress bar
 try:
-    from tqdm import tqdm
+    from utils.progress import iter_progress
 
     PROGRESS = True
-except ImportError:
+except Exception:  # pragma: no cover - optional
     PROGRESS = False
 
 # ---------------------------------------------------------------------------
@@ -737,7 +737,7 @@ def main():
         expiry_hint = hint or None
 
     logger.info("Symbols: %s", ", ".join(symbols))
-    iterable = tqdm(symbols, desc="Option snapshots") if PROGRESS else symbols
+    iterable = iter_progress(symbols, "Option snapshots") if PROGRESS else symbols
 
     date_tag = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     combined = []

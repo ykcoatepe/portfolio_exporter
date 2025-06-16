@@ -36,10 +36,10 @@ except Exception:  # pragma: no cover - optional
 
 # optional progress bar
 try:
-    from tqdm import tqdm
+    from utils.progress import iter_progress
 
     PROGRESS = True
-except ImportError:
+except Exception:  # pragma: no cover - optional
     PROGRESS = False
 
 try:
@@ -203,7 +203,7 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     reqs: dict[str, any] = {}
 
     # Build contracts & request market data
-    iterable = tqdm(tickers, desc="IB snapshots") if PROGRESS else tickers
+    iterable = iter_progress(tickers, "IB snapshots") if PROGRESS else tickers
     for tk in iterable:
         # Skip continuous futures (=F) and Yahoo-only yield symbols – use yfinance
         if tk.endswith("=F") or tk in YIELD_MAP:
@@ -291,7 +291,7 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
 def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
     rows = []
     ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-    iterable = tqdm(tickers, desc="yfinance") if PROGRESS else tickers
+    iterable = iter_progress(tickers, "yfinance") if PROGRESS else tickers
     for t in iterable:
         if t in YIELD_MAP:
             continue  # yields fetched via FRED
@@ -343,7 +343,7 @@ def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
         return pd.DataFrame()
     rows = []
     ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-    iterable = tqdm(tickers, desc="FRED") if PROGRESS else tickers
+    iterable = iter_progress(tickers, "FRED") if PROGRESS else tickers
     for t in iterable:
         series = YIELD_MAP.get(t)
         if not series:
