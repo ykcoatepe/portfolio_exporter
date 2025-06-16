@@ -12,7 +12,7 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | Script | Description |
 | ------ | ----------- |
 | `historic_prices.py` | Downloads the last 60 days of daily OHLCV data for tickers read from `tickers_live.txt` or `tickers.txt`. If IBKR is reachable, the current account holdings are used as the ticker list. The output is a timestamped CSV in `~/Library/Mobile\ Documents/.../Downloads`. Use `--excel` or `--pdf` to save as those formats instead. |
-| `live_feed.py` | Takes a snapshot of real‑time quotes for tickers listed in `tickers_live.txt` (falling back to `tickers.txt`). Quotes are pulled from IBKR when available, otherwise from yfinance and FRED. Results are written to `live_quotes_YYYYMMDD_HHMM.csv`. |
+| `live_feed.py` | Takes a snapshot of real‑time quotes for tickers listed in `tickers_live.txt` (falling back to `tickers.txt`). Quotes are pulled from IBKR when available, otherwise from yfinance and FRED. Results are written to `live_quotes_YYYYMMDD_HHMM.csv`. Use `--pdf` to save a PDF report instead. |
 | `tech_signals_ibkr.py` | Calculates technical indicators using IBKR data and includes option chain details like open interest (fetched from Yahoo Finance) and near‑ATM implied volatility. |
 | `update_tickers.py` | Writes the current IBKR stock positions to `tickers_live.txt` so other scripts always use a fresh portfolio. |
 | `daily_pulse.py` | Generates a one-row-per-ticker summary of technical indicators from an OHLCV CSV. Defaults to CSV output; use `--excel` or `--pdf` for other formats. |
@@ -20,6 +20,7 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `option_chain_snapshot.py` | Saves a complete IBKR option chain for the portfolio or given symbols. Defaults to CSV; use `--excel` or `--pdf` to change the output type. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. Supports `--excel` and `--pdf` outputs. |
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
+| `orchestrate_dataset.py` | Runs the main export scripts in sequence (`historic_prices.py`, `portfolio_greeks.py`, `live_feed.py`, and `daily_pulse.py`) and zips the results into `dataset_<DATE_TIME>.zip`. |
 
 ### CP_REFRESH_TOKEN
 `net_liq_history_export.py` looks for the environment variable `CP_REFRESH_TOKEN` when pulling data from the Client Portal API. Set it before running the script:

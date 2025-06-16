@@ -26,6 +26,14 @@ from typing import List, Dict
 import numpy as np
 import yfinance as yf
 
+# optional PDF dependencies
+try:
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+except Exception:  # pragma: no cover - optional
+    SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
+
 # optional progress bar
 try:
     from tqdm import tqdm
@@ -417,15 +425,56 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def save_to_pdf(df: pd.DataFrame, path: str) -> None:
+    if SimpleDocTemplate is None:
+        raise RuntimeError("reportlab is required for PDF output")
+    rows_data = [df.columns.tolist()] + df.values.tolist()
+    doc = SimpleDocTemplate(
+        path,
+        pagesize=landscape(letter),
+        rightMargin=18,
+        leftMargin=18,
+        topMargin=18,
+        bottomMargin=18,
+    )
+    table = Table(rows_data, repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 6),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ]
+        )
+    )
+    doc.build([table])
+
+
 # -------------------------- MAIN ---------------------------
 def main():
     parser = argparse.ArgumentParser(description="Snapshot live quotes")
     parser.add_argument(
         "--txt",
         action="store_true",
-        help="Save a plain text copy alongside the CSV files.",
+        help="Save a plain text copy alongside the output file.",
+    )
+    parser.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Save a PDF instead of CSV.",
     )
     args = parser.parse_args()
+
+    if not args.pdf:
+        try:
+            choice = input("Output format [csv/pdf] (default csv): ").strip().lower()
+        except EOFError:
+            choice = ""
+        if choice == "pdf":
+            args.pdf = True
 
     tickers = load_tickers()
     opt_list, opt_under = ([], set())
@@ -466,26 +515,32 @@ def main():
             df_pos = fetch_live_positions(ib_live)
             ib_live.disconnect()
             if not df_pos.empty:
-                df_pos.to_csv(
-                    OUTPUT_POS_CSV,
-                    index=False,
-                    quoting=csv.QUOTE_MINIMAL,
-                    float_format="%.3f",
-                )
+                base_pos = OUTPUT_POS_CSV.rsplit(".", 1)[0]
+                if args.pdf:
+                    save_to_pdf(df_pos, base_pos + ".pdf")
+                else:
+                    df_pos.to_csv(
+                        base_pos + ".csv",
+                        index=False,
+                        quoting=csv.QUOTE_MINIMAL,
+                        float_format="%.3f",
+                    )
                 if args.txt:
                     pos_txt = df_pos.copy()
                     if "unrealized_pnl_pct" in pos_txt.columns:
                         pos_txt["unrealized_pnl_pct"] = pos_txt[
                             "unrealized_pnl_pct"
                         ].map(lambda x: f"{x:.3f}%")
-                    with open(OUTPUT_POS_CSV.replace(".csv", ".txt"), "w") as fh:
+                    with open(base_pos + ".txt", "w") as fh:
                         fh.write(
                             pos_txt.to_string(
                                 index=False, float_format=lambda x: f"{x:.3f}"
                             )
                         )
                 logging.info(
-                    "Saved %d live positions → %s", len(df_pos), OUTPUT_POS_CSV
+                    "Saved %d live positions → %s",
+                    len(df_pos),
+                    base_pos + (".pdf" if args.pdf else ".csv"),
                 )
 
                 # aggregate unrealized PnL AND cost basis by underlying symbol
@@ -520,21 +575,29 @@ def main():
     ]
     df = df[[c for c in quote_cols if c in df.columns]]
 
-    df.to_csv(
-        OUTPUT_CSV,
-        index=False,
-        quoting=csv.QUOTE_MINIMAL,
-        float_format="%.3f",
-    )
+    base_q = OUTPUT_CSV.rsplit(".", 1)[0]
+    if args.pdf:
+        save_to_pdf(df, base_q + ".pdf")
+    else:
+        df.to_csv(
+            base_q + ".csv",
+            index=False,
+            quoting=csv.QUOTE_MINIMAL,
+            float_format="%.3f",
+        )
     if args.txt:
         df_txt = df.copy()
         if "unrealized_pnl_pct" in df_txt.columns:
             df_txt["unrealized_pnl_pct"] = df_txt["unrealized_pnl_pct"].map(
                 lambda x: f"{x:.3f}%"
             )
-        with open(OUTPUT_CSV.replace(".csv", ".txt"), "w") as fh:
+        with open(base_q + ".txt", "w") as fh:
             fh.write(df_txt.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
-    logging.info("Saved %d quotes → %s", len(df), OUTPUT_CSV)
+    logging.info(
+        "Saved %d quotes → %s",
+        len(df),
+        base_q + (".pdf" if args.pdf else ".csv"),
+    )
 
 
 if __name__ == "__main__":
