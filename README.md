@@ -20,7 +20,7 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `option_chain_snapshot.py` | Saves a complete IBKR option chain for the portfolio or given symbols. Defaults to CSV; use `--excel` or `--pdf` to change the output type. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. Supports `--excel` and `--pdf` outputs. |
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
-| `orchestrate_dataset.py` | Runs the main export scripts in sequence (`historic_prices.py`, `portfolio_greeks.py`, `live_feed.py`, and `daily_pulse.py`) and zips the results into `dataset_<DATE_TIME>.zip`. |
+| `orchestrate_dataset.py` | Runs the main export scripts in sequence (`historic_prices.py`, `portfolio_greeks.py`, `live_feed.py`, and `daily_pulse.py`), zips the results into `dataset_<DATE_TIME>.zip`, and deletes the individual files. |
 
 ### CP_REFRESH_TOKEN
 `net_liq_history_export.py` looks for the environment variable `CP_REFRESH_TOKEN` when pulling data from the Client Portal API. Set it before running the script:
