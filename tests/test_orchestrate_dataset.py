@@ -13,7 +13,7 @@ class OrchestrateTests(unittest.TestCase):
         self.addCleanup(lambda: [p.unlink() for p in tmp.iterdir()])
         od.OUTPUT_DIR = str(tmp)
 
-        def dummy_run(cmd, check):
+        def dummy_run(cmd, check, stdout=None, stderr=None):
             (tmp / "new.csv").write_text("x")
 
         prev = od.subprocess.run

@@ -6,13 +6,27 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import List
 
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+
 from historic_prices import OUTPUT_DIR
 
 
 def run_script(cmd: list[str]) -> List[str]:
     """Run a script and return newly created files in OUTPUT_DIR."""
     before = set(os.listdir(OUTPUT_DIR))
-    subprocess.run([sys.executable, *cmd], check=True)
+    subprocess.run(
+        [sys.executable, *cmd],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     after = set(os.listdir(OUTPUT_DIR))
     return [os.path.join(OUTPUT_DIR, f) for f in after - before]
 
@@ -41,11 +55,28 @@ def main() -> None:
     fmt = "pdf" if choice == "pdf" else "csv"
 
     flag = ["--pdf"] if fmt == "pdf" else []
+    scripts = [
+        ["historic_prices.py", *flag],
+        ["portfolio_greeks.py", *flag],
+        ["live_feed.py", *flag],
+        ["daily_pulse.py", "--filetype", fmt],
+    ]
+
     files: List[str] = []
-    files += run_script(["historic_prices.py", *flag])
-    files += run_script(["portfolio_greeks.py", *flag])
-    files += run_script(["live_feed.py", *flag])
-    files += run_script(["daily_pulse.py", "--filetype", fmt])
+    progress = Progress(
+        SpinnerColumn(),
+        BarColumn(),
+        TextColumn("{task.description}"),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+    )
+    with progress:
+        overall = progress.add_task("overall", total=len(scripts))
+        for cmd in scripts:
+            task = progress.add_task(cmd[0], total=None)
+            files += run_script(cmd)
+            progress.remove_task(task)
+            progress.advance(overall)
 
     ts = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.zip")
