@@ -273,7 +273,7 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
 
     # --- Capture open orders ---------------------------------------------------
     ib.reqAllOpenOrders()
-    ib.sleep(0.6)  # allow gateway to populate the cache
+    ib.sleep(1.5)  # allow gateway to populate the cache; was 0.6
     open_trades_snapshot: List["Trade"] = ib.openTrades()
 
     open_orders: List[OpenOrder] = []
@@ -493,9 +493,10 @@ def save_pdf(
             errors="ignore",
         )
         num_cols = df_trades_fmt.select_dtypes(include=[float, int]).columns
-        df_trades_fmt[num_cols] = df_trades_fmt[num_cols].applymap(
-            lambda x: f"{x:,.3f}" if isinstance(x, (float, int)) else x
-        )
+        for col in num_cols:
+            df_trades_fmt[col] = df_trades_fmt[col].map(
+                lambda x: f"{x:,.3f}" if isinstance(x, (float, int)) else x
+            )
 
     df_open_fmt = df_open.copy()
     if not df_open_fmt.empty:
@@ -507,9 +508,10 @@ def save_pdf(
             errors="ignore",
         )
         num_cols_open = df_open_fmt.select_dtypes(include=[float, int]).columns
-        df_open_fmt[num_cols_open] = df_open_fmt[num_cols_open].applymap(
-            lambda x: f"{x:,.3f}" if isinstance(x, (float, int)) else x
-        )
+        for col in num_cols_open:
+            df_open_fmt[col] = df_open_fmt[col].map(
+                lambda x: f"{x:,.3f}" if isinstance(x, (float, int)) else x
+            )
 
     # ---- TRADES TABLES (chunked for readability) ----
     if not df_trades_fmt.empty:
