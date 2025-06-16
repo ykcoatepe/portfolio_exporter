@@ -35,17 +35,29 @@ from option_chain_snapshot import fetch_yf_open_interest
 
 import numpy as np
 import pandas as pd
-import xlsxwriter
+
+try:  # optional dependency
+    import xlsxwriter  # type: ignore
+except Exception:  # pragma: no cover - optional
+    xlsxwriter = None  # type: ignore
+
+# PDF export dependencies
+try:
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+except Exception:  # pragma: no cover - optional
+    SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
 
 from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
 from ib_insync.contract import Contract
 
 try:
-    from tqdm import tqdm
+    from utils.progress import iter_progress
 
     # Re‑enable progress‑bar printing
     PROGRESS = True
-except ImportError:
+except Exception:  # pragma: no cover - optional
     PROGRESS = False
 
 # ────────────────────── logging setup (must precede helpers) ─────────────────────
@@ -182,6 +194,7 @@ DEFAULT_MULT = {
     "CASH": 100_000,  # treat FX as notional per lot
 }
 
+
 # ───────────────────── expiry normaliser for Yahoo OI ─────────────────────
 def _normalised_expiry(exp_str: str) -> str:
     """
@@ -190,11 +203,12 @@ def _normalised_expiry(exp_str: str) -> str:
     YYYYMM    → YYYYMM   (monthly)
     YYYYMMDD  → YYYYMMDD (weekly)
     """
-    if len(exp_str) == 6 and exp_str.isdigit():          # monthly
+    if len(exp_str) == 6 and exp_str.isdigit():  # monthly
         return exp_str
-    elif len(exp_str) >= 8 and exp_str[:8].isdigit():    # weekly/full
+    elif len(exp_str) >= 8 and exp_str[:8].isdigit():  # weekly/full
         return exp_str[:8]
     return exp_str
+
 
 # tunables
 TIMEOUT_SECONDS = 40  # seconds to wait for model-Greeks before falling back
@@ -340,6 +354,108 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
     return bundles
 
 
+#
+# ───────────────────────── PDF export helper ──────────────────────────
+def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
+    """
+    Save the detailed rows and totals to a single landscape‑letter PDF.
+    """
+    # ---- pretty‑print numbers (three decimals, thousands sep) ----
+    df_fmt = df.copy()
+    float_cols = df_fmt.select_dtypes(include=[float]).columns
+    df_fmt[float_cols] = df_fmt[float_cols].applymap(lambda x: f"{x:,.3f}")
+    rows_data = [df_fmt.columns.tolist()] + df_fmt.values.tolist()
+
+    totals_fmt = totals.copy()
+    float_cols_tot = totals_fmt.select_dtypes(include=[float]).columns
+    totals_fmt[float_cols_tot] = totals_fmt[float_cols_tot].applymap(
+        lambda x: f"{x:,.3f}"
+    )
+    totals_data = [totals_fmt.columns.tolist()] + totals_fmt.values.tolist()
+
+    doc = SimpleDocTemplate(
+        path,
+        pagesize=landscape(letter),
+        rightMargin=18,
+        leftMargin=18,
+        topMargin=18,
+        bottomMargin=18,
+    )
+    # ---- dynamic column widths to keep wide tables inside the page frame ----
+    page_width = landscape(letter)[0] - doc.leftMargin - doc.rightMargin
+    col_widths_positions = [page_width / len(df.columns)] * len(df.columns)
+    col_widths_totals = [page_width / len(totals.columns)] * len(totals.columns)
+    elements = []
+
+    # ---- repeat identifier columns + rotate metric columns for readability ----
+    ID_COLS = [
+        "timestamp",
+        "symbol",
+        "expiry",
+        "strike",
+        "right",
+        "position",
+        "option_price",
+        "underlying_price",
+    ]
+    # Fallback: if any of these columns are missing (filtered dataframe), keep what exists
+    ID_COLS = [c for c in ID_COLS if c in df.columns]
+
+    METRIC_COLS = [c for c in df.columns if c not in ID_COLS]
+    METRICS_PER_CHUNK = 6  # how many extra columns to show alongside identifiers
+
+    if not METRIC_COLS:
+        METRIC_COLS = []  # guard against edge‑case
+
+    for start in range(0, len(METRIC_COLS) or 1, METRICS_PER_CHUNK):
+        chunk_metrics = METRIC_COLS[start : start + METRICS_PER_CHUNK]
+        chunk_cols = ID_COLS + chunk_metrics
+        chunk_data = [chunk_cols] + df_fmt[chunk_cols].values.tolist()
+        col_widths = [page_width / len(chunk_cols)] * len(chunk_cols)
+
+        tbl = Table(chunk_data, repeatRows=1, colWidths=col_widths)
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                    ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 8),
+                    ("FONTSIZE", (0, 1), (-1, -1), 7),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.whitesmoke, colors.lightgrey],
+                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                ]
+            )
+        )
+        elements.append(tbl)
+        elements.append(Table([[" "]]))  # spacer between chunks
+
+    # Totals table
+    tbl_tot = Table(totals_data, repeatRows=1, colWidths=col_widths_totals)
+    tbl_tot.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.darkgreen),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                ("FONTSIZE", (0, 0), (-1, 0), 9),
+                ("FONTSIZE", (0, 1), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.3, colors.black),
+            ]
+        )
+    )
+    elements.append(tbl_tot)
+
+    doc.build(elements)
+
+
 # ─────────────────────────── MAIN ──────────────────────────
 
 
@@ -361,12 +477,33 @@ def main() -> None:
         action="store_true",
         help="Save the detailed rows and totals into a single Excel workbook instead of CSV files.",
     )
+    group.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Save the detailed rows and totals into a landscape PDF report.",
+    )
+    group.add_argument(
+        "--txt",
+        action="store_true",
+        help="Save the detailed rows and totals as plain text.",
+    )
     args = parser.parse_args()
 
     # ─── interactive prompt if no output flag was provided ───
-    if not args.flat_csv and not args.excel:
+    if (
+        not args.flat_csv
+        and not args.excel
+        and not getattr(args, "pdf", False)
+        and not getattr(args, "txt", False)
+    ):
         try:
-            choice = input("Select output format [csv / flat / excel] (default csv): ").strip().lower()
+            choice = (
+                input(
+                    "Select output format [csv / flat / excel / pdf / txt] (default csv): "
+                )
+                .strip()
+                .lower()
+            )
         except EOFError:
             # non‑interactive environment (e.g., redirected), default to csv
             choice = ""
@@ -374,6 +511,10 @@ def main() -> None:
             args.flat_csv = True
         elif choice in {"excel", "xlsx"}:
             args.excel = True
+        elif choice in {"pdf"}:
+            args.pdf = True
+        elif choice in {"txt"}:
+            args.txt = True
         # else default to CSV files
 
     ib = IB()
@@ -388,7 +529,12 @@ def main() -> None:
     if not NAV_LOG.exists() or NAV_LOG.stat().st_size == 0:
         nav_boot = bootstrap_nav(ib)
         if not nav_boot.empty:
-            nav_boot.to_csv(NAV_LOG, header=True)
+            nav_boot.to_csv(
+                NAV_LOG,
+                header=True,
+                quoting=csv.QUOTE_MINIMAL,
+                float_format="%.3f",
+            )
         else:
             NAV_LOG.write_text("timestamp,nav\n")
 
@@ -413,7 +559,7 @@ def main() -> None:
     rows: List[Dict[str, Any]] = []
     yf_oi_cache: Dict[tuple[str, str], dict[tuple[float, str], int]] = {}
 
-    iterable = tqdm(pkgs, desc="Processing portfolio greeks") if PROGRESS else pkgs
+    iterable = iter_progress(pkgs, "Processing portfolio greeks") if PROGRESS else pkgs
     for pos, tk in iterable:
         c: Contract = pos.contract
         mult = _multiplier(c)
@@ -596,14 +742,17 @@ def main() -> None:
             df_flat = df
 
         # Print to STDOUT (no index)
-        df_flat.to_csv(sys.stdout, index=False, float_format="%.6f")
+        df_flat.to_csv(sys.stdout, index=False, float_format="%.3f")
 
         # Also write to a file in OUTPUT_DIR
         date_tag = ts_local.strftime("%Y%m%d_%H%M")
-        fn_flat = os.path.join(
-            OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv"
+        fn_flat = os.path.join(OUTPUT_DIR, f"portfolio_greeks_flat_{date_tag}.csv")
+        df_flat.to_csv(
+            fn_flat,
+            index=False,
+            float_format="%.3f",
+            quoting=csv.QUOTE_MINIMAL,
         )
-        df_flat.to_csv(fn_flat, index=False, float_format="%.6f")
         logger.info(f"Flat CSV saved → {fn_flat} (and printed to STDOUT).")
     totals = (
         df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
@@ -646,7 +795,12 @@ def main() -> None:
         # write back to CSV (create header if missing)
         if not NAV_LOG.exists():
             NAV_LOG.write_text("timestamp,nav\n")
-        nav_series.to_csv(NAV_LOG, header=True)
+        nav_series.to_csv(
+            NAV_LOG,
+            header=True,
+            quoting=csv.QUOTE_MINIMAL,
+            float_format="%.3f",
+        )
 
     # Guard EDDR calculation for short history
     if len(nav_series) >= 30:  # need some history; full 252 for valid DaR
@@ -663,15 +817,42 @@ def main() -> None:
         logger.info(f"Flat CSV saved to {fn_flat} and printed to STDOUT (--flat-csv).")
     elif args.excel:
         fn_xlsx = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.xlsx")
-        with pd.ExcelWriter(fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
-            df.to_excel(writer, sheet_name="Positions", index=False, float_format="%.6f")
-            totals.to_excel(writer, sheet_name="Totals", index=False, float_format="%.2f")
+        with pd.ExcelWriter(
+            fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss"
+        ) as writer:
+            df.to_excel(
+                writer, sheet_name="Positions", index=False, float_format="%.3f"
+            )
+            totals.to_excel(
+                writer, sheet_name="Totals", index=False, float_format="%.3f"
+            )
         logger.info(f"Saved Excel workbook → {fn_xlsx}")
+    elif getattr(args, "pdf", False):
+        fn_pdf = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.pdf")
+        _save_pdf(df, totals, fn_pdf)
+        logger.info(f"Saved PDF report    → {fn_pdf}")
+    elif getattr(args, "txt", False):
+        fn_txt = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.txt")
+        with open(fn_txt, "w") as fh:
+            fh.write(df.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+            fh.write("\n\n")
+            fh.write(totals.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+        logger.info(f"Saved text file     → {fn_txt}")
     else:
         fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
         fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
-        df.to_csv(fn_pos, index=False, float_format="%.6f")
-        totals.to_csv(fn_tot, index=False, float_format="%.2f")
+        df.to_csv(
+            fn_pos,
+            index=False,
+            float_format="%.3f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
+        totals.to_csv(
+            fn_tot,
+            index=False,
+            float_format="%.3f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
         logger.info(f"Saved {len(df)} rows → {fn_pos}")
         logger.info(f"Saved totals         → {fn_tot}")
 
