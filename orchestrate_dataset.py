@@ -14,6 +14,7 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from rich.console import Console
 
 from historic_prices import OUTPUT_DIR
 
@@ -63,20 +64,24 @@ def main() -> None:
     ]
 
     files: List[str] = []
+    console = Console(force_terminal=True)  # force Rich to treat IDE/CI output as a real TTY
     progress = Progress(
         SpinnerColumn(),
-        BarColumn(),
+        BarColumn(),                     # bar now shows per‑task completion
         TextColumn("{task.description}"),
         TimeElapsedColumn(),
         TimeRemainingColumn(),
+        console=console,
+        transient=True,                  # clear finished display on exit
     )
     with progress:
         overall = progress.add_task("overall", total=len(scripts))
         for cmd in scripts:
-            task = progress.add_task(cmd[0], total=None)
+            task = progress.add_task(cmd[0], total=1, start=False)
+            progress.start_task(task)        # make spinner/bar visible immediately
             files += run_script(cmd)
-            progress.remove_task(task)
-            progress.advance(overall)
+            progress.advance(task)           # mark this script as completed
+            progress.advance(overall)        # update overall progress bar
 
     ts = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.zip")
