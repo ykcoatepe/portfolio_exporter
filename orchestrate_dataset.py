@@ -10,6 +10,7 @@ from rich.progress import (
     BarColumn,
     Progress,
     TextColumn,
+    TimeElapsedColumn,
     TimeRemainingColumn,
 )
 from rich.console import Console
@@ -23,9 +24,10 @@ def run_script(cmd: list[str]) -> List[str]:
     subprocess.run(
         [sys.executable, *cmd],
         check=True,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        timeout=600,              # fail fast if a script hangs >10 min
+        timeout=600,  # fail fast if a script hangs >10 min
     )
     after = set(os.listdir(OUTPUT_DIR))
     return [os.path.join(OUTPUT_DIR, f) for f in after - before]
@@ -63,22 +65,27 @@ def main() -> None:
     ]
 
     files: List[str] = []
-    console = Console(force_terminal=True)  # force Rich to treat IDE/CI output as a real TTY
+    console = Console(
+        force_terminal=True
+    )  # force Rich to treat IDE/CI output as a real TTY
     progress = Progress(
         BarColumn(),
+        TextColumn("{task.percentage:>3.0f}%"),
         TextColumn("{task.description}"),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
         console=console,
         transient=True,
-        auto_refresh=False,     # no automatic animation
+        auto_refresh=False,  # no automatic animation
     )
     with progress:
         overall = progress.add_task("overall", total=len(scripts))
         for cmd in scripts:
             task = progress.add_task(cmd[0], total=1)
             files += run_script(cmd)
-            progress.update(task, completed=1)   # instantly fill bar
+            progress.update(task, completed=1)  # instantly fill bar
             progress.advance(overall)
-            progress.refresh()                   # render once, no animation
+            progress.refresh()  # render once, no animation
 
     ts = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.zip")
