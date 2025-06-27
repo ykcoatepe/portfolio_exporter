@@ -89,6 +89,7 @@ class FilterTradesTests(unittest.TestCase):
                 account=None,
                 model_code=None,
                 order_ref=None,
+                combo_legs=None,
             )
             for r in data
         ]
@@ -99,6 +100,87 @@ class FilterTradesTests(unittest.TestCase):
         self.assertEqual(len(res), 2)
         self.assertEqual(res[0].symbol, "A")
         self.assertEqual(res[1].symbol, "B")
+
+
+class OpenOrderTests(unittest.TestCase):
+    def setUp(self):
+        self.combo_leg_data = [
+            {
+                "symbol": "SPY",
+                "sec_type": "OPT",
+                "expiry": "20240719",
+                "strike": 500.0,
+                "right": "C",
+                "ratio": 1,
+                "action": "BUY",
+                "exchange": "SMART",
+            },
+            {
+                "symbol": "SPY",
+                "sec_type": "OPT",
+                "expiry": "20240719",
+                "strike": 505.0,
+                "right": "C",
+                "ratio": 1,
+                "action": "SELL",
+                "exchange": "SMART",
+            },
+        ]
+        self.open_order_combo = tr.OpenOrder(
+            order_id=1,
+            perm_id=101,
+            symbol="SPY",
+            sec_type="BAG",
+            currency="USD",
+            expiry=None,
+            strike=None,
+            right=None,
+            combo_legs=self.combo_leg_data,
+            side="BUY",
+            total_qty=1,
+            lmt_price=1.50,
+            aux_price=0.0,
+            tif="DAY",
+            order_type="LMT",
+            algo_strategy=None,
+            status="Submitted",
+            filled=0,
+            remaining=1,
+            account="U1234567",
+            order_ref="ComboOrder1",
+        )
+        self.open_order_single = tr.OpenOrder(
+            order_id=2,
+            perm_id=102,
+            symbol="AAPL",
+            sec_type="STK",
+            currency="USD",
+            expiry=None,
+            strike=None,
+            right=None,
+            combo_legs=None,
+            side="BUY",
+            total_qty=10,
+            lmt_price=170.0,
+            aux_price=0.0,
+            tif="DAY",
+            order_type="LMT",
+            algo_strategy=None,
+            status="Submitted",
+            filled=0,
+            remaining=10,
+            account="U1234567",
+            order_ref="SingleOrder1",
+        )
+
+    def test_open_order_combo_legs(self):
+        self.assertIsNotNone(self.open_order_combo.combo_legs)
+        self.assertEqual(len(self.open_order_combo.combo_legs), 2)
+        self.assertEqual(self.open_order_combo.combo_legs[0]["symbol"], "SPY")
+        self.assertEqual(self.open_order_combo.combo_legs[1]["action"], "SELL")
+
+    def test_open_order_no_combo_legs(self):
+        self.assertIsNone(self.open_order_single.combo_legs)
 
 
 if __name__ == "__main__":

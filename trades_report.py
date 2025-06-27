@@ -30,6 +30,7 @@ try:
         TableStyle,
         Paragraph,
         Spacer,
+        PageBreak,
     )
     from reportlab.lib.styles import getSampleStyleSheet
 except Exception:  # pragma: no cover - optional
@@ -39,11 +40,12 @@ except Exception:  # pragma: no cover - optional
         TableStyle,
         Paragraph,
         Spacer,
+        PageBreak,
         getSampleStyleSheet,
         colors,
         letter,
         landscape,
-    ) = (None,) * 9
+    ) = (None,) * 10
 import calendar
 
 try:  # optional dependency
@@ -83,6 +85,7 @@ class Trade:
     exchange: str
     primary_exchange: str | None
     trading_class: str | None
+    combo_legs: List[dict] | None
 
     # fill details
     datetime: datetime
@@ -112,6 +115,7 @@ class OpenOrder:
     expiry: str | None
     strike: float | None
     right: str | None
+    combo_legs: List[dict] | None
     side: str
     total_qty: int
     lmt_price: float | None
@@ -252,6 +256,23 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
             (qualified,) = ib.qualifyContracts(contract)
             contract = qualified
 
+        combo_legs_data = []
+        if contract.secType == "BAG" and contract.comboLegs:
+            from ib_insync import Contract
+            for leg in contract.comboLegs:
+                # For combo legs, we need to qualify each leg's contract to get details like symbol, expiry, strike, right
+                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
+                combo_legs_data.append({
+                    "symbol": leg_contract.symbol,
+                    "sec_type": leg_contract.secType,
+                    "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
+                    "strike": getattr(leg_contract, "strike", None),
+                    "right": getattr(leg_contract, "right", None),
+                    "ratio": leg.ratio,
+                    "action": leg.action,
+                    "exchange": leg.exchange,
+                })
+
         comm = comm_map.get(ex.execId, None)
         trades.append(
             Trade(
@@ -272,6 +293,7 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
                 exchange=ex.exchange,
                 primary_exchange=getattr(contract, "primaryExchange", None),
                 trading_class=getattr(contract, "tradingClass", None),
+                combo_legs=combo_legs_data if combo_legs_data else None,
                 datetime=exec_dt,
                 side="BUY" if ex.side.upper() == "BOT" else "SELL",
                 qty=int(ex.shares),
@@ -298,6 +320,23 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
         c = tr.contract
         o = tr.order
         status = tr.orderStatus
+
+        combo_legs_data = []
+        if c.secType == "BAG" and c.comboLegs:
+            from ib_insync import Contract
+            for leg in c.comboLegs:
+                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
+                combo_legs_data.append({
+                    "symbol": leg_contract.symbol,
+                    "sec_type": leg_contract.secType,
+                    "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
+                    "strike": getattr(leg_contract, "strike", None),
+                    "right": getattr(leg_contract, "right", None),
+                    "ratio": leg.ratio,
+                    "action": leg.action,
+                    "exchange": leg.exchange,
+                })
+
         open_orders.append(
             OpenOrder(
                 order_id=o.orderId,
@@ -308,6 +347,7 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
                 expiry=getattr(c, "lastTradeDateOrContractMonth", None),
                 strike=getattr(c, "strike", None),
                 right=getattr(c, "right", None),
+                combo_legs=combo_legs_data if combo_legs_data else None,
                 side=o.action,
                 total_qty=o.totalQuantity,
                 lmt_price=o.lmtPrice if o.orderType in {"LMT", "LIT", "REL"} else None,
@@ -374,6 +414,36 @@ def _auto_fit_columns(
         # Add a little extra space
         worksheet.set_column(i, i, max_len + 2)
 
+# Helper for PDF tables: size columns based on content length
+def _calc_table_col_widths(
+    data: list[list], page_width: float, fixed_idx: int | None = None, fixed_pct: float = 0.40
+) -> list[float]:
+    """
+    Return a list of column widths (in points) that add up to page_width.
+
+    * data       — table data including header row (list of rows)
+    * page_width — available width in the PDF page (points)
+    * fixed_idx  — if not None, reserve `fixed_pct` of page_width for this column
+    * fixed_pct  — fraction of page_width for the fixed column (default 40 %)
+    """
+    ncols = len(data[0])
+    # maximum visible string length per column (header + cells)
+    max_lens = [max(len(str(row[i])) for row in data) for i in range(ncols)]
+
+    if fixed_idx is not None:
+        fixed_w = page_width * fixed_pct
+        flexible_w = page_width - fixed_w
+        total_len = sum(max_lens[i] for i in range(ncols) if i != fixed_idx) or 1
+        col_widths = [
+            fixed_w if i == fixed_idx else flexible_w * max_lens[i] / total_len
+            for i in range(ncols)
+        ]
+    else:
+        total_len = sum(max_lens) or 1
+        col_widths = [page_width * l / total_len for l in max_lens]
+
+    return col_widths
+
 
 # Save Excel workbook with trades and open orders
 def save_excel(
@@ -408,6 +478,15 @@ def save_excel(
             dt_ser = dt_ser.dt.tz_localize(None)
         df_trades["datetime"] = dt_ser
 
+    if "combo_legs" in df_trades.columns:
+        df_trades["combo_legs"] = df_trades["combo_legs"].apply(
+            lambda x: "\n".join([
+                f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                for leg in x
+            ]) if x else None
+        )
+
     # Re‑order / hide columns for readability
     trade_cols_preferred = [
         "datetime",
@@ -424,6 +503,7 @@ def save_excel(
         "strike",
         "right",
         "exchange",
+        "combo_legs",
         "order_id",
         "exec_id",
     ]
@@ -442,10 +522,20 @@ def save_excel(
         "expiry",
         "strike",
         "right",
+        "combo_legs",
         "order_type",
         "order_id",
     ]
     df_open = df_open[[c for c in open_cols_preferred if c in df_open.columns]]
+
+    if "combo_legs" in df_open.columns:
+        df_open["combo_legs"] = df_open["combo_legs"].apply(
+            lambda x: "\n".join([
+                f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                for leg in x
+            ]) if x else None
+        )
 
     with pd.ExcelWriter(
         excel_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss"
@@ -518,10 +608,18 @@ def save_pdf(
             df_trades_fmt[col] = df_trades_fmt[col].map(
                 lambda x: f"{x:,.3f}" if isinstance(x, (float, int)) else x
             )
+        if "combo_legs" in df_trades_fmt.columns:
+            df_trades_fmt["combo_legs"] = df_trades_fmt["combo_legs"].apply(
+                lambda x: "\n".join([
+                    f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                    f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                    for leg in x
+                ]) if x else None
+            )
 
     df_open_fmt = df_open.copy()
     if not df_open_fmt.empty:
-        # -- strip ID‑style columns from open‑orders as well --
+        # -- strip ID-style columns from open orders as well --
         drop_open_cols = ["order_id", "perm_id"]
         df_open_fmt.drop(
             columns=[c for c in drop_open_cols if c in df_open_fmt.columns],
@@ -533,69 +631,87 @@ def save_pdf(
             df_open_fmt[col] = df_open_fmt[col].map(
                 lambda x: f"{x:,.3f}" if isinstance(x, (float, int)) else x
             )
-
-    # ---- TRADES TABLES (chunked for readability) ----
-    if not df_trades_fmt.empty:
-        elements.append(Paragraph("Orders Made", hdr_style))
-        elements.append(Spacer(1, 6))
-        TRADE_ID_COLS = ["datetime", "symbol", "side", "qty", "price", "avg_price"]
-        TRADE_ID_COLS = [c for c in TRADE_ID_COLS if c in df_trades_fmt.columns]
-        trade_metric_cols = [c for c in df_trades_fmt.columns if c not in TRADE_ID_COLS]
-        METRICS_PER_CHUNK = 6
-
-        for start in range(0, len(trade_metric_cols) or 1, METRICS_PER_CHUNK):
-            cols = TRADE_ID_COLS + trade_metric_cols[start : start + METRICS_PER_CHUNK]
-            data = [cols] + df_trades_fmt[cols].values.tolist()
-            col_widths = [page_width / len(cols)] * len(cols)
-
-            tbl = Table(data, repeatRows=1, colWidths=col_widths)
-            tbl.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-                        ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 10), # Increased font size for better readability
-                        ("FONTSIZE", (0, 1), (-1, -1), 9), # Increased font size for better readability
-                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-                        ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
-                    ]
-                )
+        if "combo_legs" in df_open_fmt.columns:
+            df_open_fmt["combo_legs"] = df_open_fmt["combo_legs"].apply(
+                lambda x: "\n".join([
+                    f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                    f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                    for leg in x
+                ]) if x else None
             )
-            elements.append(tbl)
-            elements.append(Table([[" "]]))  # spacer
-    # ---- OPEN ORDERS TABLES ----
+
+    # ---- TRADES TABLE (consolidated for readability) ----
+    if not df_trades_fmt.empty:
+        elements.append(Paragraph("Trades Executed", hdr_style))
+        elements.append(Spacer(1, 6))
+
+        trade_cols = [
+            "datetime", "symbol", "side", "qty", "price", "avg_price",
+            "realized_pnl", "commission", "currency",
+            "expiry", "strike", "right", "combo_legs",
+        ]
+        trade_cols = [c for c in trade_cols if c in df_trades_fmt.columns]
+
+        data = [trade_cols] + df_trades_fmt[trade_cols].values.tolist()
+
+        combo_idx = trade_cols.index("combo_legs") if "combo_legs" in trade_cols else None
+        col_widths = _calc_table_col_widths(data, page_width, fixed_idx=combo_idx)
+
+        tbl = Table(data, repeatRows=1, colWidths=col_widths, hAlign="LEFT")
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                    ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 9),
+                    ("FONTSIZE", (0, 1), (-1, -1), 8),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+                     [colors.whitesmoke, colors.lightgrey]),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                ]
+            )
+        )
+        elements.append(tbl)
+        elements.append(PageBreak())
+
+    # ---- OPEN ORDERS TABLE (consolidated) ----
     if not df_open_fmt.empty:
         elements.append(Paragraph("Open Orders", hdr_style))
         elements.append(Spacer(1, 6))
-        OPEN_ID_COLS = ["symbol", "side", "total_qty", "status", "filled", "remaining"]
-        OPEN_ID_COLS = [c for c in OPEN_ID_COLS if c in df_open_fmt.columns]
-        open_metric_cols = [c for c in df_open_fmt.columns if c not in OPEN_ID_COLS]
-        METRICS_PER_CHUNK = 6
 
-        for start in range(0, len(open_metric_cols) or 1, METRICS_PER_CHUNK):
-            cols = OPEN_ID_COLS + open_metric_cols[start : start + METRICS_PER_CHUNK]
-            data = [cols] + df_open_fmt[cols].values.tolist()
-            col_widths = [page_width / len(cols)] * len(cols)
+        open_cols = [
+            "symbol", "side", "total_qty", "status", "filled", "remaining",
+            "lmt_price", "aux_price",
+            "expiry", "strike", "right", "combo_legs",
+        ]
+        open_cols = [c for c in open_cols if c in df_open_fmt.columns]
 
-            tbl = Table(data, repeatRows=1, colWidths=col_widths)
-            tbl.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.darkgreen),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-                        ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 10), # Increased font size for better readability
-                        ("FONTSIZE", (0, 1), (-1, -1), 9), # Increased font size for better readability
-                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-                        ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
-                    ]
-                )
+        data = [open_cols] + df_open_fmt[open_cols].values.tolist()
+
+        combo_idx = open_cols.index("combo_legs") if "combo_legs" in open_cols else None
+        col_widths = _calc_table_col_widths(data, page_width, fixed_idx=combo_idx)
+
+        tbl = Table(data, repeatRows=1, colWidths=col_widths, hAlign="LEFT")
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.darkgreen),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                    ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 9),
+                    ("FONTSIZE", (0, 1), (-1, -1), 8),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+                     [colors.whitesmoke, colors.lightgrey]),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+                ]
             )
-            elements.append(tbl)
-            elements.append(Table([[" "]]))  # spacer
+        )
+        elements.append(tbl)
 
     doc.build(elements)
     return pdf_path

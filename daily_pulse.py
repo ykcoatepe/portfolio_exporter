@@ -171,7 +171,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = df.sort_values(["ticker", "date"]).copy()
     grp = df.groupby("ticker", group_keys=False)
 
-    df["pct_change"] = grp["close"].pct_change()
+    df["pct_change"] = grp["close"].pct_change(fill_method=None)
     df["sma20"] = grp["close"].transform(lambda s: s.rolling(20).mean())
     df["ema20"] = grp["close"].transform(lambda s: s.ewm(span=20).mean())
 
@@ -197,7 +197,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
         .join((df["low"] - grp["close"].shift()).abs().to_frame("lc"))
         .max(axis=1)
     )
-    df["atr14"] = grp.apply(lambda g: tr.loc[g.index].rolling(14).mean())
+    df["atr14"] = grp.apply(lambda g: tr.loc[g.index].rolling(14).mean(), include_groups=False)
 
     # Bollinger
     m20 = df["sma20"]
