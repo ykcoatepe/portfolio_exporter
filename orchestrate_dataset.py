@@ -18,12 +18,15 @@ from rich.progress import (
 )
 from rich.console import Console
 
-from historic_prices import OUTPUT_DIR
+
 
 
 def run_script(cmd: list[str]) -> List[str]:
-    """Run a script and return newly created files in OUTPUT_DIR."""
-    before = set(os.listdir(OUTPUT_DIR))
+    """Run a script and return newly created PDF files."""
+    #
+    # Find all PDF files in the project directory before running the script.
+    #
+    before = set(file for file in os.listdir('.') if file.endswith('.pdf'))
     subprocess.run(
         [sys.executable, *cmd],
         check=True,
@@ -32,8 +35,11 @@ def run_script(cmd: list[str]) -> List[str]:
         stderr=subprocess.DEVNULL,
         timeout=600,  # fail fast if a script hangs >10 min
     )
-    after = set(os.listdir(OUTPUT_DIR))
-    return [os.path.join(OUTPUT_DIR, f) for f in after - before]
+    #
+    # Find all PDF files in the project directory after running the script.
+    #
+    after = set(file for file in os.listdir('.') if file.endswith('.pdf'))
+    return [os.path.abspath(f) for f in after - before]
 
 
 def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
@@ -50,9 +56,9 @@ def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
         pdf.add_page()
         pdf.set_font("Arial", "B", 24)
         pdf.cell(0, 100, clean_title, 0, 1, "C")
-        
+
         # Save the title page to a BytesIO object
-        title_page_pdf = io.BytesIO(pdf.output())
+        title_page_pdf = io.BytesIO(pdf.output(dest='S').encode('latin-1'))
         merger.append(title_page_pdf)
 
         # Add bookmark for the title page
@@ -131,10 +137,10 @@ def main() -> None:
     ts = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     all_files = [f for _, file_list in files_by_script for f in file_list]
     if fmt == "pdf":
-        dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.pdf")
+        dest = f"dataset_{ts}.pdf"
         merge_pdfs(files_by_script, dest)
     else:
-        dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.zip")
+        dest = f"dataset_{ts}.zip"
         create_zip(all_files, dest)
 
     cleanup(all_files)
