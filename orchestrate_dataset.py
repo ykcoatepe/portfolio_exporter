@@ -1,3 +1,4 @@
+import io
 import os
 import subprocess
 import sys
@@ -6,6 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import List, Tuple
 
+from fpdf import FPDF
 from pypdf import PdfWriter
 from rich.progress import (
     BarColumn,
@@ -35,14 +37,27 @@ def run_script(cmd: list[str]) -> List[str]:
 
 
 def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
-    """Merge the given PDF files into a single file, adding bookmarks for each script."""
+    """Merge the given PDF files into a single file, adding bookmarks for each script and title pages."""
     merger = PdfWriter()
     for title, files in files_by_script:
         if not files:
             continue
-        page_number = len(merger.pages)
+
         clean_title = title.replace("_", " ").replace(".py", "").title()
-        merger.add_outline_item(clean_title, page_number)
+
+        # Create a title page using FPDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 24)
+        pdf.cell(0, 100, clean_title, 0, 1, "C")
+        
+        # Save the title page to a BytesIO object
+        title_page_pdf = io.BytesIO(pdf.output())
+        merger.append(title_page_pdf)
+
+        # Add bookmark for the title page
+        merger.add_outline_item(clean_title, len(merger.pages) - 1)
+
         for path in files:
             merger.append(path)
     merger.write(dest)
@@ -70,15 +85,23 @@ def main() -> None:
         choice = input("Output format [csv/pdf] (default csv): ").strip().lower()
     except EOFError:
         choice = ""
-    fmt = "pdf" if choice == "pdf" else "csv"
+    if choice == "pdf":
+        fmt = "pdf"
+    else:
+        fmt = "csv"
 
-    flag = ["--pdf"] if fmt == "pdf" else []
     scripts = [
-        ["historic_prices.py", *flag],
-        ["portfolio_greeks.py", *flag],
-        ["live_feed.py", *flag],
-        ["daily_pulse.py", "--filetype", fmt],
+        ["historic_prices.py"],
+        ["portfolio_greeks.py"],
+        ["live_feed.py"],
+        ["daily_pulse.py"],
     ]
+    # Add format flag if not default
+    if fmt == "pdf":
+        scripts[0].append("--pdf")
+        scripts[1].append("--pdf")
+        scripts[2].append("--pdf")
+    scripts[3].extend(["--filetype", fmt])
 
     files_by_script: List[Tuple[str, List[str]]] = []
     console = Console(

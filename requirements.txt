@@ -6,3 +6,4 @@ pandas_datareader
 requests
 rich
 pypdf
+fpdf
