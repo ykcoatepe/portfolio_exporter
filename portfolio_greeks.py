@@ -176,8 +176,9 @@ def eddr(
 
 # ───────────────────────── CONFIG ──────────────────────────
 
-OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
+OUTPUT_DIR = os.environ.get(
+    "OUTPUT_DIR",
+    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads",
 )
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -368,9 +369,7 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
 
     totals_fmt = totals.copy()
     float_cols_tot = totals_fmt.select_dtypes(include=[float]).columns
-    totals_fmt[float_cols_tot] = totals_fmt[float_cols_tot].map(
-        lambda x: f"{x:,.3f}"
-    )
+    totals_fmt[float_cols_tot] = totals_fmt[float_cols_tot].map(lambda x: f"{x:,.3f}")
     totals_data = [totals_fmt.columns.tolist()] + totals_fmt.values.tolist()
 
     doc = SimpleDocTemplate(
@@ -430,8 +429,18 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                     ("ALIGN", (0, 0), (-1, 0), "CENTER"),
                     ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
-                    ("FONTSIZE", (0, 0), (-1, 0), 10), # Increased font size for better readability
-                    ("FONTSIZE", (0, 1), (-1, -1), 9), # Increased font size for better readability
+                    (
+                        "FONTSIZE",
+                        (0, 0),
+                        (-1, 0),
+                        10,
+                    ),  # Increased font size for better readability
+                    (
+                        "FONTSIZE",
+                        (0, 1),
+                        (-1, -1),
+                        9,
+                    ),  # Increased font size for better readability
                     (
                         "ROWBACKGROUNDS",
                         (0, 1),
@@ -564,7 +573,7 @@ def main() -> None:
 
     ts_utc = datetime.now(timezone.utc)  # for option T calculation
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
-    ts_iso = ts_local.strftime('%Y-%m-%d %H:%M:%S')  # what we write to CSV
+    ts_iso = ts_local.strftime("%Y-%m-%d %H:%M:%S")  # what we write to CSV
     rows: List[Dict[str, Any]] = []
     yf_oi_cache: Dict[tuple[str, str], dict[tuple[float, str], int]] = {}
 

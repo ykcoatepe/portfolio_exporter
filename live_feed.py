@@ -87,9 +87,10 @@ now_tr = datetime.now(TR_TZ)
 DATE_TAG = now_tr.strftime("%Y%m%d")
 TIME_TAG = now_tr.strftime("%H%M")
 
-# Save snapshots to iCloud Drive ▸ Downloads
-OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+# Save snapshots to iCloud Drive ▸ Downloads (override with OUTPUT_DIR env var)
+OUTPUT_DIR = os.environ.get(
+    "OUTPUT_DIR",
+    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads",
 )
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -446,7 +447,12 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8), # Increased font size for better readability
+                (
+                    "FONTSIZE",
+                    (0, 0),
+                    (-1, -1),
+                    8,
+                ),  # Increased font size for better readability
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
             ]
         )

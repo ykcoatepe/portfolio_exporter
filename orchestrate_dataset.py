@@ -22,12 +22,12 @@ from rich.console import Console
 OUTPUT_DIR = "."
 
 
-
-
 def run_script(cmd: list[str]) -> List[str]:
     """Run a script and return the newly created files in OUTPUT_DIR."""
     out_dir = OUTPUT_DIR
     before = set(os.listdir(out_dir))
+    env = os.environ.copy()
+    env["OUTPUT_DIR"] = out_dir
     subprocess.run(
         [sys.executable, *cmd],
         check=True,
@@ -35,6 +35,7 @@ def run_script(cmd: list[str]) -> List[str]:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         timeout=600,  # fail fast if a script hangs >10 min
+        env=env,
     )
     after = set(os.listdir(out_dir))
     new = after - before
@@ -57,7 +58,7 @@ def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
         pdf.cell(0, 100, clean_title, 0, 1, "C")
 
         # Save the title page to a BytesIO object
-        title_page_pdf = io.BytesIO(pdf.output(dest='S').encode('latin-1'))
+        title_page_pdf = io.BytesIO(pdf.output(dest="S").encode("latin-1"))
         merger.append(title_page_pdf)
 
         # Add bookmark for the title page
