@@ -426,6 +426,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
 
 
 def save_to_pdf(df: pd.DataFrame, path: str) -> None:
+    # reportlab's Table object renders text directly, making the PDF text-based and searchable.
     if SimpleDocTemplate is None:
         raise RuntimeError("reportlab is required for PDF output")
     rows_data = [df.columns.tolist()] + df.values.tolist()
@@ -445,7 +446,7 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 6),
+                ("FONTSIZE", (0, 0), (-1, -1), 8), # Increased font size for better readability
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
             ]
         )

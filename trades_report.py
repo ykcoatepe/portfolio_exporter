@@ -556,8 +556,8 @@ def save_pdf(
                         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
                         ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 8),
-                        ("FONTSIZE", (0, 1), (-1, -1), 7),
+                        ("FONTSIZE", (0, 0), (-1, 0), 10), # Increased font size for better readability
+                        ("FONTSIZE", (0, 1), (-1, -1), 9), # Increased font size for better readability
                         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
                         ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                     ]
@@ -587,8 +587,8 @@ def save_pdf(
                         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
                         ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 8),
-                        ("FONTSIZE", (0, 1), (-1, -1), 7),
+                        ("FONTSIZE", (0, 0), (-1, 0), 10), # Increased font size for better readability
+                        ("FONTSIZE", (0, 1), (-1, -1), 9), # Increased font size for better readability
                         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
                         ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                     ]

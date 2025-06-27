@@ -4,8 +4,9 @@ import sys
 import zipfile
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from typing import List
+from typing import List, Tuple
 
+from pypdf import PdfWriter
 from rich.progress import (
     BarColumn,
     Progress,
@@ -31,6 +32,21 @@ def run_script(cmd: list[str]) -> List[str]:
     )
     after = set(os.listdir(OUTPUT_DIR))
     return [os.path.join(OUTPUT_DIR, f) for f in after - before]
+
+
+def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
+    """Merge the given PDF files into a single file, adding bookmarks for each script."""
+    merger = PdfWriter()
+    for title, files in files_by_script:
+        if not files:
+            continue
+        page_number = len(merger.pages)
+        clean_title = title.replace("_", " ").replace(".py", "").title()
+        merger.add_outline_item(clean_title, page_number)
+        for path in files:
+            merger.append(path)
+    merger.write(dest)
+    merger.close()
 
 
 def create_zip(files: List[str], dest: str) -> None:
@@ -64,7 +80,7 @@ def main() -> None:
         ["daily_pulse.py", "--filetype", fmt],
     ]
 
-    files: List[str] = []
+    files_by_script: List[Tuple[str, List[str]]] = []
     console = Console(
         force_terminal=True
     )  # force Rich to treat IDE/CI output as a real TTY
@@ -82,15 +98,23 @@ def main() -> None:
         overall = progress.add_task("overall", total=len(scripts))
         for cmd in scripts:
             task = progress.add_task(cmd[0], total=1)
-            files += run_script(cmd)
+            new_files = run_script(cmd)
+            if new_files:
+                files_by_script.append((cmd[0], new_files))
             progress.update(task, completed=1)  # instantly fill bar
             progress.advance(overall)
             progress.refresh()  # render once, no animation
 
     ts = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
-    dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.zip")
-    create_zip(files, dest)
-    cleanup(files)
+    all_files = [f for _, file_list in files_by_script for f in file_list]
+    if fmt == "pdf":
+        dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.pdf")
+        merge_pdfs(files_by_script, dest)
+    else:
+        dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.zip")
+        create_zip(all_files, dest)
+
+    cleanup(all_files)
     print(f"Created {dest}")
 
 

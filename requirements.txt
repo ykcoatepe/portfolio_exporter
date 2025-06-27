@@ -5,3 +5,4 @@ ib_insync
 pandas_datareader
 requests
 rich
+pypdf
