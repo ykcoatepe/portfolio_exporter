@@ -24,6 +24,13 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 from typing import List, Dict
 import numpy as np
+
+# ------------------------------------------------------------------
+# Helper to normalize prices: IB sometimes returns -1 for no‑quote
+# ------------------------------------------------------------------
+def _clean_price(val):
+    """Return np.nan for None/‑1 placeholders, otherwise the value."""
+    return np.nan if val in (None, -1) else val
 import yfinance as yf
 
 # optional PDF dependencies
@@ -377,6 +384,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
 
     Columns: timestamp · ticker · secType · position · avg_cost · last ·
              market_value · cost_basis · unrealized_pnl · unrealized_pnl_pct
+             (combo positions are labeled as OPT_COMBO – detected either as BAG or multi‑leg heuristics)
     """
     try:
         positions = ib.positions()
@@ -387,10 +395,31 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
     rows: List[Dict] = []
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
 
+    # --- simple combo heuristic -----------------------------------------
+    # If there is more than one option position with the same underlying
+    # symbol *and* expiry date, treat those legs as belonging to a combo.
+    combo_counts: dict[tuple[str, str], int] = {}
+    for pos in positions:
+        c = pos.contract
+        if c.secType == "OPT":
+            key = (c.symbol, getattr(c, "lastTradeDateOrContractMonth", ""))
+            combo_counts[key] = combo_counts.get(key, 0) + 1
+
+    # Collect conIds of all individual legs that are part of a combo
+    combo_leg_con_ids = set()
+    for pos in positions:
+        if pos.contract.secType == "BAG" and pos.contract.comboLegs:
+            for leg in pos.contract.comboLegs:
+                combo_leg_con_ids.add(leg.conId)
+
     # prepare market‑data requests
     md_reqs = {}
     for pos in positions:
         con = pos.contract
+        # Skip individual legs that are part of a combo
+        if con.conId in combo_leg_con_ids:
+            continue
+
         try:
             (ql,) = ib.qualifyContracts(con)
             md = ib.reqMktData(ql, "", False, False)
@@ -401,17 +430,48 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
     ib.sleep(IB_TIMEOUT)  # allow quotes to update
 
     for conId, (con, md, avg_cost, qty) in md_reqs.items():
-        last = md.last or md.close or np.nan
+        raw_last = _clean_price(md.last) if md.last is not None else _clean_price(md.close)
+        last = raw_last
         mult = int(con.multiplier) if con.multiplier else 1
         cost_basis = avg_cost * qty * mult
         market_val = last * qty * mult
         unreal_pnl = (last - avg_cost) * qty * mult
         unreal_pct = (unreal_pnl / cost_basis * 100) if cost_basis else np.nan
+
+        combo_legs_data = []
+        if con.secType == "BAG" and con.comboLegs:
+            from ib_insync import Contract
+            for leg in con.comboLegs:
+                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
+                combo_legs_data.append({
+                    "symbol": leg_contract.symbol,
+                    "sec_type": leg_contract.secType,
+                    "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
+                    "strike": getattr(leg_contract, "strike", None),
+                    "right": getattr(leg_contract, "right", None),
+                    "ratio": leg.ratio,
+                    "action": leg.action,
+                    "exchange": leg.exchange,
+                })
+
         rows.append(
             {
                 "timestamp": ts_now,
                 "ticker": con.symbol,
-                "secType": con.secType,
+                # Mark as OPT_COMBO if it's a BAG *or* detected multi‑leg set
+                "secType": (
+                    "OPT_COMBO"
+                    if (
+                        con.secType == "BAG"
+                        or (
+                            con.secType == "OPT"
+                            and combo_counts.get(
+                                (con.symbol, getattr(con, "lastTradeDateOrContractMonth", ""))
+                            , 0) > 1
+                        )
+                    )
+                    else con.secType
+                ),
                 "position": qty,
                 "avg_cost": avg_cost,
                 "last": last,
@@ -419,6 +479,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
                 "cost_basis": cost_basis,
                 "unrealized_pnl_pct": unreal_pct,
                 "unrealized_pnl": unreal_pnl,
+                "combo_legs": combo_legs_data if combo_legs_data else None,
             }
         )
         ib.cancelMktData(md.contract)
@@ -430,7 +491,24 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
     # reportlab's Table object renders text directly, making the PDF text-based and searchable.
     if SimpleDocTemplate is None:
         raise RuntimeError("reportlab is required for PDF output")
-    rows_data = [df.columns.tolist()] + df.values.tolist()
+
+    if "combo_legs" in df.columns:
+        df["combo_legs"] = df["combo_legs"].apply(
+            lambda x: "\n".join([
+                f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                for leg in x
+            ]) if x else None
+        )
+
+    # ---------- pretty‑format numbers & NaNs ---------------------
+    display_df = df.copy()
+    num_cols = display_df.select_dtypes(include=["number"]).columns
+    for col in num_cols:
+        display_df[col] = display_df[col].apply(
+            lambda x: "—" if pd.isna(x) else f"{x:,.2f}"
+        )
+    rows_data = [display_df.columns.tolist()] + display_df.values.tolist()
     doc = SimpleDocTemplate(
         path,
         pagesize=landscape(letter),
@@ -538,6 +616,14 @@ def main():
                         pos_txt["unrealized_pnl_pct"] = pos_txt[
                             "unrealized_pnl_pct"
                         ].map(lambda x: f"{x:.3f}%")
+                    if "combo_legs" in pos_txt.columns:
+                        pos_txt["combo_legs"] = pos_txt["combo_legs"].apply(
+                            lambda x: "\n".join([
+                                f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                                f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                                for leg in x
+                            ]) if x else None
+                        )
                     with open(base_pos + ".txt", "w") as fh:
                         fh.write(
                             pos_txt.to_string(
