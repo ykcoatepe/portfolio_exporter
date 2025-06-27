@@ -347,7 +347,10 @@ def main():
     # Save results                                                        #
     # ------------------------------------------------------------------- #
     out_dir = Path(
-        "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+        os.environ.get(
+            "OUTPUT_DIR",
+            "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads",
+        )
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     base = out_dir / f"pre_mkt_{stamp}"
@@ -431,7 +434,12 @@ def main():
                         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, -1), 8), # Increased font size for better readability
+                        (
+                            "FONTSIZE",
+                            (0, 0),
+                            (-1, -1),
+                            8,
+                        ),  # Increased font size for better readability
                         ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
                         ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                     ]
