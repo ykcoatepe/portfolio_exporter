@@ -19,7 +19,8 @@ from rich.progress import (
 from rich.console import Console
 
 # Directory where orchestrated dataset and script outputs are stored.
-OUTPUT_DIR = "."
+OUTPUT_DIR = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def run_script(cmd: list[str]) -> List[str]:
@@ -43,10 +44,11 @@ def run_script(cmd: list[str]) -> List[str]:
 
 
 def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
-    """Merge the given PDF files into a single file, adding bookmarks for each script and title pages."""
+    """Merge the given PDF files into a single output, adding bookmarks for each script and title pages, skipping non-PDF files."""
     merger = PdfWriter()
     for title, files in files_by_script:
-        if not files:
+        pdfs = [path for path in files if path.lower().endswith(".pdf")]
+        if not pdfs:
             continue
 
         clean_title = title.replace("_", " ").replace(".py", "").title()
@@ -64,7 +66,7 @@ def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
         # Add bookmark for the title page
         merger.add_outline_item(clean_title, len(merger.pages) - 1)
 
-        for path in files:
+        for path in pdfs:
             merger.append(path)
     merger.write(dest)
     merger.close()
