@@ -18,15 +18,16 @@ from rich.progress import (
 )
 from rich.console import Console
 
+# Directory where orchestrated dataset and script outputs are stored.
+OUTPUT_DIR = "."
+
 
 
 
 def run_script(cmd: list[str]) -> List[str]:
-    """Run a script and return newly created PDF files."""
-    #
-    # Find all PDF files in the project directory before running the script.
-    #
-    before = set(file for file in os.listdir('.') if file.endswith('.pdf'))
+    """Run a script and return the newly created files in OUTPUT_DIR."""
+    out_dir = OUTPUT_DIR
+    before = set(os.listdir(out_dir))
     subprocess.run(
         [sys.executable, *cmd],
         check=True,
@@ -35,11 +36,9 @@ def run_script(cmd: list[str]) -> List[str]:
         stderr=subprocess.DEVNULL,
         timeout=600,  # fail fast if a script hangs >10 min
     )
-    #
-    # Find all PDF files in the project directory after running the script.
-    #
-    after = set(file for file in os.listdir('.') if file.endswith('.pdf'))
-    return [os.path.abspath(f) for f in after - before]
+    after = set(os.listdir(out_dir))
+    new = after - before
+    return [os.path.join(out_dir, f) for f in new]
 
 
 def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
@@ -137,10 +136,10 @@ def main() -> None:
     ts = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     all_files = [f for _, file_list in files_by_script for f in file_list]
     if fmt == "pdf":
-        dest = f"dataset_{ts}.pdf"
+        dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.pdf")
         merge_pdfs(files_by_script, dest)
     else:
-        dest = f"dataset_{ts}.zip"
+        dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.zip")
         create_zip(all_files, dest)
 
     cleanup(all_files)
