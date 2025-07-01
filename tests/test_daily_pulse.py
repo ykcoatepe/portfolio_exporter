@@ -4,7 +4,8 @@ import numpy as np
 import tempfile
 from pathlib import Path
 
-import daily_pulse as dp
+from src import analysis as dp
+from src import reporting
 
 
 class DailyPulseTests(unittest.TestCase):
@@ -49,7 +50,7 @@ class DailyPulseTests(unittest.TestCase):
         df_ind = dp.compute_indicators(self.df)
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "pulse.csv"
-            dp.generate_report(df_ind, str(out))
+            reporting.generate_report(df_ind, str(out))
             self.assertTrue(out.exists())
             saved = pd.read_csv(out, index_col=0)
             self.assertIn("close", saved.columns)
