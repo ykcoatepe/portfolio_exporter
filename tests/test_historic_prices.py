@@ -7,7 +7,7 @@ except Exception as e:  # pragma: no cover - skip if pandas missing
     raise unittest.SkipTest("pandas is not installed") from e
 
 
-import historic_prices as hp
+from src import data_fetching as hp
 
 
 def make_multiindex_df(tickers):
@@ -42,8 +42,11 @@ class HistoricPricesTests(unittest.TestCase):
         df_sample = make_multiindex_df(tickers)
         with patch.object(hp.yf, "download", return_value=df_sample):
             result = hp.fetch_and_prepare_data(tickers)
-        self.assertEqual(set(result.columns), {"date","ticker","open","high","low","close","adj_close","volume"})
-        self.assertEqual(len(result), len(df_sample)*len(tickers))
+        self.assertEqual(
+            set(result.columns),
+            {"date", "ticker", "open", "high", "low", "close", "adj_close", "volume"},
+        )
+        self.assertEqual(len(result), len(df_sample) * len(tickers))
         self.assertEqual(sorted(result["ticker"].unique()), tickers)
 
     def test_fetch_and_prepare_single(self):
@@ -51,7 +54,10 @@ class HistoricPricesTests(unittest.TestCase):
         df_sample = make_single_df(ticker[0])
         with patch.object(hp.yf, "download", return_value=df_sample):
             result = hp.fetch_and_prepare_data(ticker)
-        self.assertEqual(set(result.columns), {"date","ticker","open","high","low","close","adj_close","volume"})
+        self.assertEqual(
+            set(result.columns),
+            {"date", "ticker", "open", "high", "low", "close", "adj_close", "volume"},
+        )
         self.assertEqual(len(result), len(df_sample))
         self.assertEqual(result["ticker"].unique().tolist(), ticker)
 
@@ -60,25 +66,29 @@ class HistoricPricesTests(unittest.TestCase):
             hp.fetch_and_prepare_data([])
 
     def test_load_tickers_file_fallback(self):
-        with patch.object(hp, "_tickers_from_ib", return_value=[]), \
-             patch.object(hp, "EXTRA_TICKERS", []):
+        with patch.object(hp, "_tickers_from_ib", return_value=[]), patch.object(
+            hp, "EXTRA_TICKERS", []
+        ):
             with patch.object(hp, "PORTFOLIO_FILES", ["dummy.txt"]):
                 # create temporary file
                 import tempfile
+
                 with tempfile.TemporaryDirectory() as td:
-                    f = td+"/tickers.txt"
-                    with open(f,"w") as fh:
+                    f = td + "/tickers.txt"
+                    with open(f, "w") as fh:
                         fh.write("AAA\nVIX\n")
                     with patch.object(hp, "PORTFOLIO_FILES", [f]):
                         tickers = hp.load_tickers()
         self.assertEqual(sorted(tickers), ["AAA", "^VIX"])
 
     def test_load_tickers_ib(self):
-        with patch.object(hp, "_tickers_from_ib", return_value=["BBB","VIX"]), \
-             patch.object(hp, "EXTRA_TICKERS", ["SPY"]), \
-             patch.object(hp, "PORTFOLIO_FILES", []):
+        with patch.object(
+            hp, "_tickers_from_ib", return_value=["BBB", "VIX"]
+        ), patch.object(hp, "EXTRA_TICKERS", ["SPY"]), patch.object(
+            hp, "PORTFOLIO_FILES", []
+        ):
             tickers = hp.load_tickers()
-        self.assertEqual(sorted(tickers), ["BBB","SPY","^VIX"])
+        self.assertEqual(sorted(tickers), ["BBB", "SPY", "^VIX"])
 
 
 if __name__ == "__main__":

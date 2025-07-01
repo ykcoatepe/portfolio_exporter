@@ -22,6 +22,21 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
 | `orchestrate_dataset.py` | Runs the main export scripts in sequence (`historic_prices.py`, `portfolio_greeks.py`, `live_feed.py`, and `daily_pulse.py`), zips the results into `dataset_<DATE_TIME>.zip`, and deletes the individual files. |
 
+## Unified CLI
+
+All major features are exposed through `main.py`. Use the sub‑commands below as a
+drop‑in replacement for the old scripts:
+
+```bash
+python main.py pulse        # daily_pulse.py
+python main.py live         # live_feed.py
+python main.py options      # option_chain_snapshot.py
+python main.py report       # trades_report.py
+python main.py orchestrate  # orchestrate_dataset.py
+```
+
+The legacy scripts remain for reference but are no longer needed.
+
 ### CP_REFRESH_TOKEN
 `net_liq_history_export.py` looks for the environment variable `CP_REFRESH_TOKEN` when pulling data from the Client Portal API. Set it before running the script:
 
