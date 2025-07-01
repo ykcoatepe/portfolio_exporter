@@ -1,7 +1,7 @@
-
 """
 technicals.py - A library of technical analysis functions.
 """
+
 import pandas as pd
 
 
@@ -36,14 +36,18 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     ema12 = grp["close"].transform(lambda s: s.ewm(span=12, adjust=False).mean())
     ema26 = grp["close"].transform(lambda s: s.ewm(span=26, adjust=False).mean())
     df["macd"] = ema12 - ema26
-    df["macd_signal"] = df.groupby("ticker")["macd"].transform(lambda s: s.ewm(span=9, adjust=False).mean())
+    df["macd_signal"] = df.groupby("ticker")["macd"].transform(
+        lambda s: s.ewm(span=9, adjust=False).mean()
+    )
 
     # Average True Range (ATR)
     tr1 = abs(df["high"] - df["low"])
     tr2 = abs(df["high"] - grp["close"].shift())
     tr3 = abs(df["low"] - grp["close"].shift())
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    df["atr14"] = grp.apply(lambda g: tr.loc[g.index].ewm(alpha=1/14, adjust=False).mean(), include_groups=False)
+    df["atr14"] = tr.groupby(df["ticker"]).transform(
+        lambda s: s.ewm(alpha=1 / 14, adjust=False).mean()
+    )
 
     # Bollinger Bands
     sma20 = df.groupby("ticker")["close"].transform(lambda s: s.rolling(20).mean())
@@ -52,14 +56,20 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["bb_lower"] = sma20 - (std20 * 2)
 
     # Realized Volatility
-    df["real_vol_30"] = grp["close"].pct_change().transform(lambda s: s.rolling(30).std() * (252**0.5))
-    
+    df["real_vol_30"] = (
+        grp["close"].pct_change().transform(lambda s: s.rolling(30).std() * (252**0.5))
+    )
+
     # ADX
-    plus_dm = (df["high"].diff()).where((df["high"].diff() > df["low"].diff().abs()) & (df["high"].diff() > 0), 0)
-    minus_dm = (df["low"].diff()).where((df["low"].diff() > df["high"].diff().abs()) & (df["low"].diff() > 0), 0)
+    plus_dm = (df["high"].diff()).where(
+        (df["high"].diff() > df["low"].diff().abs()) & (df["high"].diff() > 0), 0
+    )
+    minus_dm = (df["low"].diff()).where(
+        (df["low"].diff() > df["high"].diff().abs()) & (df["low"].diff() > 0), 0
+    )
     tr14 = tr.rolling(14).sum()
     pdi = 100 * plus_dm.rolling(14).sum() / tr14
     mdi = 100 * minus_dm.rolling(14).sum() / tr14
     df["adx14"] = ((pdi - mdi).abs() / (pdi + mdi) * 100).rolling(14).mean()
-    
+
     return df
