@@ -194,6 +194,17 @@ def load_tickers(ib: IB) -> list[str]:
     mapped = [PROXY_MAP.get(t, t) for t in user_tickers]
     return sorted(set(mapped + EXTRA_TICKERS))
 
+def get_option_positions(ib: IB) -> Tuple[List[Option], Set[str]]:
+    """Return option contracts in the IBKR account and their underlying symbols."""
+    opt_cons: List[Option] = []
+    underlyings: Set[str] = set()
+    for pos in ib.positions():
+        c = pos.contract
+        if getattr(c, "secType", "") == "OPT":
+            opt_cons.append(c)
+            underlyings.add(c.symbol)
+    return opt_cons, underlyings
+
 
 def fetch_ib_quotes(ib: IB, tickers: List[str], opt_cons: List[Option]) -> pd.DataFrame:
     """Return DataFrame of quotes for symbols IB can serve; missing ones flagged NaN."""
