@@ -1,4 +1,4 @@
-'''import math
+import math
 from typing import Dict
 
 
@@ -46,4 +46,3 @@ def bs_greeks(S: float, K: float, T: float, r: float, sigma: float, call: bool =
     vega = S * pdf_d1 * math.sqrt(T) / 100.0
 
     return dict(delta=delta, gamma=gamma, vega=vega, theta=theta)
-''

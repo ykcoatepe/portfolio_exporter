@@ -20,8 +20,12 @@ from utils.analysis import get_greeks, get_option_chain, get_technical_signals, 
 
 def pre_market_analysis(ib_manager):
     """Generates the pre-market analysis report."""
-    with ib_manager as ib:
-        positions = load_ib_positions_ib(ib)
+    try:
+        with ib_manager as ib:
+            positions = load_ib_positions_ib(ib)
+    except Exception as e:
+        print(f"⚠️  IBKR connection failed ({e}); using only default tickers.")
+        positions = pd.DataFrame()
         tickers = positions['symbol'].unique().tolist() if not positions.empty else []
         
         if not tickers:
@@ -127,12 +131,15 @@ def option_chain_analysis(ib_manager, symbol):
 
 def main():
     parser = argparse.ArgumentParser(description="Unified market analysis tool.")
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group()
     group.add_argument("--mode", choices=["pre-market", "live", "tech-signals"], help="Analysis mode.")
     group.add_argument("--greeks", action="store_true", help="Portfolio greeks analysis.")
     group.add_argument("--option-chain", type=str, metavar="SYMBOL", help="Fetch option chain for a symbol.")
 
     args = parser.parse_args()
+    # default to pre-market if no option provided
+    if args.mode is None and not args.greeks and not args.option_chain:
+        args.mode = "pre-market"
 
     ib_manager = IBManager()
 

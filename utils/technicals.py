@@ -1,5 +1,4 @@
 
-'''
 """
 technicals.py - A library of technical analysis functions.
 """
@@ -64,4 +63,3 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["adx14"] = ((pdi - mdi).abs() / (pdi + mdi) * 100).rolling(14).mean()
     
     return df
-''
