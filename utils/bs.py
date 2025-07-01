@@ -1,9 +1,17 @@
-import math
+'''import math
 from typing import Dict
+
 
 def norm_cdf(x: float) -> float:
     """Return cumulative normal distribution function."""
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def _bs_delta(S, K, T, r, sigma, call=True):
+    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+        return 0.0
+    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    return norm_cdf(d1) if call else norm_cdf(d1) - 1.0
 
 
 def bs_greeks(S: float, K: float, T: float, r: float, sigma: float, call: bool = True) -> Dict[str, float]:
@@ -38,3 +46,4 @@ def bs_greeks(S: float, K: float, T: float, r: float, sigma: float, call: bool =
     vega = S * pdf_d1 * math.sqrt(T) / 100.0
 
     return dict(delta=delta, gamma=gamma, vega=vega, theta=theta)
+''
