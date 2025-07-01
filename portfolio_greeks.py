@@ -176,8 +176,9 @@ def eddr(
 
 # ───────────────────────── CONFIG ──────────────────────────
 
-OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
+OUTPUT_DIR = os.environ.get(
+    "OUTPUT_DIR",
+    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads",
 )
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -363,14 +364,12 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
     # ---- pretty‑print numbers (three decimals, thousands sep) ----
     df_fmt = df.copy()
     float_cols = df_fmt.select_dtypes(include=[float]).columns
-    df_fmt[float_cols] = df_fmt[float_cols].applymap(lambda x: f"{x:,.3f}")
+    df_fmt[float_cols] = df_fmt[float_cols].map(lambda x: f"{x:,.3f}")
     rows_data = [df_fmt.columns.tolist()] + df_fmt.values.tolist()
 
     totals_fmt = totals.copy()
     float_cols_tot = totals_fmt.select_dtypes(include=[float]).columns
-    totals_fmt[float_cols_tot] = totals_fmt[float_cols_tot].applymap(
-        lambda x: f"{x:,.3f}"
-    )
+    totals_fmt[float_cols_tot] = totals_fmt[float_cols_tot].map(lambda x: f"{x:,.3f}")
     totals_data = [totals_fmt.columns.tolist()] + totals_fmt.values.tolist()
 
     doc = SimpleDocTemplate(
@@ -383,7 +382,16 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
     )
     # ---- dynamic column widths to keep wide tables inside the page frame ----
     page_width = landscape(letter)[0] - doc.leftMargin - doc.rightMargin
-    col_widths_positions = [page_width / len(df.columns)] * len(df.columns)
+    timestamp_col_width = 80  # Adjust as needed
+    remaining_width = page_width - timestamp_col_width
+
+    col_widths_positions = []
+    for col in df.columns:
+        if col == "timestamp":
+            col_widths_positions.append(timestamp_col_width)
+        else:
+            col_widths_positions.append(remaining_width / (len(df.columns) - 1))
+
     col_widths_totals = [page_width / len(totals.columns)] * len(totals.columns)
     elements = []
 
@@ -421,8 +429,18 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                     ("ALIGN", (0, 0), (-1, 0), "CENTER"),
                     ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
-                    ("FONTSIZE", (0, 0), (-1, 0), 8),
-                    ("FONTSIZE", (0, 1), (-1, -1), 7),
+                    (
+                        "FONTSIZE",
+                        (0, 0),
+                        (-1, 0),
+                        10,
+                    ),  # Increased font size for better readability
+                    (
+                        "FONTSIZE",
+                        (0, 1),
+                        (-1, -1),
+                        9,
+                    ),  # Increased font size for better readability
                     (
                         "ROWBACKGROUNDS",
                         (0, 1),
@@ -555,7 +573,7 @@ def main() -> None:
 
     ts_utc = datetime.now(timezone.utc)  # for option T calculation
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
-    ts_iso = ts_local.isoformat()  # what we write to CSV
+    ts_iso = ts_local.strftime("%Y-%m-%d %H:%M:%S")  # what we write to CSV
     rows: List[Dict[str, Any]] = []
     yf_oi_cache: Dict[tuple[str, str], dict[tuple[float, str], int]] = {}
 

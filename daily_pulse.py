@@ -171,7 +171,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = df.sort_values(["ticker", "date"]).copy()
     grp = df.groupby("ticker", group_keys=False)
 
-    df["pct_change"] = grp["close"].pct_change()
+    df["pct_change"] = grp["close"].pct_change(fill_method=None)
     df["sma20"] = grp["close"].transform(lambda s: s.rolling(20).mean())
     df["ema20"] = grp["close"].transform(lambda s: s.ewm(span=20).mean())
 
@@ -197,7 +197,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
         .join((df["low"] - grp["close"].shift()).abs().to_frame("lc"))
         .max(axis=1)
     )
-    df["atr14"] = grp.apply(lambda g: tr.loc[g.index].rolling(14).mean())
+    df["atr14"] = grp.apply(lambda g: tr.loc[g.index].rolling(14).mean(), include_groups=False)
 
     # Bollinger
     m20 = df["sma20"]
@@ -347,7 +347,10 @@ def main():
     # Save results                                                        #
     # ------------------------------------------------------------------- #
     out_dir = Path(
-        "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+        os.environ.get(
+            "OUTPUT_DIR",
+            "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads",
+        )
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     base = out_dir / f"pre_mkt_{stamp}"
@@ -421,6 +424,7 @@ def main():
         elements = []
 
         def df_to_table(df):
+            # reportlab's Table object renders text directly, making the PDF text-based and searchable.
             data = [df.columns.tolist()] + df.values.tolist()
             table = Table(data)
             table.setStyle(
@@ -430,6 +434,12 @@ def main():
                         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        (
+                            "FONTSIZE",
+                            (0, 0),
+                            (-1, -1),
+                            8,
+                        ),  # Increased font size for better readability
                         ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
                         ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                     ]

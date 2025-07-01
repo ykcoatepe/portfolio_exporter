@@ -64,9 +64,10 @@ PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]  # first existing file win
 # Timestamped output (UTC). Includes time so repeated runs don't overwrite.
 DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
 TIME_TAG = datetime.utcnow().strftime("%H%M")
-# Save to iCloud Drive ▸ Downloads
-OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+# Save to iCloud Drive ▸ Downloads (override with OUTPUT_DIR env var)
+OUTPUT_DIR = os.environ.get(
+    "OUTPUT_DIR",
+    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads",
 )
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"historic_prices_{DATE_TAG}_{TIME_TAG}.csv")
@@ -168,6 +169,7 @@ def save_to_txt(df: pd.DataFrame, path: str) -> None:
 
 
 def save_to_pdf(df: pd.DataFrame, path: str) -> None:
+    # reportlab's Table object renders text directly, making the PDF text-based and searchable.
     rows_data = [df.columns.tolist()] + df.values.tolist()
     doc = SimpleDocTemplate(
         path,
@@ -185,7 +187,12 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 6),
+                (
+                    "FONTSIZE",
+                    (0, 0),
+                    (-1, -1),
+                    8,
+                ),  # Increased font size for better readability
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
             ]
         )

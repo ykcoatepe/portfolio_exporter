@@ -13,7 +13,9 @@ class OrchestrateTests(unittest.TestCase):
         self.addCleanup(lambda: [p.unlink() for p in tmp.iterdir()])
         od.OUTPUT_DIR = str(tmp)
 
-        def dummy_run(cmd, check, stdout=None, stderr=None):
+        def dummy_run(
+            cmd, check, stdout=None, stderr=None, timeout=None, stdin=None, env=None
+        ):
             (tmp / "new.csv").write_text("x")
 
         prev = od.subprocess.run
@@ -45,7 +47,7 @@ class OrchestrateTests(unittest.TestCase):
             od.OUTPUT_DIR = td
             created: list[Path] = []
 
-            def fake_run_script(cmd):
+            def fake_run_script(cmd, *, env=None):
                 path = Path(td) / f"{cmd[0]}.csv"
                 path.write_text("x")
                 created.append(path)
@@ -59,6 +61,38 @@ class OrchestrateTests(unittest.TestCase):
 
             zips = list(Path(td).glob("dataset_*.zip"))
             self.assertEqual(len(zips), 1)
+            for p in created:
+                self.assertFalse(p.exists())
+
+    def test_main_merges_pdfs(self):
+        with tempfile.TemporaryDirectory() as td:
+            od.OUTPUT_DIR = td
+            created: list[Path] = []
+
+            def fake_run_script(cmd, *, env=None):
+                path = Path(td) / f"{cmd[0].replace('.py', '')}.pdf"
+                from fpdf import FPDF
+
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Helvetica", size=12)
+                pdf.cell(40, 10, cmd[0])
+                pdf.output(str(path))
+                created.append(path)
+                return [str(path)]
+
+            with unittest.mock.patch.object(
+                od, "run_script", side_effect=fake_run_script
+            ):
+                with unittest.mock.patch("builtins.input", return_value="pdf"):
+                    od.main()
+
+            merged = list(Path(td).glob("dataset_*.pdf"))
+            self.assertEqual(len(merged), 1)
+            from pypdf import PdfReader
+
+            num_pages = len(PdfReader(str(merged[0])).pages)
+            self.assertGreaterEqual(num_pages, 8)
             for p in created:
                 self.assertFalse(p.exists())
 

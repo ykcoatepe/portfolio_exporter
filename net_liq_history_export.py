@@ -149,6 +149,7 @@ def _save_excel(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
 
 
 def _save_pdf(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
+    # reportlab's Table object renders text directly, making the PDF text-based and searchable.
     out_name = f"net_liq_history_{start_label}-{end_label}_{TIME_TAG}.pdf"
     out_path = OUTPUT_DIR / out_name
     df_reset = df.reset_index()
@@ -169,7 +170,7 @@ def _save_pdf(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("FONTSIZE", (0, 0), (-1, -1), 10), # Increased font size for better readability
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
             ]
         )
