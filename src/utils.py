@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Iterable, Iterator, List
 import pandas as pd
+import sys
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -24,7 +25,7 @@ _PASTEL_THEME = Theme(
     }
 )
 
-_console = Console(theme=_PASTEL_THEME, force_terminal=True)
+_console = Console(file=sys.stderr, theme=_PASTEL_THEME, force_terminal=False)
 
 
 def progress_bar(iterable: Iterable, description: str) -> Iterator:

@@ -139,13 +139,37 @@ def cmd_options(args: argparse.Namespace) -> None:
             data_fetching.IB_CLIENT_ID,
             timeout=10,
         )
-        df = data_fetching.snapshot_chain(ib, args.symbol, args.expiry_hint)
-        if not df.empty:
-            out_path = Path(OUTPUT_DIR) / f"{args.symbol}_options_{get_timestamp()}.csv"
-            df.to_csv(out_path, index=False)
-            print(f"Option chain saved to {out_path}")
+
+        tickers: list[str] = []
+        if getattr(args, "tickers", None):
+            tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+        elif getattr(args, "symbol", None):
+            tickers = [args.symbol.upper()]
         else:
-            print(f"No option chain data found for {args.symbol}")
+            tickers = [input("Enter stock symbol: ").strip().upper()]
+
+        expiries: list[str | None] = []
+        if getattr(args, "expiries", None):
+            expiries = [e.strip() for e in args.expiries.split(",") if e.strip()]
+        elif getattr(args, "expiry_hint", None):
+            expiries = [args.expiry_hint]
+
+        for sym in tickers:
+            exps = expiries or [None]
+            for exp in exps:
+                df = data_fetching.snapshot_chain(ib, sym, exp)
+                if not df.empty:
+                    exp_part = exp or "auto"
+                    out_file = (
+                        args.output
+                        if args.output and len(tickers) == 1 and len(exps) == 1
+                        else f"{sym}_{exp_part}_options_{get_timestamp()}.csv"
+                    )
+                    out_path = Path(OUTPUT_DIR) / out_file
+                    df.to_csv(out_path, index=False)
+                    print(f"Option chain saved to {out_path}")
+                else:
+                    print(f"No option chain data found for {sym}")
         ib.disconnect()
     except Exception as e:
         print(f"Error fetching option chain: {e}")
@@ -167,11 +191,9 @@ def cmd_positions(args: argparse.Namespace) -> None:
 def cmd_report(args: argparse.Namespace) -> None:
     try:
         trades_df = pd.read_csv(args.input)
-        formatted_trades = reporting.format_trades(trades_df.to_dict(orient="records"))
-        reporting.generate_report(
-            formatted_trades, str(Path(OUTPUT_DIR) / args.output), fmt=args.format
-        )
-        print(f"Trades report generated to {args.output}")
+        out_path = Path(OUTPUT_DIR) / args.output
+        trades_df.to_csv(out_path, index=False)
+        print(f"Trades report generated to {out_path}")
     except FileNotFoundError:
         print(f"Error: Input file not found at {args.input}")
     except Exception as e:
@@ -215,9 +237,8 @@ def cmd_portfolio_greeks(args: argparse.Namespace) -> None:
         print(f"Error calculating portfolio greeks: {e}")
 
 
-OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
-)
+DEFAULT_OUTPUT_DIR = Path.home() / "Downloads"
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
@@ -336,7 +357,14 @@ def cmd_orchestrate(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    global OUTPUT_DIR
     parser = argparse.ArgumentParser(description="Portfolio Exporter CLI")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=OUTPUT_DIR,
+        help="Directory to write output files",
+    )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Pulse command
@@ -382,13 +410,14 @@ def main() -> None:
         "options", help="Fetch option chain snapshot"
     )
     options_parser.add_argument(
-        "--symbol", type=str, required=True, help="Stock symbol for option chain"
+        "--tickers", type=str, help="Comma-separated stock symbols"
     )
+    options_parser.add_argument("--symbol", type=str, help=argparse.SUPPRESS)
     options_parser.add_argument(
-        "--expiry-hint",
-        type=str,
-        help="Expiry hint (e.g., YYYYMMDD, YYYYMM, month name)",
+        "--expiries", type=str, help="Comma-separated expiry hints"
     )
+    options_parser.add_argument("--expiry-hint", type=str, help=argparse.SUPPRESS)
+    options_parser.add_argument("--output", type=str, help="Output file name")
     options_parser.add_argument(
         "--format",
         type=str,
@@ -467,6 +496,8 @@ def main() -> None:
     # Check if any command-line arguments were provided
     if len(sys.argv) > 1:
         args = parser.parse_args()
+        OUTPUT_DIR = args.output_dir
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
         if args.command == "pulse":
             cmd_pulse(args)
         elif args.command == "live":
@@ -494,8 +525,7 @@ def main() -> None:
             print("7. orchestrate (Dataset orchestration)")
             print("8. Exit")
 
-            choice = input("Enter your choice (1-7): ").strip()
-            
+            choice = input("Enter your choice (1-8): ").strip()
 
             try:
                 choice_num = int(choice)
@@ -521,30 +551,78 @@ def main() -> None:
                 # Prepare args based on the command
                 args = argparse.Namespace()
                 if choice_num == 1:  # pulse
-                    args.tickers = input("Enter tickers (comma-separated, e.g., AAPL,MSFT; leave blank to fetch from IBKR): ").strip()
-                    args.output = input(f"Enter output file name (default: pulse_{get_timestamp()}.csv): ").strip() or f"pulse_{get_timestamp()}.csv"
-                    args.format = input("Enter output format (csv, excel, pdf; default: csv): ").strip() or "csv"
+                    args.tickers = input(
+                        "Enter tickers (comma-separated, e.g., AAPL,MSFT; leave blank to fetch from IBKR): "
+                    ).strip()
+                    args.output = (
+                        input(
+                            f"Enter output file name (default: pulse_{get_timestamp()}.csv): "
+                        ).strip()
+                        or f"pulse_{get_timestamp()}.csv"
+                    )
+                    args.format = (
+                        input(
+                            "Enter output format (csv, excel, pdf; default: csv): "
+                        ).strip()
+                        or "csv"
+                    )
                 elif choice_num == 2:  # live
-                    args.tickers = input("Enter tickers (comma-separated, e.g., AAPL,MSFT): ").strip()
-                    args.output = input(f"Enter output file name (default: live_quotes_{get_timestamp()}.csv): ").strip() or f"live_quotes_{get_timestamp()}.csv"
-                    args.format = "csv" # Default for live, as per original code
+                    args.tickers = input(
+                        "Enter tickers (comma-separated, e.g., AAPL,MSFT): "
+                    ).strip()
+                    args.output = (
+                        input(
+                            f"Enter output file name (default: live_quotes_{get_timestamp()}.csv): "
+                        ).strip()
+                        or f"live_quotes_{get_timestamp()}.csv"
+                    )
+                    args.format = "csv"  # Default for live, as per original code
                 elif choice_num == 3:  # options
-                    args.symbol = input("Enter stock symbol for option chain (e.g., SPY): ").strip()
-                    args.expiry_hint = input("Enter expiry hint (optional, e.g., YYYYMMDD, YYYYMM, month name): ").strip() or None
-                    args.format = "csv" # Default for options, as per original code
+                    args.symbol = input(
+                        "Enter stock symbol for option chain (e.g., SPY): "
+                    ).strip()
+                    args.expiry_hint = (
+                        input(
+                            "Enter expiry hint (optional, e.g., YYYYMMDD, YYYYMM, month name): "
+                        ).strip()
+                        or None
+                    )
+                    args.format = "csv"  # Default for options, as per original code
                 elif choice_num == 4:  # positions
-                    args.group_by_combo = input("Group by combo? (y/n): ").lower().strip() == "y"
-                    args.output = input(f"Enter output file name (default: positions_{get_timestamp()}.csv): ").strip() or f"positions_{get_timestamp()}.csv"
-                    args.format = "csv" # Default for positions, as per original code
+                    args.group_by_combo = (
+                        input("Group by combo? (y/n): ").lower().strip() == "y"
+                    )
+                    args.output = (
+                        input(
+                            f"Enter output file name (default: positions_{get_timestamp()}.csv): "
+                        ).strip()
+                        or f"positions_{get_timestamp()}.csv"
+                    )
+                    args.format = "csv"  # Default for positions, as per original code
                 elif choice_num == 5:  # report
                     args.input = input("Enter path to trades CSV file: ").strip()
-                    args.output = input(f"Enter output file name (default: trades_report_{get_timestamp()}.csv): ").strip() or f"trades_report_{get_timestamp()}.csv"
-                    args.format = input("Enter output format (csv, excel, pdf; default: csv): ").strip() or "csv"
+                    args.output = (
+                        input(
+                            f"Enter output file name (default: trades_report_{get_timestamp()}.csv): "
+                        ).strip()
+                        or f"trades_report_{get_timestamp()}.csv"
+                    )
+                    args.format = (
+                        input(
+                            "Enter output format (csv, excel, pdf; default: csv): "
+                        ).strip()
+                        or "csv"
+                    )
                 elif choice_num == 6:  # portfolio-greeks
                     args.ib_timeout = 10.0
-                    args.format = "csv" # Default for portfolio-greeks, as per original code
+                    args.format = (
+                        "csv"  # Default for portfolio-greeks, as per original code
+                    )
                 elif choice_num == 7:  # orchestrate
-                    args.format = input("Enter output format (csv, pdf; default: csv): ").strip() or "csv"
+                    args.format = (
+                        input("Enter output format (csv, pdf; default: csv): ").strip()
+                        or "csv"
+                    )
 
                 commands[choice_num](args)
             else:
