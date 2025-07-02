@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import logging
 import time
 from datetime import datetime, timedelta, timezone
 from typing import List
@@ -11,14 +12,14 @@ import numpy as np
 import yfinance as yf
 
 try:
-    from ib_insync import IB, Option, Stock
+    from ib_insync import IB, Option, Stock, Forex, Index
     from ib_insync.contract import Contract
     from ib_insync.ticker import Ticker
     from ib_insync.objects import Position
     IB_AVAILABLE = True
 except Exception:  # pragma: no cover - optional
     IB_AVAILABLE = False
-    IB = Option = Stock = Contract = Ticker = Position = None  # type: ignore
+    IB = Option = Stock = Contract = Ticker = Position = Forex = Index = None  # type: ignore
 
 from utils.progress import iter_progress
 from bisect import bisect_left
@@ -117,6 +118,44 @@ def fetch_and_prepare_data(tickers: List[str]) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
+    return sorted(list(unique_tickers))
+
+def get_portfolio_contracts(
+    ib: IB
+) -> List[Contract]:
+    """Return a list of contracts from the IBKR portfolio, with combos grouped."""
+    positions = ib.positions()
+    
+    # Create a set of all conIds that are part of a combo
+    combo_leg_conIds = set()
+    for p in positions:
+        if p.contract.secType == 'BAG' and p.contract.comboLegs:
+            for leg in p.contract.comboLegs:
+                combo_leg_conIds.add(leg.conId)
+
+    # Filter positions to get final contracts (combos + standalone positions)
+    contracts = []
+    processed_conIds = set()
+    for p in positions:
+        if p.contract.conId in processed_conIds:
+            continue
+
+        if p.contract.secType == 'BAG':
+            contracts.append(p.contract)
+            processed_conIds.add(p.contract.conId)
+            logging.debug(f"Adding combo contract: {p.contract.symbol} ({p.contract.secType})")
+        elif p.contract.secType == 'OPT' and p.contract.conId not in combo_leg_conIds:
+            contracts.append(p.contract)
+            processed_conIds.add(p.contract.conId)
+            logging.debug(f"Adding standalone option contract: {p.contract.symbol} ({p.contract.secType})")
+        elif p.contract.conId not in combo_leg_conIds:
+            contracts.append(p.contract)
+            processed_conIds.add(p.contract.conId)
+            logging.debug(f"Adding other contract: {p.contract.symbol} ({p.contract.secType})")
+            
+    logging.debug(f"Total contracts returned by get_portfolio_contracts: {len(contracts)}")
+    return contracts
+
 def get_portfolio_tickers_from_ib(
     host: str = IB_HOST, port: int = IB_PORT, client_id: int = IB_CLIENT_ID
 ) -> List[str]:
@@ -141,8 +180,81 @@ def get_portfolio_tickers_from_ib(
 
     return sorted(list(unique_tickers))
 
-def load_ib_positions_ib(
+def get_option_contracts_from_ib(
     host: str = IB_HOST, port: int = IB_PORT, client_id: int = IB_CLIENT_ID
+) -> List[Option]:
+    """Return a list of option contracts from the IBKR portfolio."""
+    if not IB_AVAILABLE:
+        return []
+
+    ib = IB()
+    try:
+        ib.connect(host, port, clientId=client_id, timeout=3)
+    except Exception:
+        logging.warning("IBKR Gateway not reachable — cannot fetch option contracts.")
+        return []
+
+    positions = ib.positions()
+    ib.disconnect()
+
+    option_contracts = []
+    for p in positions:
+        if p.contract.secType == "OPT":
+            option_contracts.append(p.contract)
+
+    return option_contracts
+
+
+TIMEOUT_SECONDS = 40
+
+def _has_any_greeks_populated(ticker: Ticker) -> bool:
+    for name in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks"):
+        g = getattr(ticker, name, None)
+        if g and g.delta is not None and not math.isnan(g.delta):
+            return True
+    return False
+
+def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
+    """Retrieve option/FOP positions and live market data streams for Greeks."""
+    if IB is None:
+        try:
+            from ib_insync import IB as _IB, Position as _Pos, Ticker as _Ticker
+        except Exception:
+            return []
+        else:
+            globals()["IB"] = _IB
+            globals()["Position"] = _Pos
+            globals()["Ticker"] = _Ticker
+    positions = [
+        p
+        for p in ib.portfolio()
+        if p.position != 0 and p.contract.secType in {"OPT", "FOP"}
+    ]
+    if not positions:
+        return []
+
+    bundles: List[Tuple[Position, Ticker]] = []
+    for pos in positions:
+        qc = ib.qualifyContracts(pos.contract)
+        if not qc:
+            continue
+        c = qc[0]
+        if not c.exchange:
+            c.exchange = "SMART"
+        tk = ib.reqMktData(
+            c, genericTickList="106", snapshot=False, regulatorySnapshot=False
+        )
+        bundles.append((pos, tk))
+
+    deadline = time.time() + TIMEOUT_SECONDS
+    while time.time() < deadline:
+        ib.sleep(0.25)
+        if all(_has_any_greeks_populated(tk) for _, tk in bundles):
+            break
+    return bundles
+
+def load_ib_positions_ib(
+    host: str = IB_HOST, port: int = IB_PORT, client_id: int = IB_CLIENT_ID, group_by_combo: bool = False
 ) -> pd.DataFrame:
     """Return current IBKR portfolio positions with market prices."""
     if IB is None:
@@ -153,39 +265,73 @@ def load_ib_positions_ib(
     ib.errorEvent += lambda *a, **k: None
 
     positions = ib.positions()
-    contracts = [p.contract for p in positions]
-    tickers = ib.reqTickers(*contracts)
-    price_map = {}
-    for t in tickers:
-        last = t.last if t.last else (t.bid + t.ask) / 2 if (t.bid and t.ask) else None
-        price_map[t.contract.conId] = last
+    
+    if group_by_combo:
+        combos = {}
+        for p in positions:
+            if p.contract.secType == "BAG":
+                if p.contract.conId not in combos:
+                    combos[p.contract.conId] = {"contract": p.contract, "legs": [], "qty": 0}
+                combos[p.contract.conId]["legs"].append(p)
+                combos[p.contract.conId]["qty"] += p.position
+        
+        rows = []
+        for combo_id, combo_data in combos.items():
+            symbol = _format_combo_symbol(combo_data["contract"])
+            qty = combo_data["qty"]
+            cost_basis = sum(leg.avgCost * leg.position for leg in combo_data["legs"]) / qty if qty != 0 else 0
+            
+            tickers = ib.reqTickers(*[leg.contract for leg in combo_data["legs"]])
+            mark_price = sum(t.last for t in tickers if t.last) / len(tickers) if tickers else None
+            
+            side = "Short" if qty < 0 else "Long"
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "side": side,
+                    "quantity": abs(qty),
+                    "cost basis": cost_basis,
+                    "mark price": mark_price,
+                }
+            )
+        df = pd.DataFrame(rows)
 
-    rows = []
-    for p in positions:
-        symbol = p.contract.symbol
-        qty = p.position
-        cost_basis = p.avgCost
-        mark_price = price_map.get(p.contract.conId)
-        if mark_price is None or pd.isna(mark_price):
-            try:
-                yq = yf.Ticker(symbol).history(period="1d")["Close"]
-                mark_price = float(yq.iloc[-1]) if not yq.empty else None
-            except Exception:
-                mark_price = None
-        side = "Short" if qty < 0 else "Long"
-        rows.append(
-            {
-                "symbol": symbol,
-                "side": side,
-                "quantity": abs(qty),
-                "cost basis": cost_basis,
-                "mark price": mark_price,
-            }
-        )
+    else:
+        contracts = [p.contract for p in positions]
+        tickers = ib.reqTickers(*contracts)
+        price_map = {}
+        for t in tickers:
+            last = t.last if t.last else (t.bid + t.ask) / 2 if (t.bid and t.ask) else None
+            price_map[t.contract.conId] = last
 
-    df = pd.DataFrame(rows)
-    df["market_value"] = df["quantity"] * df["mark price"]
-    df["unrealized_pnl"] = (df["mark price"] - df["cost basis"]) * df["quantity"]
+        rows = []
+        for p in positions:
+            symbol = p.contract.symbol
+            qty = p.position
+            cost_basis = p.avgCost
+            mark_price = price_map.get(p.contract.conId)
+            if mark_price is None or pd.isna(mark_price):
+                try:
+                    yq = yf.Ticker(symbol).history(period="1d")["Close"]
+                    mark_price = float(yq.iloc[-1]) if not yq.empty else None
+                except Exception:
+                    mark_price = None
+            side = "Short" if qty < 0 else "Long"
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "side": side,
+                    "quantity": abs(qty),
+                    "cost basis": cost_basis,
+                    "mark price": mark_price,
+                }
+            )
+        df = pd.DataFrame(rows)
+
+    if not df.empty:
+        df["market_value"] = df["quantity"] * df["mark price"]
+        df["unrealized_pnl"] = (df["mark price"] - df["cost basis"]) * df["quantity"]
+    
     ib.disconnect()
     return df
 
@@ -199,10 +345,12 @@ def fetch_ohlc(tickers: List[str], days_back: int = 60) -> pd.DataFrame:
     """Fetch historical OHLC data for a list of tickers, handling currency pairs."""
     formatted_tickers = []
     for ticker in tickers:
-        if ticker.upper() in CURRENCIES:
-            formatted_tickers.append(f"{ticker.upper()}USD=X")
+        # Apply PROXY_MAP for yfinance compatibility
+        yf_ticker = PROXY_MAP.get(ticker.upper(), ticker)
+        if yf_ticker.upper() in CURRENCIES:
+            formatted_tickers.append(f"{yf_ticker.upper()}USD=X")
         else:
-            formatted_tickers.append(ticker)
+            formatted_tickers.append(yf_ticker)
 
     if not formatted_tickers:
         return pd.DataFrame()
@@ -247,58 +395,63 @@ def fetch_ohlc(tickers: List[str], days_back: int = 60) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def fetch_ib_quotes(tickers: List[str], opt_cons: List[Option]) -> pd.DataFrame:
-    if IB is None:
-        return pd.DataFrame()
-
-    ib = IB()
-    try:
-        ib.connect(IB_HOST, IB_PORT, IB_CLIENT_ID, timeout=3)
-    except Exception:
-        logging.warning("IBKR Gateway not reachable — skipping IB pull.")
+def fetch_ib_quotes(ib: IB, contracts: List[Contract]) -> pd.DataFrame:
+    if IB is None or not contracts:
         return pd.DataFrame()
 
     combined_rows: list[dict] = []
     reqs: dict[str, any] = {}
-    for tk in tickers:
-        con = Stock(tk, "SMART", "USD")
+
+    reqs: dict[str, Contract] = {}
+    for con in contracts:
+        logging.debug(f"Processing contract in fetch_ib_quotes: Symbol={con.symbol}, SecType={con.secType}")
         try:
             ql = ib.qualifyContracts(con)
             if not ql:
-                raise ValueError("not qualified")
-            md = ib.reqMktData(ql[0], "", False, False)
-            reqs[tk] = md
-        except Exception:
-            continue
-
-    for opt in opt_cons:
-        try:
-            ql = ib.qualifyContracts(opt)
-            if not ql:
+                logging.warning(f"Contract not qualified: {con.symbol}")
                 continue
-            md = ib.reqMktData(ql[0], "", False, False)
-            reqs[opt.localSymbol] = md
-        except Exception:
+            reqs[con.conId] = ql[0]
+        except Exception as e:
+            logging.warning(f"Error qualifying contract {con.symbol}: {e}")
             continue
 
-    ib.sleep(4.0)
+    tickers = ib.reqTickers(*reqs.values())
+    ib.sleep(1.0)  # Give a moment for data to arrive
 
-    for key, md in reqs.items():
-        combined_rows.append(
-            {
-                "ticker": key,
-                "last": md.last,
-                "bid": md.bid,
-                "ask": md.ask,
-                "open": md.open,
-                "high": md.high,
-                "low": md.low,
-                "prev_close": md.close,
-                "volume": md.volume,
-                "source": "IB",
-            }
-        )
-        ib.cancelMktData(md.contract)
+    combined_rows: list[dict] = []
+    for t in tickers:
+        con = t.contract
+        if con.secType == 'BAG':
+            formatted_ticker = _format_combo_symbol(con)
+        elif con.secType == 'OPT':
+            formatted_ticker = f"{con.symbol} {con.lastTradeDateOrContractMonth} {con.strike}{con.right}"
+        else:
+            formatted_ticker = con.symbol
+
+        last_price = t.last if t.last is not None and t.last != -1 else t.close
+        if last_price is None or last_price == -1:
+            last_price = np.nan
+
+        if not np.isnan(last_price):
+            combined_rows.append(
+                {
+                    "ticker": formatted_ticker,
+                    "last": last_price,
+                    "bid": t.bid if t.bid != -1 else np.nan,
+                    "ask": t.ask if t.ask != -1 else np.nan,
+                    "open": t.open if t.open != -1 else np.nan,
+                    "high": t.high if t.high != -1 else np.nan,
+                    "low": t.low if t.low != -1 else np.nan,
+                    "prev_close": t.close if t.close != -1 else np.nan,
+                    "volume": t.volume if t.volume != -1 else np.nan,
+                    "source": "IB",
+                }
+            )
+            logging.debug(f"Added {formatted_ticker} to quotes with data: last={last_price}, bid={t.bid}, ask={t.ask}")
+        else:
+            logging.warning(f"No valid market data for {formatted_ticker} from IBKR.")
+
+    return pd.DataFrame(combined_rows)
 
     ib.disconnect()
     return pd.DataFrame(combined_rows)
@@ -316,13 +469,17 @@ def fetch_yf_quotes(tickers: List[str]) -> pd.DataFrame:
             day_low = info.get("dayLow")
             prev_close = info.get("previousClose")
             vol = info.get("volume")
-        except Exception:
+            logging.debug(f"YF data for {t}: price={price}, bid={bid}, ask={ask}")
+        except Exception as e:
+            logging.warning(f"Error fetching YF info for {t}: {e}")
             try:
                 hist = yf.download(t, period="2d", interval="1d", progress=False)
                 price = hist["Close"].iloc[-1] if not hist.empty else np.nan
                 prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else np.nan
                 bid = ask = day_high = day_low = vol = np.nan
-            except Exception:
+                logging.debug(f"YF historical data for {t}: price={price}")
+            except Exception as e_hist:
+                logging.warning(f"Error fetching YF historical data for {t}: {e_hist}")
                 continue
         rows.append(
             {

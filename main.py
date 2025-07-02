@@ -11,11 +11,13 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import List, Tuple
 
+import pandas as pd
 from pypdf import PdfWriter
 from fpdf import FPDF
 
 from src import analysis, data_fetching, reporting, interactive
-from src.data_fetching import get_portfolio_tickers_from_ib
+import logging
+from src.data_fetching import get_portfolio_contracts
 
 def get_timestamp() -> str:
     """Returns a formatted timestamp string for filenames."""
@@ -24,32 +26,74 @@ def get_timestamp() -> str:
 
 def cmd_pulse(args) -> None:
     tickers = args.tickers.split(",") if args.tickers else []
-    if not tickers:
-        print("Fetching portfolio tickers from IBKR...")
-        tickers = get_portfolio_tickers_from_ib()
-        if not tickers:
-            print("No tickers found in IBKR portfolio. Please provide tickers manually or ensure IBKR is running and connected.")
-            return
+    ib = None # Initialize ib to None
     try:
+        if not tickers:
+            print("Fetching portfolio contracts from IBKR for pulse report...")
+            ib = data_fetching.IB()
+            ib.connect(data_fetching.IB_HOST, data_fetching.IB_PORT, data_fetching.IB_CLIENT_ID, timeout=10)
+            
+            contracts = data_fetching.get_portfolio_contracts(ib)
+            if not contracts:
+                print("No contracts found in IBKR portfolio. Please provide tickers manually or ensure IBKR is running and connected.")
+                return
+            
+            # Extract underlying symbols from contracts
+            underlying_symbols = set()
+            for contract in contracts:
+                if contract.secType == "OPT" or contract.secType == "BAG":
+                    underlying_symbols.add(contract.symbol)
+                else: # For stocks, forex, etc.
+                    underlying_symbols.add(contract.symbol)
+            tickers = list(underlying_symbols)
+            
         ohlc = data_fetching.fetch_ohlc(tickers)
         df = analysis.compute_indicators(ohlc)
         out = Path(OUTPUT_DIR) / args.output
         reporting.generate_report(df, str(out), fmt=args.format)
+        print(f"Report generated to {out}")
     except ValueError as e:
         print(f"Error: {e}")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+    finally:
+        if ib and ib.isConnected():
+            ib.disconnect()
 
 
 def cmd_live(args: argparse.Namespace) -> None:
-    tickers = args.tickers.split(",") if args.tickers else []
-    if not tickers:
-        print("Please provide tickers for live feed.")
-        return
+    ib = data_fetching.IB()
     try:
-        ib_quotes = data_fetching.fetch_ib_quotes(tickers, [])
-        yf_quotes = data_fetching.fetch_yf_quotes(tickers)
+        ib.connect(data_fetching.IB_HOST, data_fetching.IB_PORT, data_fetching.IB_CLIENT_ID, timeout=10)
+        logging.basicConfig(level=logging.DEBUG)
         
+        print("Fetching portfolio contracts from IBKR...")
+        contracts = data_fetching.get_portfolio_contracts(ib)
+        
+        if not contracts:
+            print("No contracts found in IBKR portfolio.")
+            return
+
+        ib_quotes = data_fetching.fetch_ib_quotes(ib, contracts)
+        
+        # Fallback to Yahoo Finance for tickers that failed in IBKR
+        ib_tickers = ib_quotes['ticker'].unique() if not ib_quotes.empty else []
+        
+        all_symbols = []
+        for c in contracts:
+            if c.secType == 'BAG':
+                all_symbols.append(data_fetching._format_combo_symbol(c))
+            else:
+                all_symbols.append(c.symbol)
+        
+        missing_tickers = [t for t in all_symbols if t not in ib_tickers]
+        
+        if missing_tickers:
+            print(f"Fetching missing tickers from Yahoo Finance: {missing_tickers}")
+            yf_quotes = data_fetching.fetch_yf_quotes(missing_tickers)
+        else:
+            yf_quotes = pd.DataFrame()
+
         if not ib_quotes.empty and not yf_quotes.empty:
             quotes = pd.concat([ib_quotes, yf_quotes]).drop_duplicates(subset=['ticker', 'source'])
         elif not ib_quotes.empty:
@@ -63,8 +107,12 @@ def cmd_live(args: argparse.Namespace) -> None:
         out = Path(OUTPUT_DIR) / args.output
         quotes.to_csv(out, index=False)
         print(f"Live quotes saved to {out}")
+        
     except Exception as e:
         print(f"Error fetching live quotes: {e}")
+    finally:
+        if ib.isConnected():
+            ib.disconnect()
 
 
 def cmd_options(args: argparse.Namespace) -> None:
@@ -81,6 +129,19 @@ def cmd_options(args: argparse.Namespace) -> None:
         ib.disconnect()
     except Exception as e:
         print(f"Error fetching option chain: {e}")
+
+
+def cmd_positions(args: argparse.Namespace) -> None:
+    try:
+        df = data_fetching.load_ib_positions_ib(group_by_combo=args.group_by_combo)
+        if not df.empty:
+            out_path = Path(OUTPUT_DIR) / args.output
+            df.to_csv(out_path, index=False)
+            print(f"Positions report saved to {out_path}")
+        else:
+            print("No positions found.")
+    except Exception as e:
+        print(f"Error fetching positions: {e}")
 
 
 def cmd_report(args: argparse.Namespace) -> None:
@@ -220,6 +281,11 @@ def main() -> None:
     options_parser.add_argument("--symbol", type=str, required=True, help="Stock symbol for option chain")
     options_parser.add_argument("--expiry-hint", type=str, help="Expiry hint (e.g., YYYYMMDD, YYYYMM, month name)")
 
+    # Positions command
+    positions_parser = subparsers.add_parser("positions", help="Fetch portfolio positions")
+    positions_parser.add_argument("--group-by-combo", action="store_true", help="Group positions by combo")
+    positions_parser.add_argument("--output", type=str, default=f"positions_{get_timestamp()}.csv", help="Output file name")
+
     # Report command
     report_parser = subparsers.add_parser("report", help="Generate a trades report")
     report_parser.add_argument("--input", type=str, required=True, help="Path to trades CSV file")
@@ -239,6 +305,8 @@ def main() -> None:
             cmd_live(args)
         elif args.command == "options":
             cmd_options(args)
+        elif args.command == "positions":
+            cmd_positions(args)
         elif args.command == "report":
             cmd_report(args)
         elif args.command == "orchestrate":
@@ -250,11 +318,12 @@ def main() -> None:
             print("1. pulse (Daily pulse report)")
             print("2. live (Live quotes)")
             print("3. options (Option chains)")
-            print("4. report (Trades report)")
-            print("5. orchestrate (Dataset orchestration)")
-            print("6. Exit")
+            print("4. positions (Portfolio positions)")
+            print("5. report (Trades report)")
+            print("6. orchestrate (Dataset orchestration)")
+            print("7. Exit")
 
-            choice = input("Enter your choice (1-6): ")
+            choice = input("Enter your choice (1-7): ")
 
             if choice == '1':
                 tickers = input("Enter tickers (comma-separated, e.g., AAPL,MSFT; leave blank to fetch from IBKR): ")
@@ -286,6 +355,15 @@ def main() -> None:
                 args.expiry_hint = expiry_hint if expiry_hint else None
                 cmd_options(args)
             elif choice == '4':
+                group_by_combo = input("Group by combo? (y/n): ").lower() == 'y'
+                output = input(f"Enter output file name (default: positions_{get_timestamp()}.csv): ") or f"positions_{get_timestamp()}.csv"
+                class Args:
+                    pass
+                args = Args()
+                args.group_by_combo = group_by_combo
+                args.output = output
+                cmd_positions(args)
+            elif choice == '5':
                 input_file = input("Enter path to trades CSV file: ")
                 output = input(f"Enter output file name (default: trades_report_{get_timestamp()}.csv): ") or f"trades_report_{get_timestamp()}.csv"
                 fmt = input("Enter output format (csv, excel, pdf; default: csv): ") or "csv"
@@ -296,14 +374,14 @@ def main() -> None:
                 args.output = output
                 args.format = fmt
                 cmd_report(args)
-            elif choice == '5':
+            elif choice == '6':
                 fmt = input("Enter output format (csv, pdf; default: csv): ") or "csv"
                 class Args:
                     pass
                 args = Args()
                 args.format = fmt
                 cmd_orchestrate(args)
-            elif choice == '6':
+            elif choice == '7':
                 print("Exiting.")
                 break
             else:

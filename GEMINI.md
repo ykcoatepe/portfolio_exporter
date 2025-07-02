@@ -46,6 +46,12 @@ The application is now run through `main.py`. Here are some examples:
   python main.py --help
   ```
 
+- **Run a specific command:**
+  ```shell
+  python main.py <command> --help
+  ```
+  (e.g., `python main.py historic-prices --help`)
+
 ## Running Tests
 
 To run the test suite, use the following command:
