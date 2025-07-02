@@ -64,7 +64,7 @@ class EDDRTests(unittest.TestCase):
 class ListPositionsTests(unittest.TestCase):
     def test_list_positions_basic(self):
         class DummyIB:
-            def portfolio(self):
+            def positions(self):
                 P = type("Pos", (), {})()
                 C = type(
                     "Contract",

@@ -6,6 +6,9 @@ import time
 from typing import List, Tuple
 
 import pandas as pd
+from rich.console import Console
+
+console = Console(stderr=True)
 import numpy as np
 
 try:
@@ -90,11 +93,46 @@ def list_positions(ib: IB):
 
 
 def calc_portfolio_greeks(
-    positions: pd.DataFrame, chains: pd.DataFrame | None = None
+    positions: pd.DataFrame,
+    holdings: pd.DataFrame | None = None,
+    include_indices: bool = False,
 ) -> pd.DataFrame:
-    """Aggregate Greek exposures by underlying and for the full portfolio."""
+    """Aggregate Greek exposures by underlying and for the full portfolio.
+
+    Optionally filter out index underlyings unless include_indices is True or the index
+    is present in the holdings DataFrame.
+    """
     if positions.empty:
         return pd.DataFrame()
+
+    # filter index underlyings if not explicitly included
+    if not include_indices:
+        index_names = {"VIX", "^VIX", "SPX", "^SPX", ""}
+        if holdings is not None:
+            # determine which underlyings are truly held
+            if "underlying" in holdings.columns:
+                held = set(holdings["underlying"].astype(str))
+            elif "symbol" in holdings.columns:
+                held = set(holdings["symbol"].astype(str))
+            else:
+                held = set()
+        else:
+            held = set()
+        # identify and warn about skipped index tickers
+        to_drop = positions.loc[
+            positions["underlying"].isin(index_names)
+            & ~positions["underlying"].isin(held),
+            "underlying",
+        ].unique()
+        for sym in to_drop:
+            console.print(f"[yellow]Skipped index ticker: {sym}[/]")
+        # drop rows for index names not in held
+        positions = positions.loc[
+            ~(
+                positions["underlying"].isin(index_names)
+                & ~positions["underlying"].isin(held)
+            )
+        ]
 
     cols = ["delta", "gamma", "vega", "theta", "rho"]
     df = positions.copy()
@@ -111,6 +149,6 @@ def calc_portfolio_greeks(
         df["underlying"] if "underlying" in df.columns else df.get("symbol")
     )
     agg = out.groupby("underlying")[cols].sum()
-    portfolio = agg.sum().to_frame().T
-    portfolio.index = ["PORTFOLIO"]
-    return pd.concat([agg, portfolio])
+    total = agg.sum().to_frame().T
+    total.index = ["PORTFOLIO_TOTAL"]
+    return pd.concat([agg, total])

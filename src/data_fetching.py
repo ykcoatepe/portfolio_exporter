@@ -261,7 +261,7 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
             globals()["Ticker"] = _Ticker
     positions = [
         p
-        for p in ib.portfolio()
+        for p in ib.positions()
         if p.position != 0 and p.contract.secType in {"OPT", "FOP"}
     ]
     if not positions:
@@ -273,8 +273,11 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
         if not qc:
             continue
         c = qc[0]
-        if not c.exchange:
+        # ensure contract has exchange and currency to avoid IB error 321
+        if not getattr(c, "exchange", None):
             c.exchange = "SMART"
+        if not getattr(c, "currency", None):
+            c.currency = "USD"
         tk = ib.reqMktData(
             c, genericTickList="106", snapshot=False, regulatorySnapshot=False
         )
@@ -974,6 +977,28 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
                 currency=tmpl.currency,
                 tradingClass=symbol,  # use the underlying itself
             )
+            # Auto-fill missing exchange/currency for the template before resolving
+            if not getattr(tmpl_sym_tc, "exchange", None):
+                tmpl_sym_tc.exchange = "SMART"
+                if not logged_exchange_fill:
+                    logging.warning("Option contract template missing exchange, auto-filling with 'SMART'.")
+                    logged_exchange_fill = True
+            if not getattr(tmpl_sym_tc, "currency", None):
+                tmpl_sym_tc.currency = "USD"
+                if not logged_currency_fill:
+                    logging.warning("Option contract template missing currency, auto-filling with 'USD'.")
+                    logged_currency_fill = True
+            # Auto-fill missing exchange/currency for the template before resolving
+            if not getattr(tmpl_sym_tc, "exchange", None):
+                tmpl_sym_tc.exchange = "SMART"
+                if not logged_exchange_fill:
+                    logging.warning("Option contract template missing exchange, auto-filling with 'SMART'.")
+                    logged_exchange_fill = True
+            if not getattr(tmpl_sym_tc, "currency", None):
+                tmpl_sym_tc.currency = "USD"
+                if not logged_currency_fill:
+                    logging.warning("Option contract template missing currency, auto-filling with 'USD'.")
+                    logged_currency_fill = True
             c = _resolve_contract(ib, tmpl_sym_tc)
 
         if c:

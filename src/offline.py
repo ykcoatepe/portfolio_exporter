@@ -105,7 +105,40 @@ def load_ib_positions_ib(*a, **k) -> pd.DataFrame:
 
 
 def list_positions(ib) -> List[Tuple[DummyPos, DummyTicker]]:
-    return [(DummyPos("AAPL"), DummyTicker())]
+    class DummyContract:
+        def __init__(self, symbol, secType="OPT", multiplier=1):
+            self.symbol = symbol
+            self.secType = secType
+            self.multiplier = multiplier
+
+    class DummyPosition:
+        def __init__(self, contract, position):
+            self.contract = contract
+            self.position = position
+
+    class DummyGreeks:
+        def __init__(self):
+            self.delta = 0.5
+            self.gamma = 0.1
+            self.vega = 0.2
+            self.theta = 0.1
+            self.rho = 0.0
+
+    class DummyTicker:
+        def __init__(self, contract):
+            self.contract = contract
+            self.modelGreeks = DummyGreeks()
+
+    # Create dummy positions for testing
+    positions = [
+        DummyPosition(DummyContract("AAPL"), 100),
+        DummyPosition(DummyContract("VIX"), 50),
+    ]
+
+    bundles = []
+    for pos in positions:
+        bundles.append((pos, DummyTicker(pos.contract)))
+    return bundles
 
 
 def get_portfolio_contracts(ib) -> List[DummyContract]:

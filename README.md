@@ -21,7 +21,7 @@ Here's an overview of the available commands and their functionalities:
 *   **`positions`**: Fetches portfolio positions from IBKR.
 *   **`report`**: Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports.
 *   **`orchestrate`**: Runs a sequence of commands (pulse, live, options) and zips the results.
-*   **`portfolio-greeks`**: Calculates and exports per-position Greeks and account totals using IBKR market data.
+*   **`portfolio-greeks`**: Calculates and exports per-position Greeks and account totals using IBKR market data. Index underlyings (e.g. VIX, SPX) are excluded by default; use `--include-indices` to include them.
 
 
 ### Usage

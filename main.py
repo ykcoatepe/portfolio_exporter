@@ -223,10 +223,12 @@ def cmd_portfolio_greeks(args: argparse.Namespace) -> None:
             timeout=args.ib_timeout,
         )
         bundles = data_fetching.list_positions(ib)
+        print(f"DEBUG: Bundles: {bundles}")
         rows = []
         for pos, tk in bundles:
             g = getattr(tk, "modelGreeks", None)
             if not g:
+                print(f"DEBUG: No greeks for {pos.contract.symbol}")
                 continue
             rows.append(
                 {
@@ -241,12 +243,30 @@ def cmd_portfolio_greeks(args: argparse.Namespace) -> None:
                 }
             )
         ib.disconnect()
+        print(f"DEBUG: Rows before DataFrame: {rows}")
         console.print("[bold cyan]Calculating portfolio Greeks exposures...[/]")
         df = pd.DataFrame(rows)
-        greeks = analysis.calc_portfolio_greeks(df, None)
+        print(f"DEBUG: DataFrame after creation: {df.head()}")
+        if df.empty:
+            print("DEBUG: DataFrame is empty, skipping further processing.")
+            return
+        console.print("[bold cyan]Loading portfolio holdings for index filtering...[/]")
+        holdings = data_fetching.load_ib_positions_ib()
+        print(f"DEBUG: Holdings: {holdings.head()}")
+        greeks = analysis.calc_portfolio_greeks(
+            df, holdings, include_indices=args.include_indices
+        )
+        print(f"DEBUG: Greeks DataFrame after calc: {greeks.head()}")
+        if greeks.empty:
+            print("DEBUG: Greeks DataFrame is empty, skipping CSV generation.")
+            return
         out_path = Path(OUTPUT_DIR) / f"portfolio_greeks_{get_timestamp()}.csv"
+        
         greeks.to_csv(out_path, index=True)
         console.print(f"[bold green]Greeks saved to {out_path}[/]")
+        print(f"DEBUG: Greeks saved to {out_path}")
+        console.print(f"[bold yellow]Greeks DataFrame head before saving:\n{greeks.head()}[/]")
+        console.print(f"[bold yellow]Greeks DataFrame head before saving:\n{greeks.head()}[/]")
     except Exception as e:
         console.print(f"[bold red]Error calculating portfolio greeks: {e}[/]")
 
@@ -265,9 +285,8 @@ def run_script(cmd: list[str]) -> List[str]:
     subprocess.run(
         [sys.executable, *cmd],
         check=True,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
         timeout=600,  # fail fast if a script hangs >10 min
         env=env,
     )
@@ -509,6 +528,11 @@ def main() -> None:
         choices=["csv", "excel", "pdf", "txt"],
         help="Output format",
     )
+    greeks_parser.add_argument(
+        "--include-indices",
+        action="store_true",
+        help="Include index underlyings (VIX, SPX) in the report",
+    )
 
     # Check if any command-line arguments were provided
     if len(sys.argv) > 1:
@@ -632,14 +656,18 @@ def main() -> None:
                     )
                 elif choice_num == 6:  # portfolio-greeks
                     args.ib_timeout = 10.0
-                    args.format = (
-                        "csv"  # Default for portfolio-greeks, as per original code
-                    )
+                    args.format = "csv"
+                    include = input("Include index underlyings (VIX, SPX)? (y/n): ").lower().strip() == "y"
+                    args.include_indices = include
+                    args.output = f"portfolio_greeks_{get_timestamp()}.csv"
                 elif choice_num == 7:  # orchestrate
                     args.format = (
                         input("Enter output format (csv, pdf; default: csv): ").strip()
                         or "csv"
                     )
+                    # Orchestrate doesn't use these directly, but for consistency with other commands
+                    args.tickers = ""
+                    args.output = ""
 
                 commands[choice_num](args)
             else:
