@@ -268,7 +268,7 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
         return []
 
     bundles: List[Tuple[Position, Ticker]] = []
-    for pos in positions:
+    for pos in iter_progress(positions, "Requesting market data for Greeks"):
         qc = ib.qualifyContracts(pos.contract)
         if not qc:
             continue
@@ -471,7 +471,7 @@ def fetch_ib_quotes(ib: IB, contracts: List[Contract]) -> pd.DataFrame:
     reqs: dict[str, any] = {}
 
     reqs: dict[str, Contract] = {}
-    for con in contracts:
+    for con in iter_progress(contracts, "Fetching IB quotes"):
         logging.debug(
             f"Processing contract in fetch_ib_quotes: Symbol={con.symbol}, SecType={con.secType}"
         )
@@ -947,7 +947,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     ]
 
     contracts: list[Option] = []
-    for tmpl in raw_templates:
+    for tmpl in iter_progress(raw_templates, f"Qualifying option contracts for {symbol}"):
         # --- first try with tradingClass as provided (root_tc) -----------------
         c = _resolve_contract(ib, tmpl)
 
@@ -985,18 +985,15 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         )
 
     # stream market data (need streaming for generic-tick 101)
-    snapshots = [
-        (
+    snapshots: list[tuple[Option, any]] = []
+    for c in iter_progress(contracts, f"Streaming market data for {symbol}"):
+        tk = ib.reqMktData(
             c,
-            ib.reqMktData(
-                c,
-                "",  # let IB decide tick types; avoids eid errors
-                snapshot=False,
-                regulatorySnapshot=False,
-            ),
+            "",  # let IB decide tick types; avoids eid errors
+            snapshot=False,
+            regulatorySnapshot=False,
         )
-        for c in contracts
-    ]
+        snapshots.append((c, tk))
     _wait_for_snapshots(ib, snapshots)
 
     # cancel streams

@@ -103,7 +103,7 @@ def calc_portfolio_greeks(
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
         else:
             df[c] = 0.0
-    df["multiplier"].replace(0, 1, inplace=True)
+    df["multiplier"] = df["multiplier"].replace(0, 1)
     weight = df["position"] * df["multiplier"]
     exposures = df[cols].to_numpy() * weight.to_numpy()[:, None]
     out = pd.DataFrame(exposures, columns=cols)

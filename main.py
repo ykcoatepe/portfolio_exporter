@@ -19,6 +19,10 @@ from src import analysis, data_fetching, reporting, interactive
 import logging
 from src.data_fetching import get_portfolio_contracts
 
+from rich.console import Console
+
+console = Console(stderr=True)
+
 
 def get_timestamp() -> str:
     """Returns a formatted timestamp string for filenames."""
@@ -27,10 +31,10 @@ def get_timestamp() -> str:
 
 def cmd_pulse(args) -> None:
     tickers = args.tickers.split(",") if args.tickers else []
-    ib = None  # Initialize ib to None
+    ib = None
     try:
         if not tickers:
-            print("Fetching portfolio contracts from IBKR for pulse report...")
+            console.print("[bold cyan]Fetching portfolio contracts from IBKR for pulse report...[/]")
             ib = data_fetching.IB()
             ib.connect(
                 data_fetching.IB_HOST,
@@ -55,11 +59,14 @@ def cmd_pulse(args) -> None:
                     underlying_symbols.add(contract.symbol)
             tickers = list(underlying_symbols)
 
+        console.print(f"[bold cyan]Fetching historical prices for {len(tickers)} tickers...[/]")
         ohlc = data_fetching.fetch_ohlc(tickers)
+        console.print("[bold cyan]Computing technical indicators...[/]")
         df = analysis.compute_indicators(ohlc)
         out = Path(OUTPUT_DIR) / args.output
+        console.print(f"[bold cyan]Generating {args.format.upper()} report...[/]")
         reporting.generate_report(df, str(out), fmt=args.format)
-        print(f"Report generated to {out}")
+        console.print(f"[bold green]Report generated to {out}[/]")
     except ValueError as e:
         print(f"Error: {e}")
     except Exception as e:
@@ -72,6 +79,7 @@ def cmd_pulse(args) -> None:
 def cmd_live(args: argparse.Namespace) -> None:
     ib = data_fetching.IB()
     try:
+        console.print("[bold cyan]Connecting to IBKR for live quotes...[/]")
         ib.connect(
             data_fetching.IB_HOST,
             data_fetching.IB_PORT,
@@ -80,7 +88,7 @@ def cmd_live(args: argparse.Namespace) -> None:
         )
         logging.basicConfig(level=logging.DEBUG)
 
-        print("Fetching portfolio contracts from IBKR...")
+        console.print("[bold cyan]Fetching portfolio contracts from IBKR...[/]")
         contracts = data_fetching.get_portfolio_contracts(ib)
 
         if not contracts:
@@ -102,7 +110,7 @@ def cmd_live(args: argparse.Namespace) -> None:
         missing_tickers = [t for t in all_symbols if t not in ib_tickers]
 
         if missing_tickers:
-            print(f"Fetching missing tickers from Yahoo Finance: {missing_tickers}")
+            console.print(f"[bold cyan]Fetching missing tickers from Yahoo Finance: {missing_tickers}[/]")
             yf_quotes = data_fetching.fetch_yf_quotes(missing_tickers)
         else:
             yf_quotes = pd.DataFrame()
@@ -121,7 +129,7 @@ def cmd_live(args: argparse.Namespace) -> None:
 
         out = Path(OUTPUT_DIR) / args.output
         quotes.to_csv(out, index=False)
-        print(f"Live quotes saved to {out}")
+        console.print(f"[bold green]Live quotes saved to {out}[/]")
 
     except Exception as e:
         print(f"Error fetching live quotes: {e}")
@@ -132,6 +140,7 @@ def cmd_live(args: argparse.Namespace) -> None:
 
 def cmd_options(args: argparse.Namespace) -> None:
     try:
+        console.print("[bold cyan]Connecting to IBKR for option chain...[/]")
         ib = data_fetching.IB()
         ib.connect(
             data_fetching.IB_HOST,
@@ -155,21 +164,21 @@ def cmd_options(args: argparse.Namespace) -> None:
             expiries = [args.expiry_hint]
 
         for sym in tickers:
-            exps = expiries or [None]
-            for exp in exps:
+            for exp in (expiries or [None]):
+                console.print(f"[bold cyan]Fetching option chain for {sym} (expiry: {exp or 'auto'})...[/]")
                 df = data_fetching.snapshot_chain(ib, sym, exp)
                 if not df.empty:
                     exp_part = exp or "auto"
                     out_file = (
                         args.output
-                        if args.output and len(tickers) == 1 and len(exps) == 1
+                        if args.output and len(tickers) == 1 and len(expiries or []) == 1
                         else f"{sym}_{exp_part}_options_{get_timestamp()}.csv"
                     )
                     out_path = Path(OUTPUT_DIR) / out_file
                     df.to_csv(out_path, index=False)
-                    print(f"Option chain saved to {out_path}")
+                    console.print(f"[bold green]Option chain saved to {out_path}[/]")
                 else:
-                    print(f"No option chain data found for {sym}")
+                    console.print(f"[bold yellow]No option chain data found for {sym}[/]")
         ib.disconnect()
     except Exception as e:
         print(f"Error fetching option chain: {e}")
@@ -177,31 +186,35 @@ def cmd_options(args: argparse.Namespace) -> None:
 
 def cmd_positions(args: argparse.Namespace) -> None:
     try:
+        console.print("[bold cyan]Fetching portfolio positions from IBKR...[/]")
         df = data_fetching.load_ib_positions_ib(group_by_combo=args.group_by_combo)
         if not df.empty:
             out_path = Path(OUTPUT_DIR) / args.output
             df.to_csv(out_path, index=False)
-            print(f"Positions report saved to {out_path}")
+            console.print(f"[bold green]Positions report saved to {out_path}[/]")
         else:
-            print("No positions found.")
+            console.print("[bold yellow]No positions found.[/]")
     except Exception as e:
-        print(f"Error fetching positions: {e}")
+        console.print(f"[bold red]Error fetching positions: {e}[/]")
 
 
 def cmd_report(args: argparse.Namespace) -> None:
     try:
+        console.print(f"[bold cyan]Reading trades from {args.input}...[/]")
         trades_df = pd.read_csv(args.input)
         out_path = Path(OUTPUT_DIR) / args.output
+        console.print(f"[bold cyan]Saving trades report to {out_path}...[/]")
         trades_df.to_csv(out_path, index=False)
-        print(f"Trades report generated to {out_path}")
+        console.print(f"[bold green]Trades report saved to {out_path}[/]")
     except FileNotFoundError:
-        print(f"Error: Input file not found at {args.input}")
+        console.print(f"[bold red]Error: Input file not found at {args.input}[/]")
     except Exception as e:
-        print(f"An error occurred while generating the trades report: {e}")
+        console.print(f"[bold red]An error occurred while generating the trades report: {e}[/]")
 
 
 def cmd_portfolio_greeks(args: argparse.Namespace) -> None:
     try:
+        console.print("[bold cyan]Connecting to IBKR and fetching option positions for Greeks...[/]")
         ib = data_fetching.IB()
         ib.connect(
             data_fetching.IB_HOST,
@@ -220,24 +233,25 @@ def cmd_portfolio_greeks(args: argparse.Namespace) -> None:
                     "underlying": pos.contract.symbol,
                     "position": pos.position,
                     "multiplier": getattr(pos.contract, "multiplier", 1),
-                    "delta": g.delta,
-                    "gamma": g.gamma,
-                    "vega": g.vega,
-                    "theta": g.theta,
-                    "rho": g.rho,
+                    "delta": getattr(g, "delta", 0.0),
+                    "gamma": getattr(g, "gamma", 0.0),
+                    "vega": getattr(g, "vega", 0.0),
+                    "theta": getattr(g, "theta", 0.0),
+                    "rho": getattr(g, "rho", 0.0),
                 }
             )
         ib.disconnect()
+        console.print("[bold cyan]Calculating portfolio Greeks exposures...[/]")
         df = pd.DataFrame(rows)
         greeks = analysis.calc_portfolio_greeks(df, None)
         out_path = Path(OUTPUT_DIR) / f"portfolio_greeks_{get_timestamp()}.csv"
         greeks.to_csv(out_path, index=True)
-        print(f"Greeks saved to {out_path}")
+        console.print(f"[bold green]Greeks saved to {out_path}[/]")
     except Exception as e:
-        print(f"Error calculating portfolio greeks: {e}")
+        console.print(f"[bold red]Error calculating portfolio greeks: {e}[/]")
 
 
-DEFAULT_OUTPUT_DIR = Path.home() / "Downloads"
+DEFAULT_OUTPUT_DIR = Path("/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads")
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -309,6 +323,7 @@ def cleanup(files: List[str]) -> None:
 
 def cmd_orchestrate(args: argparse.Namespace) -> None:
     try:
+        console.print("[bold cyan]Running dataset orchestration (pulse, live, options)...[/]")
         ts = get_timestamp()
 
         scripts = [
@@ -345,15 +360,17 @@ def cmd_orchestrate(args: argparse.Namespace) -> None:
         all_files = [f for _, file_list in files_by_script for f in file_list]
         if args.format == "pdf":
             dest = os.path.join(OUTPUT_DIR, f"dataset_{get_timestamp()}.pdf")
+            console.print(f"[bold cyan]Merging PDFs into {dest}...[/]")
             merge_pdfs(files_by_script, dest)
         else:
             dest = os.path.join(OUTPUT_DIR, f"dataset_{get_timestamp()}.zip")
+            console.print(f"[bold cyan]Creating ZIP archive {dest}...[/]")
             create_zip(all_files, dest)
 
         cleanup(all_files)
-        print(f"Created {dest}")
+        console.print(f"[bold green]Orchestration complete! Dataset at {dest}[/]")
     except Exception as e:
-        print(f"An error occurred during orchestration: {e}")
+        console.print(f"[bold red]An error occurred during orchestration: {e}[/]")
 
 
 def main() -> None:
