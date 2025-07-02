@@ -27,8 +27,11 @@ try:
     IB_AVAILABLE = True
 except Exception:  # pragma: no cover - optional
     IB_AVAILABLE = False
-    IB = Option = Stock = Contract = Ticker = Position = Forex = Index = None  # type: ignore
+    IB = Option = Stock = Contract = Ticker = Position = Forex = Index = None
+    if TEST_MODE:
+        from .offline import DummyIB as IB, DummyOption as Option, DummyStock as Stock, DummyForex as Forex, DummyIndex as Index, DummyContract as Contract, DummyTicker as Ticker, DummyPosition as Position
 
+from rich.progress import Progress, track
 from utils.progress import iter_progress
 from bisect import bisect_left
 from zoneinfo import ZoneInfo
@@ -487,111 +490,118 @@ def fetch_ohlc(tickers: List[str], days_back: int = 60) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def fetch_ib_quotes(ib: IB, contracts: List[Contract]) -> pd.DataFrame:
+from rich.console import Console
+def fetch_ib_quotes(ib: IB, contracts: List[Contract], console: Console) -> pd.DataFrame:
     if IB is None or not contracts:
         return pd.DataFrame()
 
     combined_rows: list[dict] = []
-    reqs: dict[str, any] = {}
-
     reqs: dict[str, Contract] = {}
-    for con in iter_progress(contracts, "Fetching IB quotes"):
-        logging.debug(
-            f"Processing contract in fetch_ib_quotes: Symbol={con.symbol}, SecType={con.secType}"
-        )
-        try:
-            ql = ib.qualifyContracts(con)
-            if not ql:
-                logging.warning(f"Contract not qualified: {con.symbol}")
+
+    with Progress(console=console, transient=True) as progress:
+        task_qualify = progress.add_task("[cyan]Qualifying IB contracts...", total=len(contracts))
+        for con in contracts:
+            logging.debug(
+                f"Processing contract in fetch_ib_quotes: Symbol={con.symbol}, SecType={con.secType}"
+            )
+            try:
+                ql = ib.qualifyContracts(con)
+                if not ql:
+                    logging.warning(f"Contract not qualified: {con.symbol}")
+                    progress.update(task_qualify, advance=1)
+                    continue
+                reqs[con.conId] = ql[0]
+            except Exception as e:
+                logging.warning(f"Error qualifying contract {con.symbol}: {e}")
+                progress.update(task_qualify, advance=1)
                 continue
-            reqs[con.conId] = ql[0]
-        except Exception as e:
-            logging.warning(f"Error qualifying contract {con.symbol}: {e}")
-            continue
+            progress.update(task_qualify, advance=1)
 
     tickers = ib.reqTickers(*reqs.values())
     ib.sleep(1.0)  # Give a moment for data to arrive
 
-    combined_rows: list[dict] = []
-    for t in tickers:
-        con = t.contract
-        if con.secType == "BAG":
-            formatted_ticker = _format_combo_symbol(con)
-        elif con.secType == "OPT":
-            formatted_ticker = f"{con.symbol} {con.lastTradeDateOrContractMonth} {con.strike}{con.right}"
-        else:
-            formatted_ticker = con.symbol
+    with Progress(console=console, transient=True) as progress:
+        task_fetch = progress.add_task("[cyan]Fetching IB quotes...", total=len(tickers))
+        for t in tickers:
+            con = t.contract
+            if con.secType == "BAG":
+                formatted_ticker = _format_combo_symbol(con)
+            elif con.secType == "OPT":
+                formatted_ticker = f"{con.symbol} {con.lastTradeDateOrContractMonth} {con.strike}{con.right}"
+            else:
+                formatted_ticker = con.symbol
 
-        last_price = t.last if t.last is not None and t.last != -1 else t.close
-        if last_price is None or last_price == -1:
-            last_price = np.nan
+            last_price = t.last if t.last is not None and t.last != -1 else t.close
+            if last_price is None or last_price == -1:
+                last_price = np.nan
 
-        if not np.isnan(last_price):
-            combined_rows.append(
+            if not np.isnan(last_price):
+                combined_rows.append(
+                    {
+                        "ticker": formatted_ticker,
+                        "last": last_price,
+                        "bid": t.bid if t.bid != -1 else np.nan,
+                        "ask": t.ask if t.ask != -1 else np.nan,
+                        "open": t.open if t.open != -1 else np.nan,
+                        "high": t.high if t.high != -1 else np.nan,
+                        "low": t.low if t.low != -1 else np.nan,
+                        "prev_close": t.close if t.close != -1 else np.nan,
+                        "volume": t.volume if t.volume != -1 else np.nan,
+                        "source": "IB",
+                    }
+                )
+                logging.debug(
+                    f"Added {formatted_ticker} to quotes with data: last={last_price}, bid={t.bid}, ask={t.ask}"
+                )
+            else:
+                logging.warning(f"No valid market data for {formatted_ticker} from IBKR.")
+            progress.update(task_fetch, advance=1)
+
+    return pd.DataFrame(combined_rows)
+
+
+def fetch_yf_quotes(tickers: List[str], console: Console) -> pd.DataFrame:
+    rows = []
+    with Progress(console=console, transient=True) as progress:
+        task_yf = progress.add_task("[cyan]Fetching Yahoo Finance quotes...", total=len(tickers))
+        for t in tickers:
+            try:
+                info = yf.Ticker(t).info
+                price = info.get("regularMarketPrice")
+                bid = info.get("bid")
+                ask = info.get("ask")
+                day_high = info.get("dayHigh")
+                day_low = info.get("dayLow")
+                prev_close = info.get("previousClose")
+                vol = info.get("volume")
+                logging.debug(f"YF data for {t}: price={price}, bid={bid}, ask={ask}")
+            except Exception as e:
+                logging.warning(f"Error fetching YF info for {t}: {e}")
+                try:
+                    hist = yf.download(t, period="2d", interval="1d", progress=False)
+                    price = hist["Close"].iloc[-1] if not hist.empty else np.nan
+                    prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else np.nan
+                    bid = ask = day_high = day_low = vol = np.nan
+                    logging.debug(f"YF historical data for {t}: price={price}")
+                except Exception as e_hist:
+                    logging.warning(f"Error fetching YF historical data for {t}: {e_hist}")
+                    continue
+            rows.append(
                 {
-                    "ticker": formatted_ticker,
-                    "last": last_price,
-                    "bid": t.bid if t.bid != -1 else np.nan,
-                    "ask": t.ask if t.ask != -1 else np.nan,
-                    "open": t.open if t.open != -1 else np.nan,
-                    "high": t.high if t.high != -1 else np.nan,
-                    "low": t.low if t.low != -1 else np.nan,
-                    "prev_close": t.close if t.close != -1 else np.nan,
-                    "volume": t.volume if t.volume != -1 else np.nan,
-                    "source": "IB",
+                    "ticker": t,
+                    "last": price,
+                    "bid": bid,
+                    "ask": ask,
+                    "open": info.get("open") if "info" in locals() else np.nan,
+                    "high": day_high,
+                    "low": day_low,
+                    "prev_close": prev_close,
+                    "volume": vol,
+                    "source": "YF",
                 }
             )
-            logging.debug(
-                f"Added {formatted_ticker} to quotes with data: last={last_price}, bid={t.bid}, ask={t.ask}"
-            )
-        else:
-            logging.warning(f"No valid market data for {formatted_ticker} from IBKR.")
-
-    return pd.DataFrame(combined_rows)
-
-    ib.disconnect()
-    return pd.DataFrame(combined_rows)
-
-
-def fetch_yf_quotes(tickers: List[str]) -> pd.DataFrame:
-    rows = []
-    for t in tickers:
-        try:
-            info = yf.Ticker(t).info
-            price = info.get("regularMarketPrice")
-            bid = info.get("bid")
-            ask = info.get("ask")
-            day_high = info.get("dayHigh")
-            day_low = info.get("dayLow")
-            prev_close = info.get("previousClose")
-            vol = info.get("volume")
-            logging.debug(f"YF data for {t}: price={price}, bid={bid}, ask={ask}")
-        except Exception as e:
-            logging.warning(f"Error fetching YF info for {t}: {e}")
-            try:
-                hist = yf.download(t, period="2d", interval="1d", progress=False)
-                price = hist["Close"].iloc[-1] if not hist.empty else np.nan
-                prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else np.nan
-                bid = ask = day_high = day_low = vol = np.nan
-                logging.debug(f"YF historical data for {t}: price={price}")
-            except Exception as e_hist:
-                logging.warning(f"Error fetching YF historical data for {t}: {e_hist}")
-                continue
-        rows.append(
-            {
-                "ticker": t,
-                "last": price,
-                "bid": bid,
-                "ask": ask,
-                "open": info.get("open") if "info" in locals() else np.nan,
-                "high": day_high,
-                "low": day_low,
-                "prev_close": prev_close,
-                "volume": vol,
-                "source": "YF",
-            }
-        )
-        time.sleep(0.1)
+            time.sleep(0.1)
+            progress.update(task_yf, advance=1)
     return pd.DataFrame(rows)
 
 
@@ -1149,4 +1159,11 @@ if TEST_MODE:
     load_ib_positions_ib = _offline.load_ib_positions_ib
     list_positions = _offline.list_positions
     get_portfolio_contracts = _offline.get_portfolio_contracts
-    IB = _offline.DummyIB  # type: ignore
+    IB = _offline.DummyIB
+    Option = _offline.DummyOption
+    Stock = _offline.DummyStock
+    Forex = _offline.DummyForex
+    Index = _offline.DummyIndex
+    Contract = _offline.DummyContract
+    Ticker = _offline.DummyTicker
+    Position = _offline.DummyPosition

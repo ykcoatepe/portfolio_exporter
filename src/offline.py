@@ -63,7 +63,7 @@ def fetch_ohlc(tickers: List[str], days_back: int = 60) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def fetch_ib_quotes(ib, contracts) -> pd.DataFrame:
+def fetch_ib_quotes(ib, contracts, console) -> pd.DataFrame:
     rows = []
     for i, c in enumerate(contracts):
         sym = getattr(c, "symbol", f"C{i}")
@@ -71,7 +71,7 @@ def fetch_ib_quotes(ib, contracts) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def fetch_yf_quotes(tickers: List[str]) -> pd.DataFrame:
+def fetch_yf_quotes(tickers: List[str], console) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "ticker": tickers,
