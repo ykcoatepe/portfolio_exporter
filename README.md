@@ -36,7 +36,7 @@ Here are some common usage examples:
 
 ```bash
 # Generate a daily pulse report
-python main.py pulse --tickers "AAPL,MSFT,GOOG" --output pulse.csv
+python main.py pulse --tickers "AAPL,MSFT,GOOG" --output pulse.csv --output-dir ~/Downloads
 
 # Fetch portfolio positions, grouped by combo
 python main.py positions --group-by-combo
@@ -45,13 +45,13 @@ python main.py positions --group-by-combo
 python main.py portfolio-greeks
 
 # Grab a live quote snapshot
-python main.py live
+python main.py live --format pdf
 
 # Interactively choose symbols and expiries for option chain
-python main.py options --symbol SPY
+python main.py options --tickers SPY
 
 # Option-chain snapshot for specific symbols and expiries
-python main.py options --symbol-expiries 'TSLA:20250620,20250703;AAPL:20250620'
+python main.py options --tickers TSLA,AAPL --expiries 20250620
 
 # Export today's executions and open orders
 python main.py report --today

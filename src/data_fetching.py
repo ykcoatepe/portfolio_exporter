@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import logging
 import math
 import time
 from datetime import datetime, timedelta, timezone, date
@@ -11,6 +10,8 @@ import os
 import pandas as pd
 import numpy as np
 import yfinance as yf
+
+TEST_MODE = os.getenv("PE_TEST_MODE") == "1"
 
 try:
     from ib_insync import IB, Option, Stock, Forex, Index
@@ -1082,3 +1083,16 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     )
 
     return df
+
+
+if TEST_MODE:
+    from . import offline as _offline
+
+    fetch_ohlc = _offline.fetch_ohlc
+    fetch_ib_quotes = _offline.fetch_ib_quotes
+    fetch_yf_quotes = _offline.fetch_yf_quotes
+    snapshot_chain = _offline.snapshot_chain
+    load_ib_positions_ib = _offline.load_ib_positions_ib
+    list_positions = _offline.list_positions
+    get_portfolio_contracts = _offline.get_portfolio_contracts
+    IB = _offline.DummyIB  # type: ignore

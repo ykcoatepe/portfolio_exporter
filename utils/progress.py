@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Iterable, Iterator, TypeVar
+import sys
 
 from rich.console import Console
 from rich.progress import (
@@ -18,7 +19,7 @@ T = TypeVar("T")
 def iter_progress(iterable: Iterable[T], description: str) -> Iterator[T]:
     """Yield items from *iterable* with a Rich progress bar."""
     items = list(iterable)
-    console = Console(force_terminal=True)
+    console = Console(file=sys.stderr, force_terminal=False)
     progress = Progress(
         SpinnerColumn(),
         BarColumn(),
