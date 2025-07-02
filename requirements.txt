@@ -8,3 +8,4 @@ urllib3==2.5.0
 rich==14.0.0
 pypdf==5.7.0
 fpdf==1.7.2
+scipy==1.12.0
