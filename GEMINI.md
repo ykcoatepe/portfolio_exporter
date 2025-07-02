@@ -9,7 +9,7 @@ This document provides project-specific context, conventions, and commands for t
 ## Key Technologies
 
 - **Language:** Python 3.11
-- **Dependencies:** Managed via `requirements.txt` (main) and `requirements-dev.txt` (development). Key libraries include `pandas`, `yfinance`, and `ib_insync`.
+- **Dependencies:** Managed via `requirements.txt` (main) and `requirements-dev.txt` (development). Key libraries include `yfinance`, `pandas`, `numpy`, `ib_insync`, `pandas_datareader`, `requests`, `urllib3`, `rich`, `pypdf`, `fpdf`, and `scipy`.
 - **Testing:** `pytest`
 
 ## Project Structure
@@ -21,7 +21,7 @@ This document provides project-specific context, conventions, and commands for t
   - `reporting.py`: Functions for generating reports in various formats.
   - `interactive.py`: Functions for handling user interaction.
 - `tests/`: Contains unit tests for the core scripts.
-- `utils/`: Shared utility modules.
+- `utils/`: Shared utility modules, including `utils.py` for progress bars and IBKR-related helpers.
 - `Makefile`: Defines setup and testing commands.
 
 ## Getting Started & Setup
@@ -39,6 +39,36 @@ The application is now run through `main.py`. Here are some examples:
 - **Generate a daily pulse report:**
   ```shell
   python main.py pulse --tickers "AAPL,MSFT,GOOG" --output pulse.csv
+  ```
+
+- **Fetch live quotes:**
+  ```shell
+  python main.py live
+  ```
+
+- **Fetch option chain snapshot:**
+  ```shell
+  python main.py options --symbol SPY
+  ```
+
+- **Fetch portfolio positions:**
+  ```shell
+  python main.py positions --group-by-combo
+  ```
+
+- **Generate a trades report:**
+  ```shell
+  python main.py report --input sample_trades.csv
+  ```
+
+- **Calculate portfolio Greeks:**
+  ```shell
+  python main.py portfolio-greeks
+  ```
+
+- **Run a sequence of commands (orchestrate):**
+  ```shell
+  python main.py orchestrate
   ```
 
 - **See all available commands:**
