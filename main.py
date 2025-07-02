@@ -34,7 +34,9 @@ def cmd_pulse(args) -> None:
     ib = None
     try:
         if not tickers:
-            console.print("[bold cyan]Fetching portfolio contracts from IBKR for pulse report...[/]")
+            console.print(
+                "[bold cyan]Fetching portfolio contracts from IBKR for pulse report...[/]"
+            )
             ib = data_fetching.IB()
             ib.connect(
                 data_fetching.IB_HOST,
@@ -59,7 +61,9 @@ def cmd_pulse(args) -> None:
                     underlying_symbols.add(contract.symbol)
             tickers = list(underlying_symbols)
 
-        console.print(f"[bold cyan]Fetching historical prices for {len(tickers)} tickers...[/]")
+        console.print(
+            f"[bold cyan]Fetching historical prices for {len(tickers)} tickers...[/]"
+        )
         ohlc = data_fetching.fetch_ohlc(tickers)
         console.print("[bold cyan]Computing technical indicators...[/]")
         df = analysis.compute_indicators(ohlc)
@@ -110,7 +114,9 @@ def cmd_live(args: argparse.Namespace) -> None:
         missing_tickers = [t for t in all_symbols if t not in ib_tickers]
 
         if missing_tickers:
-            console.print(f"[bold cyan]Fetching missing tickers from Yahoo Finance: {missing_tickers}[/]")
+            console.print(
+                f"[bold cyan]Fetching missing tickers from Yahoo Finance: {missing_tickers}[/]"
+            )
             yf_quotes = data_fetching.fetch_yf_quotes(missing_tickers)
         else:
             yf_quotes = pd.DataFrame()
@@ -164,21 +170,27 @@ def cmd_options(args: argparse.Namespace) -> None:
             expiries = [args.expiry_hint]
 
         for sym in tickers:
-            for exp in (expiries or [None]):
-                console.print(f"[bold cyan]Fetching option chain for {sym} (expiry: {exp or 'auto'})...[/]")
+            for exp in expiries or [None]:
+                console.print(
+                    f"[bold cyan]Fetching option chain for {sym} (expiry: {exp or 'auto'})...[/]"
+                )
                 df = data_fetching.snapshot_chain(ib, sym, exp)
                 if not df.empty:
                     exp_part = exp or "auto"
                     out_file = (
                         args.output
-                        if args.output and len(tickers) == 1 and len(expiries or []) == 1
+                        if args.output
+                        and len(tickers) == 1
+                        and len(expiries or []) == 1
                         else f"{sym}_{exp_part}_options_{get_timestamp()}.csv"
                     )
                     out_path = Path(OUTPUT_DIR) / out_file
                     df.to_csv(out_path, index=False)
                     console.print(f"[bold green]Option chain saved to {out_path}[/]")
                 else:
-                    console.print(f"[bold yellow]No option chain data found for {sym}[/]")
+                    console.print(
+                        f"[bold yellow]No option chain data found for {sym}[/]"
+                    )
         ib.disconnect()
     except Exception as e:
         print(f"Error fetching option chain: {e}")
@@ -209,12 +221,16 @@ def cmd_report(args: argparse.Namespace) -> None:
     except FileNotFoundError:
         console.print(f"[bold red]Error: Input file not found at {args.input}[/]")
     except Exception as e:
-        console.print(f"[bold red]An error occurred while generating the trades report: {e}[/]")
+        console.print(
+            f"[bold red]An error occurred while generating the trades report: {e}[/]"
+        )
 
 
 def cmd_portfolio_greeks(args: argparse.Namespace) -> None:
     try:
-        console.print("[bold cyan]Connecting to IBKR and fetching option positions for Greeks...[/]")
+        console.print(
+            "[bold cyan]Connecting to IBKR and fetching option positions for Greeks...[/]"
+        )
         ib = data_fetching.IB()
         ib.connect(
             data_fetching.IB_HOST,
@@ -261,17 +277,23 @@ def cmd_portfolio_greeks(args: argparse.Namespace) -> None:
             print("DEBUG: Greeks DataFrame is empty, skipping CSV generation.")
             return
         out_path = Path(OUTPUT_DIR) / f"portfolio_greeks_{get_timestamp()}.csv"
-        
+
         greeks.to_csv(out_path, index=True)
         console.print(f"[bold green]Greeks saved to {out_path}[/]")
         print(f"DEBUG: Greeks saved to {out_path}")
-        console.print(f"[bold yellow]Greeks DataFrame head before saving:\n{greeks.head()}[/]")
-        console.print(f"[bold yellow]Greeks DataFrame head before saving:\n{greeks.head()}[/]")
+        console.print(
+            f"[bold yellow]Greeks DataFrame head before saving:\n{greeks.head()}[/]"
+        )
+        console.print(
+            f"[bold yellow]Greeks DataFrame head before saving:\n{greeks.head()}[/]"
+        )
     except Exception as e:
         console.print(f"[bold red]Error calculating portfolio greeks: {e}[/]")
 
 
-DEFAULT_OUTPUT_DIR = Path("/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads")
+DEFAULT_OUTPUT_DIR = Path(
+    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+)
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -342,7 +364,9 @@ def cleanup(files: List[str]) -> None:
 
 def cmd_orchestrate(args: argparse.Namespace) -> None:
     try:
-        console.print("[bold cyan]Running dataset orchestration (pulse, live, options)...[/]")
+        console.print(
+            "[bold cyan]Running dataset orchestration (pulse, live, options)...[/]"
+        )
         ts = get_timestamp()
 
         scripts = [
@@ -628,6 +652,7 @@ def main() -> None:
                         ).strip()
                         or None
                     )
+                    args.output = ""  # ensure attribute exists
                     args.format = "csv"  # Default for options, as per original code
                 elif choice_num == 4:  # positions
                     args.group_by_combo = (
@@ -655,9 +680,15 @@ def main() -> None:
                         or "csv"
                     )
                 elif choice_num == 6:  # portfolio-greeks
-                    args.ib_timeout = 10.0
-                    args.format = "csv"
-                    include = input("Include index underlyings (VIX, SPX)? (y/n): ").lower().strip() == "y"
+                    args = argparse.Namespace(
+                        ib_timeout=10.0, format="csv", include_indices=False
+                    )
+                    include = (
+                        input("Include index underlyings (VIX, SPX)? (y/n): ")
+                        .lower()
+                        .strip()
+                        == "y"
+                    )
                     args.include_indices = include
                     args.output = f"portfolio_greeks_{get_timestamp()}.csv"
                 elif choice_num == 7:  # orchestrate

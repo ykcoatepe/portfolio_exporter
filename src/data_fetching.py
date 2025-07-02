@@ -13,6 +13,11 @@ import yfinance as yf
 
 TEST_MODE = os.getenv("PE_TEST_MODE") == "1"
 
+logger = logging.getLogger(__name__)
+
+_warned_exchange_fill = False
+_warned_currency_fill = False
+
 try:
     from ib_insync import IB, Option, Stock, Forex, Index
     from ib_insync.contract import Contract
@@ -232,12 +237,32 @@ def get_option_contracts_from_ib(
     option_contracts = []
     for p in positions:
         if p.contract.secType == "OPT":
+            _ensure_contract_fields(p.contract)
             option_contracts.append(p.contract)
 
     return option_contracts
 
 
 TIMEOUT_SECONDS = 40
+
+
+def _ensure_contract_fields(contract: Contract) -> None:
+    """Fill missing exchange/currency and warn once per run."""
+    global _warned_exchange_fill, _warned_currency_fill
+    if not getattr(contract, "exchange", None):
+        contract.exchange = "SMART"
+        if not _warned_exchange_fill:
+            logger.warning(
+                "Option contract template missing exchange, auto-filling with 'SMART'."
+            )
+            _warned_exchange_fill = True
+    if not getattr(contract, "currency", None):
+        contract.currency = "USD"
+        if not _warned_currency_fill:
+            logger.warning(
+                "Option contract template missing currency, auto-filling with 'USD'."
+            )
+            _warned_currency_fill = True
 
 
 def _has_any_greeks_populated(ticker: Ticker) -> bool:
@@ -273,11 +298,7 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
         if not qc:
             continue
         c = qc[0]
-        # ensure contract has exchange and currency to avoid IB error 321
-        if not getattr(c, "exchange", None):
-            c.exchange = "SMART"
-        if not getattr(c, "currency", None):
-            c.currency = "USD"
+        _ensure_contract_fields(c)
         tk = ib.reqMktData(
             c, genericTickList="106", snapshot=False, regulatorySnapshot=False
         )
@@ -950,7 +971,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     ]
 
     contracts: list[Option] = []
-    for tmpl in iter_progress(raw_templates, f"Qualifying option contracts for {symbol}"):
+    for tmpl in iter_progress(
+        raw_templates, f"Qualifying option contracts for {symbol}"
+    ):
         # --- first try with tradingClass as provided (root_tc) -----------------
         c = _resolve_contract(ib, tmpl)
 
@@ -981,27 +1004,36 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             if not getattr(tmpl_sym_tc, "exchange", None):
                 tmpl_sym_tc.exchange = "SMART"
                 if not logged_exchange_fill:
-                    logging.warning("Option contract template missing exchange, auto-filling with 'SMART'.")
+                    logging.warning(
+                        "Option contract template missing exchange, auto-filling with 'SMART'."
+                    )
                     logged_exchange_fill = True
             if not getattr(tmpl_sym_tc, "currency", None):
                 tmpl_sym_tc.currency = "USD"
                 if not logged_currency_fill:
-                    logging.warning("Option contract template missing currency, auto-filling with 'USD'.")
+                    logging.warning(
+                        "Option contract template missing currency, auto-filling with 'USD'."
+                    )
                     logged_currency_fill = True
             # Auto-fill missing exchange/currency for the template before resolving
             if not getattr(tmpl_sym_tc, "exchange", None):
                 tmpl_sym_tc.exchange = "SMART"
                 if not logged_exchange_fill:
-                    logging.warning("Option contract template missing exchange, auto-filling with 'SMART'.")
+                    logging.warning(
+                        "Option contract template missing exchange, auto-filling with 'SMART'."
+                    )
                     logged_exchange_fill = True
             if not getattr(tmpl_sym_tc, "currency", None):
                 tmpl_sym_tc.currency = "USD"
                 if not logged_currency_fill:
-                    logging.warning("Option contract template missing currency, auto-filling with 'USD'.")
+                    logging.warning(
+                        "Option contract template missing currency, auto-filling with 'USD'."
+                    )
                     logged_currency_fill = True
             c = _resolve_contract(ib, tmpl_sym_tc)
 
         if c:
+            _ensure_contract_fields(c)
             contracts.append(c)
 
     if not contracts:
