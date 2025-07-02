@@ -10,7 +10,7 @@ COMMANDS = [
     ["live", "--tickers", "AAPL", "--format", "pdf"],
     ["options", "--tickers", "AAPL", "--expiries", "20250101"],
     ["positions"],
-    ["report", "--input", "sample_trades.csv", "--format", "pdf"],
+    ["report", "--input", "sample_trades.csv", "--date", "today", "--format", "pdf"],
     ["portfolio-greeks"],
     ["orchestrate"],
 ]
