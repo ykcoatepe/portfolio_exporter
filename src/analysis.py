@@ -13,6 +13,8 @@ try:
 except Exception:  # pragma: no cover - optional
     IB = Position = Ticker = None  # type: ignore
 
+TIMEOUT_SECONDS = 40
+
 
 def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Compute common technical indicators for a price dataframe."""
@@ -78,3 +80,37 @@ def eddr(
     dar_val = float(np.quantile(window_dd, alpha))
     cdar_val = float(window_dd[window_dd >= dar_val].mean())
     return dar_val, cdar_val
+
+
+def list_positions(ib: IB):
+    """Proxy to :func:`src.data_fetching.list_positions`."""
+    from .data_fetching import list_positions as _lp
+
+    return _lp(ib)
+
+
+def calc_portfolio_greeks(
+    positions: pd.DataFrame, chains: pd.DataFrame | None = None
+) -> pd.DataFrame:
+    """Aggregate Greek exposures by underlying and for the full portfolio."""
+    if positions.empty:
+        return pd.DataFrame()
+
+    cols = ["delta", "gamma", "vega", "theta", "rho"]
+    df = positions.copy()
+    for c in cols + ["position", "multiplier"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+        else:
+            df[c] = 0.0
+    df["multiplier"].replace(0, 1, inplace=True)
+    weight = df["position"] * df["multiplier"]
+    exposures = df[cols].to_numpy() * weight.to_numpy()[:, None]
+    out = pd.DataFrame(exposures, columns=cols)
+    out["underlying"] = (
+        df["underlying"] if "underlying" in df.columns else df.get("symbol")
+    )
+    agg = out.groupby("underlying")[cols].sum()
+    portfolio = agg.sum().to_frame().T
+    portfolio.index = ["PORTFOLIO"]
+    return pd.concat([agg, portfolio])
