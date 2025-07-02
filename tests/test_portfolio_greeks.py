@@ -102,6 +102,50 @@ class ListPositionsTests(unittest.TestCase):
         self.assertEqual(result[0][0].position, 1)
         self.assertTrue(hasattr(result[0][1], "modelGreeks"))
 
+    def test_exchange_autofill(self):
+        class DummyIB:
+            def positions(self):
+                P = type("Pos", (), {})()
+                C = type(
+                    "Contract",
+                    (),
+                    {
+                        "secType": "OPT",
+                        "localSymbol": "A",
+                        "exchange": "",
+                        "currency": "",
+                    },
+                )
+                P.contract = C
+                P.position = 1
+                return [P]
+
+            def qualifyContracts(self, contract):
+                return [contract]
+
+            def reqMktData(
+                self,
+                contract,
+                genericTickList="",
+                snapshot=False,
+                regulatorySnapshot=False,
+            ):
+                G = type("Greeks", (), {"delta": 0.5})()
+                T = type("Ticker", (), {"modelGreeks": G})()
+                return T
+
+            def sleep(self, t):
+                pass
+
+        prev = pg.TIMEOUT_SECONDS
+        pg.TIMEOUT_SECONDS = 0
+        try:
+            result = pg.list_positions(DummyIB())
+        finally:
+            pg.TIMEOUT_SECONDS = prev
+        self.assertEqual(result[0][0].contract.exchange, "SMART")
+        self.assertEqual(result[0][0].contract.currency, "USD")
+
 
 if __name__ == "__main__":
     unittest.main()

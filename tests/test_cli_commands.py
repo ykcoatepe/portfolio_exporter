@@ -32,22 +32,21 @@ def test_interactive_exit(tmp_path):
     env["PE_TEST_MODE"] = "1"
     env["OUTPUT_DIR"] = str(tmp_path)
     proc = subprocess.run(
-        [sys.executable, "main.py", "--output-dir", str(tmp_path)],
-        input="8\n",
-        text=True,
+        [sys.executable, "main.py"],
+        input=b"8\n",
         capture_output=True,
         env=env,
     )
     assert proc.returncode == 0
+
 
 def test_interactive_portfolio_greeks(tmp_path):
     env = os.environ.copy()
     env["PE_TEST_MODE"] = "1"
     env["OUTPUT_DIR"] = str(tmp_path)
     proc = subprocess.run(
-        [sys.executable, "main.py", "--output-dir", str(tmp_path)],
-        input="6\nn\n8\n",
-        text=True,
+        [sys.executable, "main.py"],
+        input=b"6\nn\n8\n",
         capture_output=True,
         env=env,
     )
@@ -55,4 +54,7 @@ def test_interactive_portfolio_greeks(tmp_path):
     print(f"STDOUT: {proc.stdout}")
     print(f"STDERR: {proc.stderr}")
     # Assert that a portfolio_greeks CSV is produced
-    assert any(f.name.startswith("portfolio_greeks") and f.suffix == ".csv" for f in tmp_path.iterdir())
+    assert any(
+        f.name.startswith("portfolio_greeks") and f.suffix == ".csv"
+        for f in tmp_path.iterdir()
+    )
