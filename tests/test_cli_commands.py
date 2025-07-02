@@ -2,6 +2,8 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+
+import pandas as pd
 import pytest
 from ib_insync import Option
 
@@ -58,3 +60,25 @@ def test_interactive_portfolio_greeks(tmp_path):
         f.name.startswith("portfolio_greeks") and f.suffix == ".csv"
         for f in tmp_path.iterdir()
     )
+
+
+def test_live_quiet(tmp_path):
+    env = os.environ.copy()
+    env["PE_TEST_MODE"] = "1"
+    env["OUTPUT_DIR"] = str(tmp_path)
+    cmd = [
+        sys.executable,
+        "main.py",
+        "--output-dir",
+        str(tmp_path),
+        "live",
+        "--tickers",
+        "AAPL",
+        "--quiet",
+    ]
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    csv = next(tmp_path.glob("*.csv"))
+    df = pd.read_csv(csv)
+    assert list(df.columns) == ["ticker", "price", "bid", "ask", "source"]
+    assert len(df) == 1

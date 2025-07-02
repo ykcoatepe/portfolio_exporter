@@ -20,7 +20,13 @@ import trades_report as tr
 import logging
 from src.data_fetching import get_portfolio_contracts
 
+# mute overly verbose third-party libraries
+for lib in ("yfinance", "urllib3", "ib_insync", "pandas"):
+    logging.getLogger(lib).setLevel(logging.WARNING)
+logging.basicConfig(level=logging.INFO)
+
 from rich.console import Console
+from rich.status import Status
 
 console = Console(stderr=True)
 
@@ -82,64 +88,63 @@ def cmd_pulse(args) -> None:
 
 
 def cmd_live(args: argparse.Namespace) -> None:
+    """Fetch live quotes from IBKR/Yahoo Finance and save to CSV."""
+
+    def _normalize(df: pd.DataFrame) -> pd.DataFrame:
+        if df.empty:
+            return pd.DataFrame(columns=["ticker", "price", "bid", "ask", "source"])
+        df = df.rename(columns={"last": "price"})
+        for col in ["price", "bid", "ask"]:
+            if col not in df.columns:
+                df[col] = pd.NA
+        return df[["ticker", "price", "bid", "ask", "source"]]
+
+    console = Console(stderr=True, quiet=args.quiet)
     ib = data_fetching.IB()
     try:
-        console.print("[bold cyan]Connecting to IBKR for live quotes...[/]")
-        ib.connect(
-            data_fetching.IB_HOST,
-            data_fetching.IB_PORT,
-            data_fetching.IB_CLIENT_ID,
-            timeout=10,
-        )
-        logging.basicConfig(level=logging.DEBUG)
-
-        console.print("[bold cyan]Fetching portfolio contracts from IBKR...[/]")
-        contracts = data_fetching.get_portfolio_contracts(ib)
-
-        if not contracts:
-            print("No contracts found in IBKR portfolio.")
-            return
-
-        ib_quotes = data_fetching.fetch_ib_quotes(ib, contracts)
-
-        # Fallback to Yahoo Finance for tickers that failed in IBKR
-        ib_tickers = ib_quotes["ticker"].unique() if not ib_quotes.empty else []
-
-        all_symbols = []
-        for c in contracts:
-            if c.secType == "BAG":
-                all_symbols.append(data_fetching._format_combo_symbol(c))
-            else:
-                all_symbols.append(c.symbol)
-
-        missing_tickers = [t for t in all_symbols if t not in ib_tickers]
-
-        if missing_tickers:
-            console.print(
-                f"[bold cyan]Fetching missing tickers from Yahoo Finance: {missing_tickers}[/]"
+        with Status("[cyan]Connecting to IBKR…", console=console, spinner="dots") as st:
+            ib.connect(
+                data_fetching.IB_HOST,
+                data_fetching.IB_PORT,
+                data_fetching.IB_CLIENT_ID,
+                timeout=10,
             )
-            yf_quotes = data_fetching.fetch_yf_quotes(missing_tickers)
-        else:
-            yf_quotes = pd.DataFrame()
 
-        if not ib_quotes.empty and not yf_quotes.empty:
-            quotes = pd.concat([ib_quotes, yf_quotes]).drop_duplicates(
-                subset=["ticker", "source"]
+            st.update("[cyan]Fetching portfolio…")
+            contracts = data_fetching.get_portfolio_contracts(ib)
+            if not contracts:
+                return
+
+            st.update("[cyan]Downloading quotes…")
+            ib_quotes = _normalize(data_fetching.fetch_ib_quotes(ib, contracts))
+            ib_tickers = ib_quotes["ticker"].unique() if not ib_quotes.empty else []
+            all_symbols = [
+                (
+                    data_fetching._format_combo_symbol(c)
+                    if c.secType == "BAG"
+                    else c.symbol
+                )
+                for c in contracts
+            ]
+            missing_tickers = [t for t in all_symbols if t not in ib_tickers]
+            yf_quotes = (
+                _normalize(data_fetching.fetch_yf_quotes(missing_tickers))
+                if missing_tickers
+                else pd.DataFrame(columns=["ticker", "price", "bid", "ask", "source"])
             )
-        elif not ib_quotes.empty:
-            quotes = ib_quotes
-        elif not yf_quotes.empty:
-            quotes = yf_quotes
-        else:
-            print("No live quotes fetched.")
-            return
 
-        out = Path(OUTPUT_DIR) / args.output
-        quotes.to_csv(out, index=False)
-        console.print(f"[bold green]Live quotes saved to {out}[/]")
+            st.update("[cyan]Merging & saving…")
+            quotes = pd.concat([ib_quotes, yf_quotes], ignore_index=True)
+            quotes = quotes.drop_duplicates(subset="ticker", keep="first")
+            quotes = quotes[["ticker", "price", "bid", "ask", "source"]]
+            assert set(quotes.columns) == {"ticker", "price", "bid", "ask", "source"}
+            out = Path(OUTPUT_DIR) / args.output
+            quotes.to_csv(out, index=False)
 
-    except Exception as e:
-        print(f"Error fetching live quotes: {e}")
+        console.print(f"[bold green]✔ Live quotes saved to {out}[/]")
+
+    except Exception as e:  # pragma: no cover - unexpected failures
+        console.print(f"[bold red]Error fetching live quotes: {e}[/]")
     finally:
         if ib.isConnected():
             ib.disconnect()
@@ -485,6 +490,11 @@ def main() -> None:
         default="csv",
         choices=["csv", "excel", "pdf", "txt"],
         help="Output format",
+    )
+    live_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress console output except errors",
     )
 
     # Options command
