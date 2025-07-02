@@ -42,8 +42,11 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
         .join((df["low"] - grp["close"].shift()).abs().to_frame("lc"))
         .max(axis=1)
     )
-    df["atr14"] = grp.apply(
-        lambda g: tr.loc[g.index].rolling(14).mean(), include_groups=False
+    df["atr14"] = (
+        tr.groupby(df["ticker"], group_keys=False)
+        .rolling(14)
+        .mean()
+        .reset_index(level=0, drop=True)
     )
 
     m20 = df["sma20"]
