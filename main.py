@@ -16,6 +16,7 @@ from pypdf import PdfWriter
 from fpdf import FPDF
 
 from src import analysis, data_fetching, reporting, interactive
+import trades_report as tr
 import logging
 from src.data_fetching import get_portfolio_contracts
 
@@ -211,13 +212,34 @@ def cmd_positions(args: argparse.Namespace) -> None:
 
 
 def cmd_report(args: argparse.Namespace) -> None:
+    """Generate a trades report and open orders listing."""
+
     try:
-        console.print(f"[bold cyan]Reading trades from {args.input}...[/]")
-        trades_df = pd.read_csv(args.input)
-        out_path = Path(OUTPUT_DIR) / args.output
-        console.print(f"[bold cyan]Saving trades report to {out_path}...[/]")
-        trades_df.to_csv(out_path, index=False)
-        console.print(f"[bold green]Trades report saved to {out_path}[/]")
+        path = args.input or "sample_trades.csv"
+        console.print(f"[bold cyan]Reading trades from {path}...[/]")
+        trades_df = pd.read_csv(path)
+        trades_df["datetime"] = pd.to_datetime(trades_df["date"])
+
+        open_orders_df = pd.DataFrame(
+            [{"order_id": 1, "symbol": "AAPL", "side": "BUY"}]
+        )
+
+        trades_report, orders_report = tr.generate_trade_report(
+            trades_df,
+            open_orders_df,
+            tr.DateOption(args.date),
+            start=pd.to_datetime(args.start).date() if args.start else None,
+            end=pd.to_datetime(args.end).date() if args.end else None,
+        )
+
+        trades_out = Path(OUTPUT_DIR) / args.output
+        orders_out = Path(OUTPUT_DIR) / args.orders_output
+
+        reporting.save_table(trades_report, str(trades_out), args.format)
+        reporting.save_table(orders_report, str(orders_out), args.format)
+
+        console.print(f"[bold green]Trades report saved to {trades_out}[/]")
+        console.print(f"[bold green]Open orders saved to {orders_out}[/]")
     except FileNotFoundError:
         console.print(f"[bold red]Error: Input file not found at {args.input}[/]")
     except Exception as e:
@@ -509,14 +531,18 @@ def main() -> None:
 
     # Report command
     report_parser = subparsers.add_parser("report", help="Generate a trades report")
-    report_parser.add_argument(
-        "--input", type=str, required=True, help="Path to trades CSV file"
-    )
+    report_parser.add_argument("--input", type=str, help="Path to trades CSV file")
     report_parser.add_argument(
         "--output",
         type=str,
         default=f"trades_report_{get_timestamp()}.csv",
-        help="Output file name",
+        help="Trades output file name",
+    )
+    report_parser.add_argument(
+        "--orders-output",
+        type=str,
+        default=f"open_orders_{get_timestamp()}.csv",
+        help="Open orders output file name",
     )
     report_parser.add_argument(
         "--format",
@@ -525,6 +551,15 @@ def main() -> None:
         choices=["csv", "excel", "pdf"],
         help="Output format",
     )
+    report_parser.add_argument(
+        "--date",
+        type=str,
+        choices=[o.value for o in tr.DateOption],
+        default=tr.DateOption.TODAY.value,
+        help="Date range option",
+    )
+    report_parser.add_argument("--start", type=str, help="Start date (YYYY-MM-DD)")
+    report_parser.add_argument("--end", type=str, help="End date (YYYY-MM-DD)")
 
     # Orchestrate command
     orchestrate_parser = subparsers.add_parser(
@@ -666,12 +701,20 @@ def main() -> None:
                     )
                     args.format = "csv"  # Default for positions, as per original code
                 elif choice_num == 5:  # report
-                    args.input = input("Enter path to trades CSV file: ").strip()
+                    args.input = input(
+                        "Enter path to trades CSV file (blank for sample): "
+                    ).strip()
                     args.output = (
                         input(
-                            f"Enter output file name (default: trades_report_{get_timestamp()}.csv): "
+                            f"Enter trades output file name (default: trades_report_{get_timestamp()}.csv): "
                         ).strip()
                         or f"trades_report_{get_timestamp()}.csv"
+                    )
+                    args.orders_output = (
+                        input(
+                            f"Enter open orders file name (default: open_orders_{get_timestamp()}.csv): "
+                        ).strip()
+                        or f"open_orders_{get_timestamp()}.csv"
                     )
                     args.format = (
                         input(
@@ -679,6 +722,17 @@ def main() -> None:
                         ).strip()
                         or "csv"
                     )
+                    args.date = (
+                        input(
+                            "Date option (today, yesterday, week_to_date, custom): "
+                        ).strip()
+                        or "today"
+                    )
+                    if args.date == "custom":
+                        args.start = input("Start date YYYY-MM-DD: ").strip()
+                        args.end = input("End date YYYY-MM-DD: ").strip()
+                    else:
+                        args.start = args.end = None
                 elif choice_num == 6:  # portfolio-greeks
                     args = argparse.Namespace(
                         ib_timeout=10.0, format="csv", include_indices=False

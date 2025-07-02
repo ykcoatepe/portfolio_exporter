@@ -19,7 +19,7 @@ Here's an overview of the available commands and their functionalities:
 *   **`live`**: Takes a snapshot of real‑time quotes for tickers listed in `tickers_live.txt` (falling back to `tickers.txt`). Quotes are pulled from IBKR when available, otherwise from yfinance and FRED. Results are written to `live_quotes_YYYYMMDD_HHMM.csv`. Use `--pdf` to save a PDF report instead.
 *   **`options`**: Saves a complete IBKR option chain for the portfolio or given symbols. Results are zipped into `option_chain_<DATE_TIME>.zip` and the original files are removed. Defaults to CSV; use `--excel` or `--pdf` to change the output type.
 *   **`positions`**: Fetches portfolio positions from IBKR.
-*   **`report`**: Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports.
+*   **`report`**: Exports executions and open orders from IBKR. Use `--date` to filter trades by `today`, `yesterday`, `week_to_date`, or a custom range with `--start` and `--end`. Add `--excel` or `--pdf` for formatted reports.
 *   **`orchestrate`**: Runs a sequence of commands (pulse, live, options) and zips the results.
 *   **`portfolio-greeks`**: Calculates and exports per-position Greeks and account totals using IBKR market data. Index underlyings (e.g. VIX, SPX) are excluded by default; use `--include-indices` to include them.
 
@@ -54,7 +54,10 @@ python main.py options --tickers SPY
 python main.py options --tickers TSLA,AAPL --expiries 20250620
 
 # Export today's executions and open orders
-python main.py report --today
+python main.py report --date today
+
+# Custom date range
+python main.py report --date custom --start 2025-06-01 --end 2025-06-30
 ```
 
 ### Expiry Hint Formats
