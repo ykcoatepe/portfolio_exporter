@@ -19,7 +19,9 @@ from rich.progress import (
 from rich.console import Console
 
 # Directory where orchestrated dataset and script outputs are stored.
-OUTPUT_DIR = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+OUTPUT_DIR = (
+    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 

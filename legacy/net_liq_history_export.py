@@ -170,7 +170,12 @@ def _save_pdf(df: pd.DataFrame, start_label: str, end_label: str) -> Path:
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 10), # Increased font size for better readability
+                (
+                    "FONTSIZE",
+                    (0, 0),
+                    (-1, -1),
+                    10,
+                ),  # Increased font size for better readability
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
             ]
         )

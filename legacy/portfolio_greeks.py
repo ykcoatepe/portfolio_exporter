@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple
 from pathlib import Path
 
 from utils.bs import bs_greeks
-from option_chain_snapshot import fetch_yf_open_interest
+from legacy.option_chain_snapshot import fetch_yf_open_interest
 
 import numpy as np
 import pandas as pd

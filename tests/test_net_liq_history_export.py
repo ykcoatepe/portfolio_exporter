@@ -2,7 +2,7 @@ import unittest
 from datetime import date
 import pandas as pd
 
-import net_liq_history_export as nlhe
+import legacy.net_liq_history_export as nlhe
 
 
 class NetLiqHistoryExportTests(unittest.TestCase):
@@ -19,11 +19,15 @@ class NetLiqHistoryExportTests(unittest.TestCase):
 
     def test_filter_range_start_end(self):
         result = nlhe._filter_range(self.df, "2024-01-02", "2024-01-04")
-        self.assertEqual(list(result.index), [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)])
+        self.assertEqual(
+            list(result.index), [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4)]
+        )
 
     def test_filter_range_open_ended(self):
         result = nlhe._filter_range(self.df, None, "2024-01-03")
-        self.assertEqual(list(result.index), [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)])
+        self.assertEqual(
+            list(result.index), [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)]
+        )
 
 
 if __name__ == "__main__":

@@ -55,7 +55,7 @@ def load_module(mapping=None):
     sys.modules["ib_insync"] = ib_mod
 
     module = types.ModuleType("ts")
-    lines = Path("tech_signals_ibkr.py").read_text().splitlines()
+    lines = Path("legacy/tech_signals_ibkr.py").read_text().splitlines()
     snippet = lines[:75] + lines[120:201]
     exec("\n".join(snippet), module.__dict__)
     module.ib = DummyIB(mapping)
