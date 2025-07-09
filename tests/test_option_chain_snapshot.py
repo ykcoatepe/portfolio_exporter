@@ -33,7 +33,7 @@ except Exception:
 
 import importlib
 
-oc = importlib.import_module("option_chain_snapshot")
+oc = importlib.import_module("legacy.option_chain_snapshot")
 
 
 class ChooseExpiryTests(unittest.TestCase):

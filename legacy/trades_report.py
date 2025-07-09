@@ -259,19 +259,26 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
         combo_legs_data = []
         if contract.secType == "BAG" and contract.comboLegs:
             from ib_insync import Contract
+
             for leg in contract.comboLegs:
                 # For combo legs, we need to qualify each leg's contract to get details like symbol, expiry, strike, right
-                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
-                combo_legs_data.append({
-                    "symbol": leg_contract.symbol,
-                    "sec_type": leg_contract.secType,
-                    "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
-                    "strike": getattr(leg_contract, "strike", None),
-                    "right": getattr(leg_contract, "right", None),
-                    "ratio": leg.ratio,
-                    "action": leg.action,
-                    "exchange": leg.exchange,
-                })
+                leg_contract = ib.qualifyContracts(
+                    Contract(conId=leg.conId, exchange=leg.exchange)
+                )[0]
+                combo_legs_data.append(
+                    {
+                        "symbol": leg_contract.symbol,
+                        "sec_type": leg_contract.secType,
+                        "expiry": getattr(
+                            leg_contract, "lastTradeDateOrContractMonth", None
+                        ),
+                        "strike": getattr(leg_contract, "strike", None),
+                        "right": getattr(leg_contract, "right", None),
+                        "ratio": leg.ratio,
+                        "action": leg.action,
+                        "exchange": leg.exchange,
+                    }
+                )
 
         comm = comm_map.get(ex.execId, None)
         trades.append(
@@ -324,18 +331,25 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
         combo_legs_data = []
         if c.secType == "BAG" and c.comboLegs:
             from ib_insync import Contract
+
             for leg in c.comboLegs:
-                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
-                combo_legs_data.append({
-                    "symbol": leg_contract.symbol,
-                    "sec_type": leg_contract.secType,
-                    "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
-                    "strike": getattr(leg_contract, "strike", None),
-                    "right": getattr(leg_contract, "right", None),
-                    "ratio": leg.ratio,
-                    "action": leg.action,
-                    "exchange": leg.exchange,
-                })
+                leg_contract = ib.qualifyContracts(
+                    Contract(conId=leg.conId, exchange=leg.exchange)
+                )[0]
+                combo_legs_data.append(
+                    {
+                        "symbol": leg_contract.symbol,
+                        "sec_type": leg_contract.secType,
+                        "expiry": getattr(
+                            leg_contract, "lastTradeDateOrContractMonth", None
+                        ),
+                        "strike": getattr(leg_contract, "strike", None),
+                        "right": getattr(leg_contract, "right", None),
+                        "ratio": leg.ratio,
+                        "action": leg.action,
+                        "exchange": leg.exchange,
+                    }
+                )
 
         open_orders.append(
             OpenOrder(
@@ -380,7 +394,7 @@ def save_csvs(
     trades_file = OUTPUT_DIR / f"trades_{base}.csv"
     with open(trades_file, "w", newline="") as fh:
         wr = csv.writer(fh)
-        wr.writerow(["# Orders Made"])                 # user‑friendly banner
+        wr.writerow(["# Orders Made"])  # user‑friendly banner
         wr.writerow(Trade.__annotations__.keys())
         for t in trades:
             wr.writerow([getattr(t, f) for f in Trade.__annotations__])
@@ -389,7 +403,7 @@ def save_csvs(
     oo_file = OUTPUT_DIR / f"open_orders_{base}.csv"
     with open(oo_file, "w", newline="") as fh:
         wr = csv.writer(fh)
-        wr.writerow(["# Open Orders"])                # section banner
+        wr.writerow(["# Open Orders"])  # section banner
         wr.writerow(OpenOrder.__annotations__.keys())
         for o in open_orders:
             wr.writerow([getattr(o, f) for f in OpenOrder.__annotations__])
@@ -414,9 +428,13 @@ def _auto_fit_columns(
         # Add a little extra space
         worksheet.set_column(i, i, max_len + 2)
 
+
 # Helper for PDF tables: size columns based on content length
 def _calc_table_col_widths(
-    data: list[list], page_width: float, fixed_idx: int | None = None, fixed_pct: float = 0.40
+    data: list[list],
+    page_width: float,
+    fixed_idx: int | None = None,
+    fixed_pct: float = 0.40,
 ) -> list[float]:
     """
     Return a list of column widths (in points) that add up to page_width.
@@ -480,11 +498,17 @@ def save_excel(
 
     if "combo_legs" in df_trades.columns:
         df_trades["combo_legs"] = df_trades["combo_legs"].apply(
-            lambda x: "\n".join([
-                f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                for leg in x
-            ]) if x else None
+            lambda x: (
+                "\n".join(
+                    [
+                        f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                        f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                        for leg in x
+                    ]
+                )
+                if x
+                else None
+            )
         )
 
     # Re‑order / hide columns for readability
@@ -530,11 +554,17 @@ def save_excel(
 
     if "combo_legs" in df_open.columns:
         df_open["combo_legs"] = df_open["combo_legs"].apply(
-            lambda x: "\n".join([
-                f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                for leg in x
-            ]) if x else None
+            lambda x: (
+                "\n".join(
+                    [
+                        f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                        f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                        for leg in x
+                    ]
+                )
+                if x
+                else None
+            )
         )
 
     with pd.ExcelWriter(
@@ -610,11 +640,17 @@ def save_pdf(
             )
         if "combo_legs" in df_trades_fmt.columns:
             df_trades_fmt["combo_legs"] = df_trades_fmt["combo_legs"].apply(
-                lambda x: "\n".join([
-                    f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                    f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                    for leg in x
-                ]) if x else None
+                lambda x: (
+                    "\n".join(
+                        [
+                            f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                            f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                            for leg in x
+                        ]
+                    )
+                    if x
+                    else None
+                )
             )
 
     df_open_fmt = df_open.copy()
@@ -633,11 +669,17 @@ def save_pdf(
             )
         if "combo_legs" in df_open_fmt.columns:
             df_open_fmt["combo_legs"] = df_open_fmt["combo_legs"].apply(
-                lambda x: "\n".join([
-                    f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                    f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                    for leg in x
-                ]) if x else None
+                lambda x: (
+                    "\n".join(
+                        [
+                            f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                            f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                            for leg in x
+                        ]
+                    )
+                    if x
+                    else None
+                )
             )
 
     # ---- TRADES TABLE (consolidated for readability) ----
@@ -646,15 +688,27 @@ def save_pdf(
         elements.append(Spacer(1, 6))
 
         trade_cols = [
-            "datetime", "symbol", "side", "qty", "price", "avg_price",
-            "realized_pnl", "commission", "currency",
-            "expiry", "strike", "right", "combo_legs",
+            "datetime",
+            "symbol",
+            "side",
+            "qty",
+            "price",
+            "avg_price",
+            "realized_pnl",
+            "commission",
+            "currency",
+            "expiry",
+            "strike",
+            "right",
+            "combo_legs",
         ]
         trade_cols = [c for c in trade_cols if c in df_trades_fmt.columns]
 
         data = [trade_cols] + df_trades_fmt[trade_cols].values.tolist()
 
-        combo_idx = trade_cols.index("combo_legs") if "combo_legs" in trade_cols else None
+        combo_idx = (
+            trade_cols.index("combo_legs") if "combo_legs" in trade_cols else None
+        )
         col_widths = _calc_table_col_widths(data, page_width, fixed_idx=combo_idx)
 
         tbl = Table(data, repeatRows=1, colWidths=col_widths, hAlign="LEFT")
@@ -668,8 +722,12 @@ def save_pdf(
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, 0), 9),
                     ("FONTSIZE", (0, 1), (-1, -1), 8),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-                     [colors.whitesmoke, colors.lightgrey]),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.whitesmoke, colors.lightgrey],
+                    ),
                     ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                 ]
             )
@@ -683,9 +741,18 @@ def save_pdf(
         elements.append(Spacer(1, 6))
 
         open_cols = [
-            "symbol", "side", "total_qty", "status", "filled", "remaining",
-            "lmt_price", "aux_price",
-            "expiry", "strike", "right", "combo_legs",
+            "symbol",
+            "side",
+            "total_qty",
+            "status",
+            "filled",
+            "remaining",
+            "lmt_price",
+            "aux_price",
+            "expiry",
+            "strike",
+            "right",
+            "combo_legs",
         ]
         open_cols = [c for c in open_cols if c in df_open_fmt.columns]
 
@@ -705,8 +772,12 @@ def save_pdf(
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                     ("FONTSIZE", (0, 0), (-1, 0), 9),
                     ("FONTSIZE", (0, 1), (-1, -1), 8),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1),
-                     [colors.whitesmoke, colors.lightgrey]),
+                    (
+                        "ROWBACKGROUNDS",
+                        (0, 1),
+                        (-1, -1),
+                        [colors.whitesmoke, colors.lightgrey],
+                    ),
                     ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                 ]
             )

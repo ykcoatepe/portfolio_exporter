@@ -25,12 +25,15 @@ import pandas as pd
 from typing import List, Dict
 import numpy as np
 
+
 # ------------------------------------------------------------------
 # Helper to normalize prices: IB sometimes returns -1 for no‑quote
 # ------------------------------------------------------------------
 def _clean_price(val):
     """Return np.nan for None/‑1 placeholders, otherwise the value."""
     return np.nan if val in (None, -1) else val
+
+
 import yfinance as yf
 
 # optional PDF dependencies
@@ -430,7 +433,9 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
     ib.sleep(IB_TIMEOUT)  # allow quotes to update
 
     for conId, (con, md, avg_cost, qty) in md_reqs.items():
-        raw_last = _clean_price(md.last) if md.last is not None else _clean_price(md.close)
+        raw_last = (
+            _clean_price(md.last) if md.last is not None else _clean_price(md.close)
+        )
         last = raw_last
         mult = int(con.multiplier) if con.multiplier else 1
         cost_basis = avg_cost * qty * mult
@@ -441,18 +446,25 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
         combo_legs_data = []
         if con.secType == "BAG" and con.comboLegs:
             from ib_insync import Contract
+
             for leg in con.comboLegs:
-                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
-                combo_legs_data.append({
-                    "symbol": leg_contract.symbol,
-                    "sec_type": leg_contract.secType,
-                    "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
-                    "strike": getattr(leg_contract, "strike", None),
-                    "right": getattr(leg_contract, "right", None),
-                    "ratio": leg.ratio,
-                    "action": leg.action,
-                    "exchange": leg.exchange,
-                })
+                leg_contract = ib.qualifyContracts(
+                    Contract(conId=leg.conId, exchange=leg.exchange)
+                )[0]
+                combo_legs_data.append(
+                    {
+                        "symbol": leg_contract.symbol,
+                        "sec_type": leg_contract.secType,
+                        "expiry": getattr(
+                            leg_contract, "lastTradeDateOrContractMonth", None
+                        ),
+                        "strike": getattr(leg_contract, "strike", None),
+                        "right": getattr(leg_contract, "right", None),
+                        "ratio": leg.ratio,
+                        "action": leg.action,
+                        "exchange": leg.exchange,
+                    }
+                )
 
         rows.append(
             {
@@ -466,8 +478,13 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
                         or (
                             con.secType == "OPT"
                             and combo_counts.get(
-                                (con.symbol, getattr(con, "lastTradeDateOrContractMonth", ""))
-                            , 0) > 1
+                                (
+                                    con.symbol,
+                                    getattr(con, "lastTradeDateOrContractMonth", ""),
+                                ),
+                                0,
+                            )
+                            > 1
                         )
                     )
                     else con.secType
@@ -494,11 +511,17 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
 
     if "combo_legs" in df.columns:
         df["combo_legs"] = df["combo_legs"].apply(
-            lambda x: "\n".join([
-                f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                for leg in x
-            ]) if x else None
+            lambda x: (
+                "\n".join(
+                    [
+                        f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                        f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                        for leg in x
+                    ]
+                )
+                if x
+                else None
+            )
         )
 
     # ---------- pretty‑format numbers & NaNs ---------------------
@@ -618,11 +641,17 @@ def main():
                         ].map(lambda x: f"{x:.3f}%")
                     if "combo_legs" in pos_txt.columns:
                         pos_txt["combo_legs"] = pos_txt["combo_legs"].apply(
-                            lambda x: "\n".join([
-                                f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                                f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                                for leg in x
-                            ]) if x else None
+                            lambda x: (
+                                "\n".join(
+                                    [
+                                        f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
+                                        f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
+                                        for leg in x
+                                    ]
+                                )
+                                if x
+                                else None
+                            )
                         )
                     with open(base_pos + ".txt", "w") as fh:
                         fh.write(

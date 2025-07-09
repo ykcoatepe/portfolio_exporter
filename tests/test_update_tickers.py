@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 import tempfile
 
-import update_tickers as ut
+import legacy.update_tickers as ut
 
 
 class UpdateTickersTests(unittest.TestCase):
