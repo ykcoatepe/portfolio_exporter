@@ -6,6 +6,8 @@ import sys
 from rich.console import Console
 from rich.table import Table
 
+from portfolio_exporter.core.ui import StatusBar
+
 console = Console()
 
 
@@ -36,18 +38,29 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    status = None
     if not args.quiet:
-        console.rule("[bold cyan]AI-Managed Playbook[/]")
+        status = StatusBar("Ready")
+        status.update("Ready")
+        console.rule("[bold cyan]AI-Managed Playbook")
 
     while True:
         build_menu()
         choice = input("Select › ").strip()
         if choice == "0":
-            sys.exit(0)
+            break
         elif choice not in {"1", "2", "3"}:
-            console.print("[red]Invalid choice[/]")
+            console.print("[red]Invalid choice")
         else:
-            console.print(f"(stub) You chose {choice}")
+            if choice == "1":
+                if status:
+                    status.update("Pre-Market menu (stub)", "cyan")
+                console.print("(stub) You chose Pre-Market")
+            else:
+                console.print(f"(stub) You chose {choice}")
+
+    if status:
+        status.stop()
 
 
 if __name__ == "__main__":
