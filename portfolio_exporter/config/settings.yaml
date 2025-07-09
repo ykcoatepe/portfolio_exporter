@@ -1,0 +1,4 @@
+output_dir: "~/Downloads/portfolio_exports"
+timezone: "Europe/Istanbul"
+broker: "IBKR"
+default_account: "UXXXXXXX"
