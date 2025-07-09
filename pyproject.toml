@@ -34,3 +34,6 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["portfolio_exporter*"]
 exclude = ["legacy*", "tests*", "utils*", "docs*", "ibkr_env*", "iv_history*"]
+
+[project.scripts]
+portfolio_playbook = "main:main"
