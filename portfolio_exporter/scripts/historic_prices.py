@@ -2,6 +2,7 @@ import os
 import csv
 import argparse
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core import io
 import pandas as pd
 import yfinance as yf
 
@@ -201,15 +202,4 @@ def run(fmt: str = "csv") -> None:
     """Export historical prices using ``fmt`` extension."""
     tickers = load_tickers()
     df = fetch_and_prepare_data(tickers)
-    fmt = fmt.lower()
-    if fmt in {"excel", "xlsx"}:
-        path = OUTPUT_CSV.replace(".csv", ".xlsx")
-        save_to_excel(df, path)
-    elif fmt == "pdf":
-        path = OUTPUT_CSV.replace(".csv", ".pdf")
-        save_to_pdf(df, path)
-    elif fmt == "txt":
-        path = OUTPUT_CSV.replace(".csv", ".txt")
-        save_to_txt(df, path)
-    else:
-        save_to_csv(df)
+    io.save(df, "historic_prices", fmt.lower())

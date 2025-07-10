@@ -25,6 +25,7 @@ import json
 import os
 import sys
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core import io
 from datetime import datetime, date
 from pathlib import Path
 from typing import Optional
@@ -216,9 +217,6 @@ def run(fmt: str = "csv") -> None:
         end=None,
         plot=False,
         cp_download=False,
-        excel=filetype in {"excel", "xlsx"},
-        pdf=filetype == "pdf",
-        txt=filetype == "txt",
     )
 
     # 1) pick data source
@@ -236,21 +234,6 @@ def run(fmt: str = "csv") -> None:
     if df.empty:
         sys.exit("❌  No data in the selected date range.")
 
-    start_lbl = df.index.min().strftime("%Y%m%d")
-    end_lbl = df.index.max().strftime("%Y%m%d")
-
-    if args.excel:
-        out_path = _save_excel(df, start_lbl, end_lbl)
-        print(f"💾  Saved Excel workbook → {out_path}")
-    elif args.pdf:
-        out_path = _save_pdf(df, start_lbl, end_lbl)
-        print(f"💾  Saved PDF report   → {out_path}")
-    elif args.txt:
-        out_path = _save_txt(df, start_lbl, end_lbl)
-        print(f"💾  Saved text report  → {out_path}")
-    else:
-        out_path = _save_csv(df, start_lbl, end_lbl)
-        print(f"💾  Saved {len(df):,} rows → {out_path}")
-
+    out_path = io.save(df.reset_index(), "net_liq_history_export", filetype)
     if args.plot:
-        _plot(df, out_path if isinstance(out_path, Path) else Path(out_path))
+        _plot(df, Path(out_path))
