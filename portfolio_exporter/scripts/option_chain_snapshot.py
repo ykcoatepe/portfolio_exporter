@@ -27,6 +27,7 @@ from typing import Any
 import os
 import time
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core import io
 from datetime import datetime, timezone, date
 from typing import List, Sequence
 import zipfile
@@ -752,13 +753,7 @@ def run(fmt: str = "csv") -> None:
                         path = f"{out_base}.txt"
                         _save_txt(df, path)
                     else:
-                        path = f"{out_base}.csv"
-                        df.to_csv(
-                            path,
-                            index=False,
-                            quoting=csv.QUOTE_MINIMAL,
-                            float_format="%.3f",
-                        )
+                        path = io.save(df, f"option_chain_{sym}_{label}", filetype)
                     created_files.append(path)
                     logger.info("Saved %s (%d rows)", path, len(df))
             except Exception as e:
@@ -777,10 +772,7 @@ def run(fmt: str = "csv") -> None:
             out_path = f"{out_base}.txt"
             _save_txt(df_all, out_path)
         else:
-            out_path = f"{out_base}.csv"
-            df_all.to_csv(
-                out_path, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f"
-            )
+            out_path = io.save(df_all, "option_chain_portfolio", filetype)
         logger.info(
             "Saved consolidated portfolio snapshot → %s (%d rows)",
             out_path,
