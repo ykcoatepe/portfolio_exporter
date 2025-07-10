@@ -5,6 +5,9 @@ import sys
 
 from rich.console import Console
 from rich.table import Table
+from builtins import input as builtin_input
+
+input = builtin_input
 
 from portfolio_exporter.core.ui import StatusBar
 
@@ -54,8 +57,9 @@ def main() -> None:
         else:
             if choice == "1":
                 if status:
-                    status.update("Pre-Market menu (stub)", "cyan")
-                console.print("(stub) You chose Pre-Market")
+                    status.update("Entering Pre-Market", "cyan")
+                from portfolio_exporter.menus import pre
+                pre.launch(status, args.format)
             else:
                 console.print(f"(stub) You chose {choice}")
 
