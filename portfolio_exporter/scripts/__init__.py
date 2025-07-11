@@ -5,6 +5,7 @@ from . import (
     option_chain_snapshot,
     net_liq_history_export,
     orchestrate_dataset,
+    tech_scan,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "option_chain_snapshot",
     "net_liq_history_export",
     "orchestrate_dataset",
+    "tech_scan",
 ]
