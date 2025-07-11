@@ -59,7 +59,14 @@ def main() -> None:
                 if status:
                     status.update("Entering Pre-Market", "cyan")
                 from portfolio_exporter.menus import pre
+
                 pre.launch(status, args.format)
+            elif choice == "2":
+                if status:
+                    status.update("Entering Live-Market", "cyan")
+                from portfolio_exporter.menus import live
+
+                live.launch(status)
             else:
                 console.print(f"(stub) You chose {choice}")
 
