@@ -16,6 +16,9 @@ dependencies = [
     "pydantic-settings",
     "ib_insync",
     "yfinance",
+    "reportlab",
+    "fpdf",
+    "pypdf",
     "pandas",
     "numpy",
 ]
