@@ -6,6 +6,12 @@ from . import (
     net_liq_history_export,
     orchestrate_dataset,
     tech_scan,
+    live_feed,
+    tech_signals_ibkr,
+    portfolio_greeks,
+    risk_watch,
+    theta_cap,
+    gamma_scalp,
 )
 
 __all__ = [
@@ -16,4 +22,10 @@ __all__ = [
     "net_liq_history_export",
     "orchestrate_dataset",
     "tech_scan",
+    "live_feed",
+    "tech_signals_ibkr",
+    "portfolio_greeks",
+    "risk_watch",
+    "theta_cap",
+    "gamma_scalp",
 ]
