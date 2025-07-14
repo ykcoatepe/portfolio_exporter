@@ -68,7 +68,11 @@ def main() -> None:
 
                 live.launch(status)
             else:
-                console.print(f"(stub) You chose {choice}")
+                if status:
+                    status.update("Entering Trades menu", "cyan")
+                from portfolio_exporter.menus import trade
+
+                trade.launch(status, args.format)
 
     if status:
         status.stop()
