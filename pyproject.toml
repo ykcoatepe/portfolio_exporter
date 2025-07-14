@@ -11,16 +11,16 @@ requires-python = ">=3.11"
 license = "MIT"
 authors = [{name = "Codex", email = "codex@example.com"}]
 dependencies = [
-    "rich",
+    "fpdf",
+    "ib_insync",
+    "numpy",
+    "pandas",
     "prompt_toolkit",
     "pydantic-settings",
-    "ib_insync",
-    "yfinance",
-    "reportlab",
-    "fpdf",
     "pypdf",
-    "pandas",
-    "numpy",
+    "reportlab",
+    "rich",
+    "yfinance",
 ]
 
 [project.optional-dependencies]
