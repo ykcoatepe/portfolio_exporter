@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 from typing import List, Dict
+from portfolio_exporter.core.quotes import snapshot
 import numpy as np
 
 
@@ -721,4 +722,18 @@ def main():
 
 
 def run() -> None:
-    main()
+    tickers = load_tickers()
+    if not tickers:
+        return
+    data = snapshot(tickers)
+    ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
+    df = pd.DataFrame({"ticker": list(data.keys()), "last": list(data.values())})
+    df.insert(0, "timestamp", ts_now)
+    base_q = OUTPUT_CSV.rsplit(".", 1)[0]
+    df.to_csv(
+        base_q + ".csv",
+        index=False,
+        quoting=csv.QUOTE_MINIMAL,
+        float_format="%.3f",
+    )
+    print(df)
