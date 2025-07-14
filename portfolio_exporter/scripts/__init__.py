@@ -12,6 +12,9 @@ from . import (
     risk_watch,
     theta_cap,
     gamma_scalp,
+    trades_report,
+    order_builder,
+    roll_manager,
 )
 
 __all__ = [
@@ -28,4 +31,7 @@ __all__ = [
     "risk_watch",
     "theta_cap",
     "gamma_scalp",
+    "trades_report",
+    "order_builder",
+    "roll_manager",
 ]
