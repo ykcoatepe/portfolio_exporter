@@ -15,7 +15,7 @@ def launch(status, default_fmt):
         tbl = Table(title="Trades & Reports")
         for k, lbl in [
             ("e", "Executions / open orders"),
-            ("b", "Build order (stub)"),
+            ("b", "Build order"),
             ("l", "Roll positions (stub)"),
             ("q", "Quick option chain"),
             ("v", "View Net-Liq chart"),
