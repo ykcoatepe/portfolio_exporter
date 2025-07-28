@@ -210,12 +210,11 @@ def _plot(df: pd.DataFrame, out_csv: Path):
 
 
 # ─────────────────────────── MAIN ──────────────────────────
-def run(fmt: str = "csv") -> None:
+def run(fmt: str = "csv", plot: bool = False) -> None:
     filetype = fmt.lower()
     args = argparse.Namespace(
         start=None,
         end=None,
-        plot=False,
         cp_download=False,
     )
 
@@ -234,6 +233,10 @@ def run(fmt: str = "csv") -> None:
     if df.empty:
         sys.exit("❌  No data in the selected date range.")
 
+    df = df.rename(columns={"net_liq": "NetLiq"})
     out_path = io.save(df.reset_index(), "net_liq_history_export", filetype)
-    if args.plot:
-        _plot(df, Path(out_path))
+    if plot:
+        import matplotlib.pyplot as plt
+
+        df["NetLiq"].plot(title="Net Liquidation History")
+        plt.show()
