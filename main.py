@@ -6,10 +6,12 @@ import sys
 from rich.console import Console
 from rich.table import Table
 from portfolio_exporter.menus.pre import _input as menu_input
+import builtins
 
 from portfolio_exporter.core.ui import StatusBar
 
 console = Console()
+input = builtins.input
 
 
 def build_menu() -> None:
