@@ -86,8 +86,6 @@ TIME_TAG = datetime.now(TR_TZ).strftime("%H%M")
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-FILETYPE = "csv"
-BASE_PATH = ""
 
 HIST_DAYS = 300  # enough for SMA200 / ADX
 SPAN_PCT = 0.05  # ±5 % strike window
@@ -192,25 +190,22 @@ def front_future(root: str, exch: str) -> Future:
 # ────────────────────── connect IB ─────────────────────────
 
 
-def run() -> None:
+def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = False):
+    """Export technical signals for given tickers.
+
+    Parameters
+    ----------
+    tickers:
+        If ``None`` (default), use the portfolio tickers file.
+    fmt:
+        Output format for :func:`portfolio_exporter.core.io.save`.
+    return_df:
+        When ``True`` return the resulting :class:`pandas.DataFrame` instead of
+        writing it to disk.
+    """
+
     global ib
     ib = IB()
-
-    parser = argparse.ArgumentParser(description="Tech signal exporter")
-    parser.add_argument(
-        "-f",
-        "--filetype",
-        choices=["csv", "txt"],
-        help="Output format",
-    )
-    args = parser.parse_args([])
-    filetype = args.filetype
-    if not filetype:
-        choice = input("Output type [csv/txt] (default csv): ").strip().lower()
-        filetype = choice if choice in {"csv", "txt"} else "csv"
-    global FILETYPE, BASE_PATH
-    FILETYPE = filetype
-    BASE_PATH = os.path.join(OUTPUT_DIR, f"tech_signals_{DATE_TAG}_{TIME_TAG}")
 
     # Suppress repetitive "No security definition" errors (code 200)
     def _quiet_error_handler(reqId, errorCode, errorString, contract):
@@ -226,7 +221,8 @@ def run() -> None:
         logging.warning("IBKR Gateway not reachable – using yfinance only.")
         USE_IB = False
 
-    rows, tickers = [], load_tickers()
+    rows = []
+    tickers = tickers or load_tickers()
     ts_now = datetime.now(TR_TZ).isoformat(timespec="seconds")
 
     # pull SPY once for beta
@@ -608,16 +604,12 @@ def run() -> None:
         ib.sleep(0.05)
 
     df_out = pd.DataFrame(rows)
-    csv_file = BASE_PATH + ".csv"
-    txt_file = BASE_PATH + ".txt"
-    if FILETYPE == "txt":
-        with open(txt_file, "w") as fh:
-            fh.write(df_out.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
-        logging.info("Saved plain text → %s", txt_file)
-    else:
-        df_out.to_csv(
-            csv_file, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f"
-        )
-        logging.info("Saved %d rows → %s", len(rows), csv_file)
+
+    if return_df:
+        if USE_IB:
+            ib.disconnect()
+        return df_out
+
+    portfolio_exporter.core.io.save(df_out, "tech_signals", fmt)
     if USE_IB:
         ib.disconnect()
