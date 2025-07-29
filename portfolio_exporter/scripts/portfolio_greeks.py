@@ -876,4 +876,14 @@ def main() -> None:
 
 
 def run() -> None:
-    main()
+    """
+    Entry point for menu-driven invocation: clear any existing CLI args
+    so that portfolio_greeks.main() can prompt properly.
+    """
+    saved_argv = sys.argv
+    # invoke in non-interactive CSV mode when called from menu
+    sys.argv = [sys.argv[0], "--flat-csv"]
+    try:
+        main()
+    finally:
+        sys.argv = saved_argv

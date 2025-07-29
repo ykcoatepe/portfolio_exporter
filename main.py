@@ -5,9 +5,7 @@ import sys
 
 from rich.console import Console
 from rich.table import Table
-from builtins import input as builtin_input
-
-input = builtin_input
+from portfolio_exporter.menus.pre import _input as menu_input
 
 from portfolio_exporter.core.ui import StatusBar
 
@@ -49,30 +47,38 @@ def main() -> None:
 
     while True:
         build_menu()
-        choice = input("Select › ").strip()
-        if choice == "0":
-            break
-        elif choice not in {"1", "2", "3"}:
-            console.print("[red]Invalid choice")
-        else:
+        raw = menu_input("Select › ")
+        for choice in raw.strip().splitlines():
+            choice = choice.strip().lower()
+            if choice == "0":
+                return
+            if choice == "s":
+                from portfolio_exporter.scripts import update_tickers
+
+                update_tickers.run(args.format)
+                continue
             if choice == "1":
                 if status:
                     status.update("Entering Pre-Market", "cyan")
                 from portfolio_exporter.menus import pre
 
                 pre.launch(status, args.format)
-            elif choice == "2":
+                continue
+            if choice == "2":
                 if status:
                     status.update("Entering Live-Market", "cyan")
                 from portfolio_exporter.menus import live
 
                 live.launch(status)
-            else:
+                continue
+            if choice == "3":
                 if status:
                     status.update("Entering Trades menu", "cyan")
                 from portfolio_exporter.menus import trade
 
                 trade.launch(status, args.format)
+                continue
+            console.print("[red]Invalid choice")
 
     if status:
         status.stop()

@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    output_dir: str = "~/Downloads/portfolio_exports"
+    output_dir: str = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
     timezone: str = "Europe/Istanbul"
     broker: str = "IBKR"
     default_account: str = "UXXXXXXX"

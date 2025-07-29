@@ -14,6 +14,8 @@ class StatusBar:
         self._style = style
         self._live = Live(self._render(), console=console, transient=False)
         self._live.__enter__()  # start live context
+        # expose console for menus to print via the same console
+        self.console = console
 
     # --- public API ----------------------------------------------------
     def update(self, text: str, style: str = "green") -> None:

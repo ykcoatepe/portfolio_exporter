@@ -30,12 +30,34 @@ If the token is not present, the script will attempt to read `dailyNetLiq.csv` f
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+pip install pip-tools
+pip-compile requirements.in requirements-dev.in
+pip install -r requirements.txt -r requirements-dev.txt
 pytest
 ```
 
-The included *Makefile* provides `make setup` and `make test` targets to automate
+
+## Upgrading dependencies
+
+This project uses the [pip-tools](https://github.com/jazzband/pip-tools) workflow
+to maintain fully pinned requirements.
+
+1. Edit top‑level dependencies in `requirements.in` or dev dependencies in
+   `requirements-dev.in` (e.g. adjust version specifiers).
+2. Re‑compile the pinned files:
+
+   ```bash
+   pip-compile requirements.in requirements-dev.in
+   ```
+
+3. Re‑install dependencies and re‑run tests:
+
+   ```bash
+   pip install -r requirements.txt -r requirements-dev.txt
+   pytest
+   ```
+
+The included *Makefile* still provides `make setup` and `make test` targets to automate
 these steps if desired.
 
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.

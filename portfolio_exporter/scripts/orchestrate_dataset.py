@@ -25,9 +25,16 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def run_script(cmd: list[str]) -> List[str]:
-    """Run a script and return the newly created files in OUTPUT_DIR."""
+    """Run a script and return the newly created or modified files in OUTPUT_DIR."""
     out_dir = OUTPUT_DIR
-    before = set(os.listdir(out_dir))
+    # record existing files and mtimes to detect new or modified outputs
+    before_mtimes: dict[str, float] = {}
+    for fname in os.listdir(out_dir):
+        path = os.path.join(out_dir, fname)
+        try:
+            before_mtimes[fname] = os.path.getmtime(path)
+        except OSError:
+            before_mtimes[fname] = 0.0
     env = os.environ.copy()
     env["OUTPUT_DIR"] = out_dir
     subprocess.run(
@@ -39,9 +46,18 @@ def run_script(cmd: list[str]) -> List[str]:
         timeout=600,  # fail fast if a script hangs >10 min
         env=env,
     )
-    after = set(os.listdir(out_dir))
-    new = after - before
-    return [os.path.join(out_dir, f) for f in new]
+    # detect new or modified files after running the script
+    files_out: list[str] = []
+    for fname in os.listdir(out_dir):
+        path = os.path.join(out_dir, fname)
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            continue
+        prev = before_mtimes.get(fname)
+        if prev is None or mtime > prev:
+            files_out.append(path)
+    return files_out
 
 
 def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
@@ -123,13 +139,20 @@ def run(fmt: str = "csv") -> None:
         overall = progress.add_task("overall", total=len(scripts))
         for cmd in scripts:
             task = progress.add_task(cmd[0], total=1)
-            new_files = run_script(cmd)
+            try:
+                new_files = run_script(cmd)
+            except Exception as error:
+                console.print(f"[red]Error running {cmd[0]}: {error}")
+                new_files = []
             if new_files:
                 files_by_script.append((cmd[0], new_files))
             progress.update(task, completed=1)  # instantly fill bar
             progress.advance(overall)
             progress.refresh()  # render once, no animation
 
+    if not files_by_script:
+        console.print("[yellow]No files generated; exiting batch.")
+        return
     ts = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     all_files = [f for _, file_list in files_by_script for f in file_list]
     if fmt == "pdf":

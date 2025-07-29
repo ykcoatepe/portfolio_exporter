@@ -32,6 +32,7 @@ dev = [
     "pandas",
     "numpy",
     "requests",
+    "pip-tools",
 ]
 
 [tool.setuptools.packages.find]
