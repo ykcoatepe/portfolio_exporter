@@ -71,7 +71,7 @@ def main() -> None:
                     status.update("Entering Live-Market", "cyan")
                 from portfolio_exporter.menus import live
 
-                live.launch(status)
+                live.launch(status, args.format)
                 continue
             if choice == "3":
                 if status:
