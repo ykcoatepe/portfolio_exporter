@@ -8,7 +8,7 @@ from typing import Sequence
 import pandas as pd
 import yfinance as yf
 
-from portfolio_exporter.core.io import save
+from portfolio_exporter.core import io
 from portfolio_exporter.core.config import settings
 
 
@@ -54,4 +54,4 @@ def run(tickers: Sequence[str], fmt: str = "csv") -> None:
         print("⚠️  No data downloaded.")
         return
     df = pd.concat(frames)
-    save(df, name="tech_scan", fmt=fmt, outdir=settings.output_dir)
+    io.save(df, name="tech_scan", fmt=fmt, outdir=settings.output_dir)
