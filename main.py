@@ -1,5 +1,4 @@
 from __future__ import annotations
-1
 import argparse
 import sys
 
@@ -10,7 +9,10 @@ import builtins
 from portfolio_exporter.core.ui import StatusBar
 
 console = Console()
-input = builtins.input
+
+
+def input(prompt: str = "") -> str:
+    return builtins.input(prompt)
 
 
 def build_menu() -> None:
@@ -40,6 +42,7 @@ def parse_args() -> argparse.Namespace:
 
 import os
 
+
 def main() -> None:
     args = parse_args()
     status = None
@@ -51,12 +54,13 @@ def main() -> None:
     if os.getenv("PE_TEST_MODE"):
         from portfolio_exporter.scripts import portfolio_greeks
         import sys
+
         original_argv = sys.argv
         try:
             idx = sys.argv.index("portfolio-greeks")
-            sys.argv = [sys.argv[0]] + sys.argv[idx+1:]
+            sys.argv = [sys.argv[0]] + sys.argv[idx + 1 :]
         except ValueError:
-            pass # should not happen in test
+            pass  # should not happen in test
         portfolio_greeks.main()
         sys.argv = original_argv
         return

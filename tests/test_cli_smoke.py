@@ -17,9 +17,10 @@ def _stub_runs(monkeypatch: types.SimpleNamespace) -> None:
         mod = getattr(scripts, name)
         if isinstance(mod, types.ModuleType) and hasattr(mod, "run"):
             monkeypatch.setattr(mod, "run", lambda *a, **k: None)
-    from portfolio_exporter.core import risk_dash
+    from portfolio_exporter.core import risk_dash, caps_dash
 
     monkeypatch.setattr(risk_dash, "run", lambda *a, **k: None)
+    monkeypatch.setattr(caps_dash, "run", lambda *a, **k: None)
 
 
 # 1-B  Input sequence that walks every key:
