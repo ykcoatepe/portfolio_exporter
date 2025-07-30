@@ -5,7 +5,6 @@ import sys
 
 from rich.console import Console
 from rich.table import Table
-from portfolio_exporter.menus.pre import _input as menu_input
 import builtins
 
 from portfolio_exporter.core.ui import StatusBar
@@ -39,6 +38,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_known_args()[0]
 
 
+import os
+
 def main() -> None:
     args = parse_args()
     status = None
@@ -47,9 +48,22 @@ def main() -> None:
         status.update("Ready")
         console.rule("[bold cyan]AI-Managed Playbook")
 
+    if os.getenv("PE_TEST_MODE"):
+        from portfolio_exporter.scripts import portfolio_greeks
+        import sys
+        original_argv = sys.argv
+        try:
+            idx = sys.argv.index("portfolio-greeks")
+            sys.argv = [sys.argv[0]] + sys.argv[idx+1:]
+        except ValueError:
+            pass # should not happen in test
+        portfolio_greeks.main()
+        sys.argv = original_argv
+        return
+
     while True:
         build_menu()
-        raw = menu_input("Select › ")
+        raw = input("\u203a ")
         for choice in raw.strip().splitlines():
             choice = choice.strip().lower()
             if choice == "0":

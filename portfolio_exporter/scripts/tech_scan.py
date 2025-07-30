@@ -24,8 +24,14 @@ def _rsi(series: pd.Series, n: int = 14) -> pd.Series:
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(n).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(n).mean()
+
+    # Avoid division by zero
     rs = gain / loss
-    return 100 - (100 / (1 + rs))
+    rs.replace([float('inf'), -float('inf')], float('nan'), inplace=True)
+    rs.fillna(0, inplace=True)
+
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
 
 
 def _macd(

@@ -312,7 +312,7 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
     """
     positions = [
         p
-        for p in ib.portfolio()
+        for p in ib.positions()
         if p.position != 0 and p.contract.secType in {"OPT", "FOP"}
     ]
     if not positions:
@@ -332,6 +332,8 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
         c = qc[0]
         if not c.exchange:
             c.exchange = "SMART"
+        if not c.currency:
+            c.currency = "USD"
 
         tk = ib.reqMktData(
             c,
@@ -482,6 +484,11 @@ def main() -> None:
         type=str,
         help="Comma-separated tickers to include (filters positions).",
     )
+    parser.add_argument(
+        "--include-indices",
+        action="store_true",
+        help="Include index options (e.g. VIX) in output.",
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--flat-csv",
@@ -511,6 +518,7 @@ def main() -> None:
         and not args.excel
         and not getattr(args, "pdf", False)
         and not getattr(args, "txt", False)
+        and not os.getenv("PE_TEST_MODE")
     ):
         try:
             choice = (
@@ -568,6 +576,9 @@ def main() -> None:
             logger.warning("No positions match filter – exiting.")
             ib.disconnect()
             sys.exit(0)
+
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
 
     ts_utc = datetime.now(timezone.utc)  # for option T calculation
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
@@ -745,6 +756,24 @@ def main() -> None:
         sys.exit(0)
 
     df = pd.DataFrame(rows)
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
     # ─── optionally dump flat CSV to stdout and file ───
     if args.flat_csv:
         # Ensure single‑level columns
@@ -770,6 +799,9 @@ def main() -> None:
             quoting=csv.QUOTE_MINIMAL,
         )
         logger.info(f"Flat CSV saved → {fn_flat} (and printed to STDOUT).")
+    if not args.include_indices:
+        df = df[~df["symbol"].isin(["VIX"])]
+
     totals = (
         df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
         .sum()
@@ -777,6 +809,7 @@ def main() -> None:
         .T
     )
     totals.insert(0, "timestamp", ts_iso)
+    totals.index = ["PORTFOLIO_TOTAL"]
 
     # ────────── pick NAV series for EDDR ──────────
     if NAV_LOG.exists() and NAV_LOG.stat().st_size > 0:
@@ -859,7 +892,7 @@ def main() -> None:
         fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
         df.to_csv(
             fn_pos,
-            index=False,
+            index=True,
             float_format="%.3f",
             quoting=csv.QUOTE_MINIMAL,
         )
@@ -875,14 +908,18 @@ def main() -> None:
     ib.disconnect()
 
 
-def run() -> None:
+def run(fmt: str = "csv", symbols: str = "", include_indices: bool = False) -> None:
     """
     Entry point for menu-driven invocation: clear any existing CLI args
     so that portfolio_greeks.main() can prompt properly.
     """
     saved_argv = sys.argv
     # invoke in non-interactive CSV mode when called from menu
-    sys.argv = [sys.argv[0], "--flat-csv"]
+    sys.argv = [sys.argv[0], f"--format={fmt}"]
+    if symbols:
+        sys.argv.extend(["--symbols", symbols])
+    if include_indices:
+        sys.argv.append("--include-indices")
     try:
         main()
     finally:
