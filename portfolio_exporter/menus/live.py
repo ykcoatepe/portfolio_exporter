@@ -4,10 +4,10 @@ from portfolio_exporter.scripts import (
     live_feed,
     tech_signals_ibkr,
     portfolio_greeks,
-    risk_watch,
     theta_cap,
     gamma_scalp,
 )
+from portfolio_exporter.core import risk_dash
 
 
 def _user_tech_signals(status, default_fmt):
@@ -27,7 +27,7 @@ def launch(status, default_fmt):
         "q": ("Snapshot quotes", live_feed.run),
         "t": ("Tech signals", tech_signals_ibkr.run),
         "g": ("Portfolio Greeks", portfolio_greeks.run),
-        "r": ("Risk dashboard", risk_watch.run),
+        "r": ("Risk dashboard", lambda: risk_dash.run()),
         "c": ("Theta / Gamma caps", lambda: (theta_cap.run(), gamma_scalp.run())),
         "u": (
             "User-defined Tech Signals",
