@@ -66,6 +66,11 @@ LIQ_MAP = {1: "Added", 2: "Removed", 3: "RoutedOut", 4: "Auction"}
 def _load_executions():
     """Fetch executions and open orders from IBKR.
 
+    Raises
+    ------
+    RuntimeError
+        If ib_insync is not available or IB API cannot be used.
+
     Returns
     -------
     tuple
@@ -73,6 +78,12 @@ def _load_executions():
         trades DataFrame. Tests may monkeypatch this function and return only a
         DataFrame.
     """
+    # Ensure IB API support is available
+    if IB is None or ExecutionFilter is None:
+        raise RuntimeError(
+            "❌ ib_insync library not found or IB ExecutionFilter unavailable. "
+            "Install with: pip install ib_insync and ensure the IB Gateway/TWS is running with API enabled."
+        )
 
     start, end = prompt_date_range()
     trades, open_orders = fetch_trades_ib(start, end)
@@ -270,7 +281,7 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
     while day <= end:
         next_day = day + timedelta(days=1)
         filt = ExecutionFilter(
-            time=day.strftime("%Y%m%d 00:00:00"), clientId=0, accountCode=""
+            time=day.strftime("%Y%m%d 00:00:00"), clientId=0, acctCode=""
         )
         all_execs.extend(ib.reqExecutions(filt))
         day = next_day
@@ -662,7 +673,10 @@ def run(
     else:
         df, trades, open_orders, start, end = loaded
 
-    if show_actions and not df.empty:
+    if df.empty:
+        print("⚠️ No trades found for the specified date range; no report generated.")
+        return None
+    if show_actions:
         df["Action"] = df.apply(_classify, axis=1)
 
     from portfolio_exporter.core.io import save

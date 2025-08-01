@@ -24,9 +24,11 @@ def _stub_runs(monkeypatch: types.SimpleNamespace) -> None:
 
 
 # 1-B  Input sequence that walks every key:
+# 1-B  Input sequence that walks every key:
 # Main: 1 Pre-Market  →  s h p o n z r
 #       2 Live-Market →  q t g r c b
 #       3 Trades      →  e b l q v r
+#       4 Portfolio Greeks → r
 # Exit
 keys = [
     "1",
@@ -51,6 +53,8 @@ keys = [
     "l",
     "q",
     "v",
+    "r",
+    "4",
     "r",
     "0",
 ]

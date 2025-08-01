@@ -23,6 +23,7 @@ def build_menu() -> None:
     table.add_row("1", "Pre-Market")
     table.add_row("2", "Live-Market")
     table.add_row("3", "Trades & Reports")
+    table.add_row("4", "Portfolio Greeks")
     table.add_row("0", "Exit")
     console.print(table)
 
@@ -98,6 +99,15 @@ def main() -> None:
                 from portfolio_exporter.menus import trade
 
                 trade.launch(status, args.format)
+                continue
+            if choice == "4":
+                if status:
+                    status.update("Running Portfolio Greeks", "cyan")
+                from portfolio_exporter.scripts import portfolio_greeks
+
+                portfolio_greeks.run(args.format)
+                if status:
+                    status.update("Ready", "green")
                 continue
             console.print("[red]Invalid choice")
 
