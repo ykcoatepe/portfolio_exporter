@@ -78,6 +78,9 @@ def _load_executions():
     trades, open_orders = fetch_trades_ib(start, end)
     trades = filter_trades(trades, start, end)
     df = pd.DataFrame([t.__dict__ for t in trades])
+    if df.empty:
+        print("⚠ No executions found for that period.")
+        return None
     return df, trades, open_orders, start, end
 
 
@@ -262,12 +265,20 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
 
     ib.commissionReportEvent += _comm
 
-    filt = ExecutionFilter(time=start.strftime("%Y%m%d 00:00:00"))
-    exec_details = ib.reqExecutions(filt)  # synchronous; returns list immediately
+    all_execs: list["ExecutionDetail"] = []
+    day = start
+    while day <= end:
+        next_day = day + timedelta(days=1)
+        filt = ExecutionFilter(
+            time=day.strftime("%Y%m%d 00:00:00"), clientId=0, accountCode=""
+        )
+        all_execs.extend(ib.reqExecutions(filt))
+        day = next_day
+    print(f"[INFO] pulled {len(all_execs)} executions between {start} and {end}")
     ib.sleep(0.3)  # brief pause so CommissionReport callbacks arrive
     ib.commissionReportEvent -= _comm
 
-    execs = [(det.contract, det.execution) for det in exec_details]
+    execs = [(det.contract, det.execution) for det in all_execs]
 
     # --- Build Trade objects ---------------------------------------------------
     trades: List[Trade] = []
@@ -641,6 +652,8 @@ def run(
 ) -> pd.DataFrame | None:
     """Generate trades report and export in desired format."""
     loaded = _load_executions()
+    if loaded is None:
+        return None
     if isinstance(loaded, pd.DataFrame):
         df = loaded
         trades: list[Trade] = []
