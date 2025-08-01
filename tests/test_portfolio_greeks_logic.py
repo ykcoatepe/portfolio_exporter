@@ -9,7 +9,9 @@ def test_greeks_aggregation(monkeypatch):
         [
             {
                 "symbol": "FAKE",
+                "secType": "STK",
                 "qty": 2,
+                "multiplier": 1,
                 "delta": 0.5,
                 "gamma": 0.1,
                 "vega": 0.2,
@@ -17,7 +19,9 @@ def test_greeks_aggregation(monkeypatch):
             },
             {
                 "symbol": "FOO",
+                "secType": "STK",
                 "qty": 1,
+                "multiplier": 1,
                 "delta": 1.0,
                 "gamma": 0.2,
                 "vega": 0.3,

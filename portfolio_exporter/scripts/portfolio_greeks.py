@@ -957,14 +957,23 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
     """Return current positions with greeks.
 
     This helper retains the legacy IBKR pull behaviour but is kept separate so
-    tests can monkeypatch it with deterministic data.
-    The real implementation would connect to IBKR and return a DataFrame with
-    columns: ``symbol``, ``qty``, ``mult``, ``delta``, ``gamma``, ``vega`` and
-    ``theta``.
+    tests can monkeypatch it with deterministic data.  The real implementation
+    would connect to IBKR and return a DataFrame with columns:
+    ``symbol``, ``secType``, ``qty``, ``multiplier``, ``delta``, ``gamma``,
+    ``vega`` and ``theta``.
     """
 
     return pd.DataFrame(
-        columns=["symbol", "qty", "mult", "delta", "gamma", "vega", "theta"]
+        columns=[
+            "symbol",
+            "secType",
+            "qty",
+            "multiplier",
+            "delta",
+            "gamma",
+            "vega",
+            "theta",
+        ]
     )
 
 
@@ -973,26 +982,20 @@ def run(
     write_positions: bool = True,
     write_totals: bool = True,
     return_dict: bool = False,
-):
+) -> dict | None:
     """Aggregate per-position Greeks and optionally persist the results."""
 
-    pos = _load_positions()
-    mult = pos.get("mult", 1)
+    pos = _load_positions().copy()
 
-    pos["delta_exposure"] = pos["delta"] * pos["qty"] * mult
-    pos["gamma_exposure"] = pos["gamma"] * pos["qty"] * mult
-    pos["vega_exposure"] = pos["vega"] * pos["qty"] * mult
-    pos["theta_exposure"] = pos["theta"] * pos["qty"] * mult
+    # ensure contract multipliers are populated correctly
+    pos.loc[(pos.secType == "OPT") & (pos.multiplier.isna()), "multiplier"] = 100
+    pos.loc[pos.secType.isin(["STK", "ETF"]), "multiplier"] = 1
+
+    for greek in ["delta", "gamma", "vega", "theta"]:
+        pos[f"{greek}_exposure"] = pos[greek] * pos.qty * pos.multiplier
 
     totals = (
-        pos[
-            [
-                "delta_exposure",
-                "gamma_exposure",
-                "vega_exposure",
-                "theta_exposure",
-            ]
-        ]
+        pos[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
         .sum()
         .to_frame()
         .T
@@ -1008,11 +1011,8 @@ def run(
     if write_totals:
         save(totals, "portfolio_greeks_totals", fmt, outdir)
 
+    print(f"✅ Greeks exported → {outdir}")
+
     if return_dict:
         return totals.iloc[0].to_dict()
-
-    print(
-        "✅ Greeks exported:",
-        "positions " if write_positions else "",
-        "totals" if write_totals else "",
-    )
+    return None

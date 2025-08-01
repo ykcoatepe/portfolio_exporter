@@ -16,11 +16,7 @@ def input(prompt: str = "") -> str:
 
 
 def build_menu() -> None:
-    """Render the top-level menu.
-
-    The former "Portfolio Greeks" option was removed, leaving only the
-    pre‑market, live‑market and trades menus alongside exit.
-    """
+    """Render the top-level menu."""
     table = Table(title="AI-Managed Playbook – Main Menu")
     table.add_column("#")
     table.add_column("Function")
