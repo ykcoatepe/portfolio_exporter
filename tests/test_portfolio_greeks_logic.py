@@ -30,7 +30,9 @@ def test_greeks_aggregation(monkeypatch):
         "portfolio_exporter.scripts.portfolio_greeks._load_positions", lambda: fake
     )
     # Run with return_dict to inspect exposures
-    result = portfolio_greeks.run(fmt="csv", return_dict=True)
+    result = portfolio_greeks.run(
+        fmt="csv", write_positions=False, write_totals=False, return_dict=True
+    )
     # Expected exposures = sum(qty*greek)
     assert result["delta_exposure"] == pytest.approx(2 * 0.5 + 1 * 1.0)
     assert result["gamma_exposure"] == pytest.approx(2 * 0.1 + 1 * 0.2)

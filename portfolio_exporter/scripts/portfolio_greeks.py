@@ -956,65 +956,63 @@ def main() -> None:
 def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
     """Return current positions with greeks.
 
-    The default implementation is a placeholder and should be monkeypatched in
-    tests or replaced with a real data loader that connects to IBKR.
+    This helper retains the legacy IBKR pull behaviour but is kept separate so
+    tests can monkeypatch it with deterministic data.
+    The real implementation would connect to IBKR and return a DataFrame with
+    columns: ``symbol``, ``qty``, ``mult``, ``delta``, ``gamma``, ``vega`` and
+    ``theta``.
     """
 
     return pd.DataFrame(
-        columns=["symbol", "qty", "delta", "gamma", "vega", "theta", "multiplier"]
+        columns=["symbol", "qty", "mult", "delta", "gamma", "vega", "theta"]
     )
 
 
-def run(fmt: str = "csv", return_dict: bool = False):
-    """Aggregate per-position Greeks into portfolio exposures.
+def run(
+    fmt: str = "csv",
+    write_positions: bool = True,
+    write_totals: bool = True,
+    return_dict: bool = False,
+):
+    """Aggregate per-position Greeks and optionally persist the results."""
 
-    When ``return_dict`` is ``False`` this function behaves like the previous
-    CLI wrapper and delegates to :func:`main` to produce the full report.
-    When ``return_dict`` is ``True`` it uses :func:`_load_positions` to obtain a
-    DataFrame of positions and returns the summed exposures.
-    """
+    pos = _load_positions()
+    mult = pos.get("mult", 1)
+
+    pos["delta_exposure"] = pos["delta"] * pos["qty"] * mult
+    pos["gamma_exposure"] = pos["gamma"] * pos["qty"] * mult
+    pos["vega_exposure"] = pos["vega"] * pos["qty"] * mult
+    pos["theta_exposure"] = pos["theta"] * pos["qty"] * mult
+
+    totals = (
+        pos[
+            [
+                "delta_exposure",
+                "gamma_exposure",
+                "vega_exposure",
+                "theta_exposure",
+            ]
+        ]
+        .sum()
+        .to_frame()
+        .T
+    )
+
+    from portfolio_exporter.core.io import save
+    from portfolio_exporter.core.config import settings
+
+    outdir = settings.output_dir
+
+    if write_positions:
+        save(pos, "portfolio_greeks_positions", fmt, outdir)
+    if write_totals:
+        save(totals, "portfolio_greeks_totals", fmt, outdir)
 
     if return_dict:
-        df = _load_positions()
-        delta_sum = gamma_sum = vega_sum = theta_sum = 0.0
-        debug = os.getenv("PE_GREEKS_DEBUG")
-        for pos in df.itertuples(index=False):
-            mult = getattr(pos, "multiplier", 1) or 1
-            if debug:
-                print(
-                    f"[DEBUG] {pos.symbol}: qty={pos.qty}  delta={pos.delta:.4f}  "
-                    f"gamma={pos.gamma:.4f}  vega={pos.vega:.4f}  theta={pos.theta:.4f}"
-                )
-            delta_sum += pos.delta * pos.qty * mult
-            gamma_sum += pos.gamma * pos.qty * mult
-            vega_sum += pos.vega * pos.qty * mult
-            theta_sum += pos.theta * pos.qty * mult
+        return totals.iloc[0].to_dict()
 
-        return {
-            "delta_exposure": delta_sum,
-            "gamma_exposure": gamma_sum,
-            "vega_exposure": vega_sum,
-            "theta_exposure": theta_sum,
-        }
-
-    saved_argv = sys.argv
-    saved_mode = os.environ.get("PE_TEST_MODE")
-    os.environ["PE_TEST_MODE"] = "1"
-    args: list[str] = [saved_argv[0]]
-    if fmt == "csv":
-        args.append("--flat-csv")
-    elif fmt == "excel":
-        args.append("--excel")
-    elif fmt == "pdf":
-        args.append("--pdf")
-    elif fmt == "txt":
-        args.append("--txt")
-    sys.argv = args
-    try:
-        main()
-    finally:
-        sys.argv = saved_argv
-        if saved_mode is None:
-            os.environ.pop("PE_TEST_MODE", None)
-        else:
-            os.environ["PE_TEST_MODE"] = saved_mode
+    print(
+        "✅ Greeks exported:",
+        "positions " if write_positions else "",
+        "totals" if write_totals else "",
+    )
