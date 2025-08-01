@@ -573,7 +573,8 @@ def main():
         action="store_true",
         help="Save a PDF instead of CSV.",
     )
-    args = parser.parse_args()
+    # Ignore any extra args when invoked from a parent menu
+    args, _ = parser.parse_known_args()
 
     if not args.pdf:
         try:

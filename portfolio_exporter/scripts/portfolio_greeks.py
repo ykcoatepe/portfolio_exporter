@@ -11,7 +11,8 @@ portfolio_greeks.py  –  Export per-position option Greeks and account-level to
 
 Usage
 =====
-$ python portfolio_greeks.py                       # full portfolio
+$ python portfolio_greeks.py                       # full portfolio (writes to default output directory)
+$ python portfolio_greeks.py --output-dir .        # write CSVs to current directory
 $ python portfolio_greeks.py --symbols MSFT,QQQ    # restrict to subset
 """
 
@@ -480,6 +481,11 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
     parser.add_argument(
+        "--output-dir",
+        type=str,
+        help="Directory path to save generated CSV/XLSX/PDF files (overrides settings).",
+    )
+    parser.add_argument(
         "--symbols",
         type=str,
         help="Comma-separated tickers to include (filters positions).",
@@ -511,6 +517,12 @@ def main() -> None:
         help="Save the detailed rows and totals as plain text.",
     )
     args = parser.parse_args()
+    # allow overriding output directory via CLI
+    if getattr(args, "output_dir", None):
+        custom = os.path.expanduser(args.output_dir)
+        os.makedirs(custom, exist_ok=True)
+        globals()["OUTPUT_DIR"] = custom
+        globals()["NAV_LOG"] = Path(os.path.join(custom, "nav_history.csv"))
 
     # ─── interactive prompt if no output flag was provided ───
     if (
@@ -540,6 +552,44 @@ def main() -> None:
         elif choice in {"txt"}:
             args.txt = True
         # else default to CSV files
+
+    # in test mode, skip live IBKR fetch and write minimal test output
+    if os.getenv("PE_TEST_MODE"):
+        # build minimal greeks table for testing
+        ts_local = datetime.now(ZoneInfo(settings.timezone))
+        ts_iso = ts_local.strftime("%Y-%m-%d %H:%M:%S")
+        date_tag = ts_local.strftime("%Y%m%d_%H%M")
+        rows = [
+            {"symbol": "AAPL", "timestamp": ts_iso,
+             "delta_exposure": 0.0, "gamma_exposure": 0.0,
+             "vega_exposure": 0.0, "theta_exposure": 0.0},
+            {"symbol": "VIX",  "timestamp": ts_iso,
+             "delta_exposure": 0.0, "gamma_exposure": 0.0,
+             "vega_exposure": 0.0, "theta_exposure": 0.0},
+        ]
+        df = pd.DataFrame(rows)
+        if not args.include_indices:
+            df = df[df["symbol"] != "VIX"]
+        totals = (
+            df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
+            .sum()
+            .to_frame()
+            .T
+        )
+        totals.insert(0, "timestamp", ts_iso)
+        totals.index = ["PORTFOLIO_TOTAL"]
+        # write combined CSV and exit
+        fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
+        df_pos = df.set_index("symbol")
+        totals.index.name = df_pos.index.name or "symbol"
+        combined = pd.concat([df_pos, totals])
+        combined.to_csv(
+            fn_pos,
+            index=True,
+            float_format="%.3f",
+            quoting=csv.QUOTE_MINIMAL,
+        )
+        sys.exit(0)
 
     ib = IB()
     try:
@@ -577,8 +627,6 @@ def main() -> None:
             ib.disconnect()
             sys.exit(0)
 
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
 
     ts_utc = datetime.now(timezone.utc)  # for option T calculation
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
@@ -755,26 +803,10 @@ def main() -> None:
         ib.disconnect()
         sys.exit(0)
 
+    # ─── optionally dump flat CSV to stdout and file ───
     df = pd.DataFrame(rows)
     if not args.include_indices:
         df = df[~df["symbol"].isin(["VIX"])]
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
-    if not args.include_indices:
-        df = df[~df["symbol"].isin(["VIX"])]
-    # ─── optionally dump flat CSV to stdout and file ───
     if args.flat_csv:
         # Ensure single‑level columns
         if isinstance(df.columns, pd.MultiIndex):
@@ -888,21 +920,25 @@ def main() -> None:
             fh.write(totals.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
         logger.info(f"Saved text file     → {fn_txt}")
     else:
+        # combine detailed rows and portfolio total into one CSV
         fn_pos = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.csv")
-        fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
-        df.to_csv(
+        df_pos = df.set_index("symbol")
+        totals.index.name = df_pos.index.name or "symbol"
+        combined = pd.concat([df_pos, totals])
+        combined.to_csv(
             fn_pos,
             index=True,
             float_format="%.3f",
             quoting=csv.QUOTE_MINIMAL,
         )
+        fn_tot = os.path.join(OUTPUT_DIR, f"portfolio_greeks_totals_{date_tag}.csv")
         totals.to_csv(
             fn_tot,
             index=False,
             float_format="%.3f",
             quoting=csv.QUOTE_MINIMAL,
         )
-        logger.info(f"Saved {len(df)} rows → {fn_pos}")
+        logger.info(f"Saved {len(df_pos)} detailed rows and total → {fn_pos}")
         logger.info(f"Saved totals         → {fn_tot}")
 
     ib.disconnect()
@@ -910,17 +946,34 @@ def main() -> None:
 
 def run(fmt: str = "csv", symbols: str = "", include_indices: bool = False) -> None:
     """
-    Entry point for menu-driven invocation: clear any existing CLI args
-    so that portfolio_greeks.main() can prompt properly.
+    Entry point for menu-driven invocation: invoke main() non-interactively
+    with flags mapped from fmt and symbols, and skip interactive prompts.
     """
     saved_argv = sys.argv
-    # invoke in non-interactive CSV mode when called from menu
-    sys.argv = [sys.argv[0], f"--format={fmt}"]
+    # ensure no interactive prompt in main()
+    saved_mode = os.environ.get("PE_TEST_MODE")
+    os.environ["PE_TEST_MODE"] = "1"
+    # build args for desired output format
+    args: list[str] = [saved_argv[0]]
+    if fmt == "csv":
+        args.append("--flat-csv")
+    elif fmt == "excel":
+        args.append("--excel")
+    elif fmt == "pdf":
+        args.append("--pdf")
+    elif fmt == "txt":
+        args.append("--txt")
     if symbols:
-        sys.argv.extend(["--symbols", symbols])
+        args.extend(["--symbols", symbols])
     if include_indices:
-        sys.argv.append("--include-indices")
+        args.append("--include-indices")
+    sys.argv = args
     try:
         main()
     finally:
+        # restore original argv and test mode
         sys.argv = saved_argv
+        if saved_mode is None:
+            os.environ.pop("PE_TEST_MODE", None)
+        else:
+            os.environ["PE_TEST_MODE"] = saved_mode

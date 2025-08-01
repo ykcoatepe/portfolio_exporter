@@ -24,11 +24,14 @@ def run(refresh: float = 5.0, iterations: Optional[int] = None) -> None:
 
     console = Console()
     count = 0
-    with Live(console=console, refresh_per_second=4) as live:
+    # fetch and render initial metrics immediately
+    metrics = risk_watch.run(return_dict=True) or {}
+    table = _render(metrics)
+    with Live(table, console=console, refresh_per_second=4) as live:
         while True:
-            metrics = risk_watch.run(return_dict=True) or {}
-            live.update(_render(metrics))
             count += 1
             if iterations is not None and count >= iterations:
                 break
             time.sleep(refresh)
+            metrics = risk_watch.run(return_dict=True) or {}
+            live.update(_render(metrics))

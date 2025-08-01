@@ -1,5 +1,5 @@
 import yfinance as yf
-from ib_insync import util, IB
+from ib_insync import IB, Stock
 from typing import Sequence, Dict
 
 
@@ -11,7 +11,7 @@ def _ibkr_quotes(tickers: Sequence[str]) -> Dict[str, float]:
         raise ConnectionError(str(e))
     data = {}
     for t in tickers:
-        contract = util.stock(t, "SMART", "USD")
+        contract = Stock(t, "SMART", "USD")
         q = ib.reqMktData(contract, "", False, False)
         ib.sleep(1)
         if q.last:
