@@ -15,6 +15,10 @@ from typing import Iterable, List, Tuple
 from typing import Optional
 
 import pandas as pd
+import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from reportlab.lib.pagesizes import letter, landscape
@@ -63,8 +67,8 @@ LIQ_MAP = {1: "Added", 2: "Removed", 3: "RoutedOut", 4: "Auction"}
 
 
 # ───── Lightweight executions loader & action classifier ─────
-def _load_executions():
-    """Fetch executions and open orders from IBKR.
+def _load_trades() -> pd.DataFrame | None:
+    """Fetch executed trades from IBKR.
 
     Raises
     ------
@@ -73,12 +77,10 @@ def _load_executions():
 
     Returns
     -------
-    tuple
-        (df, trades, open_orders, start, end) where ``df`` is the consolidated
-        trades DataFrame. Tests may monkeypatch this function and return only a
-        DataFrame.
+    DataFrame | None
+        DataFrame of executions. Tests may monkeypatch this function and
+        return a prebuilt DataFrame.
     """
-    # Ensure IB API support is available
     if IB is None or ExecutionFilter is None:
         raise RuntimeError(
             "❌ ib_insync library not found or IB ExecutionFilter unavailable. "
@@ -86,13 +88,45 @@ def _load_executions():
         )
 
     start, end = prompt_date_range()
-    trades, open_orders = fetch_trades_ib(start, end)
+    trades, _open_orders = fetch_trades_ib(start, end)
     trades = filter_trades(trades, start, end)
     df = pd.DataFrame([t.__dict__ for t in trades])
     if df.empty:
         print("⚠ No executions found for that period.")
-        return None
-    return df, trades, open_orders, start, end
+        return pd.DataFrame()
+    return df
+
+
+def _load_open_orders() -> pd.DataFrame:
+    from ib_insync import IB
+
+    ib = IB()
+    try:
+        ib.connect("127.0.0.1", 7497, clientId=19, timeout=5)
+    except Exception as exc:  # pragma: no cover - connection optional
+        logger.error(f"IBKR connect failed: {exc}")
+        return pd.DataFrame()
+
+    rows = []
+    for o in ib.openOrders():
+        c = o.contract
+        rows.append(
+            {
+                "PermId": o.permId,
+                "OrderId": o.orderId,
+                "symbol": c.symbol,
+                "secType": c.secType,
+                "Side": o.action.upper(),
+                "Qty": o.totalQuantity,
+                "Price": getattr(o, "lmtPrice", np.nan),
+                "OrderRef": o.orderRef or "",
+                "Liquidation": 0,
+                "lastLiquidity": 0,
+                "Action": "Open",
+            }
+        )
+    ib.disconnect()
+    return pd.DataFrame(rows)
 
 
 def _classify(row: pd.Series) -> str:
@@ -659,32 +693,33 @@ def save_pdf(
 
 
 def run(
-    fmt: str = "csv", show_actions: bool = False, return_df: bool = False
+    fmt: str = "csv",
+    show_actions: bool = False,
+    include_open: bool = True,
+    return_df: bool = False,
 ) -> pd.DataFrame | None:
     """Generate trades report and export in desired format."""
-    loaded = _load_executions()
-    if loaded is None:
+    trades = _load_trades()
+    if trades is None:
         return None
-    if isinstance(loaded, pd.DataFrame):
-        df = loaded
-        trades: list[Trade] = []
-        open_orders: list[OpenOrder] = []
-        start = end = None
-    else:
-        df, trades, open_orders, start, end = loaded
+
+    df = trades.copy()
+    if include_open:
+        open_df = _load_open_orders()
+        df = pd.concat([df, open_df], ignore_index=True, sort=False)
 
     if df.empty:
         print("⚠️ No trades found for the specified date range; no report generated.")
         return None
     if show_actions:
-        df["Action"] = df.apply(_classify, axis=1)
+        df["Action"] = df.apply(
+            lambda r: r["Action"] if r.get("Action") == "Open" else _classify(r),
+            axis=1,
+        )
 
     from portfolio_exporter.core.io import save
-    from portfolio_exporter.core.config import settings
 
     path = save(df, "trades_report", fmt, settings.output_dir)
-    if fmt.lower() == "pdf" and trades:
-        save_pdf(trades, open_orders, start, end, path)
     print(f"✅ Trades report exported → {path}")
     if return_df:
         return df

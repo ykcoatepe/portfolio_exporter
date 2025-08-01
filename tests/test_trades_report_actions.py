@@ -44,7 +44,7 @@ def test_action_tags(monkeypatch):
         ]
     )
     monkeypatch.setattr(
-        "portfolio_exporter.scripts.trades_report._load_executions", lambda: dummy
+        "portfolio_exporter.scripts.trades_report._load_trades", lambda: dummy
     )
     df = trades_report.run(fmt="csv", show_actions=True, return_df=True)
     assert list(df["Action"]) == ["Buy", "Sell", "Close", "Combo", "Roll"]
