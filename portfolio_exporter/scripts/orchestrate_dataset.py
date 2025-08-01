@@ -1,12 +1,11 @@
 import io
 import os
-import subprocess
-import sys
 import zipfile
-from portfolio_exporter.core.config import settings
 from datetime import datetime
+from typing import Callable, List, Tuple
 from zoneinfo import ZoneInfo
-from typing import List, Tuple
+
+from portfolio_exporter.core.config import settings
 
 from fpdf import FPDF
 from pypdf import PdfWriter
@@ -24,10 +23,9 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-def run_script(cmd: list[str]) -> List[str]:
-    """Run a script and return the newly created or modified files in OUTPUT_DIR."""
+def run_script(func: Callable[[], None]) -> List[str]:
+    """Run a script callable and return new or modified files in OUTPUT_DIR."""
     out_dir = OUTPUT_DIR
-    # record existing files and mtimes to detect new or modified outputs
     before_mtimes: dict[str, float] = {}
     for fname in os.listdir(out_dir):
         path = os.path.join(out_dir, fname)
@@ -35,18 +33,7 @@ def run_script(cmd: list[str]) -> List[str]:
             before_mtimes[fname] = os.path.getmtime(path)
         except OSError:
             before_mtimes[fname] = 0.0
-    env = os.environ.copy()
-    env["OUTPUT_DIR"] = out_dir
-    subprocess.run(
-        [sys.executable, *cmd],
-        check=True,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        timeout=600,  # fail fast if a script hangs >10 min
-        env=env,
-    )
-    # detect new or modified files after running the script
+    func()
     files_out: list[str] = []
     for fname in os.listdir(out_dir):
         path = os.path.join(out_dir, fname)
@@ -108,20 +95,25 @@ def cleanup(files: List[str]) -> None:
 def run(fmt: str = "csv") -> None:
     fmt = fmt.lower()
 
-    scripts = [
-        ["historic_prices.py"],
-        ["portfolio_greeks.py"],
-        ["live_feed.py"],
-        ["daily_pulse.py"],
+    from portfolio_exporter.scripts import (
+        daily_pulse,
+        historic_prices,
+        live_feed,
+        portfolio_greeks,
+    )
+
+    scripts: list[tuple[str, Callable[[], None]]] = [
+        ("historic_prices", lambda: historic_prices.run(fmt=fmt)),
+        ("portfolio_greeks", lambda: portfolio_greeks.run(fmt=fmt)),
+        (
+            "live_feed",
+            (lambda: live_feed.run() if fmt == "csv" else live_feed.run(fmt=fmt)),
+        ),
+        ("daily_pulse", lambda: daily_pulse.run(fmt=fmt)),
     ]
-    # Add format flag if not default
-    if fmt == "pdf":
-        scripts[0].append("--pdf")
-        scripts[1].append("--pdf")
-        scripts[2].append("--pdf")
-    scripts[3].extend(["--filetype", fmt])
 
     files_by_script: List[Tuple[str, List[str]]] = []
+    failed: list[str] = []
     console = Console(
         force_terminal=True
     )  # force Rich to treat IDE/CI output as a real TTY
@@ -137,15 +129,16 @@ def run(fmt: str = "csv") -> None:
     )
     with progress:
         overall = progress.add_task("overall", total=len(scripts))
-        for cmd in scripts:
-            task = progress.add_task(cmd[0], total=1)
+        for name, func in scripts:
+            task = progress.add_task(name, total=1)
             try:
-                new_files = run_script(cmd)
+                new_files = run_script(func)
             except Exception as error:
-                console.print(f"[red]Error running {cmd[0]}: {error}")
+                console.print(f"[red]Error running {name}: {error}")
+                failed.append(name)
                 new_files = []
             if new_files:
-                files_by_script.append((cmd[0], new_files))
+                files_by_script.append((name, new_files))
             progress.update(task, completed=1)  # instantly fill bar
             progress.advance(overall)
             progress.refresh()  # render once, no animation
@@ -164,3 +157,8 @@ def run(fmt: str = "csv") -> None:
 
     cleanup(all_files)
     print(f"Created {dest}")
+
+    if failed:
+        print(f"⚠ Batch finished with {len(failed)} failure(s):", failed)
+    else:
+        print("✅ Overnight batch completed – all files written.")
