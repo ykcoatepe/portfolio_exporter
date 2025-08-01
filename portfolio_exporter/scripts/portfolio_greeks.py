@@ -954,27 +954,71 @@ def main() -> None:
 
 
 def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
-    """Return current positions with greeks.
+    """Connect to IBKR and return current positions with greeks.
 
-    This helper retains the legacy IBKR pull behaviour but is kept separate so
-    tests can monkeypatch it with deterministic data.  The real implementation
-    would connect to IBKR and return a DataFrame with columns:
-    ``symbol``, ``secType``, ``qty``, ``multiplier``, ``delta``, ``gamma``,
-    ``vega`` and ``theta``.
+    The returned DataFrame includes ``symbol``, ``secType``, ``qty``,
+    ``multiplier`` and the option greeks ``delta``, ``gamma``, ``vega`` and
+    ``theta``.  Option greeks are pulled live from IBKR while stock/ETF
+    positions receive a delta of ``1`` and zero for the remaining greeks.
     """
 
-    return pd.DataFrame(
-        columns=[
-            "symbol",
-            "secType",
-            "qty",
-            "multiplier",
-            "delta",
-            "gamma",
-            "vega",
-            "theta",
-        ]
-    )
+    ib = IB()
+    try:
+        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
+    except Exception as exc:  # pragma: no cover - network
+        logger.error(f"IBKR connect failed in _load_positions: {exc}")
+        return pd.DataFrame()
+
+    # -------- options & futures options --------
+    bundles = list_positions(ib)
+    opt_rows: list[dict[str, float | str | int]] = []
+    for pos, tk in bundles:
+        c = pos.contract
+        mult = _multiplier(c)
+        qty = pos.position
+        src = next(
+            (
+                getattr(tk, n)
+                for n in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks")
+                if getattr(tk, n, None) and getattr(getattr(tk, n), "delta") is not None
+            ),
+            None,
+        )
+        if not src:
+            continue
+        opt_rows.append(
+            {
+                "symbol": c.localSymbol,
+                "secType": c.secType,
+                "qty": qty,
+                "multiplier": mult,
+                "delta": src.delta,
+                "gamma": src.gamma,
+                "vega": src.vega,
+                "theta": src.theta,
+            }
+        )
+
+    # -------- stock / ETF positions --------
+    stk_rows: list[dict[str, float | str | int]] = []
+    for p in ib.positions():
+        if p.contract.secType in {"STK", "ETF"} and p.position != 0:
+            stk_rows.append(
+                {
+                    "symbol": p.contract.symbol,
+                    "secType": p.contract.secType,
+                    "qty": p.position,
+                    "multiplier": 1,
+                    # shares: delta = 1, other greeks 0
+                    "delta": 1.0,
+                    "gamma": 0.0,
+                    "vega": 0.0,
+                    "theta": 0.0,
+                }
+            )
+
+    ib.disconnect()
+    return pd.DataFrame(opt_rows + stk_rows)
 
 
 def run(
