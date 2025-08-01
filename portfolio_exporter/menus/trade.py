@@ -27,7 +27,7 @@ def launch(status, default_fmt):
         if ch == "r":
             break
         dispatch = {
-            "e": lambda: trades_report.run(fmt=default_fmt),
+            "e": lambda: trades_report.run(fmt=default_fmt, show_actions=True),
             "b": order_builder.run,
             "l": roll_manager.run,
             "q": lambda: option_chain_snapshot.run(fmt=default_fmt),

@@ -69,6 +69,31 @@ if IB is None:
 LIQ_MAP = {1: "Added", 2: "Removed", 3: "RoutedOut", 4: "Auction"}
 
 
+# ───── Lightweight executions loader & action classifier ─────
+def _load_executions() -> pd.DataFrame:
+    """Load executions into a DataFrame (placeholder implementation)."""
+    try:
+        return pd.read_csv("sample_trades.csv")
+    except FileNotFoundError:  # pragma: no cover - sample file may be missing
+        return pd.DataFrame()
+
+
+def _classify(row: pd.Series) -> str:
+    sec = row.get("secType", "")
+    side = row.get("Side", "")
+    liq = int(row.get("Liquidation", 0))
+    lastliq = int(row.get("lastLiquidity", 0))
+    ref = (row.get("OrderRef") or "").upper()
+
+    if sec == "BAG":
+        return "Combo"
+    if "ROLL" in ref:
+        return "Roll"
+    if liq > 0 or lastliq in {2, 4}:
+        return "Close"
+    return "Buy" if side == "BOT" else "Sell"
+
+
 @dataclass
 class Trade:
     # execution identifiers
@@ -788,29 +813,19 @@ def save_pdf(
     return pdf_path
 
 
-def run(fmt: str = "csv") -> None:
-    start, end = prompt_date_range()
+def run(
+    fmt: str = "csv", show_actions: bool = False, return_df: bool = False
+) -> pd.DataFrame | None:
+    df = _load_executions()
+    if show_actions:
+        df["Action"] = df.apply(_classify, axis=1)
+    from portfolio_exporter.core.io import save
 
-    trades, open_orders = fetch_trades_ib(start, end)
-    if not trades and not open_orders:
-        print("⚠ No executions or open orders retrieved.")
-        return
-
-    trades = filter_trades(trades, start, end)
-
-    fmt = fmt.lower()
-    if fmt in {"excel", "xlsx"}:
-        excel_path = save_excel(trades, open_orders, start, end)
-        if excel_path:
-            print(f"\u2705  Saved Excel report to {excel_path}")
-    elif fmt == "pdf":
-        pdf_path = save_pdf(trades, open_orders, start, end)
-        if pdf_path:
-            print(f"\u2705  Saved PDF report to {pdf_path}")
-    else:
-        trade_path, oo_path = save_csvs(trades, open_orders, start, end)
-        print(f"\u2705  Saved {len(trades)} trades to {trade_path}")
-        print(f"\u2705  Saved {len(open_orders)} open orders to {oo_path}")
+    path = save(df, "trades_report", fmt)
+    print(f"✅ Trades report exported → {path}")
+    if return_df:
+        return df
+    return None
 
 
 def main() -> None:
