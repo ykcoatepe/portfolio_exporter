@@ -560,12 +560,22 @@ def main() -> None:
         ts_iso = ts_local.strftime("%Y-%m-%d %H:%M:%S")
         date_tag = ts_local.strftime("%Y%m%d_%H%M")
         rows = [
-            {"symbol": "AAPL", "timestamp": ts_iso,
-             "delta_exposure": 0.0, "gamma_exposure": 0.0,
-             "vega_exposure": 0.0, "theta_exposure": 0.0},
-            {"symbol": "VIX",  "timestamp": ts_iso,
-             "delta_exposure": 0.0, "gamma_exposure": 0.0,
-             "vega_exposure": 0.0, "theta_exposure": 0.0},
+            {
+                "symbol": "AAPL",
+                "timestamp": ts_iso,
+                "delta_exposure": 0.0,
+                "gamma_exposure": 0.0,
+                "vega_exposure": 0.0,
+                "theta_exposure": 0.0,
+            },
+            {
+                "symbol": "VIX",
+                "timestamp": ts_iso,
+                "delta_exposure": 0.0,
+                "gamma_exposure": 0.0,
+                "vega_exposure": 0.0,
+                "theta_exposure": 0.0,
+            },
         ]
         df = pd.DataFrame(rows)
         if not args.include_indices:
@@ -626,7 +636,6 @@ def main() -> None:
             logger.warning("No positions match filter – exiting.")
             ib.disconnect()
             sys.exit(0)
-
 
     ts_utc = datetime.now(timezone.utc)  # for option T calculation
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
@@ -944,16 +953,53 @@ def main() -> None:
     ib.disconnect()
 
 
-def run(fmt: str = "csv", symbols: str = "", include_indices: bool = False) -> None:
+def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
+    """Return current positions with greeks.
+
+    The default implementation is a placeholder and should be monkeypatched in
+    tests or replaced with a real data loader that connects to IBKR.
     """
-    Entry point for menu-driven invocation: invoke main() non-interactively
-    with flags mapped from fmt and symbols, and skip interactive prompts.
+
+    return pd.DataFrame(
+        columns=["symbol", "qty", "delta", "gamma", "vega", "theta", "multiplier"]
+    )
+
+
+def run(fmt: str = "csv", return_dict: bool = False):
+    """Aggregate per-position Greeks into portfolio exposures.
+
+    When ``return_dict`` is ``False`` this function behaves like the previous
+    CLI wrapper and delegates to :func:`main` to produce the full report.
+    When ``return_dict`` is ``True`` it uses :func:`_load_positions` to obtain a
+    DataFrame of positions and returns the summed exposures.
     """
+
+    if return_dict:
+        df = _load_positions()
+        delta_sum = gamma_sum = vega_sum = theta_sum = 0.0
+        debug = os.getenv("PE_GREEKS_DEBUG")
+        for pos in df.itertuples(index=False):
+            mult = getattr(pos, "multiplier", 1) or 1
+            if debug:
+                print(
+                    f"[DEBUG] {pos.symbol}: qty={pos.qty}  delta={pos.delta:.4f}  "
+                    f"gamma={pos.gamma:.4f}  vega={pos.vega:.4f}  theta={pos.theta:.4f}"
+                )
+            delta_sum += pos.delta * pos.qty * mult
+            gamma_sum += pos.gamma * pos.qty * mult
+            vega_sum += pos.vega * pos.qty * mult
+            theta_sum += pos.theta * pos.qty * mult
+
+        return {
+            "delta_exposure": delta_sum,
+            "gamma_exposure": gamma_sum,
+            "vega_exposure": vega_sum,
+            "theta_exposure": theta_sum,
+        }
+
     saved_argv = sys.argv
-    # ensure no interactive prompt in main()
     saved_mode = os.environ.get("PE_TEST_MODE")
     os.environ["PE_TEST_MODE"] = "1"
-    # build args for desired output format
     args: list[str] = [saved_argv[0]]
     if fmt == "csv":
         args.append("--flat-csv")
@@ -963,15 +1009,10 @@ def run(fmt: str = "csv", symbols: str = "", include_indices: bool = False) -> N
         args.append("--pdf")
     elif fmt == "txt":
         args.append("--txt")
-    if symbols:
-        args.extend(["--symbols", symbols])
-    if include_indices:
-        args.append("--include-indices")
     sys.argv = args
     try:
         main()
     finally:
-        # restore original argv and test mode
         sys.argv = saved_argv
         if saved_mode is None:
             os.environ.pop("PE_TEST_MODE", None)
