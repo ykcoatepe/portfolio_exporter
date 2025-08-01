@@ -19,7 +19,7 @@ This document outlines the goals of the project and provides a high level overvi
 | `portfolio_greeks.py` | retrieves option positions and Greeks from IBKR | – |
 | `option_chain_snapshot.py` | exports the full IBKR option chain for each underlying | – |
 | `net_liq_history_export.py` | reads TWS logs or queries the Client Portal for account net‑liquidation history | – |
+| `trades_report.py`       | exports executions and open orders from IBKR within a date range      | – |
 
 These scripts share a common approach: IBKR is queried first for portfolio aware data; if connectivity is not available or the ticker is unsupported, they use public APIs such as yfinance. This makes the tools useful even without a running IBKR gateway.
-
 

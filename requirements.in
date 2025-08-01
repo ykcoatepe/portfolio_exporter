@@ -1,0 +1,13 @@
+fpdf
+ib_insync
+numpy
+pandas
+prompt_toolkit
+pydantic-settings
+pypdf
+reportlab
+rich
+yfinance
+pandas_datareader
+requests
+xlsxwriter

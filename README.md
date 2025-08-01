@@ -28,37 +28,28 @@ If the token is not present, the script will attempt to read `dailyNetLiq.csv` f
 ## Installation
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install pip-tools
-pip-compile requirements.in requirements-dev.in
-pip install -r requirements.txt -r requirements-dev.txt
-pytest
+make setup
 ```
 
 
 ## Upgrading dependencies
 
-This project uses the [pip-tools](https://github.com/jazzband/pip-tools) workflow
-to maintain fully pinned requirements.
+This project uses the [pip-tools](https://github.com/jazzband/pip-tools) workflow to maintain fully pinned requirements.
 
-1. Edit top‑level dependencies in `requirements.in` or dev dependencies in
-   `requirements-dev.in` (e.g. adjust version specifiers).
+1. Edit dependencies in `requirements.in` or dev dependencies in `requirements-dev.in` (e.g. adjust version specifiers).
 2. Re‑compile the pinned files:
 
    ```bash
+   pip install pip-tools
    pip-compile requirements.in requirements-dev.in
    ```
 
-3. Re‑install dependencies and re‑run tests:
+3. Re‑install dependencies and re‑run tests (or use `make setup && make test`):
 
    ```bash
    pip install -r requirements.txt -r requirements-dev.txt
    pytest
    ```
-
-The included *Makefile* still provides `make setup` and `make test` targets to automate
-these steps if desired.
 
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.
 `pandas_datareader` is needed for downloading FRED data in `live_feed.py`, and `requests` is required by `net_liq_history_export.py` for accessing the IBKR Client Portal API. `xlsxwriter` enables Excel exports and `reportlab` enables PDF output. `matplotlib` is optional and only needed when using the `--plot` flag with `net_liq_history_export.py`.
