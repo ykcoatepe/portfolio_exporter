@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import argparse
-import csv
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -17,11 +15,6 @@ from typing import Iterable, List, Tuple
 from typing import Optional
 
 import pandas as pd
-
-try:  # optional dependencies
-    import xlsxwriter  # type: ignore
-except Exception:  # pragma: no cover - optional
-    xlsxwriter = None  # type: ignore
 
 try:
     from reportlab.lib.pagesizes import letter, landscape
@@ -70,12 +63,22 @@ LIQ_MAP = {1: "Added", 2: "Removed", 3: "RoutedOut", 4: "Auction"}
 
 
 # ───── Lightweight executions loader & action classifier ─────
-def _load_executions() -> pd.DataFrame:
-    """Load executions into a DataFrame (placeholder implementation)."""
-    try:
-        return pd.read_csv("sample_trades.csv")
-    except FileNotFoundError:  # pragma: no cover - sample file may be missing
-        return pd.DataFrame()
+def _load_executions():
+    """Fetch executions and open orders from IBKR.
+
+    Returns
+    -------
+    tuple
+        (df, trades, open_orders, start, end) where ``df`` is the consolidated
+        trades DataFrame. Tests may monkeypatch this function and return only a
+        DataFrame.
+    """
+
+    start, end = prompt_date_range()
+    trades, open_orders = fetch_trades_ib(start, end)
+    trades = filter_trades(trades, start, end)
+    df = pd.DataFrame([t.__dict__ for t in trades])
+    return df, trades, open_orders, start, end
 
 
 def _classify(row: pd.Series) -> str:
@@ -159,9 +162,6 @@ class OpenOrder:
 
 # ───────────────────────── CONFIG ──────────────────────────
 # Use Türkiye local time (Europe/Istanbul) for timestamp tags
-TIME_TAG = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%H%M")
-OUTPUT_DIR = Path(settings.output_dir).expanduser()
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 5  # dedicated clientId
 
 
@@ -406,54 +406,6 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
     return trades, open_orders
 
 
-def save_csvs(
-    trades: Iterable[Trade],
-    open_orders: Iterable[OpenOrder],
-    start: date,
-    end: date,
-) -> Tuple[Path, Path]:
-    ts = TIME_TAG
-    base = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}_{ts}"
-
-    # trades file
-    trades_file = OUTPUT_DIR / f"trades_{base}.csv"
-    with open(trades_file, "w", newline="") as fh:
-        wr = csv.writer(fh)
-        wr.writerow(["# Orders Made"])  # user‑friendly banner
-        wr.writerow(Trade.__annotations__.keys())
-        for t in trades:
-            wr.writerow([getattr(t, f) for f in Trade.__annotations__])
-
-    # open orders file
-    oo_file = OUTPUT_DIR / f"open_orders_{base}.csv"
-    with open(oo_file, "w", newline="") as fh:
-        wr = csv.writer(fh)
-        wr.writerow(["# Open Orders"])  # section banner
-        wr.writerow(OpenOrder.__annotations__.keys())
-        for o in open_orders:
-            wr.writerow([getattr(o, f) for f in OpenOrder.__annotations__])
-
-    return trades_file, oo_file
-
-
-# Helper for Excel export: auto-fit columns
-def _auto_fit_columns(
-    df: pd.DataFrame, writer: pd.ExcelWriter, sheet_name: str
-) -> None:
-    """
-    Auto‑adjust column widths based on the longest value in each column.
-    """
-    worksheet = writer.sheets[sheet_name]
-    for i, col in enumerate(df.columns):
-        # find length of the column header and the longest cell content
-        max_len = max(
-            df[col].astype(str).map(len).max(),
-            len(col),
-        )
-        # Add a little extra space
-        worksheet.set_column(i, i, max_len + 2)
-
-
 # Helper for PDF tables: size columns based on content length
 def _calc_table_col_widths(
     data: list[list],
@@ -488,149 +440,20 @@ def _calc_table_col_widths(
     return col_widths
 
 
-# Save Excel workbook with trades and open orders
-def save_excel(
+# Save PDF report with trades and open orders
+def save_pdf(
     trades: Iterable[Trade],
     open_orders: Iterable[OpenOrder],
     start: date,
     end: date,
-) -> Optional[Path]:
-    """
-    Save trades and open orders to a nicely formatted Excel workbook that is
-    easier to read than raw CSVs. Returns the path to the created workbook,
-    or None if both data sets are empty.
-    """
-    trades = list(trades)
-    open_orders = list(open_orders)
-    if not trades and not open_orders:
-        return None
-
-    ts = TIME_TAG
-    base = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}_{ts}"
-    excel_path = OUTPUT_DIR / f"trades_report_{base}.xlsx"
-
-    # Convert dataclass lists to DataFrames
-    df_trades = pd.DataFrame([t.__dict__ for t in trades])
-    df_open = pd.DataFrame([o.__dict__ for o in open_orders])
-
-    # ── ensure Excel gets timezone‑naive datetimes ─────────────────────────────
-    if "datetime" in df_trades.columns:
-        # pandas raises if we call tz_localize(None) on a naive column, so check dtype first
-        dt_ser = pd.to_datetime(df_trades["datetime"], errors="coerce")
-        if isinstance(dt_ser.dtype, pd.DatetimeTZDtype):
-            dt_ser = dt_ser.dt.tz_localize(None)
-        df_trades["datetime"] = dt_ser
-
-    if "combo_legs" in df_trades.columns:
-        df_trades["combo_legs"] = df_trades["combo_legs"].apply(
-            lambda x: (
-                "\n".join(
-                    [
-                        f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                        f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                        for leg in x
-                    ]
-                )
-                if x
-                else None
-            )
-        )
-
-    # Re‑order / hide columns for readability
-    trade_cols_preferred = [
-        "datetime",
-        "symbol",
-        "sec_type",
-        "side",
-        "qty",
-        "price",
-        "avg_price",
-        "realized_pnl",
-        "commission",
-        "currency",
-        "expiry",
-        "strike",
-        "right",
-        "exchange",
-        "combo_legs",
-        "order_id",
-        "exec_id",
-    ]
-    df_trades = df_trades[[c for c in trade_cols_preferred if c in df_trades.columns]]
-
-    open_cols_preferred = [
-        "symbol",
-        "sec_type",
-        "side",
-        "total_qty",
-        "lmt_price",
-        "aux_price",
-        "status",
-        "filled",
-        "remaining",
-        "expiry",
-        "strike",
-        "right",
-        "combo_legs",
-        "order_type",
-        "order_id",
-    ]
-    df_open = df_open[[c for c in open_cols_preferred if c in df_open.columns]]
-
-    if "combo_legs" in df_open.columns:
-        df_open["combo_legs"] = df_open["combo_legs"].apply(
-            lambda x: (
-                "\n".join(
-                    [
-                        f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                        f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                        for leg in x
-                    ]
-                )
-                if x
-                else None
-            )
-        )
-
-    with pd.ExcelWriter(
-        excel_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss"
-    ) as writer:
-        if not df_trades.empty:
-            df_trades.to_excel(writer, sheet_name="Trades", index=False)
-            _auto_fit_columns(df_trades, writer, "Trades")
-
-            # --- summary sheet, grouped by symbol -------------
-            summary = (
-                df_trades.groupby("symbol")
-                .agg(
-                    trades_count=("exec_id", "count"),
-                    total_qty=("qty", "sum"),
-                    realized_pnl=("realized_pnl", "sum"),
-                )
-                .reset_index()
-                .sort_values("realized_pnl", ascending=False)
-            )
-            summary.to_excel(writer, sheet_name="Summary", index=False)
-            _auto_fit_columns(summary, writer, "Summary")
-
-        if not df_open.empty:
-            df_open.to_excel(writer, sheet_name="OpenOrders", index=False)
-            _auto_fit_columns(df_open, writer, "OpenOrders")
-
-    return excel_path
-
-
-def save_pdf(
-    trades: Iterable[Trade], open_orders: Iterable[OpenOrder], start: date, end: date
+    out_path: Path,
 ) -> Optional[Path]:
     trades = list(trades)
     open_orders = list(open_orders)
     if not trades and not open_orders:
         return None
 
-    ts = TIME_TAG
-    base = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}_{ts}"
-    pdf_path = OUTPUT_DIR / f"trades_report_{base}.pdf"
+    pdf_path = Path(out_path)
 
     df_trades = pd.DataFrame([t.__dict__ for t in trades])
     df_open = pd.DataFrame([o.__dict__ for o in open_orders])
@@ -816,99 +639,26 @@ def save_pdf(
 def run(
     fmt: str = "csv", show_actions: bool = False, return_df: bool = False
 ) -> pd.DataFrame | None:
-    df = _load_executions()
-    if show_actions:
-        df["Action"] = df.apply(_classify, axis=1)
-    from portfolio_exporter.core.io import save
+    """Generate trades report and export in desired format."""
+    loaded = _load_executions()
+    if isinstance(loaded, pd.DataFrame):
+        df = loaded
+        trades: list[Trade] = []
+        open_orders: list[OpenOrder] = []
+        start = end = None
+    else:
+        df, trades, open_orders, start, end = loaded
 
-    path = save(df, "trades_report", fmt)
+    if show_actions and not df.empty:
+        df["Action"] = df.apply(_classify, axis=1)
+
+    from portfolio_exporter.core.io import save
+    from portfolio_exporter.core.config import settings
+
+    path = save(df, "trades_report", fmt, settings.output_dir)
+    if fmt.lower() == "pdf" and trades:
+        save_pdf(trades, open_orders, start, end, path)
     print(f"✅ Trades report exported → {path}")
     if return_df:
         return df
     return None
-
-
-def main() -> None:
-    p = argparse.ArgumentParser(description="Filter trade history")
-    g = p.add_mutually_exclusive_group()
-    g.add_argument("--today", action="store_true", help="Trades for today")
-    g.add_argument("--yesterday", action="store_true", help="Trades for yesterday")
-    g.add_argument("--week", action="store_true", help="Week to date")
-    g.add_argument("--phrase", help="Custom date phrase, e.g. 'June 2024'")
-    g.add_argument("--start")
-    p.add_argument("--end")
-    p.add_argument("--ibport", type=int, help="Override API port (default 7497)")
-    p.add_argument("--cid", type=int, help="Override IB clientId (default 5)")
-    out_grp = p.add_mutually_exclusive_group()
-    out_grp.add_argument(
-        "--excel",
-        action="store_true",
-        help="Save output as an Excel workbook instead of CSV.",
-    )
-    out_grp.add_argument(
-        "--pdf",
-        action="store_true",
-        help="Save output as a PDF report instead of CSV.",
-    )
-
-    args = p.parse_args()
-
-    if not args.excel and not args.pdf:
-        try:
-            choice = (
-                input("Select output format [csv / excel / pdf] (default csv): ")
-                .strip()
-                .lower()
-            )
-        except EOFError:
-            choice = ""
-        if choice in {"excel", "xlsx"}:
-            args.excel = True
-        elif choice == "pdf":
-            args.pdf = True
-
-    global IB_PORT, IB_CID
-    if args.ibport:
-        IB_PORT = args.ibport
-    if args.cid:
-        IB_CID = args.cid
-
-    if args.today:
-        start, end = date_range_from_phrase("today")
-    elif args.yesterday:
-        start, end = date_range_from_phrase("yesterday")
-    elif args.week:
-        start, end = date_range_from_phrase("week")
-    elif args.phrase:
-        start, end = date_range_from_phrase(args.phrase)
-    elif args.start:
-        s = datetime.fromisoformat(args.start).date()
-        e = datetime.fromisoformat(args.end).date() if args.end else s
-        start, end = s, e
-    else:
-        # No CLI flags – fall back to interactive prompt
-        start, end = prompt_date_range()
-
-    trades, open_orders = fetch_trades_ib(start, end)
-    if not trades and not open_orders:
-        print("⚠ No executions or open orders retrieved.")
-        return
-
-    trades = filter_trades(trades, start, end)
-
-    if args.excel:
-        excel_path = save_excel(trades, open_orders, start, end)
-        if excel_path:
-            print(f"\u2705  Saved Excel report to {excel_path}")
-    elif args.pdf:
-        pdf_path = save_pdf(trades, open_orders, start, end)
-        if pdf_path:
-            print(f"\u2705  Saved PDF report to {pdf_path}")
-    else:
-        trade_path, oo_path = save_csvs(trades, open_orders, start, end)
-        print(f"\u2705  Saved {len(trades)} trades to {trade_path}")
-        print(f"\u2705  Saved {len(open_orders)} open orders to {oo_path}")
-
-
-if __name__ == "__main__":
-    main()
