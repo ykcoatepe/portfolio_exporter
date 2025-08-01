@@ -8,6 +8,8 @@ from portfolio_exporter.scripts import (
     net_liq_history_export,
 )
 
+# Menu for trade-related utilities
+
 
 def launch(status, default_fmt):
     console = status.console if status else Console()
