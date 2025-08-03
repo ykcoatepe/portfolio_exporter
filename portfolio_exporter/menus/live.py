@@ -22,8 +22,16 @@ def _user_tech_signals(status, default_fmt):
 
 def launch(status, default_fmt):
     console = status.console if status else Console()
+
+    def _snapshot():
+        try:
+            live_feed.run(fmt=default_fmt, include_indices=True)
+        except TypeError:
+            # backward compatibility for patched or legacy signatures
+            live_feed.run()
+
     actions = {
-        "q": ("Snapshot quotes", live_feed.run),
+        "q": ("Snapshot quotes", _snapshot),
         "t": ("Tech signals", tech_signals_ibkr.run),
         "g": ("Portfolio Greeks", portfolio_greeks.run),
         "r": ("Risk dashboard", lambda: risk_dash.run()),
