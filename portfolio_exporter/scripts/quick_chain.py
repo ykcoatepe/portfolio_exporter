@@ -49,11 +49,35 @@ def run(
         return
     pre_menu.last_expiry.value = expiry
 
+    from yfinance import Ticker
+
+    all_exps: list[str] = []
+
+    def _valid_expirations(sym: str) -> list[str]:
+        nonlocal all_exps
+        if all_exps:
+            return all_exps
+        all_exps = Ticker(sym).options
+        return all_exps
+
+    def _nearest(expiry_date: str) -> str:
+        # if the requested expiry is not listed, pick the next later one
+        exps = _valid_expirations(symbol)
+        if not exps:
+            return expiry_date
+        if expiry_date in exps:
+            return expiry_date
+        for e in exps:
+            if e > expiry_date:
+                return e
+        return exps[-1]  # fallback: last available
+
     def _fetch(cur_width: int, cur_expiry: str) -> pd.DataFrame:
+        exp = _nearest(cur_expiry)
         use_strikes = (
             strikes if strikes is not None else _calc_strikes(symbol, cur_width)
         )
-        return core_chain.fetch_chain(symbol, cur_expiry, use_strikes)
+        return core_chain.fetch_chain(symbol, exp, use_strikes)
 
     df = _fetch(width, expiry)
 
