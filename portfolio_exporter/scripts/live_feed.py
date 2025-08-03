@@ -72,6 +72,9 @@ try:
 except ImportError:
     IB_AVAILABLE = False
 
+# Tickers always included in live snapshots
+ALWAYS_TICKERS = ["SPY", "QQQ", "IWM", "DIA", "VIX"]
+
 # Always‑included macro tickers
 EXTRA_TICKERS = [
     # Treasury yields (intraday CBOE + FRED daily)
@@ -166,6 +169,11 @@ def load_tickers() -> list[str]:
         return []
     with open(p) as f:
         return [ln.strip().upper() for ln in f if ln.strip()]
+
+
+def _load_portfolio_tickers() -> list[str]:
+    """Wrapper for tests to load portfolio tickers."""
+    return load_tickers()
 
 
 def fetch_ib_positions(ib: "IB") -> tuple[list[Option], set[str]]:
@@ -722,14 +730,46 @@ def main():
     )
 
 
-def run() -> None:
-    tickers = load_tickers()
-    if not tickers:
-        return
-    data = snapshot(tickers)
+def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
+    """Snapshot quotes using IBKR with yfinance fallback."""
+    try:
+        data = snapshot(ticker_list)
+    except Exception:
+        data = {}
+
+    rows: list[dict[str, float]] = []
+    if data:
+        rows = [{"symbol": k, "price": v} for k, v in data.items()]
+    else:
+        for t in ticker_list:
+            try:
+                df = yf.download(t, period="1d", interval="1m", progress=False)
+                price = float(df["Close"].dropna().iloc[-1])
+            except Exception:
+                price = float("nan")
+            rows.append({"symbol": t, "price": price})
+    return pd.DataFrame(rows)
+
+
+def run(
+    fmt: str = "csv",
+    tickers: list[str] | None = None,
+    include_indices: bool = True,
+    return_df: bool = False,
+) -> pd.DataFrame | None:
+    if tickers is None:
+        tickers = _load_portfolio_tickers()
+    if include_indices:
+        tickers = sorted(set(t.upper() for t in tickers) | set(ALWAYS_TICKERS))
+
+    df = _snapshot_quotes(tickers, fmt=fmt)
+    df = df.rename(columns={"symbol": "ticker", "price": "last"})
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
-    df = pd.DataFrame({"ticker": list(data.keys()), "last": list(data.values())})
     df.insert(0, "timestamp", ts_now)
+
+    if return_df:
+        return df
+
     base_q = OUTPUT_CSV.rsplit(".", 1)[0]
     df.to_csv(
         base_q + ".csv",
@@ -738,3 +778,4 @@ def run() -> None:
         float_format="%.3f",
     )
     print(df)
+    return None
