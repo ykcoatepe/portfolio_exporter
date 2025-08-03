@@ -21,6 +21,7 @@ dependencies = [
     "reportlab",
     "rich",
     "yfinance",
+    "dateparser>=1.2.0",
 ]
 
 [project.optional-dependencies]

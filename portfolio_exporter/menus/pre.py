@@ -15,6 +15,11 @@ from portfolio_exporter.scripts import (
 import builtins
 
 _input_buffer: list[str] = []
+
+# cache last symbol / expiry used by quick-chain prompts
+_last_used: dict[str, str] = {"symbol": "", "expiry": ""}
+
+
 def _input(prompt: str = "") -> str:
     """Fetch one command from potentially multi-line input buffer."""
     global _input_buffer
@@ -30,6 +35,26 @@ def _input(prompt: str = "") -> str:
         _input_buffer.extend(lines[1:])
         return lines[0]
     return raw
+
+
+def _ask_symbol(prompt: str = "Symbol: ") -> str:
+    """Prompt for a symbol, reusing last entry on blank input."""
+    sym = _input(prompt).strip().upper()
+    if not sym:
+        sym = _last_used.get("symbol", "")
+    if sym:
+        _last_used["symbol"] = sym
+    return sym
+
+
+def _ask_expiry(prompt: str = "Expiry (YYYY-MM-DD): ") -> str:
+    """Prompt for an expiry, reusing last entry on blank input."""
+    exp = _input(prompt).strip()
+    if not exp:
+        exp = _last_used.get("expiry", "")
+    if exp:
+        _last_used["expiry"] = exp
+    return exp
 
 
 def launch(status: StatusBar, default_fmt: str):
