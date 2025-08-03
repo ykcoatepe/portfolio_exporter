@@ -11,3 +11,4 @@ yfinance
 pandas_datareader
 requests
 xlsxwriter
+dateparser>=1.2.0
