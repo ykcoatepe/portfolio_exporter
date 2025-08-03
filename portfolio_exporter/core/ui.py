@@ -2,6 +2,9 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.align import Align
 from rich.console import Console
+from rich.table import Table
+
+import pandas as pd
 
 console = Console()
 
@@ -29,3 +32,52 @@ class StatusBar:
     def _render(self):
         panel = Panel(Align.left(self._text), style=self._style, padding=(0, 1))
         return panel
+
+
+def render_chain(df: pd.DataFrame, console: Console, width: int) -> Table:
+    """Render a Rich table for an option chain snapshot.
+
+    The ``mid`` column is coloured green when it increases from the previous
+    render and red when it decreases. ``NaN`` values in greeks are shown as
+    ``"--"``.
+    """
+
+    if not hasattr(render_chain, "_last_mid"):
+        render_chain._last_mid = {}
+    last_mid: dict[tuple[float, str], float] = render_chain._last_mid  # type: ignore[attr-defined]
+
+    tbl = Table()
+    tbl.add_column("Strike", justify="right")
+    tbl.add_column("Bid", justify="right")
+    tbl.add_column("Ask", justify="right")
+    tbl.add_column("Mid", justify="right")
+    tbl.add_column("Δ", justify="right")
+    tbl.add_column("Θ", justify="right")
+    tbl.add_column("IV", justify="right")
+
+    def _fmt(val: float) -> str:
+        return f"{val:.2f}" if pd.notna(val) else "--"
+
+    for row in df.itertuples():
+        key = (row.strike, row.right)
+        mid = row.mid
+        prev = last_mid.get(key)
+        style = ""
+        if prev is not None and pd.notna(mid):
+            if mid > prev:
+                style = "green"
+            elif mid < prev:
+                style = "red"
+        last_mid[key] = mid
+
+        tbl.add_row(
+            f"{row.strike:g}",
+            _fmt(row.bid),
+            _fmt(row.ask),
+            f"[{style}]{_fmt(mid)}[/{style}]" if style else _fmt(mid),
+            _fmt(row.delta),
+            _fmt(row.theta),
+            _fmt(row.iv),
+        )
+
+    return tbl
