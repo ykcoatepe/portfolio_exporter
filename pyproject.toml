@@ -20,7 +20,7 @@ dependencies = [
     "pypdf",
     "reportlab",
     "rich",
-    "yfinance",
+    "yfinance>=0.2.37",
     "dateparser>=1.2.0",
 ]
 
