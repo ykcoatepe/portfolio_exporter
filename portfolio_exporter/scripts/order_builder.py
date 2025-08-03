@@ -10,8 +10,13 @@ import builtins
 import datetime
 import json
 import pathlib
+import sys
+import rich
 
 from prompt_toolkit import prompt
+
+# Use a rich console that respects TTY detection for cosmetic output
+console = rich.console.Console(force_terminal=sys.stdin.isatty())
 
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.input import parse_order_line
@@ -48,12 +53,30 @@ def run():
             "vert" if len(parsed.legs) == 2 else ("csp" if right == "P" else "cc")
         )
 
-    strat = _ask("Strategy (cc/csp/vert)", strat_default).lower()
-    underlying = _ask("Underlying", underlying_default).upper()
-    expiry = _ask("Expiry (YYYY-MM-DD)", expiry_default)
-    qty = int(_ask("Contracts", qty_default))
-    strikes_in = _ask("Strike(s) (comma-sep)", strikes_default).replace(" ", "")
-    strikes = [float(s) for s in strikes_in.split(",") if s]
+    # If shorthand parsed with two legs, use default vertical strategy & skip prompting
+    if parsed and len(parsed.legs) == 2:
+        strat = "vert"
+    else:
+        strat = _ask("Strategy (cc/csp/vert)", strat_default).lower()
+
+    # Skip prompting underlying when shorthand parsed with two legs (use default underlying)
+    if parsed and len(parsed.legs) == 2:
+        underlying = underlying_default
+    else:
+        underlying = _ask("Underlying", underlying_default).upper()
+    # Skip the expiry prompt when a shorthand string already supplied it
+    if parsed:
+        expiry = expiry_default  # derived from parsed.legs[0].expiry
+    else:
+        expiry = _ask("Expiry (YYYY-MM-DD)", expiry_default)
+    # Skip contracts & strikes prompts if parsed already supplied them
+    if parsed:
+        qty = int(qty_default)
+        strikes = [leg.strike for leg in parsed.legs]
+    else:
+        qty = int(_ask("Contracts", qty_default))
+        strikes_in = _ask("Strike(s) (comma-sep)", strikes_default).replace(" ", "")
+        strikes = [float(s) for s in strikes_in.split(",") if s]
     if not right:
         right = "P" if strat == "csp" else "C"
 
