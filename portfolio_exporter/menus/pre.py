@@ -13,11 +13,15 @@ from portfolio_exporter.scripts import (
 
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
 import builtins
+from types import SimpleNamespace
 
 _input_buffer: list[str] = []
 
 # cache last symbol / expiry used by quick-chain prompts
-_last_used: dict[str, str] = {"symbol": "", "expiry": ""}
+last_symbol = SimpleNamespace(value="")
+last_symbol.get = lambda ls=last_symbol: ls.value
+last_expiry = SimpleNamespace(value="")
+last_expiry.get = lambda le=last_expiry: le.value
 
 
 def _input(prompt: str = "") -> str:
@@ -39,21 +43,17 @@ def _input(prompt: str = "") -> str:
 
 def _ask_symbol(prompt: str = "Symbol: ") -> str:
     """Prompt for a symbol, reusing last entry on blank input."""
-    sym = _input(prompt).strip().upper()
-    if not sym:
-        sym = _last_used.get("symbol", "")
+    sym = _input(prompt).strip().upper() or last_symbol.get()
     if sym:
-        _last_used["symbol"] = sym
+        last_symbol.value = sym
     return sym
 
 
 def _ask_expiry(prompt: str = "Expiry (YYYY-MM-DD): ") -> str:
     """Prompt for an expiry, reusing last entry on blank input."""
-    exp = _input(prompt).strip()
-    if not exp:
-        exp = _last_used.get("expiry", "")
+    exp = _input(prompt).strip() or last_expiry.get()
     if exp:
-        _last_used["expiry"] = exp
+        last_expiry.value = exp
     return exp
 
 
@@ -77,6 +77,7 @@ def launch(status: StatusBar, default_fmt: str):
             ("s", "Sync tickers"),
             ("h", "Historic prices"),
             ("p", "Daily pulse"),
+            ("q", "Quick chain"),
             ("o", "Option chain snapshot"),
             ("n", "Net-Liq history"),
             ("x", "External technical scan"),
@@ -96,11 +97,18 @@ def launch(status: StatusBar, default_fmt: str):
             idx = order.index(current_fmt)
             current_fmt = order[(idx + 1) % len(order)]
             continue
+
         # map choices to actions
+        def _quick_chain(fmt: str = "") -> None:
+            from portfolio_exporter.scripts import quick_chain
+
+            quick_chain.run(last_symbol.get(), last_expiry.get())
+
         action_map = {
             "s": update_tickers.run,
             "h": historic_prices.run,
             "p": daily_pulse.run,
+            "q": _quick_chain,
             "o": option_chain_snapshot.run,
             "n": net_liq_history_export.run,
             "x": lambda fmt=default_fmt: _external_scan(fmt),
