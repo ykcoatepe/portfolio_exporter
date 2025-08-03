@@ -31,12 +31,16 @@ def quote_stock(symbol: str) -> Dict[str, Any]:
     ib = _ib()
     if ib.isConnected():
         stk = Stock(symbol, "SMART", "USD")
-        ticker = ib.reqMktData(stk, "", False, snapshot=True)
+        ticker = ib.reqMktData(stk, "", snapshot=True)
         ib.sleep(0.3)
         mid = (
             (ticker.bid + ticker.ask) / 2 if ticker.bid and ticker.ask else ticker.last
         )
-        return {"mid": mid, "bid": ticker.bid, "ask": ticker.ask}
+        # IB can return blanks outside RTH; if so, fall back to yfinance
+        if mid is None or (isinstance(mid, float) and math.isnan(mid)):
+            ib.disconnect()
+        else:
+            return {"mid": mid, "bid": ticker.bid, "ask": ticker.ask}
     yf_tkr = yf.Ticker(symbol)
     price = yf_tkr.history(period="1d")["Close"].iloc[-1]
     return {"mid": price, "bid": price, "ask": price}
@@ -57,23 +61,28 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> Dict[st
     """
     ib = _ib()
     if ib.isConnected():
-        opt = Option(symbol, expiry, strike, right, "SMART")
-        ticker = ib.reqMktData(opt, "", False, snapshot=True)
+        # IB expects yyyymmdd string for lastTradeDateOrContractMonth
+        opt = Option(symbol, expiry.replace("-", ""), strike, right, "SMART", "USD")
+        ticker = ib.reqMktData(opt, "", snapshot=True)
         ib.sleep(0.3)
         mid = (
             (ticker.bid + ticker.ask) / 2 if ticker.bid and ticker.ask else ticker.last
         )
-        g = ticker.modelGreeks
-        return {
-            "mid": mid,
-            "bid": ticker.bid,
-            "ask": ticker.ask,
-            "delta": getattr(g, "delta", math.nan),
-            "gamma": getattr(g, "gamma", math.nan),
-            "vega": getattr(g, "vega", math.nan),
-            "theta": getattr(g, "theta", math.nan),
-            "iv": getattr(g, "impliedVol", math.nan),
-        }
+        if mid is None or (isinstance(mid, float) and math.isnan(mid)):
+            # empty snapshot → disconnect so we hit the fallback below
+            ib.disconnect()
+        else:
+            g = ticker.modelGreeks
+            return {
+                "mid": mid,
+                "bid": ticker.bid,
+                "ask": ticker.ask,
+                "delta": getattr(g, "delta", math.nan),
+                "gamma": getattr(g, "gamma", math.nan),
+                "vega": getattr(g, "vega", math.nan),
+                "theta": getattr(g, "theta", math.nan),
+                "iv": getattr(g, "impliedVol", math.nan),
+            }
 
     yf_tkr = yf.Ticker(symbol)
     chain = yf_tkr.option_chain(expiry)
