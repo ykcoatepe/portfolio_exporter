@@ -95,8 +95,15 @@ def run(
         use_strikes = (
             strikes if strikes is not None else _calc_strikes(symbol, cur_width)
         )
+        progress_console = (
+            Console(force_terminal=True)
+            if not sys.stdin.isatty()
+            else console
+        )
         with Progress(
-            SpinnerColumn(), TextColumn("[progress.description]{task.description}")
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=progress_console,
         ) as prog:
             prog.add_task(description=f"Fetching {symbol} {exp} …", total=None)
             df = core_chain.fetch_chain(symbol, exp, use_strikes)
