@@ -162,6 +162,7 @@ def run(
     if soon.empty:
         if return_df:
             return pd.DataFrame()
+    console = Console(force_terminal=True)
     rows: List[dict] = []
     for cid, cmb in soon.iterrows():
         new_exp = _next_expiry(today, weekly)
@@ -178,7 +179,23 @@ def run(
         new_theta = 0.0
         net_mid = 0.0
         for strike, right, qty in zip(strikes, rights, qtys):
-            ch = chain[(chain["strike"] == strike) & (chain["right"] == right)].iloc[0]
+            # --- ensure columns exist even if fetch_chain() set them as index ---
+            if "strike" not in chain.columns:
+                chain = chain.reset_index(drop=False, names=["strike"])  # pandas ≥2
+            if "right" not in chain.columns:
+                chain["right"] = (
+                    chain.index.get_level_values("right")
+                    if chain.index.nlevels > 1
+                    else pd.NA
+                )
+
+            sel = chain[(chain["strike"] == strike) & (chain["right"] == right)]
+            if sel.empty:
+                console.print(
+                    f"[yellow]⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
+                )
+                continue
+            ch = sel.iloc[0]
             new_legs.append(
                 {
                     "strike": strike,
@@ -216,8 +233,6 @@ def run(
         )
 
     df = pd.DataFrame(rows).set_index("combo_id")
-
-    console = Console(force_terminal=True)
     selected: set = set()
 
     def _render() -> Table:
