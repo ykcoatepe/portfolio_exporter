@@ -189,7 +189,11 @@ def run(
                     else pd.NA
                 )
 
-            sel = chain[(chain["strike"] == strike) & (chain["right"] == right)]
+            # IB/YF chains often list strikes in 5‑pt increments; roll to the
+            # *nearest* available strike within $0.25 of the original.
+            sel = chain[
+                (chain["right"] == right) & (abs(chain["strike"] - strike) < 0.25)
+            ]
             if sel.empty:
                 console.print(
                     f"[yellow]⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
@@ -231,6 +235,10 @@ def run(
                 "theta_after": new_theta,
             }
         )
+
+    if not rows:
+        console.print("[yellow]No eligible combos found or priced; nothing to roll.")
+        return
 
     df = pd.DataFrame(rows).set_index("combo_id")
     selected: set = set()
