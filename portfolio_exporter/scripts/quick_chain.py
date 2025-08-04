@@ -5,6 +5,7 @@ import sys
 from typing import List
 
 import pandas as pd
+import dateparser
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
@@ -29,7 +30,7 @@ def run(
     strikes: List[float] | None = None,
     width: int = 5,
 ) -> None:
-    """Interactive Rich-based option-chain browser."""
+    """Interactive Rich-based option-chain browser with natural-language expiry parsing."""
 
     from portfolio_exporter.menus import pre as pre_menu
 
@@ -42,11 +43,18 @@ def run(
     pre_menu.last_symbol.value = symbol
 
     default_expiry = expiry or pre_menu.last_expiry.get()
-    expiry = (
-        input(f"Expiry (YYYY-MM-DD) [{default_expiry}]: ").strip() or default_expiry
-    )
+    # ── natural‑language expiry parsing ──────────────────────────────
     if not expiry:
+        exp_raw = input(
+            f"Expiry (YYYY-MM-DD, 'Aug 15', '+30d', etc.) [{default_expiry}]: "
+        ).strip() or default_expiry
+    else:
+        exp_raw = expiry
+    parsed_exp = dateparser.parse(exp_raw, settings={"PREFER_DATES_FROM": "future"})
+    if not parsed_exp:
+        console.print(f"[red]Could not parse expiry '{exp_raw}'.")
         return
+    expiry = parsed_exp.strftime("%Y-%m-%d")
     pre_menu.last_expiry.value = expiry
 
     from yfinance import Ticker

@@ -50,7 +50,7 @@ def _ask_symbol(prompt: str = "Symbol: ") -> str:
 
 
 def _ask_expiry(prompt: str = "Expiry (YYYY-MM-DD): ") -> str:
-    """Prompt for an expiry, reusing last entry on blank input."""
+    """Prompt for an expiry (supports natural-language entries), reusing last entry on blank input."""
     exp = _input(prompt).strip() or last_expiry.get()
     if exp:
         last_expiry.value = exp
