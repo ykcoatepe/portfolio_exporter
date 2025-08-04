@@ -991,9 +991,13 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
         opt_rows.append(
             {
                 "symbol": c.localSymbol,
+                "underlying": c.symbol,
                 "secType": c.secType,
                 "qty": qty,
                 "multiplier": mult,
+                "right": getattr(c, "right", None),  # "C"/"P" for options
+                "strike": getattr(c, "strike", None),
+                "expiry": getattr(c, "lastTradeDateOrContractMonth", None),
                 "delta": src.delta,
                 "gamma": src.gamma,
                 "vega": src.vega,
@@ -1008,9 +1012,13 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
             stk_rows.append(
                 {
                     "symbol": p.contract.symbol,
+                    "underlying": p.contract.symbol,
                     "secType": p.contract.secType,
                     "qty": p.position,
                     "multiplier": 1,
+                    "right": None,
+                    "strike": None,
+                    "expiry": None,
                     # shares: delta = 1, other greeks 0
                     "delta": 1.0,
                     "gamma": 0.0,
