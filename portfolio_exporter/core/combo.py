@@ -60,6 +60,10 @@ def detect_combos(pos_df: pd.DataFrame) -> pd.DataFrame:
     including the list of legs.
     """
 
+    # guarantee the column is present (stock legs will have <NA>)
+    if "right" not in pos_df.columns:
+        pos_df["right"] = pd.NA
+
     combos: List[Dict] = []
     used: set[int] = set()
 
