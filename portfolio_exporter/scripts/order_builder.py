@@ -1,47 +1,51 @@
-"""
-order_builder.py – Interactive ticket wizard for simple strategies
-Currently supports:
-  • Covered call
-  • Cash-secured put
-  • Vertical spread (call or put)
-"""
+"""order_builder.py – Interactive ticket wizard for simple strategies."""
+
+from __future__ import annotations
 
 import builtins
-import datetime
+import datetime as dt
 import json
 import pathlib
-import sys
-import rich
+from typing import Any, Dict, List, Optional
 
 from prompt_toolkit import prompt
 
-# Use a rich console that respects TTY detection for cosmetic output
-console = rich.console.Console(force_terminal=sys.stdin.isatty())
-
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.input import parse_order_line
+from portfolio_exporter.core.ui import banner_delta_theta, console
+from portfolio_exporter.core.ib import quote_option, quote_stock
 
 # Expose prompt_toolkit.prompt via a dotted builtins attribute for tests
 setattr(builtins, "prompt_toolkit.prompt", prompt)
 
 
-def _ask(question, default=None):
+def _ask(question: str, default: Optional[str] = None) -> str | None:
     default_str = f" [{default}]" if default else ""
     ask_fn = getattr(builtins, "prompt_toolkit.prompt", prompt)
     return ask_fn(f"{question}{default_str}: ") or default
 
 
-def run():
+def _price_leg(
+    symbol: str, expiry: str | None, strike: float | None, right: str | None
+) -> Dict[str, float]:
+    if right in {"C", "P"}:
+        return quote_option(symbol, expiry or "", float(strike), right)
+    data = quote_stock(symbol)
+    data.update({"delta": 1.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "iv": 0.0})
+    return data
+
+
+def run() -> bool:
     raw = input("Order (shorthand, Enter to step-through): ").strip()
     parsed = parse_order_line(raw) if raw else None
 
-    today = datetime.date.today()
-    expiry_default = (today + datetime.timedelta(weeks=2)).isoformat()
+    today = dt.date.today()
+    expiry_default = (today + dt.timedelta(weeks=2)).isoformat()
     strat_default = "cc"
     underlying_default = "TSLA"
     qty_default = "1"
     strikes_default = ""
-    right = None
+    right: Optional[str] = None
 
     if parsed:
         underlying_default = parsed.underlying
@@ -53,34 +57,204 @@ def run():
             "vert" if len(parsed.legs) == 2 else ("csp" if right == "P" else "cc")
         )
 
-    # If shorthand parsed with two legs, use default vertical strategy & skip prompting
     if parsed and len(parsed.legs) == 2:
         strat = "vert"
     else:
-        strat = _ask("Strategy (cc/csp/vert)", strat_default).lower()
+        strat = (_ask("Strategy (cc/csp/vert)", strat_default) or "cc").lower()
 
-    # Skip prompting underlying when shorthand parsed with two legs (use default underlying)
     if parsed and len(parsed.legs) == 2:
         underlying = underlying_default
     else:
-        underlying = _ask("Underlying", underlying_default).upper()
-    # Skip the expiry prompt when a shorthand string already supplied it
+        underlying = (_ask("Underlying", underlying_default) or "TSLA").upper()
+
     if parsed:
-        expiry = expiry_default  # derived from parsed.legs[0].expiry
+        expiry = expiry_default
     else:
-        expiry = _ask("Expiry (YYYY-MM-DD)", expiry_default)
-    # Skip contracts & strikes prompts if parsed already supplied them
+        expiry = _ask("Expiry (YYYY-MM-DD)", expiry_default) or expiry_default
+
     if parsed:
         qty = int(qty_default)
         strikes = [leg.strike for leg in parsed.legs]
     else:
-        qty = int(_ask("Contracts", qty_default))
-        strikes_in = _ask("Strike(s) (comma-sep)", strikes_default).replace(" ", "")
+        qty = int(_ask("Contracts", qty_default) or qty_default)
+        strikes_in = (_ask("Strike(s) (comma-sep)", strikes_default) or "").replace(
+            " ", ""
+        )
         strikes = [float(s) for s in strikes_in.split(",") if s]
+
     if not right:
         right = "P" if strat == "csp" else "C"
 
+    legs: List[Dict[str, Any]] = []
+    if strat == "cc":
+        legs.append(
+            {
+                "symbol": underlying,
+                "expiry": None,
+                "strike": None,
+                "right": None,
+                "qty": qty * 100,
+                "mult": 1,
+            }
+        )
+        legs.append(
+            {
+                "symbol": underlying,
+                "expiry": expiry,
+                "strike": strikes[0],
+                "right": "C",
+                "qty": -qty,
+                "mult": 100,
+            }
+        )
+    elif strat == "csp":
+        legs.append(
+            {
+                "symbol": underlying,
+                "expiry": expiry,
+                "strike": strikes[0],
+                "right": "P",
+                "qty": -qty,
+                "mult": 100,
+            }
+        )
+    elif strat == "vert":
+        if len(strikes) != 2:
+            raise ValueError("Vertical strategy requires two strikes")
+        if right == "C":
+            legs.append(
+                {
+                    "symbol": underlying,
+                    "expiry": expiry,
+                    "strike": strikes[0],
+                    "right": right,
+                    "qty": qty,
+                    "mult": 100,
+                }
+            )
+            legs.append(
+                {
+                    "symbol": underlying,
+                    "expiry": expiry,
+                    "strike": strikes[1],
+                    "right": right,
+                    "qty": -qty,
+                    "mult": 100,
+                }
+            )
+        else:
+            legs.append(
+                {
+                    "symbol": underlying,
+                    "expiry": expiry,
+                    "strike": strikes[0],
+                    "right": right,
+                    "qty": -qty,
+                    "mult": 100,
+                }
+            )
+            legs.append(
+                {
+                    "symbol": underlying,
+                    "expiry": expiry,
+                    "strike": strikes[1],
+                    "right": right,
+                    "qty": qty,
+                    "mult": 100,
+                }
+            )
+    else:
+        raise ValueError(f"Unknown strategy {strat}")
+
+    cfg = getattr(settings, "order_builder", None)
+    slippage = getattr(cfg, "slippage", 0.05)
+    delta_cap = getattr(cfg, "delta_cap", float("inf"))
+    theta_cap = getattr(cfg, "theta_cap", float("-inf"))
+    confirm_caps = getattr(cfg, "confirm_above_caps", True)
+
+    mid_prices: List[float] = []
+    net_mid = net_delta = net_theta = net_gamma = net_vega = 0.0
+    rows: List[Dict[str, Any]] = []
+    for leg in legs:
+        price = _price_leg(
+            leg["symbol"], leg.get("expiry"), leg.get("strike"), leg.get("right")
+        )
+        leg.update(price)
+        mid_prices.append(price["mid"])
+        leg_qty = leg["qty"]
+        mult = leg["mult"]
+        net_mid += leg_qty * price["mid"] * mult
+        net_delta += leg_qty * price["delta"] * mult
+        net_theta += leg_qty * price["theta"] * mult
+        net_gamma += leg_qty * price["gamma"] * mult
+        net_vega += leg_qty * price["vega"] * mult
+        sign = 1 if leg_qty > 0 else -1
+        leg["limit"] = round(price["mid"] + slippage * sign, 2)
+        rows.append(
+            {
+                "underlying": underlying,
+                "strategy": strat,
+                "expiry": leg.get("expiry") or "",
+                "strike": leg.get("strike") or "",
+                "right": leg.get("right") or "",
+                "qty": leg_qty,
+                "mid": price["mid"],
+                "delta": price["delta"],
+                "theta": price["theta"],
+                "vega": price["vega"],
+                "iv": price["iv"],
+            }
+        )
+
+    rows.append(
+        {
+            "underlying": "TOTAL",
+            "strategy": "",
+            "expiry": "",
+            "strike": "",
+            "right": "",
+            "qty": sum(leg["qty"] for leg in legs),
+            "mid": net_mid,
+            "delta": net_delta,
+            "theta": net_theta,
+            "vega": net_vega,
+            "iv": "",
+        }
+    )
+
+    outdir = pathlib.Path(settings.output_dir).expanduser()
+    outdir.mkdir(parents=True, exist_ok=True)
+    ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    preview_path = outdir / f"order_preview_{ts}.csv"
+    import pandas as pd
+
+    pd.DataFrame(rows).to_csv(preview_path, index=False)
+
+    console.rule("Risk impact")
+    banner_delta_theta(net_delta, net_theta, net_gamma, net_vega, net_mid)
+    caps_warn = []
+    if abs(net_delta) > delta_cap:
+        caps_warn.append(f"Δ>{delta_cap}")
+    if net_theta < theta_cap:
+        caps_warn.append(f"Θ<{theta_cap}")
+
+    risk_caps_ok = True
+    if caps_warn and confirm_caps:
+        console.print(f"[red]⚠  {' & '.join(caps_warn)}[/red]")
+        risk_caps_ok = input("Proceed? (y/N): ").strip().lower() == "y"
+    if not risk_caps_ok:
+        console.print("Aborted.")
+        return False
+
+    out = outdir / "tickets"
+    out.mkdir(parents=True, exist_ok=True)
+    fn = (
+        out
+        / f"ticket_{underlying}_{expiry}_{dt.datetime.now().strftime('%H%M%S')}.json"
+    )
+
     ticket = {
+        "timestamp": dt.datetime.utcnow().isoformat(),
         "strategy": strat,
         "underlying": underlying,
         "expiry": expiry,
@@ -88,14 +262,22 @@ def run():
         "strikes": strikes,
         "right": right,
         "account": settings.default_account,
+        "legs": [
+            {
+                "symbol": leg["symbol"],
+                "expiry": leg.get("expiry"),
+                "strike": leg.get("strike"),
+                "right": leg.get("right"),
+                "qty": leg["qty"],
+                "limit": leg["limit"],
+            }
+            for leg in legs
+        ],
+        "mid_prices": mid_prices,
+        "net_delta": net_delta,
+        "net_theta": net_theta,
+        "risk_caps_ok": risk_caps_ok,
     }
-
-    # Save ticket to JSON in output_dir
-    out = pathlib.Path(settings.output_dir).expanduser() / "tickets"
-    out.mkdir(parents=True, exist_ok=True)
-    fn = (
-        out
-        / f"ticket_{underlying}_{expiry}_{datetime.datetime.now().strftime('%H%M%S')}.json"
-    )
     fn.write_text(json.dumps(ticket, indent=2))
     print(f"✅ Ticket saved to {fn}")
+    return True

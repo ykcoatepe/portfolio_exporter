@@ -6,3 +6,8 @@ roll:
   slippage: 0.05           # $0.05 off mid
   default_days: 7
   use_weekly: false
+order_builder:
+  slippage: 0.05
+  delta_cap: 500
+  theta_cap: -100
+  confirm_above_caps: true

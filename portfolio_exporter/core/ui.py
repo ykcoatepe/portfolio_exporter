@@ -109,3 +109,17 @@ def spinner(msg: str):
 def run_with_spinner(msg: str, fn, *a, **kw):
     with spinner(msg):
         return fn(*a, **kw)
+
+
+def banner_delta_theta(
+    delta: float, theta: float, gamma: float, vega: float, cost: float
+) -> None:
+    """Print a colour-coded risk banner."""
+
+    def _c(val: float, fmt: str) -> str:
+        colour = "green" if val >= 0 else "red"
+        return f"[{colour}]{fmt.format(val)}[/{colour}]"
+
+    console.print(
+        f"Δ {_c(delta, '{:+.1f}')}  Θ {_c(theta, '{:+.1f}')}  Γ {_c(gamma, '{:+.3f}')}  Vega {_c(vega, '{:+.1f}')}   Cost {_c(cost, '{:+.2f}')}"
+    )
