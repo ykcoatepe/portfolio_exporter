@@ -8,13 +8,12 @@ from typing import List
 import pandas as pd
 import dateparser
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.live import Live
 from rich.table import Table
 
 from portfolio_exporter.core import chain as core_chain
 from portfolio_exporter.core.ib import quote_stock
-from portfolio_exporter.core.ui import render_chain
+from portfolio_exporter.core.ui import render_chain, run_with_spinner
 
 
 def _calc_strikes(symbol: str, width: int) -> List[float]:
@@ -95,18 +94,13 @@ def run(
         use_strikes = (
             strikes if strikes is not None else _calc_strikes(symbol, cur_width)
         )
-        progress_console = (
-            Console(force_terminal=True)
-            if not sys.stdin.isatty()
-            else console
+        df = run_with_spinner(
+            f"Fetching {symbol} {exp} …",
+            core_chain.fetch_chain,
+            symbol,
+            exp,
+            use_strikes,
         )
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=progress_console,
-        ) as prog:
-            prog.add_task(description=f"Fetching {symbol} {exp} …", total=None)
-            df = core_chain.fetch_chain(symbol, exp, use_strikes)
         # ── optional CSV export ──────────────────────────────────────
         if save_csv:
             # Same directory convention as the other scripts

@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 from typing import List, Dict
 from portfolio_exporter.core.quotes import snapshot
+from portfolio_exporter.core.ui import run_with_spinner
 import numpy as np
 
 
@@ -762,7 +763,7 @@ def run(
     if include_indices:
         tickers = sorted(set(t.upper() for t in tickers) | set(ALWAYS_TICKERS))
 
-    df = _snapshot_quotes(tickers, fmt=fmt)
+    df = run_with_spinner("Fetching quotes…", _snapshot_quotes, tickers, fmt=fmt)
     df = df.rename(columns={"symbol": "ticker", "price": "last"})
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
     df.insert(0, "timestamp", ts_now)

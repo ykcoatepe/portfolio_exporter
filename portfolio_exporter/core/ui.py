@@ -1,7 +1,12 @@
-from rich.live import Live
-from rich.panel import Panel
+from contextlib import contextmanager
+import os
+import sys
+
 from rich.align import Align
 from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 import pandas as pd
@@ -81,3 +86,26 @@ def render_chain(df: pd.DataFrame, console: Console, width: int) -> Table:
         )
 
     return tbl
+
+
+def _progress_console() -> Console:
+    return Console(force_terminal=not sys.stdin.isatty())
+
+
+@contextmanager
+def spinner(msg: str):
+    if os.getenv("PE_QUIET", "0").lower() in {"1", "true", "yes"}:
+        yield
+        return
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=_progress_console(),
+    ) as prog:
+        prog.add_task(description=msg, total=None)
+        yield
+
+
+def run_with_spinner(msg: str, fn, *a, **kw):
+    with spinner(msg):
+        return fn(*a, **kw)

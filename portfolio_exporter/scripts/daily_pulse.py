@@ -18,6 +18,7 @@ import contextlib
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core import io
 from utils.progress import iter_progress
+from portfolio_exporter.core.ui import run_with_spinner
 from reportlab.lib.pagesizes import letter, landscape  # PDF output (landscape added)
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
 from reportlab.lib import colors
@@ -310,7 +311,7 @@ def run(fmt: str = "csv") -> None:
 
     # 2. technical data
     tickers = list(MARKET_OVERVIEW.keys()) + pos["ticker"].unique().tolist()
-    ohlc = fetch_ohlc(tickers)
+    ohlc = run_with_spinner("Fetching price data…", fetch_ohlc, tickers)
     tech = compute_indicators(ohlc)
     tech_last = last_row(tech)[INDICATORS].round(3)
 
