@@ -1,5 +1,5 @@
-from rich.table import Table
 from rich.console import Console
+from rich.table import Table
 from portfolio_exporter.scripts import (
     trades_report,
     order_builder,
@@ -18,7 +18,7 @@ def launch(status, default_fmt):
         for k, lbl in [
             ("e", "Executions / open orders"),
             ("b", "Build order"),
-            ("l", "Roll positions (stub)"),
+            ("l", "Roll positions"),
             ("q", "Quick option chain"),
             ("v", "View Net-Liq chart"),
             ("r", "Return"),
@@ -31,7 +31,7 @@ def launch(status, default_fmt):
         dispatch = {
             "e": lambda: trades_report.run(fmt=default_fmt, show_actions=True),
             "b": order_builder.run,
-            "l": roll_manager.run,
+            "l": lambda: roll_manager.run(),
             "q": lambda: option_chain_snapshot.run(fmt=default_fmt),
             "v": lambda: net_liq_history_export.run(fmt=default_fmt, plot=True),
         }.get(ch)
