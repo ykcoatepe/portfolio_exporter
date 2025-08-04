@@ -34,6 +34,7 @@ from pathlib import Path
 
 from utils.bs import bs_greeks
 from legacy.option_chain_snapshot import fetch_yf_open_interest
+from portfolio_exporter.core.ui import run_with_spinner
 
 import numpy as np
 import pandas as pd
@@ -1029,7 +1030,7 @@ def run(
 ) -> dict | None:
     """Aggregate per-position Greeks and optionally persist the results."""
 
-    pos = _load_positions().copy()
+    pos = run_with_spinner("Fetching positions…", _load_positions).copy()
 
     # ensure contract multipliers are populated correctly
     pos.loc[(pos.secType == "OPT") & (pos.multiplier.isna()), "multiplier"] = 100

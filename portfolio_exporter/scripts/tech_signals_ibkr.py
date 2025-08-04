@@ -20,6 +20,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.io import save
+from portfolio_exporter.core.ui import run_with_spinner
 
 TR_TZ = ZoneInfo("Europe/Istanbul")
 
@@ -216,7 +217,9 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
 
     ib.errorEvent += _quiet_error_handler
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_CID)
+        run_with_spinner(
+            "Connecting to IBKR…", ib.connect, IB_HOST, IB_PORT, clientId=IB_CID
+        )
         USE_IB = True
     except Exception:
         logging.warning("IBKR Gateway not reachable – using yfinance only.")
@@ -229,8 +232,15 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
     # pull SPY once for beta
     if USE_IB:
         spy = Stock("SPY", "SMART", "USD")
-        spy_bars = ib.reqHistoricalData(
-            spy, "", f"{HIST_DAYS} D", "1 day", "TRADES", useRTH=True
+        spy_bars = run_with_spinner(
+            "Fetching SPY history…",
+            ib.reqHistoricalData,
+            spy,
+            "",
+            f"{HIST_DAYS} D",
+            "1 day",
+            "TRADES",
+            useRTH=True,
         )
         spy_ret = pd.Series(dtype=float)
         if spy_bars:
@@ -306,8 +316,15 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
                 bar_type = "TRADES"
 
             try:
-                bars = ib.reqHistoricalData(
-                    stk, "", f"{HIST_DAYS} D", "1 day", bar_type, useRTH=True
+                bars = run_with_spinner(
+                    f"Fetching {tk} history…",
+                    ib.reqHistoricalData,
+                    stk,
+                    "",
+                    f"{HIST_DAYS} D",
+                    "1 day",
+                    bar_type,
+                    useRTH=True,
                 )
                 df = util.df(bars) if bars else pd.DataFrame()
             except Exception as e:

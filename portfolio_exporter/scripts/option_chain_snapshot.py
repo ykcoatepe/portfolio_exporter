@@ -28,6 +28,7 @@ import os
 import time
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core import io
+from portfolio_exporter.core.ui import run_with_spinner
 from datetime import datetime, timezone, date
 from typing import List, Sequence
 import zipfile
@@ -732,7 +733,9 @@ def run(fmt: str = "csv") -> None:
         hints = hints or [expiry_hint]
         for hint in hints:
             try:
-                df = snapshot_chain(ib, sym, hint)
+                df = run_with_spinner(
+                    f"Fetching {sym} chain…", snapshot_chain, ib, sym, hint
+                )
                 if df.empty:
                     logger.warning("%s %s – no data", sym, hint)
                     continue
