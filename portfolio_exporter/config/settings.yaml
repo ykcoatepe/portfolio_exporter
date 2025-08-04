@@ -2,3 +2,7 @@ output_dir: "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/
 timezone: "Europe/Istanbul"
 broker: "IBKR"
 default_account: "UXXXXXXX"
+roll:
+  slippage: 0.05           # $0.05 off mid
+  default_days: 7
+  use_weekly: false
