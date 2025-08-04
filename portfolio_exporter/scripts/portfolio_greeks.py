@@ -35,6 +35,7 @@ from pathlib import Path
 from utils.bs import bs_greeks
 from legacy.option_chain_snapshot import fetch_yf_open_interest
 from portfolio_exporter.core.ui import run_with_spinner
+from portfolio_exporter.core.combo import detect_combos
 
 import numpy as np
 import pandas as pd
@@ -1027,20 +1028,41 @@ def run(
     write_positions: bool = True,
     write_totals: bool = True,
     return_dict: bool = False,
+    combos: bool = True,
 ) -> dict | None:
     """Aggregate per-position Greeks and optionally persist the results."""
 
-    pos = run_with_spinner("Fetching positions…", _load_positions).copy()
+    pos_df = run_with_spinner("Fetching positions…", _load_positions).copy()
+    if pos_df.empty:
+        pos_df = pd.DataFrame(
+            columns=[
+                "secType",
+                "qty",
+                "multiplier",
+                "delta",
+                "gamma",
+                "vega",
+                "theta",
+                "underlying",
+                "right",
+                "strike",
+                "expiry",
+            ]
+        )
 
     # ensure contract multipliers are populated correctly
-    pos.loc[(pos.secType == "OPT") & (pos.multiplier.isna()), "multiplier"] = 100
-    pos.loc[pos.secType.isin(["STK", "ETF"]), "multiplier"] = 1
+    pos_df.loc[(pos_df.secType == "OPT") & (pos_df.multiplier.isna()), "multiplier"] = (
+        100
+    )
+    pos_df.loc[pos_df.secType.isin(["STK", "ETF"]), "multiplier"] = 1
 
     for greek in ["delta", "gamma", "vega", "theta"]:
-        pos[f"{greek}_exposure"] = pos[greek] * pos.qty * pos.multiplier
+        pos_df[f"{greek}_exposure"] = pos_df[greek] * pos_df.qty * pos_df.multiplier
+
+    combos_df = detect_combos(pos_df) if combos else pd.DataFrame()
 
     totals = (
-        pos[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
+        pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
         .sum()
         .to_frame()
         .T
@@ -1052,12 +1074,32 @@ def run(
     outdir = settings.output_dir
 
     if write_positions:
-        save(pos, "portfolio_greeks_positions", fmt, outdir)
+        save(pos_df, "portfolio_greeks_positions", fmt, outdir)
     if write_totals:
         save(totals, "portfolio_greeks_totals", fmt, outdir)
+        if combos:
+            save(combos_df, "portfolio_greeks_combos", fmt, outdir)
 
     print(f"✅ Greeks exported → {outdir}")
 
     if return_dict:
-        return totals.iloc[0].to_dict()
+        totals_row = totals.iloc[0].to_dict()
+        if combos:
+            return {
+                "legs": totals_row,
+                "combos": combos_df[["delta", "gamma", "vega", "theta"]]
+                .sum()
+                .to_dict(),
+            }
+        return {"legs": totals_row, "combos": {}}
     return None
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry
+    parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
+    parser.add_argument("--fmt", default="csv", help="Output format")
+    parser.add_argument(
+        "--no-combos", action="store_true", help="Disable combo detection"
+    )
+    args = parser.parse_args()
+    run(fmt=args.fmt, combos=not args.no_combos)

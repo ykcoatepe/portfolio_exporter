@@ -1,5 +1,6 @@
 from rich.table import Table
 from rich.console import Console
+import pandas as pd
 from portfolio_exporter.scripts import (
     live_feed,
     tech_signals_ibkr,
@@ -7,6 +8,7 @@ from portfolio_exporter.scripts import (
 )
 from portfolio_exporter.core import risk_dash
 from portfolio_exporter.core import caps_dash
+from portfolio_exporter.core.io import latest_file
 
 
 def _user_tech_signals(status, default_fmt):
@@ -30,10 +32,21 @@ def launch(status, default_fmt):
             # backward compatibility for patched or legacy signatures
             live_feed.run()
 
+    def _run_greeks():
+        portfolio_greeks.run(fmt=default_fmt)
+        pos_path = latest_file("portfolio_greeks_positions", default_fmt)
+        combos_path = latest_file("portfolio_greeks_combos", default_fmt)
+        if pos_path and combos_path:
+            pos_df = pd.read_csv(pos_path)
+            combos_df = pd.read_csv(combos_path)
+            console.print(
+                f"[green]Positions: {len(pos_df)} legs / {len(combos_df)} combos"
+            )
+
     actions = {
         "q": ("Snapshot quotes", _snapshot),
         "t": ("Tech signals", tech_signals_ibkr.run),
-        "g": ("Portfolio Greeks", portfolio_greeks.run),
+        "g": ("Portfolio Greeks", _run_greeks),
         "r": ("Risk dashboard", lambda: risk_dash.run()),
         "c": ("Theta / Gamma Caps", lambda: caps_dash.run()),
         "u": (
