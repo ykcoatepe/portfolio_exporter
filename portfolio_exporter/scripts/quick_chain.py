@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+from portfolio_exporter.core.config import settings
 import sys
 from typing import List
 
 import pandas as pd
 import dateparser
 from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.live import Live
 from rich.table import Table
 
@@ -37,6 +39,7 @@ def run(
     console = Console()
 
     default_symbol = symbol or pre_menu.last_symbol.get()
+    # ─────────────────── input & defaults ────────────────────────────
     symbol = input(f"Symbol [{default_symbol}]: ").strip().upper() or default_symbol
     if not symbol:
         return
@@ -45,9 +48,12 @@ def run(
     default_expiry = expiry or pre_menu.last_expiry.get()
     # ── natural‑language expiry parsing ──────────────────────────────
     if not expiry:
-        exp_raw = input(
-            f"Expiry (YYYY-MM-DD, 'Aug 15', '+30d', etc.) [{default_expiry}]: "
-        ).strip() or default_expiry
+        exp_raw = (
+            input(
+                f"Expiry (YYYY-MM-DD, 'Aug 15', '+30d', etc.) [{default_expiry}]: "
+            ).strip()
+            or default_expiry
+        )
     else:
         exp_raw = expiry
     parsed_exp = dateparser.parse(exp_raw, settings={"PREFER_DATES_FROM": "future"})
@@ -80,12 +86,31 @@ def run(
                 return e
         return exps[-1]  # fallback: last available
 
+    # ------------- CSV toggle (default = ON) -------------------------
+    save_csv_env = os.getenv("PE_CHAIN_CSV", "1")  # allow override
+    save_csv = save_csv_env not in {"0", "false", "no"}
+
     def _fetch(cur_width: int, cur_expiry: str) -> pd.DataFrame:
         exp = _nearest(cur_expiry)
         use_strikes = (
             strikes if strikes is not None else _calc_strikes(symbol, cur_width)
         )
-        return core_chain.fetch_chain(symbol, exp, use_strikes)
+        with Progress(
+            SpinnerColumn(), TextColumn("[progress.description]{task.description}")
+        ) as prog:
+            prog.add_task(description=f"Fetching {symbol} {exp} …", total=None)
+            df = core_chain.fetch_chain(symbol, exp, use_strikes)
+        # ── optional CSV export ──────────────────────────────────────
+        if save_csv:
+            # Same directory convention as the other scripts
+            out_dir = os.getenv("PE_OUTPUT_DIR", settings.output_dir)
+            os.makedirs(out_dir, exist_ok=True)
+            csv_path = os.path.join(
+                out_dir, f"chain_{symbol}_{exp.replace('-', '')}.csv"
+            )
+            df.to_csv(csv_path, index=False)
+            console.print(f"[green]CSV saved → {csv_path}")
+        return df
 
     df = _fetch(width, expiry)
 
@@ -103,12 +128,20 @@ def run(
         console.print(_grid())
         return
 
+    # ----------- interactive loop (render + hot-keys) ----------------
+    toggle_msg = "[yellow]↑/↓: navigate  [cyan]space[/cyan]: mark  [cyan]b[/cyan]: build  [cyan]c[/cyan]: toggle CSV export  [cyan]q[/cyan]: quit"
+    console.print(toggle_msg)
+
     cursor = 0
     marked: list[int] = []
 
     with Live(_grid(), console=console, refresh_per_second=2) as live:
         while True:
             cmd = input()
+            if cmd == "c":
+                save_csv = not save_csv
+                console.print(f"[yellow]CSV export {'ON' if save_csv else 'OFF'}")
+                continue
             if cmd == "q":
                 break
             if cmd == "\x1b[A":

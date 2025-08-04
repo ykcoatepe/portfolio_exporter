@@ -21,7 +21,11 @@ def fetch_chain(
         strikes = [round((spot // 5 + i) * 5, 0) for i in range(-5, 6)]
     rows = []
     for strike, right in itertools.product(strikes, ["C", "P"]):
-        q = quote_option(symbol, expiry, strike, right)
-        q.update({"strike": strike, "right": right})
-        rows.append(q)
+        try:
+            q = quote_option(symbol, expiry, strike, right)
+            q.update({"strike": strike, "right": right})
+            rows.append(q)
+        except ValueError:
+            # strike not offered for this weekly; skip gracefully
+            continue
     return pd.DataFrame(rows)
