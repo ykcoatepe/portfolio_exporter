@@ -128,24 +128,26 @@ def run() -> bool:
                 "mult": 1,
             }
         )
+        # short covered call -> short CALL option
         legs.append(
             {
                 "symbol": underlying,
-                "expiry": expiry,
-                "strike": strikes[0],
-                "right": "C",
                 "qty": -qty,
+                "right": "C",
+                "expiry": expiry,
+                "strike": float(strikes[0]),
                 "mult": 100,
             }
         )
     elif strat == "csp":
+        # long cash-secured put -> long PUT option
         legs.append(
             {
                 "symbol": underlying,
-                "expiry": expiry,
-                "strike": strikes[0],
+                "qty": qty,
                 "right": "P",
-                "qty": -qty,
+                "expiry": expiry,
+                "strike": float(strikes[0]),
                 "mult": 100,
             }
         )
