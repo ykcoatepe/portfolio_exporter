@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import contextlib
 import asyncio
 import math
+import threading
 from typing import Any, Dict
 
 import yfinance as yf
@@ -11,6 +11,17 @@ from ib_insync import IB, Option, Stock
 _IB_HOST, _IB_PORT, _IB_CID = "127.0.0.1", 7497, 29
 
 _ib_singleton: IB | None = None
+
+
+def _ensure_loop() -> asyncio.AbstractEventLoop:
+    """Return a running event loop, creating one in this thread if needed."""
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        threading.current_thread()._loop = loop  # keep ref for GC
+        asyncio.set_event_loop(loop)
+        return loop
 
 
 def _ib() -> IB:
@@ -28,12 +39,11 @@ def _ib() -> IB:
         except Exception:
             pass
 
-    # run the coroutine quickly so it isn't left un‑awaited
-    try:
-        asyncio.get_running_loop()
-        asyncio.create_task(_try_connect())
-    except RuntimeError:
-        asyncio.run(_try_connect())
+    loop = _ensure_loop()
+    if loop.is_running():
+        asyncio.run_coroutine_threadsafe(_try_connect(), loop)
+    else:
+        loop.run_until_complete(_try_connect())
     return _ib_singleton
 
 
