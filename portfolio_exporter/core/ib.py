@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import asyncio
 import math
 from typing import Any, Dict
 
@@ -18,8 +19,21 @@ def _ib() -> IB:
     if _ib_singleton and _ib_singleton.isConnected():
         return _ib_singleton
     _ib_singleton = IB()
-    with contextlib.suppress(Exception):
-        _ib_singleton.connect(_IB_HOST, _IB_PORT, clientId=_IB_CID, timeout=2)
+
+    async def _try_connect():
+        try:
+            await _ib_singleton.connectAsync(
+                _IB_HOST, _IB_PORT, clientId=_IB_CID, timeout=2
+            )
+        except Exception:
+            pass
+
+    # run the coroutine quickly so it isn't left un‑awaited
+    try:
+        asyncio.get_running_loop()
+        asyncio.create_task(_try_connect())
+    except RuntimeError:
+        asyncio.run(_try_connect())
     return _ib_singleton
 
 

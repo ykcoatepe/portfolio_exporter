@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import builtins
 import datetime as dt
+import datetime as _dt
 import json
 import pathlib
 from typing import Any, Dict, List, Optional
 
 from prompt_toolkit import prompt
+from yfinance import Ticker
 
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.input import parse_order_line
@@ -17,6 +19,34 @@ from portfolio_exporter.core.ib import quote_option, quote_stock
 
 # Expose prompt_toolkit.prompt via a dotted builtins attribute for tests
 setattr(builtins, "prompt_toolkit.prompt", prompt)
+
+# ── expiry normaliser ---------------------------------------------------------
+_expiry_cache: dict[str, list[str]] = {}
+
+
+def _nearest_expiry(symbol: str, dt_like) -> str:
+    """
+    Accepts str *or* datetime/date.  Returns the same string if it is listed,
+    otherwise the next later available expiry for `symbol`.
+    """
+    # normalise to YYYY-MM-DD string
+    if isinstance(dt_like, (_dt.date, _dt.datetime)):
+        date_str = dt_like.strftime("%Y-%m-%d")
+    else:
+        date_str = str(dt_like)
+
+    exps = _expiry_cache.get(symbol)
+    if exps is None:
+        exps = Ticker(symbol).options
+        _expiry_cache[symbol] = exps
+
+    if date_str in exps:
+        return date_str
+    # pick the first expiry after the requested date; else fall back to last
+    for d in exps:
+        if d > date_str:
+            return d
+    return exps[-1]
 
 
 def _ask(question: str, default: Optional[str] = None) -> str | None:
@@ -29,6 +59,7 @@ def _price_leg(
     symbol: str, expiry: str | None, strike: float | None, right: str | None
 ) -> Dict[str, float]:
     if right in {"C", "P"}:
+        expiry = _nearest_expiry(symbol, expiry) if expiry else expiry
         return quote_option(symbol, expiry or "", float(strike), right)
     data = quote_stock(symbol)
     data.update({"delta": 1.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "iv": 0.0})
