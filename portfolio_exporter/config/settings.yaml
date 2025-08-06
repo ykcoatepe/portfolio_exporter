@@ -11,3 +11,5 @@ order_builder:
   delta_cap: 500
   theta_cap: -100
   confirm_above_caps: true
+greeks:
+  risk_free: 0.03
