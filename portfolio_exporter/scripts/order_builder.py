@@ -88,21 +88,43 @@ def run() -> bool:
             "vert" if len(parsed.legs) == 2 else ("csp" if right == "P" else "cc")
         )
 
+    # ------------------------------------------------------------------
+    # 1) STRATEGY
+    # Skip the live prompt when the shorthand gave us everything we need,
+    # regardless of TTY.  Only ask if *something* was missing/ambiguous.
+    # ------------------------------------------------------------------
+    have_all_fields = bool(parsed)
+
     if parsed and len(parsed.legs) == 2:
         strat = "vert"
     else:
-        strat = (_ask("Strategy (cc/csp/vert)", strat_default) or "cc").lower()
+        if have_all_fields:
+            strat = strat_default
+        else:
+            strat = (_ask("Strategy (cc/csp/vert)", strat_default) or "cc").lower()
 
+    # ------------------------------------------------------------------
+    # 2) UNDERLYING
+    # ------------------------------------------------------------------
     if parsed and len(parsed.legs) == 2:
         underlying = underlying_default
     else:
-        underlying = (_ask("Underlying", underlying_default) or "TSLA").upper()
+        if have_all_fields:
+            underlying = underlying_default
+        else:
+            underlying = (_ask("Underlying", underlying_default) or "TSLA").upper()
 
+    # ------------------------------------------------------------------
+    # 3) EXPIRY
+    # ------------------------------------------------------------------
     if parsed:
         expiry = expiry_default
     else:
         expiry = _ask("Expiry (YYYY-MM-DD)", expiry_default) or expiry_default
 
+    # ------------------------------------------------------------------
+    # 4) QTY & STRIKES
+    # ------------------------------------------------------------------
     if parsed:
         qty = int(qty_default)
         strikes = [leg.strike for leg in parsed.legs]

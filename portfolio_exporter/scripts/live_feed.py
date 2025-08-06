@@ -739,16 +739,22 @@ def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
         data = {}
 
     rows: list[dict[str, float]] = []
+    # Add IBKR snapshot results first and determine which tickers need fallback
     if data:
         rows = [{"symbol": k, "price": v} for k, v in data.items()]
+        missing = [t for t in ticker_list if t not in data]
     else:
-        for t in ticker_list:
-            try:
-                df = yf.download(t, period="1d", interval="1m", progress=False)
-                price = float(df["Close"].dropna().iloc[-1])
-            except Exception:
-                price = float("nan")
-            rows.append({"symbol": t, "price": price})
+        missing = ticker_list
+
+    # Fallback to yfinance for missing tickers, applying proxy map if needed
+    for t in missing:
+        try:
+            yf_tkr = PROXY_MAP.get(t, t)
+            df = yf.download(yf_tkr, period="1d", interval="1m", progress=False)
+            price = float(df["Close"].dropna().iloc[-1])
+        except Exception:
+            price = float("nan")
+        rows.append({"symbol": t, "price": price})
     return pd.DataFrame(rows)
 
 
