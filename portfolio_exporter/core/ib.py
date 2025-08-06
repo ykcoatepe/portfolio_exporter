@@ -8,6 +8,8 @@ from typing import Any, Dict
 import yfinance as yf
 from ib_insync import IB, Option, Stock
 
+from portfolio_exporter.core.config import settings
+
 _IB_HOST, _IB_PORT, _IB_CID = "127.0.0.1", 7497, 29
 
 _ib_singleton: IB | None = None
@@ -114,14 +116,45 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> Dict[st
     row = tbl.loc[tbl["strike"] == strike]
     if row.empty:
         raise ValueError("Strike not found in yfinance chain")
-    mid = (row["bid"].values[0] + row["ask"].values[0]) / 2
-    return {
+    bid = row["bid"].values[0]
+    ask = row["ask"].values[0]
+    iv = row["impliedVolatility"].values[0]
+    mid = (bid + ask) / 2
+    q = {
         "mid": mid,
-        "bid": row["bid"].values[0],
-        "ask": row["ask"].values[0],
+        "bid": bid,
+        "ask": ask,
         "delta": math.nan,
         "gamma": math.nan,
         "vega": math.nan,
         "theta": math.nan,
-        "iv": row["impliedVolatility"].values[0],
+        "iv": iv,
     }
+    if (
+        (
+            q["delta"] is None
+            or (isinstance(q["delta"], float) and math.isnan(q["delta"]))
+        )
+        and iv
+        and not math.isnan(iv)
+    ):
+        from datetime import date
+
+        from portfolio_exporter.core.greeks import bs_greeks
+
+        hist = yf_tkr.history(period="1d")
+        spot = hist["Close"].iloc[-1] if not hist.empty else strike
+        expiry_dt = date.fromisoformat(expiry)
+        t = (expiry_dt - date.today()).days / 365
+        mult = 100
+        greeks = bs_greeks(
+            spot,
+            strike,
+            t,
+            settings.greeks.risk_free,
+            iv,
+            call=(right == "C"),
+            multiplier=mult,
+        )
+        q.update(greeks)
+    return q
