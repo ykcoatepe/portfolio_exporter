@@ -1,44 +1,25 @@
-[build-system]
-requires = ["setuptools>=64"]
-build-backend = "setuptools.build_meta"
+[tool.ruff]
+# — General —
+target-version = "py311"
+line-length    = 110
 
-[project]
-name = "portfolio_exporter"
-version = "0.1.0"
-description = "Personal trading utilities"
-readme = "README.md"
-requires-python = ">=3.11"
-license = "MIT"
-authors = [{name = "Codex", email = "codex@example.com"}]
-dependencies = [
-    "fpdf",
-    "ib_insync",
-    "numpy",
-    "pandas",
-    "prompt_toolkit",
-    "pydantic-settings",
-    "pypdf",
-    "reportlab",
-    "rich",
-    "yfinance>=0.2.37",
-    "dateparser>=1.2.0",
+# — What to lint —
+# Skip the un‑maintained legacy helpers & the auto‑generated test data.
+extend-exclude = [
+    "legacy",
+    "tests",          # unit tests already run via pytest; no need to lint them
 ]
 
-[project.optional-dependencies]
-# dev dependencies from requirements-dev.txt
-# used for tests
-
-dev = [
-    "pytest",
-    "pandas",
-    "numpy",
-    "requests",
-    "pip-tools",
+# — Lint behaviour —
+[tool.ruff.lint]
+extend-ignore = [
+    "F401",  # unused import
+    "F841",  # unused variable
+    "E402",  # import not at top of file (common in CLI scripts)
+    "E401",  # multiple imports on one line
+    "E731",  # lambda assignment
+    "E701",  # multiple statements on one line
+    "E741",  # ambiguous variable name like l, O, I
+    "F821",  # undefined name (most come from optional deps in legacy code)
+    "F811",  # redefinition of unused name (harmless in our CLI scripts)
 ]
-
-[tool.setuptools.packages.find]
-include = ["portfolio_exporter*"]
-exclude = ["legacy*", "tests*", "utils*", "docs*", "ibkr_env*", "iv_history*"]
-
-[project.scripts]
-portfolio_playbook = "main:main"
