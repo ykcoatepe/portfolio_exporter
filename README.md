@@ -51,6 +51,16 @@ This project uses the [pip-tools](https://github.com/jazzband/pip-tools) workflo
    pytest
    ```
 
+## Testing
+
+After installing dev dependencies, run the test suite to verify your changes:
+
+```bash
+make test
+# or, directly:
+pytest
+```
+
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.
 `pandas_datareader` is needed for downloading FRED data in `live_feed.py`, and `requests` is required by `net_liq_history_export.py` for accessing the IBKR Client Portal API. `xlsxwriter` enables Excel exports and `reportlab` enables PDF output. `matplotlib` is optional and only needed when using the `--plot` flag with `net_liq_history_export.py`.
 
