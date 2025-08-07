@@ -27,6 +27,7 @@ from typing import List, Dict
 from portfolio_exporter.core.quotes import snapshot
 from portfolio_exporter.core.ui import run_with_spinner
 import numpy as np
+import math
 
 
 # ------------------------------------------------------------------
@@ -38,7 +39,19 @@ def _clean_price(val):
 
 
 import yfinance as yf
-
+# ---------- helpers -------------------------------------------------
+def _first_valid(*vals):
+    """
+    Return the first value that is neither None nor NaN.
+    Treats float('nan') / numpy.nan as missing, same as None.
+    """
+    for v in vals:
+        if v is None:
+            continue
+        if isinstance(v, (float, np.floating)) and math.isnan(v):
+            continue
+        return v
+    return None
 # optional PDF dependencies
 try:
     from reportlab.lib.pagesizes import letter, landscape
@@ -129,6 +142,7 @@ PROXY_MAP = {
     "US30Y=RR": "US30Y=RR",
     "^IRX": "^IRX",
     "^FVX": "^FVX",
+    "RSP": "RSP",  # equal-weight S&P 500 ETF
 }
 
 YIELD_MAP = {"US2Y": "DGS2", "US10Y": "DGS10", "US20Y": "DGS20", "US30Y": "DGS30"}
@@ -259,6 +273,11 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     ib.sleep(IB_TIMEOUT)
 
     for key, md in reqs.items():
+        last_price = _clean_price(
+            md.last
+            if md.last is not None
+            else md.close  # fallback to close if last missing
+        )
         combined_rows.append(
             {
                 "ticker": key,
@@ -304,7 +323,13 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
         ib.cancelMktData(md.contract)
 
     ib.disconnect()
-    return pd.DataFrame(combined_rows)
+
+    df_ib = pd.DataFrame(combined_rows)
+    # ------------------------------------------------------------------
+    # Only count as “served” the rows that have a real quote.
+    # Return df; caller will fall back to yfinance for the rest.
+    # ------------------------------------------------------------------
+    return df_ib
 
 
 def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
@@ -317,13 +342,25 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
         yf_tkr = PROXY_MAP.get(t, t)
         try:
             info = yf.Ticker(yf_tkr).info
-            price = info.get("regularMarketPrice")
-            bid = info.get("bid")
-            ask = info.get("ask")
-            day_high = info.get("dayHigh")
-            day_low = info.get("dayLow")
-            prev_close = info.get("previousClose")
-            vol = info.get("volume")
+            # fast_info is more reliable after hours – use it to back-fill gaps
+            fast = yf.Ticker(yf_tkr).fast_info or {}
+            # Price hierarchy: live → pre-mkt → fast_info last/prev → prev_close
+            price = _first_valid(
+                info.get("regularMarketPrice"),
+                info.get("preMarketPrice"),
+                fast.get("last_price"), fast.get("lastPrice"),
+                fast.get("previous_close"), fast.get("previousClose"),
+                info.get("previousClose"),
+            )
+            bid = _first_valid(fast.get("bid"), fast.get("bid_price"), info.get("bid"))
+            ask = _first_valid(fast.get("ask"), fast.get("ask_price"), info.get("ask"))
+            day_high = _first_valid(fast.get("day_high"), fast.get("dayHigh"))
+            day_low  = _first_valid(fast.get("day_low"),  fast.get("dayLow"))
+            prev_close = _first_valid(
+                fast.get("previous_close"), fast.get("previousClose"),
+                info.get("previousClose"),
+            )
+            vol = _first_valid(fast.get("last_volume"), fast.get("volume"), info.get("volume"))
         except Exception as e:
             # fallback to fast download (1d) if info API stalls
             try:
@@ -331,6 +368,13 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
                 price = hist["Close"].iloc[-1] if not hist.empty else np.nan
                 prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else np.nan
                 bid = ask = day_high = day_low = vol = np.nan
+                # If daily bars empty, pull intraday 5-min so we still get a quote
+                if (pd.isna(price) or price is None) and hist.empty:
+                    hist5 = yf.download(
+                        yf_tkr, period="1d", interval="5m", progress=False
+                    )
+                    if not hist5.empty:
+                        price = hist5["Close"].iloc[-1]
                 logging.warning("yfinance info fail %s, used download(): %s", t, e)
             except Exception as e2:
                 logging.warning("yfinance miss %s: %s", t, e2)
@@ -338,6 +382,9 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
         # Yahoo yields like ^TNX return 10× the percentage; rescale
         if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and price is not None:
             price = price / 10.0
+        # --- ultimate fallback: use prev_close if still missing ----------
+        if (price is None or pd.isna(price)) and prev_close is not None:
+            price = prev_close
         rows.append(
             {
                 "ticker": t,
@@ -610,12 +657,17 @@ def main():
 
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S+03:00")
     df_ib = fetch_ib_quotes(tickers, opt_list)
-    served = set(df_ib["ticker"]) if not df_ib.empty else set()
-    remaining = [t for t in tickers if t not in served and t not in YIELD_MAP]
+    # tickers whose 'last' is *not* NaN are considered served by IB
+    served = (
+        set(df_ib.loc[~df_ib["last"].isna(), "ticker"]) if not df_ib.empty else set()
+    )
+    remaining = [t for t in tickers if t not in served]
+    # Route any left-over yield tickers to FRED
+    remaining_yields = [t for t in remaining if t in YIELD_MAP]
+    remaining = [t for t in remaining if t not in YIELD_MAP]
 
     df_yf = fetch_yf_quotes(remaining) if remaining else pd.DataFrame()
 
-    remaining_yields = [t for t in remaining if t in YIELD_MAP]
     df_fred = (
         fetch_fred_yields(remaining_yields) if remaining_yields else pd.DataFrame()
     )
@@ -746,14 +798,56 @@ def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
     else:
         missing = ticker_list
 
-    # Fallback to yfinance for missing tickers, applying proxy map if needed
+    # Fallback to yfinance for missing tickers – richer ladder
     for t in missing:
+        yf_tkr = PROXY_MAP.get(t, t)
+        price = float("nan")
         try:
-            yf_tkr = PROXY_MAP.get(t, t)
-            df = yf.download(yf_tkr, period="1d", interval="1m", progress=False)
-            price = float(df["Close"].dropna().iloc[-1])
-        except Exception:
-            price = float("nan")
+            # 1) cheap fast_info first (works after hours)
+            fast = yf.Ticker(yf_tkr).fast_info or {}
+            price = _first_valid(
+                fast.get("last_price"), fast.get("lastPrice"),
+                fast.get("previous_close"), fast.get("previousClose"),
+            )
+
+            # 2) if still NaN, try 1-min intraday bar
+            if price is None or pd.isna(price):
+                intr = yf.download(
+                    yf_tkr, period="1d", interval="1m", progress=False
+                )
+                if not intr.empty:
+                    price = float(intr["Close"].dropna().iloc[-1])
+
+            # 2b) if still NaN, try 5-min bars
+            if price is None or pd.isna(price):
+                intr5 = yf.download(
+                    yf_tkr, period="1d", interval="5m", progress=False
+                )
+                if not intr5.empty:
+                    price = float(intr5["Close"].dropna().iloc[-1])
+
+            # 3) if no intraday yet (e.g., pre-open), ask daily bar
+            if price is None or pd.isna(price):
+                daily = yf.download(
+                    yf_tkr, period="2d", interval="1d", progress=False
+                )
+                if not daily.empty:
+                    price = float(daily["Close"].iloc[-1])
+        except Exception as e:
+            logging.warning("yfinance miss %s: %s", t, e)
+
+        # Rescale CBOE yield indices (^TNX etc.)
+        if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and not pd.isna(price):
+            price = price / 10.0
+
+        if (price is None or pd.isna(price)):
+            try:
+                info = yf.Ticker(yf_tkr).info
+                prev_close = info.get("previousClose")
+                if prev_close is not None and not pd.isna(prev_close):
+                    price = prev_close
+            except Exception:
+                pass
         rows.append({"symbol": t, "price": price})
     return pd.DataFrame(rows)
 
