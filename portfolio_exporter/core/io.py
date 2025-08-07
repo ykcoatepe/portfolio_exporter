@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 import pandas as pd
 from .config import settings
 
@@ -48,3 +49,20 @@ def latest_file(
     pattern = f"{name}*.{fmt}"
     files = sorted(outdir.glob(pattern))
     return files[-1] if files else None
+
+
+def migrate_combo_schema(conn: sqlite3.Connection) -> None:
+    """Ensure combo table has latest columns."""
+
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(combos)")}
+    alters = {
+        "type": "ALTER TABLE combos ADD COLUMN type TEXT",
+        "width": "ALTER TABLE combos ADD COLUMN width REAL",
+        "credit_debit": "ALTER TABLE combos ADD COLUMN credit_debit REAL",
+        "parent_combo_id": "ALTER TABLE combos ADD COLUMN parent_combo_id TEXT",
+        "closed_date": "ALTER TABLE combos ADD COLUMN closed_date TEXT",
+    }
+    for col, ddl in alters.items():
+        if col not in cols:
+            conn.execute(ddl)
+    conn.commit()

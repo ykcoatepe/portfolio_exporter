@@ -1037,6 +1037,7 @@ def run(
     write_totals: bool = True,
     return_dict: bool = False,
     combos: bool = True,
+    combo_types: str = "simple",
 ) -> dict | None:
     """Aggregate per-position Greeks and optionally persist the results."""
 
@@ -1067,7 +1068,7 @@ def run(
     for greek in ["delta", "gamma", "vega", "theta"]:
         pos_df[f"{greek}_exposure"] = pos_df[greek] * pos_df.qty * pos_df.multiplier
 
-    combos_df = detect_combos(pos_df) if combos else pd.DataFrame()
+    combos_df = detect_combos(pos_df, mode=combo_types) if combos else pd.DataFrame()
 
     totals = (
         pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
@@ -1109,5 +1110,15 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry
     parser.add_argument(
         "--no-combos", action="store_true", help="Disable combo detection"
     )
+    parser.add_argument(
+        "--combo-types",
+        choices=["simple", "all"],
+        default="simple",
+        help="Combo detection complexity",
+    )
     args = parser.parse_args()
-    run(fmt=args.fmt, combos=not args.no_combos)
+    run(
+        fmt=args.fmt,
+        combos=not args.no_combos,
+        combo_types=args.combo_types,
+    )
