@@ -11,6 +11,7 @@ rest of the project while remaining easy to stub in tests.
 
 from __future__ import annotations
 
+import argparse
 import calendar
 import datetime as dt
 import json
@@ -118,6 +119,7 @@ def run(
     weekly: bool | None = None,
     fmt: str = "csv",
     return_df: bool = False,
+    include_cal: bool = False,
 ):
     """Interactive roll manager.
 
@@ -150,6 +152,8 @@ def run(
         return None
 
     combos_df = detect_combos(pos_df)
+    if not include_cal and "type" in combos_df.columns:
+        combos_df = combos_df[combos_df["type"] != "calendar"]
     if combos_df.empty:
         if return_df:
             return pd.DataFrame()
@@ -272,6 +276,13 @@ def run(
     if return_df:
         return df
     return None
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry
+    parser = argparse.ArgumentParser(description="Roll manager")
+    parser.add_argument("--include-cal", action="store_true", help="Include calendars")
+    args = parser.parse_args()
+    run(include_cal=args.include_cal)
 
 
 __all__ = ["run"]

@@ -23,3 +23,11 @@ This document outlines the goals of the project and provides a high level overvi
 
 These scripts share a common approach: IBKR is queried first for portfolio aware data; if connectivity is not available or the ticker is unsupported, they use public APIs such as yfinance. This makes the tools useful even without a running IBKR gateway.
 
+## Combo Types
+
+The combo engine groups option legs into logical strategies.  *Simple* combos
+include vertical spreads and straddles.  The extended engine recognises
+calendars (two legs across expiries), iron condors (four legs) and butterflies
+(three legs).  Each combo stores metadata such as width and roll lineage to
+track related positions over time.
+
