@@ -1,25 +1,42 @@
 [tool.ruff]
-# — General —
 target-version = "py311"
-line-length    = 110
+line-length = 110
+extend-exclude = ["legacy", "tests"]
 
-# — What to lint —
-# Skip the un‑maintained legacy helpers & the auto‑generated test data.
-extend-exclude = [
-    "legacy",
-    "tests",          # unit tests already run via pytest; no need to lint them
-]
-
-# — Lint behaviour —
 [tool.ruff.lint]
-extend-ignore = [
-    "F401",  # unused import
-    "F841",  # unused variable
-    "E402",  # import not at top of file (common in CLI scripts)
-    "E401",  # multiple imports on one line
-    "E731",  # lambda assignment
-    "E701",  # multiple statements on one line
-    "E741",  # ambiguous variable name like l, O, I
-    "F821",  # undefined name (most come from optional deps in legacy code)
-    "F811",  # redefinition of unused name (harmless in our CLI scripts)
+extend-ignore = ["F401","F841","E402","E401","E731","E701","E741","F821","F811"]
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portfolio_exporter"
+version = "0.25.0"
+description = "Personal trading utilities: combos, greeks, roll wizard, live quotes"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{ name = "Yordam Kocatepe" }]
+
+dependencies = [
+  "pandas>=1.5",
+  "numpy>=1.23",
+  "yfinance>=0.2.37",
+  "rich>=13.3",
+  "pydantic-settings>=2.0",
+  "dateparser>=1.2.0",
+  "pandas-datareader>=0.10",
 ]
+
+[project.optional-dependencies]
+ib = ["ib_insync>=0.9.86"]
+pdf = ["reportlab>=4.0"]
+
+[project.scripts]
+portfolio_playbook = "main:main"
+
+[tool.setuptools.packages.find]
+include = ["portfolio_exporter*"]
+exclude = ["legacy*", "tests*", "utils*", "docs*", "ibkr_env*", "iv_history*"]
+
