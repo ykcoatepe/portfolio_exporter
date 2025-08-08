@@ -868,7 +868,7 @@ def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
                 daily = yf.download(yf_tkr, period="2d", interval="1d", progress=False)
                 if not daily.empty:
                     price = float(daily["Close"].iloc[-1])
-            # 4) bullet-proof history fallback: last valid close over 5 days
+            # 4) 5-day history last valid close
             if price is None or pd.isna(price):
                 tk = yf.Ticker(yf_tkr)
                 hist = tk.history(period="5d", interval="1d")
@@ -883,7 +883,7 @@ def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
         if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and not pd.isna(price):
             price = price / 10.0
 
-        # Final guard: if still missing, hard fallback to previousClose
+        # Final guard: previousClose
         if price is None or pd.isna(price):
             try:
                 inf = yf.Ticker(yf_tkr).info
