@@ -39,6 +39,38 @@ def _clean_price(val):
 
 
 import yfinance as yf
+
+# Robust session with retries/backoff to reduce empty/NaN responses from Yahoo
+try:
+    import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
+    _yf_session = requests.Session()
+    _yf_retries = Retry(
+        total=3,
+        connect=3,
+        read=3,
+        status=3,
+        backoff_factor=0.25,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset(["GET", "HEAD"]),
+    )
+    _yf_adapter = HTTPAdapter(
+        max_retries=_yf_retries, pool_connections=10, pool_maxsize=10
+    )
+    _yf_session.mount("https://", _yf_adapter)
+    _yf_session.mount("http://", _yf_adapter)
+    try:
+        import yfinance.shared as _yf_shared
+
+        _yf_shared._DEFAULT_SESSION = _yf_session
+    except Exception:
+        pass
+except Exception:
+    _yf_session = None
+
+
 # ---------- helpers -------------------------------------------------
 def _first_valid(*vals):
     """
@@ -52,6 +84,8 @@ def _first_valid(*vals):
             continue
         return v
     return None
+
+
 # optional PDF dependencies
 try:
     from reportlab.lib.pagesizes import letter, landscape
@@ -348,19 +382,24 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
             price = _first_valid(
                 info.get("regularMarketPrice"),
                 info.get("preMarketPrice"),
-                fast.get("last_price"), fast.get("lastPrice"),
-                fast.get("previous_close"), fast.get("previousClose"),
+                fast.get("last_price"),
+                fast.get("lastPrice"),
+                fast.get("previous_close"),
+                fast.get("previousClose"),
                 info.get("previousClose"),
             )
             bid = _first_valid(fast.get("bid"), fast.get("bid_price"), info.get("bid"))
             ask = _first_valid(fast.get("ask"), fast.get("ask_price"), info.get("ask"))
             day_high = _first_valid(fast.get("day_high"), fast.get("dayHigh"))
-            day_low  = _first_valid(fast.get("day_low"),  fast.get("dayLow"))
+            day_low = _first_valid(fast.get("day_low"), fast.get("dayLow"))
             prev_close = _first_valid(
-                fast.get("previous_close"), fast.get("previousClose"),
+                fast.get("previous_close"),
+                fast.get("previousClose"),
                 info.get("previousClose"),
             )
-            vol = _first_valid(fast.get("last_volume"), fast.get("volume"), info.get("volume"))
+            vol = _first_valid(
+                fast.get("last_volume"), fast.get("volume"), info.get("volume")
+            )
         except Exception as e:
             # fallback to fast download (1d) if info API stalls
             try:
@@ -806,33 +845,37 @@ def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
             # 1) cheap fast_info first (works after hours)
             fast = yf.Ticker(yf_tkr).fast_info or {}
             price = _first_valid(
-                fast.get("last_price"), fast.get("lastPrice"),
-                fast.get("previous_close"), fast.get("previousClose"),
+                fast.get("last_price"),
+                fast.get("lastPrice"),
+                fast.get("previous_close"),
+                fast.get("previousClose"),
             )
 
             # 2) if still NaN, try 1-min intraday bar
             if price is None or pd.isna(price):
-                intr = yf.download(
-                    yf_tkr, period="1d", interval="1m", progress=False
-                )
+                intr = yf.download(yf_tkr, period="1d", interval="1m", progress=False)
                 if not intr.empty:
                     price = float(intr["Close"].dropna().iloc[-1])
 
             # 2b) if still NaN, try 5-min bars
             if price is None or pd.isna(price):
-                intr5 = yf.download(
-                    yf_tkr, period="1d", interval="5m", progress=False
-                )
+                intr5 = yf.download(yf_tkr, period="1d", interval="5m", progress=False)
                 if not intr5.empty:
                     price = float(intr5["Close"].dropna().iloc[-1])
 
             # 3) if no intraday yet (e.g., pre-open), ask daily bar
             if price is None or pd.isna(price):
-                daily = yf.download(
-                    yf_tkr, period="2d", interval="1d", progress=False
-                )
+                daily = yf.download(yf_tkr, period="2d", interval="1d", progress=False)
                 if not daily.empty:
                     price = float(daily["Close"].iloc[-1])
+            # 4) bullet-proof history fallback: last valid close over 5 days
+            if price is None or pd.isna(price):
+                tk = yf.Ticker(yf_tkr)
+                hist = tk.history(period="5d", interval="1d")
+                if hist is not None and not hist.empty:
+                    close = hist["Close"].dropna()
+                    if not close.empty:
+                        price = float(close.iloc[-1])
         except Exception as e:
             logging.warning("yfinance miss %s: %s", t, e)
 
@@ -840,14 +883,16 @@ def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
         if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and not pd.isna(price):
             price = price / 10.0
 
-        if (price is None or pd.isna(price)):
+        # Final guard: if still missing, hard fallback to previousClose
+        if price is None or pd.isna(price):
             try:
-                info = yf.Ticker(yf_tkr).info
-                prev_close = info.get("previousClose")
-                if prev_close is not None and not pd.isna(prev_close):
-                    price = prev_close
+                inf = yf.Ticker(yf_tkr).info
+                pc = inf.get("previousClose")
+                if pc is not None and not pd.isna(pc):
+                    price = float(pc)
             except Exception:
                 pass
+        time.sleep(0.15)
         rows.append({"symbol": t, "price": price})
     return pd.DataFrame(rows)
 
