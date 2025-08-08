@@ -53,12 +53,20 @@ def _fetch_combos(cur: sqlite3.Cursor, date_from: str) -> List[Tuple[int, str]]:
 
 
 def _fetch_legs_for_combo(cur: sqlite3.Cursor, combo_id: int) -> List[Dict[str, Any]]:
-    # Expected flexible columns: strike, right, expiry, qty (some may be missing)
+    # Expected flexible columns: strike, right, expiry, qty, premium/price (some may be missing)
     cur.execute("PRAGMA table_info(combo_legs);")
     info = cur.fetchall()
     colmap = {r[1]: True for r in info} if info else {}
     sel: List[str] = []
-    for c in ("combo_id", "strike", "right", "expiry", "qty"):
+    for c in (
+        "combo_id",
+        "strike",
+        "right",
+        "expiry",
+        "qty",
+        "premium",
+        "price",
+    ):
         if c in colmap:
             sel.append(c)
     if not sel:
@@ -171,9 +179,11 @@ def _infer_type_and_width(
 
 def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
     """
-    Practical backfill: tries to infer 'type' and 'width' for existing combos
-    using the combo_legs table if available. Leaves credit_debit, parent_combo_id,
-    closed_date unchanged.
+    Practical backfill:
+      - Infers 'type' and 'width' from combo_legs table if present
+      - Infers 'credit_debit' if combo_legs has a premium/price column
+      - Sets 'parent_combo_id' via simple roll-lineage heuristic on same underlying
+    Leaves 'closed_date' unchanged (needs execution-level data to populate accurately).
     """
     db_path = os.path.expanduser(db)
     conn = sqlite3.connect(db_path)
@@ -185,29 +195,76 @@ def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
             conn.close()
             return
         has_legs = _table_exists(cur, "combo_legs")
+        # For parent lineage, grab all combos with expiry if present
+        colnames = [r[1] for r in cur.execute("PRAGMA table_info(combos);").fetchall()]
+        has_expiry = "expiry" in colnames
+        all_combos_meta: Dict[int, Dict[str, Any]] = {}
+        if has_expiry:
+            for cid, underlying in combos:
+                cur.execute("SELECT expiry FROM combos WHERE id = ?;", (cid,))
+                r = cur.fetchone()
+                all_combos_meta[cid] = {
+                    "underlying": underlying,
+                    "expiry": r[0] if r else None,
+                }
         updated = 0
         for cid, underlying in combos:
             ctype, width = (None, None)
+            credit_debit = None
+            parent_combo_id = None
             if has_legs:
                 legs = _fetch_legs_for_combo(cur, cid)
                 if legs:
                     ctype, width = _infer_type_and_width(legs)
+                    # --- credit/debit inference ---
+                    prem: Optional[float] = None
+                    for l in legs:
+                        for prem_key in ("premium", "price"):
+                            if prem_key in l and l[prem_key] is not None:
+                                try:
+                                    prem_val = float(l[prem_key])
+                                    if prem is None:
+                                        prem = 0.0
+                                    prem += prem_val
+                                except Exception:
+                                    pass
+                    if prem is not None:
+                        credit_debit = "credit" if prem > 0 else "debit"
+            # --- simple roll-lineage heuristic ---
+            if has_expiry and all_combos_meta.get(cid, {}).get("expiry"):
+                this_exp = all_combos_meta[cid]["expiry"]
+                for pid, meta in all_combos_meta.items():
+                    if pid == cid:
+                        continue
+                    if (
+                        meta["underlying"] == underlying
+                        and meta.get("expiry")
+                        and meta["expiry"] < this_exp
+                    ):
+                        parent_combo_id = pid
+                        break
             # Update only if we inferred something meaningful
-            if ctype is not None or width is not None:
-                sets, vals = [], []
-                if ctype is not None:
-                    sets.append("type = ?")
-                    vals.append(ctype)
-                if width is not None:
-                    sets.append("width = ?")
-                    vals.append(width)
+            sets, vals = [], []
+            if ctype is not None:
+                sets.append("type = ?")
+                vals.append(ctype)
+            if width is not None:
+                sets.append("width = ?")
+                vals.append(width)
+            if credit_debit is not None:
+                sets.append("credit_debit = ?")
+                vals.append(credit_debit)
+            if parent_combo_id is not None:
+                sets.append("parent_combo_id = ?")
+                vals.append(parent_combo_id)
+            if sets:
                 vals.append(cid)
                 sql = f"UPDATE combos SET {', '.join(sets)} WHERE id = ?;"
                 cur.execute(sql, tuple(vals))
                 updated += 1
         conn.commit()
         print(
-            f"✅ backfill_combos: updated {updated} / {len(combos)} combos (type/width)."
+            f"✅ backfill_combos: updated {updated} / {len(combos)} combos (meta fields)."
         )
     finally:
         conn.close()
