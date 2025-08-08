@@ -68,12 +68,14 @@ PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]  # first existing file win
 DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
 TIME_TAG = datetime.utcnow().strftime("%H%M")
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"historic_prices_{DATE_TAG}_{TIME_TAG}.csv")
 
 
 def load_tickers() -> list[str]:
-    """Return unique tickers prioritising IBKR holdings; otherwise text file."""
+    """Return unique tickers prioritising IBKR holdings; otherwise text file.
+
+    Portfolio files are resolved under settings.output_dir first, then CWD.
+    """
     # 1) try IBKR
     ib_tickers = _tickers_from_ib()
     if ib_tickers:
@@ -81,7 +83,11 @@ def load_tickers() -> list[str]:
         return sorted(set(mapped_ib + EXTRA_TICKERS))
 
     # 2) fallback to file
-    path = next((p for p in PORTFOLIO_FILES if os.path.exists(p)), None)
+    candidates = [
+        os.path.join(os.path.expanduser(settings.output_dir), name)
+        for name in PORTFOLIO_FILES
+    ] + PORTFOLIO_FILES
+    path = next((p for p in candidates if os.path.exists(p)), None)
     user_tickers = []
     if path:
         with open(path) as f:

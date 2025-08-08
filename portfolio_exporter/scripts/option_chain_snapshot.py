@@ -121,7 +121,6 @@ def _resolve_contract(ib: IB, template: Option):
 
 # ───────────────────────── CONFIG ──────────────────────────
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 
@@ -162,8 +161,15 @@ def cleanup(files: List[str]) -> None:
 
 
 def load_tickers_from_files() -> List[str]:
-    """Read tickers from the first portfolio file that exists."""
-    path = next((p for p in PORTFOLIO_FILES if os.path.exists(p)), None)
+    """Read tickers from the first portfolio file that exists.
+
+    Preference: files under ``settings.output_dir``; then current directory.
+    """
+    candidates = [
+        os.path.join(os.path.expanduser(settings.output_dir), name)
+        for name in PORTFOLIO_FILES
+    ] + PORTFOLIO_FILES
+    path = next((p for p in candidates if os.path.exists(p)), None)
     if not path:
         return []
     with open(path) as fh:
@@ -665,11 +671,20 @@ def _save_txt(df: pd.DataFrame, path: str) -> None:
 
 
 # ─────────────────────────── MAIN ──────────────────────────
-def run(fmt: str = "csv") -> None:
+def run(
+    fmt: str = "csv",
+    symbols: str | None = None,
+    symbol_expiries: str | None = None,
+) -> None:
     filetype = fmt.lower()
+    # Ensure output directory exists at write-time
+    try:
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+    except Exception:
+        pass
     args = argparse.Namespace(
-        symbols=None,
-        symbol_expiries=None,
+        symbols=symbols,
+        symbol_expiries=symbol_expiries,
         excel=filetype in {"excel", "xlsx"},
         pdf=filetype == "pdf",
         txt=filetype == "txt",
@@ -756,7 +771,10 @@ def run(fmt: str = "csv") -> None:
                         path = f"{out_base}.txt"
                         _save_txt(df, path)
                     else:
-                        path = io.save(df, f"option_chain_{sym}_{label}", filetype)
+                        # Keep CSV naming consistent with other formats (include timestamp)
+                        path = io.save(
+                            df, f"option_chain_{sym}_{label}_{date_tag}", filetype
+                        )
                     created_files.append(path)
                     logger.info("Saved %s (%d rows)", path, len(df))
             except Exception as e:
@@ -775,7 +793,7 @@ def run(fmt: str = "csv") -> None:
             out_path = f"{out_base}.txt"
             _save_txt(df_all, out_path)
         else:
-            out_path = io.save(df_all, "option_chain_portfolio", filetype)
+            out_path = io.save(df_all, f"option_chain_portfolio_{date_tag}", filetype)
         logger.info(
             "Saved consolidated portfolio snapshot → %s (%d rows)",
             out_path,
@@ -784,9 +802,15 @@ def run(fmt: str = "csv") -> None:
         created_files.append(out_path)
 
     if created_files:
-        zip_path = os.path.join(OUTPUT_DIR, f"option_chain_{date_tag}.zip")
-        create_zip(created_files, zip_path)
-        cleanup(created_files)
-        logger.info("Created %s", zip_path)
+        # Only zip when there are multiple outputs; keep originals by default.
+        # Set PE_DELETE_ORIGINALS=1 to remove originals after zipping, if desired.
+        if len(created_files) > 1:
+            zip_path = os.path.join(OUTPUT_DIR, f"option_chain_{date_tag}.zip")
+            create_zip(created_files, zip_path)
+            logger.info("Created %s", zip_path)
+            if os.getenv("PE_DELETE_ORIGINALS", "0") == "1":
+                cleanup(created_files)
+        else:
+            logger.info("Saved %s", created_files[0])
 
     ib.disconnect()

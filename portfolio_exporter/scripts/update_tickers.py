@@ -4,6 +4,8 @@
 from __future__ import annotations
 import os
 from typing import List
+from pathlib import Path
+from portfolio_exporter.core.config import settings
 
 try:
     from ib_insync import IB
@@ -35,8 +37,18 @@ def fetch_ib_tickers() -> List[str]:
 
 
 def save_tickers(tickers: List[str], path: str = TICKERS_FILE) -> None:
-    """Write tickers to a text file, one per line."""
-    with open(path, "w") as fh:
+    """Write tickers to a text file in the configured output directory.
+
+    If a relative path is provided, it is resolved under ``settings.output_dir``.
+    Absolute paths are respected but their parent directories will be created.
+    """
+    outdir = Path(settings.output_dir).expanduser()
+    # Resolve relative paths under the configured output directory
+    target = Path(path)
+    if not target.is_absolute():
+        target = outdir / target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w") as fh:
         for tkr in tickers:
             mapped = PROXY_MAP.get(tkr, tkr)
             fh.write(f"{mapped}\n")
@@ -49,4 +61,4 @@ def run(fmt: str = "csv") -> None:
         print("No tickers retrieved from IBKR.")
         return
     save_tickers(tickers)
-    print(f"\u2705  Updated {TICKERS_FILE} with {len(tickers)} tickers.")
+    print(f"\u2705  Updated {TICKERS_FILE} with {len(tickers)} tickers in output dir.")

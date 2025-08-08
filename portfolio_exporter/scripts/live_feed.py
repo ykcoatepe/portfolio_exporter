@@ -247,7 +247,6 @@ TIME_TAG = now_tr.strftime("%H%M")
 
 # Save snapshots to iCloud Drive ▸ Downloads
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"live_quotes_{DATE_TAG}_{TIME_TAG}.csv")
 OUTPUT_POS_CSV = os.path.join(OUTPUT_DIR, f"live_positions_{DATE_TAG}_{TIME_TAG}.csv")
@@ -314,7 +313,15 @@ if "IB_AVAILABLE" in globals() and IB_AVAILABLE:
 
 # ------------------------ HELPERS --------------------------
 def load_tickers() -> list[str]:
-    p = next((f for f in PORTFOLIO_FILES if os.path.exists(f)), None)
+    """Load tickers from the first portfolio file found.
+
+    Preference: files under ``settings.output_dir``; then current directory.
+    """
+    candidates = [
+        os.path.join(os.path.expanduser(settings.output_dir), name)
+        for name in PORTFOLIO_FILES
+    ] + PORTFOLIO_FILES
+    p = next((f for f in candidates if os.path.exists(f)), None)
     if not p:
         logging.error("No ticker file found.")
         return []
@@ -733,30 +740,29 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
     doc.build([table])
 
 
-# -------------------------- MAIN ---------------------------
-def main():
-    parser = argparse.ArgumentParser(description="Snapshot live quotes")
-    parser.add_argument(
-        "--txt",
-        action="store_true",
-        help="Save a plain text copy alongside the output file.",
-    )
-    parser.add_argument(
-        "--pdf",
-        action="store_true",
-        help="Save a PDF instead of CSV.",
-    )
-    # Ignore any extra args when invoked from a parent menu
-    args, _ = parser.parse_known_args()
+def _current_output_paths() -> tuple[str, str]:
+    """Compute fresh, timestamped output base paths for quotes and positions."""
+    now = datetime.now(TR_TZ)
+    date_tag = now.strftime("%Y%m%d")
+    time_tag = now.strftime("%H%M")
+    # Ensure output directory exists at write-time (avoid import-time side effects)
+    try:
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+    except Exception:
+        pass
+    base_q = os.path.join(OUTPUT_DIR, f"live_quotes_{date_tag}_{time_tag}")
+    base_pos = os.path.join(OUTPUT_DIR, f"live_positions_{date_tag}_{time_tag}")
+    return base_q, base_pos
 
-    if not args.pdf:
-        try:
-            choice = input("Output format [csv/pdf] (default csv): ").strip().lower()
-        except EOFError:
-            choice = ""
-        if choice == "pdf":
-            args.pdf = True
 
+def run(fmt: str = "csv", include_indices: bool = True) -> None:
+    """Programmatic entrypoint used by the Live-Market menu.
+
+    - Avoids interactive prompts
+    - Supports fmt in {csv, excel, pdf}
+    - Optionally excludes macro/index extras if include_indices=False
+    """
+    # ----- resolve tickers -----
     tickers = load_tickers()
     opt_list, opt_under = ([], set())
     if IB_AVAILABLE:
@@ -767,33 +773,29 @@ def main():
             ib_tmp.disconnect()
         except Exception:
             pass
-    tickers = sorted(set(tickers + list(opt_under) + EXTRA_TICKERS))
-
+    extras = (ALWAYS_TICKERS + EXTRA_TICKERS) if include_indices else []
+    tickers = sorted(set(tickers + list(opt_under) + extras))
     if not tickers:
+        logging.warning("No tickers to snapshot.")
         return
 
-    ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S+03:00")
+    ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+    # ----- quotes from IB, YF, FRED -----
     df_ib = fetch_ib_quotes(tickers, opt_list)
-    # tickers whose 'last' is *not* NaN are considered served by IB
-    served = (
-        set(df_ib.loc[~df_ib["last"].isna(), "ticker"]) if not df_ib.empty else set()
-    )
+    served = set(df_ib.loc[~df_ib["last"].isna(), "ticker"]) if not df_ib.empty else set()
     remaining = [t for t in tickers if t not in served]
-    # Route any left-over yield tickers to FRED
     remaining_yields = [t for t in remaining if t in YIELD_MAP]
     remaining = [t for t in remaining if t not in YIELD_MAP]
-
     df_yf = fetch_yf_quotes(remaining) if remaining else pd.DataFrame()
-
-    df_fred = (
-        fetch_fred_yields(remaining_yields) if remaining_yields else pd.DataFrame()
-    )
-
+    df_fred = fetch_fred_yields(remaining_yields) if remaining_yields else pd.DataFrame()
     df = pd.concat([df_ib, df_yf, df_fred], ignore_index=True)
     df.insert(0, "timestamp", ts_now)
-    # --- live positions snapshot & unrealized PnL merge -----------
-    pnl_map = {}
-    pct_map = {}
+
+    # ----- positions & unrealized PnL merge -----
+    pnl_map: dict[str, float] = {}
+    pct_map: dict[str, float] = {}
+    df_pos = pd.DataFrame()
     if IB_AVAILABLE:
         ib_live = IB()
         try:
@@ -801,49 +803,6 @@ def main():
             df_pos = fetch_live_positions(ib_live)
             ib_live.disconnect()
             if not df_pos.empty:
-                base_pos = OUTPUT_POS_CSV.rsplit(".", 1)[0]
-                if args.pdf:
-                    save_to_pdf(df_pos, base_pos + ".pdf")
-                else:
-                    df_pos.to_csv(
-                        base_pos + ".csv",
-                        index=False,
-                        quoting=csv.QUOTE_MINIMAL,
-                        float_format="%.3f",
-                    )
-                if args.txt:
-                    pos_txt = df_pos.copy()
-                    if "unrealized_pnl_pct" in pos_txt.columns:
-                        pos_txt["unrealized_pnl_pct"] = pos_txt[
-                            "unrealized_pnl_pct"
-                        ].map(lambda x: f"{x:.3f}%")
-                    if "combo_legs" in pos_txt.columns:
-                        pos_txt["combo_legs"] = pos_txt["combo_legs"].apply(
-                            lambda x: (
-                                "\n".join(
-                                    [
-                                        f"{leg['ratio']}x {leg['action']} {leg['symbol']} ({leg['sec_type']}) "
-                                        f"Exp: {leg['expiry'] or 'N/A'}, Strike: {leg['strike'] or 'N/A'}, Right: {leg['right'] or 'N/A'}"
-                                        for leg in x
-                                    ]
-                                )
-                                if x
-                                else None
-                            )
-                        )
-                    with open(base_pos + ".txt", "w") as fh:
-                        fh.write(
-                            pos_txt.to_string(
-                                index=False, float_format=lambda x: f"{x:.3f}"
-                            )
-                        )
-                logging.info(
-                    "Saved %d live positions → %s",
-                    len(df_pos),
-                    base_pos + (".pdf" if args.pdf else ".csv"),
-                )
-
-                # aggregate unrealized PnL AND cost basis by underlying symbol
                 pnl_map = df_pos.groupby("ticker")["unrealized_pnl"].sum().to_dict()
                 cost_map = df_pos.groupby("ticker")["cost_basis"].sum().to_dict()
                 pct_map = {
@@ -853,7 +812,6 @@ def main():
         except Exception as e:
             logging.warning("Live position snapshot failed: %s", e)
 
-    # map per-symbol PnL onto the quote rows
     df["unrealized_pnl"] = df["ticker"].map(pnl_map)
     df["unrealized_pnl_pct"] = df["ticker"].map(pct_map)
 
@@ -875,91 +833,61 @@ def main():
     ]
     df = df[[c for c in quote_cols if c in df.columns]]
 
-    base_q = OUTPUT_CSV.rsplit(".", 1)[0]
-    if args.pdf:
+    # ----- save outputs -----
+    base_q, base_pos = _current_output_paths()
+    fmt = (fmt or "csv").lower()
+    if fmt == "pdf":
         save_to_pdf(df, base_q + ".pdf")
-    else:
-        df.to_csv(
-            base_q + ".csv",
-            index=False,
-            quoting=csv.QUOTE_MINIMAL,
-            float_format="%.3f",
-        )
-    if args.txt:
-        df_txt = df.copy()
-        if "unrealized_pnl_pct" in df_txt.columns:
-            df_txt["unrealized_pnl_pct"] = df_txt["unrealized_pnl_pct"].map(
-                lambda x: f"{x:.3f}%"
+        if not df_pos.empty:
+            save_to_pdf(df_pos, base_pos + ".pdf")
+    elif fmt in {"xlsx", "excel"}:
+        out_q = base_q + ".xlsx"
+        with pd.ExcelWriter(out_q, engine="xlsxwriter") as writer:
+            df.to_excel(writer, sheet_name="Quotes", index=False)
+        if not df_pos.empty:
+            out_p = base_pos + ".xlsx"
+            with pd.ExcelWriter(out_p, engine="xlsxwriter") as writer:
+                df_pos.to_excel(writer, sheet_name="Positions", index=False)
+        logging.info("Saved live snapshot → %s", out_q)
+    else:  # csv
+        out_q = base_q + ".csv"
+        df.to_csv(out_q, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
+        if not df_pos.empty:
+            out_p = base_pos + ".csv"
+            df_pos.to_csv(
+                out_p, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f"
             )
-        with open(base_q + ".txt", "w") as fh:
-            fh.write(df_txt.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
-    logging.info(
-        "Saved %d quotes → %s",
-        len(df),
-        base_q + (".pdf" if args.pdf else ".csv"),
+        logging.info("Saved live snapshot → %s", out_q)
+
+
+# -------------------------- MAIN ---------------------------
+def main():
+    parser = argparse.ArgumentParser(description="Snapshot live quotes")
+    parser.add_argument(
+        "--txt",
+        action="store_true",
+        help="Save a plain text copy alongside the output file.",
     )
-
-
-def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
-    """Snapshot quotes using IBKR with yfinance fallback.
-
-    Uses this module's IBKR fetcher to avoid circular imports.
-    """
-    rows: list[dict[str, float]] = []
-    missing: list[str] = list(ticker_list)
-
-    # Try IBKR first for all tickers we can serve
-    try:
-        df_ib = fetch_ib_quotes(ticker_list, opt_cons=[])
-    except Exception:
-        df_ib = pd.DataFrame()
-
-    if df_ib is not None and not df_ib.empty:
-        # Normalize to {symbol, price}
-        for _, r in df_ib.iterrows():
-            sym = str(r.get("ticker"))
-            last = r.get("last")
-            rows.append({"symbol": sym, "price": last})
-        served = {str(s) for s in df_ib["ticker"].tolist() if pd.notna(s)}
-        missing = [t for t in ticker_list if t not in served]
-
-    # Fallback to yfinance for missing tickers – richer ladder
-    for t in missing:
-        yf_tkr = PROXY_MAP.get(t, t)
-        price = _yf_resolve_last_price(yf_tkr, label=t)
-        # Rescale CBOE yield indices (^TNX etc.)
-        if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and not pd.isna(price):
-            price = price / 10.0
-        time.sleep(0.15)
-        rows.append({"symbol": t, "price": price})
-    return pd.DataFrame(rows)
-
-
-def run(
-    fmt: str = "csv",
-    tickers: list[str] | None = None,
-    include_indices: bool = True,
-    return_df: bool = False,
-) -> pd.DataFrame | None:
-    if tickers is None:
-        tickers = _load_portfolio_tickers()
-    if include_indices:
-        tickers = sorted(set(t.upper() for t in tickers) | set(ALWAYS_TICKERS))
-
-    df = run_with_spinner("Fetching quotes…", _snapshot_quotes, tickers, fmt=fmt)
-    df = df.rename(columns={"symbol": "ticker", "price": "last"})
-    ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
-    df.insert(0, "timestamp", ts_now)
-
-    if return_df:
-        return df
-
-    base_q = OUTPUT_CSV.rsplit(".", 1)[0]
-    df.to_csv(
-        base_q + ".csv",
-        index=False,
-        quoting=csv.QUOTE_MINIMAL,
-        float_format="%.3f",
+    parser.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Save a PDF instead of CSV.",
     )
-    print(df)
-    return None
+    # Ignore any extra args when invoked from a parent menu
+    args, _ = parser.parse_known_args()
+
+    # Interactive choice only for direct CLI use
+    fmt = "pdf" if args.pdf else "csv"
+    if not args.pdf:
+        try:
+            choice = input("Output format [csv/pdf] (default csv): ").strip().lower()
+        except EOFError:
+            choice = ""
+        if choice in {"pdf", "csv"}:
+            fmt = choice
+
+    # Defer to run() so menu and CLI share behavior
+    run(fmt=fmt, include_indices=True)
+
+
+### Removed legacy lightweight run() in favor of unified run() above.

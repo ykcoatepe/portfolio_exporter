@@ -86,7 +86,6 @@ DATE_TAG = datetime.now(TR_TZ).strftime("%Y%m%d")
 TIME_TAG = datetime.now(TR_TZ).strftime("%H%M")
 # save to iCloud Drive Downloads
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 HIST_DAYS = 300  # enough for SMA200 / ADX
@@ -94,8 +93,8 @@ SPAN_PCT = 0.05  # ±5 % strike window
 N_ATM_STRIKES = 4  # number of strikes on each side of ATM to keep (reduced for speed)
 ATM_DELTA_BAND = 0.10  # |Δ| ≤ 0.10
 RISK_FREE_RATE = 0.01
-DATA_DIR = "iv_history"
-os.makedirs(DATA_DIR, exist_ok=True)
+# Store IV history alongside other outputs
+DATA_DIR = os.path.join(OUTPUT_DIR, "iv_history")
 
 IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 1  # tweak if needed
 
@@ -120,7 +119,11 @@ def _bs_delta(S, K, T, r, sigma, call=True):
 
 
 def load_tickers():
-    p = next((f for f in PORTFOLIO_FILES if os.path.exists(f)), None)
+    candidates = [
+        os.path.join(os.path.expanduser(settings.output_dir), name)
+        for name in PORTFOLIO_FILES
+    ] + PORTFOLIO_FILES
+    p = next((f for f in candidates if os.path.exists(f)), None)
     if not p:
         logging.error("Portfolio file not found; aborting.")
         sys.exit(1)
@@ -552,6 +555,8 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
             iv_now = oi_near = earn_dt = np.nan
 
         # IV rank
+        # Ensure IV history directory exists only when needed (avoid import-time side effects)
+        os.makedirs(DATA_DIR, exist_ok=True)
         fn = os.path.join(DATA_DIR, f"{tk}.csv")
         if not np.isnan(iv_now):
             today = datetime.utcnow().strftime("%Y-%m-%d")

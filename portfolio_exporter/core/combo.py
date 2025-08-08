@@ -37,11 +37,8 @@ def _default_db_path() -> pathlib.Path:
         outdir = pathlib.Path.cwd()
     home_p = outdir / "combos.db"
     try:
+        # Only ensure the directory exists here; avoid touching the DB file at import time.
         home_p.parent.mkdir(parents=True, exist_ok=True)
-        # Probe writability by opening a temporary connection in WAL mode
-        # without creating the file permanently (best-effort).
-        with sqlite3.connect(home_p) as _:
-            pass
         return home_p
     except Exception:
         # Fall back to a repo-local path to avoid sandbox restrictions

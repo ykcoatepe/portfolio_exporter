@@ -719,7 +719,9 @@ def run(
 
     from portfolio_exporter.core.io import save
 
-    path = save(df, "trades_report", fmt, settings.output_dir)
+    # Timestamped filename for easier tracking and to avoid overwrites
+    date_tag = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
+    path = save(df, f"trades_report_{date_tag}", fmt, settings.output_dir)
     print(f"✅ Trades report exported → {path}")
     if return_df:
         return df

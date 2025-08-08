@@ -20,7 +20,6 @@ from rich.console import Console
 
 # Directory where orchestrated dataset and script outputs are stored.
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def run_script(func: Callable[[], None]) -> List[str]:

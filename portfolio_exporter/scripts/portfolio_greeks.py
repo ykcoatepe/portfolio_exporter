@@ -181,7 +181,6 @@ def eddr(
 # ───────────────────────── CONFIG ──────────────────────────
 
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 NAV_LOG = Path(os.path.join(OUTPUT_DIR, "nav_history.csv"))
 
@@ -1040,6 +1039,12 @@ def run(
     combo_types: str = "simple",
 ) -> dict | None:
     """Aggregate per-position Greeks and optionally persist the results."""
+
+    # Ensure output directory exists when generating files (avoid import-time side effects)
+    try:
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+    except Exception:
+        pass
 
     pos_df = run_with_spinner("Fetching positions…", _load_positions).copy()
     if pos_df.empty:

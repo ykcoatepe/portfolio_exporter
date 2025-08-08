@@ -7,10 +7,8 @@ from .config import settings
 def save(
     df: pd.DataFrame, name: str, fmt: str = "csv", outdir: str | Path | None = None
 ):
-    outdir = Path(
-        outdir
-        or "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
-    ).expanduser()
+    # Default to configured output directory when not explicitly provided
+    outdir = Path(outdir or settings.output_dir).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
     fname = outdir / f"{name}.{ {'csv':'csv','excel':'xlsx','pdf':'pdf'}[fmt] }"
     if fmt == "csv":
