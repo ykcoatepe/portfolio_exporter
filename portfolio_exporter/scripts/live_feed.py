@@ -24,7 +24,6 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 from typing import List, Dict
-from portfolio_exporter.core.quotes import snapshot
 from portfolio_exporter.core.ui import run_with_spinner
 import numpy as np
 import math
@@ -162,10 +161,18 @@ IB_TIMEOUT = 4.0  # seconds to wait per batch
 
 # yfinance proxy map for friendly tickers
 PROXY_MAP = {
-    "VIX": "^VIX",
+    # Explicit Yahoo symbol mappings for stubborn tickers
+    "VIX": "^VIX",  # CBOE Volatility Index
+    "RSP": "RSP",
+    "VCSH": "VCSH",
+    "TFLO": "TFLO",
+    "KRBN": "KRBN",
+    "MCD": "MCD",
+    "PG": "PG",
+    "PLD": "PLD",
+    # Other known mappings and passthroughs
     "VVIX": "^VVIX",
     "DXY": "DX-Y.NYB",
-    # commodities / yields map to themselves (clarity)
     "GC=F": "GC=F",
     "SI=F": "SI=F",
     "CL=F": "CL=F",
@@ -176,7 +183,6 @@ PROXY_MAP = {
     "US30Y=RR": "US30Y=RR",
     "^IRX": "^IRX",
     "^FVX": "^FVX",
-    "RSP": "RSP",  # equal-weight S&P 500 ETF
 }
 
 YIELD_MAP = {"US2Y": "DGS2", "US10Y": "DGS10", "US20Y": "DGS20", "US30Y": "DGS30"}
@@ -823,19 +829,27 @@ def main():
 
 
 def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
-    """Snapshot quotes using IBKR with yfinance fallback."""
-    try:
-        data = snapshot(ticker_list)
-    except Exception:
-        data = {}
+    """Snapshot quotes using IBKR with yfinance fallback.
 
+    Uses this module's IBKR fetcher to avoid circular imports.
+    """
     rows: list[dict[str, float]] = []
-    # Add IBKR snapshot results first and determine which tickers need fallback
-    if data:
-        rows = [{"symbol": k, "price": v} for k, v in data.items()]
-        missing = [t for t in ticker_list if t not in data]
-    else:
-        missing = ticker_list
+    missing: list[str] = list(ticker_list)
+
+    # Try IBKR first for all tickers we can serve
+    try:
+        df_ib = fetch_ib_quotes(ticker_list, opt_cons=[])
+    except Exception:
+        df_ib = pd.DataFrame()
+
+    if df_ib is not None and not df_ib.empty:
+        # Normalize to {symbol, price}
+        for _, r in df_ib.iterrows():
+            sym = str(r.get("ticker"))
+            last = r.get("last")
+            rows.append({"symbol": sym, "price": last})
+        served = {str(s) for s in df_ib["ticker"].tolist() if pd.notna(s)}
+        missing = [t for t in ticker_list if t not in served]
 
     # Fallback to yfinance for missing tickers – richer ladder
     for t in missing:
