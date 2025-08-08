@@ -119,6 +119,10 @@ Schedule `update_tickers.py` with cron or another task scheduler to run daily:
 
 This keeps `tickers_live.txt` synced with your IBKR portfolio.
 
+## Contributing
+
+See Repository Guidelines in [AGENTS.md](AGENTS.md) for project structure, style, testing, and PR expectations. In short: use Python 3.11+, run `make setup`, lint with `make lint`, test with `make test`, and keep commits small and descriptive.
+
 
 ## License
 
