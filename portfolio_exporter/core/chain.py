@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import itertools
-from typing import List
+import os
+import sqlite3
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -31,48 +33,181 @@ def fetch_chain(
     return pd.DataFrame(rows)
 
 
-def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
-    """Backfill combo metadata for records in *db*.
+def _table_exists(cur: sqlite3.Cursor, name: str) -> bool:
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?;", (name,)
+    )
+    return cur.fetchone() is not None
 
-    The maintenance script expects this helper to populate recently created
-    combos with derived fields such as ``type`` and ``width``.  The full combo
-    detection logic lives elsewhere in the project and may not always be
-    available in lightweight environments.  This implementation therefore only
-    scans the database for matching rows and leaves existing values untouched,
-    allowing the migration script to run end‑to‑end without raising an
-    ``AttributeError``.
 
-    Parameters
-    ----------
-    db:
-        Path to the SQLite combos database.
-    date_from:
-        Earliest date (``YYYY-MM-DD``) to include when searching for combos.
-    """
-
-    import os
-    import sqlite3
-
-    db_path = os.path.expanduser(db)
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-
-    # ``opened_date`` may not exist on all databases; fall back to selecting all
-    # combos if the column is missing.
+def _fetch_combos(cur: sqlite3.Cursor, date_from: str) -> List[Tuple[int, str]]:
+    # tolerate older schemas missing opened_date
     try:
         cur.execute(
-            "SELECT id FROM combos WHERE opened_date >= ? OR opened_date IS NULL",
+            "SELECT id, underlying FROM combos WHERE opened_date >= ? OR opened_date IS NULL;",
             (date_from,),
         )
     except sqlite3.OperationalError:
-        cur.execute("SELECT id FROM combos")
+        cur.execute("SELECT id, underlying FROM combos;")
+    return list(cur.fetchall())
 
+
+def _fetch_legs_for_combo(cur: sqlite3.Cursor, combo_id: int) -> List[Dict[str, Any]]:
+    # Expected flexible columns: strike, right, expiry, qty (some may be missing)
+    cur.execute("PRAGMA table_info(combo_legs);")
+    info = cur.fetchall()
+    colmap = {r[1]: True for r in info} if info else {}
+    sel: List[str] = []
+    for c in ("combo_id", "strike", "right", "expiry", "qty"):
+        if c in colmap:
+            sel.append(c)
+    if not sel:
+        return []
+    q = f"SELECT {', '.join(sel)} FROM combo_legs WHERE combo_id=?;"
+    cur.execute(q, (combo_id,))
     rows = cur.fetchall()
-    count = len(rows)
-    if count == 0:
-        print(f"No combos found to backfill from {date_from}.")
-    else:
-        print(f"✅ Backfilled {count} combos from {date_from}.")
+    res: List[Dict[str, Any]] = []
+    for r in rows:
+        row: Dict[str, Any] = {}
+        for i, c in enumerate(sel):
+            row[c] = r[i]
+        res.append(row)
+    return res
 
-    conn.commit()
-    conn.close()
+
+def _infer_type_and_width(
+    legs: List[Dict[str, Any]],
+) -> Tuple[Optional[str], Optional[float]]:
+    """
+    Heuristics:
+      - calendar: 2 legs, same strike, same right, different expiry
+      - butterfly: 3 legs (1:-2:1) or 4 legs with symmetric strikes and same expiry
+      - iron condor: 4 legs, 2 calls + 2 puts, disjoint strike wings, same expiry
+      - vertical: 2 legs, same right, same expiry, different strikes
+    width:
+      - condor: min(call_spread_width, put_spread_width) or largest outer-inner gap as fallback
+      - butterfly: (max_strike - min_strike) / 2 if symmetric, else adjacent gap
+      - vertical: abs(strike1 - strike2)
+      - calendar: 0.0 (by convention; time width isn’t price width)
+    """
+    if not legs:
+        return None, None
+    # Normalize fields
+    clean = []
+    for l in legs:
+        strike = l.get("strike")
+        right = (l.get("right") or "").upper() if l.get("right") else None
+        expiry = l.get("expiry")
+        qty = l.get("qty", 1)
+        try:
+            strike = float(strike) if strike is not None else None
+        except Exception:
+            strike = None
+        clean.append({"strike": strike, "right": right, "expiry": expiry, "qty": qty})
+
+    n = len(clean)
+    strikes = [l["strike"] for l in clean if l["strike"] is not None]
+    rights = [l["right"] for l in clean if l["right"] is not None]
+    expiries = [l["expiry"] for l in clean if l["expiry"] is not None]
+    same_expiry = len(set(expiries)) <= 1 if expiries else True
+    same_right = len(set(rights)) <= 1 if rights else False
+    uniq_rights = set(rights)
+
+    # Calendar: 2 legs, same strike & right, different expiry
+    if (
+        n == 2
+        and same_right
+        and len(set([l["strike"] for l in clean])) == 1
+        and len(set(expiries)) > 1
+    ):
+        return "calendar", 0.0
+
+    # Vertical: 2 legs, same right & expiry, different strikes
+    if (
+        n == 2
+        and same_right
+        and same_expiry
+        and len(set([l["strike"] for l in clean if l["strike"] is not None])) == 2
+    ):
+        s = sorted([l["strike"] for l in clean if l["strike"] is not None])
+        return "vertical", abs(s[1] - s[0]) if len(s) == 2 else None
+
+    # Iron condor: 4 legs, 2 calls + 2 puts, same expiry (when present)
+    if n == 4 and uniq_rights == {"C", "P"} and same_expiry:
+        calls = sorted(
+            [l for l in clean if l["right"] == "C" and l["strike"] is not None],
+            key=lambda x: x["strike"],
+        )
+        puts = sorted(
+            [l for l in clean if l["right"] == "P" and l["strike"] is not None],
+            key=lambda x: x["strike"],
+        )
+        cw = abs(calls[-1]["strike"] - calls[0]["strike"]) if len(calls) >= 2 else None
+        pw = abs(puts[-1]["strike"] - puts[0]["strike"]) if len(puts) >= 2 else None
+        # choose the smaller wing width as the condor width; fallback to max gap
+        if cw is not None and pw is not None:
+            return "iron_condor", float(min(cw, pw))
+        if strikes:
+            s = sorted(strikes)
+            return "iron_condor", float(max(s) - min(s))
+        return "iron_condor", None
+
+    # Butterfly: 3 or 4 legs, same expiry, symmetric strikes (rough)
+    if same_expiry and n in (3, 4) and strikes:
+        s = sorted(strikes)
+        outer = s[-1] - s[0]
+        # symmetric-ish if middle close to mean
+        if len(s) >= 3:
+            mid = s[len(s) // 2]
+            mean = (s[0] + s[-1]) / 2.0
+            if abs(mid - mean) <= max(0.01, outer * 0.05):
+                return "butterfly", float(outer / 2.0)
+        # fallback width = outer range / 2
+        return "butterfly", float(outer / 2.0) if outer else None
+
+    # Couldn’t classify confidently
+    return None, None
+
+
+def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
+    """
+    Practical backfill: tries to infer 'type' and 'width' for existing combos
+    using the combo_legs table if available. Leaves credit_debit, parent_combo_id,
+    closed_date unchanged.
+    """
+    db_path = os.path.expanduser(db)
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    try:
+        combos = _fetch_combos(cur, date_from)
+        if not combos:
+            print(f"[backfill] No combos found from {date_from}.")
+            conn.close()
+            return
+        has_legs = _table_exists(cur, "combo_legs")
+        updated = 0
+        for cid, underlying in combos:
+            ctype, width = (None, None)
+            if has_legs:
+                legs = _fetch_legs_for_combo(cur, cid)
+                if legs:
+                    ctype, width = _infer_type_and_width(legs)
+            # Update only if we inferred something meaningful
+            if ctype is not None or width is not None:
+                sets, vals = [], []
+                if ctype is not None:
+                    sets.append("type = ?")
+                    vals.append(ctype)
+                if width is not None:
+                    sets.append("width = ?")
+                    vals.append(width)
+                vals.append(cid)
+                sql = f"UPDATE combos SET {', '.join(sets)} WHERE id = ?;"
+                cur.execute(sql, tuple(vals))
+                updated += 1
+        conn.commit()
+        print(
+            f"✅ backfill_combos: updated {updated} / {len(combos)} combos (type/width)."
+        )
+    finally:
+        conn.close()
