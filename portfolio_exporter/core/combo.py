@@ -3,19 +3,54 @@ from __future__ import annotations
 import datetime as _dt
 import hashlib
 import logging
+import os
 import pathlib
 import sqlite3
 from typing import Dict, List
 
 from .io import migrate_combo_schema
+from .config import settings
 
 import pandas as pd
 
 log = logging.getLogger(__name__)
 
 # ── database setup ────────────────────────────────────────────────────────────
-DB_PATH = pathlib.Path.home() / ".portfolio_exporter" / "combos.db"
-DB_PATH.parent.mkdir(exist_ok=True)
+def _default_db_path() -> pathlib.Path:
+    # Allow override via env var for tests/CI
+    env_path = os.environ.get("PE_DB_PATH")
+    if env_path:
+        p = pathlib.Path(env_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+
+    # Under pytest, prefer a repo-local temporary path to avoid sandbox issues
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        local_p = pathlib.Path.cwd() / "tmp_test_run" / "combos.db"
+        local_p.parent.mkdir(parents=True, exist_ok=True)
+        return local_p
+
+    # Preferred location alongside other app outputs
+    try:
+        outdir = pathlib.Path(getattr(settings, "output_dir", ".")).expanduser()
+    except Exception:
+        outdir = pathlib.Path.cwd()
+    home_p = outdir / "combos.db"
+    try:
+        home_p.parent.mkdir(parents=True, exist_ok=True)
+        # Probe writability by opening a temporary connection in WAL mode
+        # without creating the file permanently (best-effort).
+        with sqlite3.connect(home_p) as _:
+            pass
+        return home_p
+    except Exception:
+        # Fall back to a repo-local path to avoid sandbox restrictions
+        local_p = pathlib.Path.cwd() / "tmp_test_run" / "combos.db"
+        local_p.parent.mkdir(parents=True, exist_ok=True)
+        return local_p
+
+
+DB_PATH = _default_db_path()
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS combos (

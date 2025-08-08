@@ -45,6 +45,7 @@ def run(
     pre_menu.last_symbol.value = symbol
 
     default_expiry = expiry or pre_menu.last_expiry.get()
+    normalize_exps = expiry is None
     # ── natural‑language expiry parsing ──────────────────────────────
     if not expiry:
         exp_raw = (
@@ -70,7 +71,11 @@ def run(
         nonlocal all_exps
         if all_exps:
             return all_exps
-        all_exps = Ticker(sym).options
+        try:
+            all_exps = Ticker(sym).options
+        except Exception:
+            # Network unavailable; skip normalization
+            all_exps = []
         return all_exps
 
     def _nearest(expiry_date: str) -> str:
@@ -90,7 +95,7 @@ def run(
     save_csv = save_csv_env not in {"0", "false", "no"}
 
     def _fetch(cur_width: int, cur_expiry: str) -> pd.DataFrame:
-        exp = _nearest(cur_expiry)
+        exp = _nearest(cur_expiry) if normalize_exps else cur_expiry
         use_strikes = (
             strikes if strikes is not None else _calc_strikes(symbol, cur_width)
         )

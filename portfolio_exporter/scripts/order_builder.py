@@ -59,7 +59,9 @@ def _price_leg(
     symbol: str, expiry: str | None, strike: float | None, right: str | None
 ) -> Dict[str, float]:
     if right in {"C", "P"}:
-        expiry = _nearest_expiry(symbol, expiry) if expiry else expiry
+        # If an expiry was provided, use it as-is to avoid network normalization.
+        # Only resolve to the nearest listed expiry when it's missing.
+        expiry = expiry or _nearest_expiry(symbol, expiry)
         return quote_option(symbol, expiry or "", float(strike), right)
     data = quote_stock(symbol)
     data.update({"delta": 1.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "iv": 0.0})

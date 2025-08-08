@@ -23,7 +23,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from typing import List, Dict
+from typing import List, Dict, Any
 from portfolio_exporter.core.ui import run_with_spinner
 import numpy as np
 import math
@@ -83,6 +83,102 @@ def _first_valid(*vals):
             continue
         return v
     return None
+
+
+def _yf_resolve_last_price(
+    yf_symbol: str,
+    label: str | None = None,
+    info: Dict[str, Any] | None = None,
+    fast: Dict[str, Any] | None = None,
+) -> float:
+    """
+    Best-effort ladder to resolve a last price from Yahoo Finance.
+
+    Order:
+    1) Provided info/fast_info values (regular + pre-market + previous close)
+    2) 1m intraday bar, then 5m
+    3) 2d daily bar last close
+    4) 5d history last valid close
+    5) previousClose via info
+    6) 1y history last valid close
+    Returns float or NaN.
+    """
+    try:
+        tk = yf.Ticker(yf_symbol)
+        if fast is None:
+            try:
+                fast = tk.fast_info or {}
+            except Exception:
+                fast = {}
+        # Step 1: info/fast
+        price = _first_valid(
+            (info or {}).get("regularMarketPrice"),
+            (info or {}).get("preMarketPrice"),
+            fast.get("last_price"),
+            fast.get("lastPrice"),
+            fast.get("previous_close"),
+            fast.get("previousClose"),
+            (info or {}).get("previousClose"),
+        )
+        # Step 2: intraday 1m
+        if price is None or pd.isna(price):
+            try:
+                intr = yf.download(yf_symbol, period="1d", interval="1m", progress=False)
+                if intr is not None and not intr.empty:
+                    price = float(intr["Close"].dropna().iloc[-1])
+            except Exception:
+                pass
+        # Step 3: intraday 5m
+        if price is None or pd.isna(price):
+            try:
+                intr5 = yf.download(yf_symbol, period="1d", interval="5m", progress=False)
+                if intr5 is not None and not intr5.empty:
+                    price = float(intr5["Close"].dropna().iloc[-1])
+            except Exception:
+                pass
+        # Step 4: 2d daily
+        if price is None or pd.isna(price):
+            try:
+                daily = yf.download(yf_symbol, period="2d", interval="1d", progress=False)
+                if daily is not None and not daily.empty:
+                    price = float(daily["Close"].dropna().iloc[-1])
+            except Exception:
+                pass
+        # Step 5: 5d history
+        if price is None or pd.isna(price):
+            try:
+                hist5 = tk.history(period="5d", interval="1d")
+                if hist5 is not None and not hist5.empty:
+                    close_vals = hist5["Close"].dropna()
+                    if not close_vals.empty:
+                        price = float(close_vals.iloc[-1])
+            except Exception:
+                pass
+        # Step 6: previousClose via info (if not provided)
+        if price is None or pd.isna(price):
+            try:
+                inf = info if info is not None else tk.info
+                pc = inf.get("previousClose") if isinstance(inf, dict) else None
+                if pc is not None and not pd.isna(pc):
+                    price = float(pc)
+            except Exception:
+                pass
+        # Step 7: 1y history last valid close
+        if price is None or pd.isna(price):
+            try:
+                hist1y = tk.history(period="1y", interval="1d")
+                if hist1y is not None and not hist1y.empty:
+                    close_vals = hist1y["Close"].dropna()
+                    if not close_vals.empty:
+                        price = float(close_vals.iloc[-1])
+            except Exception as e:
+                if label:
+                    logging.warning("1y history fallback failed for %s: %s", label, e)
+        return price if price is not None else float("nan")
+    except Exception as e:
+        if label:
+            logging.warning("yfinance resolution failed for %s: %s", label, e)
+        return float("nan")
 
 
 # optional PDF dependencies
@@ -384,16 +480,7 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
             info = yf.Ticker(yf_tkr).info
             # fast_info is more reliable after hours – use it to back-fill gaps
             fast = yf.Ticker(yf_tkr).fast_info or {}
-            # Price hierarchy: live → pre-mkt → fast_info last/prev → prev_close
-            price = _first_valid(
-                info.get("regularMarketPrice"),
-                info.get("preMarketPrice"),
-                fast.get("last_price"),
-                fast.get("lastPrice"),
-                fast.get("previous_close"),
-                fast.get("previousClose"),
-                info.get("previousClose"),
-            )
+            price = _yf_resolve_last_price(yf_tkr, label=t, info=info, fast=fast)
             bid = _first_valid(fast.get("bid"), fast.get("bid_price"), info.get("bid"))
             ask = _first_valid(fast.get("ask"), fast.get("ask_price"), info.get("ask"))
             day_high = _first_valid(fast.get("day_high"), fast.get("dayHigh"))
@@ -407,29 +494,14 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
                 fast.get("last_volume"), fast.get("volume"), info.get("volume")
             )
         except Exception as e:
-            # fallback to fast download (1d) if info API stalls
-            try:
-                hist = yf.download(yf_tkr, period="2d", interval="1d", progress=False)
-                price = hist["Close"].iloc[-1] if not hist.empty else np.nan
-                prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else np.nan
-                bid = ask = day_high = day_low = vol = np.nan
-                # If daily bars empty, pull intraday 5-min so we still get a quote
-                if (pd.isna(price) or price is None) and hist.empty:
-                    hist5 = yf.download(
-                        yf_tkr, period="1d", interval="5m", progress=False
-                    )
-                    if not hist5.empty:
-                        price = hist5["Close"].iloc[-1]
-                logging.warning("yfinance info fail %s, used download(): %s", t, e)
-            except Exception as e2:
-                logging.warning("yfinance miss %s: %s", t, e2)
-                continue
+            logging.warning("yfinance info fail %s: %s", t, e)
+            bid = ask = day_high = day_low = vol = np.nan
+            prev_close = np.nan
+            price = _yf_resolve_last_price(yf_tkr, label=t)
         # Yahoo yields like ^TNX return 10× the percentage; rescale
         if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and price is not None:
             price = price / 10.0
-        # --- ultimate fallback: use prev_close if still missing ----------
-        if (price is None or pd.isna(price)) and prev_close is not None:
-            price = prev_close
+        
         rows.append(
             {
                 "ticker": t,
@@ -854,58 +926,10 @@ def _snapshot_quotes(ticker_list: list[str], fmt: str = "csv") -> pd.DataFrame:
     # Fallback to yfinance for missing tickers – richer ladder
     for t in missing:
         yf_tkr = PROXY_MAP.get(t, t)
-        price = float("nan")
-        try:
-            # 1) cheap fast_info first (works after hours)
-            fast = yf.Ticker(yf_tkr).fast_info or {}
-            price = _first_valid(
-                fast.get("last_price"),
-                fast.get("lastPrice"),
-                fast.get("previous_close"),
-                fast.get("previousClose"),
-            )
-
-            # 2) if still NaN, try 1-min intraday bar
-            if price is None or pd.isna(price):
-                intr = yf.download(yf_tkr, period="1d", interval="1m", progress=False)
-                if not intr.empty:
-                    price = float(intr["Close"].dropna().iloc[-1])
-
-            # 2b) if still NaN, try 5-min bars
-            if price is None or pd.isna(price):
-                intr5 = yf.download(yf_tkr, period="1d", interval="5m", progress=False)
-                if not intr5.empty:
-                    price = float(intr5["Close"].dropna().iloc[-1])
-
-            # 3) if no intraday yet (e.g., pre-open), ask daily bar
-            if price is None or pd.isna(price):
-                daily = yf.download(yf_tkr, period="2d", interval="1d", progress=False)
-                if not daily.empty:
-                    price = float(daily["Close"].iloc[-1])
-            # 4) 5-day history last valid close
-            if price is None or pd.isna(price):
-                tk = yf.Ticker(yf_tkr)
-                hist = tk.history(period="5d", interval="1d")
-                if hist is not None and not hist.empty:
-                    close = hist["Close"].dropna()
-                    if not close.empty:
-                        price = float(close.iloc[-1])
-        except Exception as e:
-            logging.warning("yfinance miss %s: %s", t, e)
-
+        price = _yf_resolve_last_price(yf_tkr, label=t)
         # Rescale CBOE yield indices (^TNX etc.)
         if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and not pd.isna(price):
             price = price / 10.0
-
-        # Final guard: previousClose
-        if price is None or pd.isna(price):
-            try:
-                inf = yf.Ticker(yf_tkr).info
-                pc = inf.get("previousClose")
-                if pc is not None and not pd.isna(pc):
-                    price = float(pc)
-            except Exception:
-                pass
         time.sleep(0.15)
         rows.append({"symbol": t, "price": price})
     return pd.DataFrame(rows)

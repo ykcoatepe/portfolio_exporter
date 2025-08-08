@@ -40,3 +40,5 @@ portfolio_playbook = "main:main"
 include = ["portfolio_exporter*"]
 exclude = ["legacy*", "tests*", "utils*", "docs*", "ibkr_env*", "iv_history*"]
 
+[tool.setuptools]
+py-modules = ["main"]
