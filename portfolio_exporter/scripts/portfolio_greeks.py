@@ -43,6 +43,7 @@ from legacy.option_chain_snapshot import fetch_yf_open_interest
 from portfolio_exporter.core.ui import run_with_spinner
 from portfolio_exporter.core import combo as combo_core
 from portfolio_exporter.core import io as io_core
+from portfolio_exporter.core import config as config_core
 
 import numpy as np
 
@@ -1075,11 +1076,8 @@ def _load_db_combos_or_none():
 
 def _choose_combos_df(
     source: str, positions_df: pd.DataFrame, combo_types: str
-) -> tuple[pd.DataFrame | None, str]:
-    """Resolve combo DataFrame from desired *source*.
-
-    Returns tuple of (DataFrame or None, resolved_source).
-    """
+) -> tuple[pd.DataFrame, str]:
+    """Resolve combo DataFrame from desired *source* and filter to true combos."""
 
     resolved = source
     df: pd.DataFrame | None = None
@@ -1112,7 +1110,8 @@ def _choose_combos_df(
             df = db_df
             resolved = "db"
         elif source == "db":
-            return None, "db"
+            df = pd.DataFrame()
+            resolved = "db"
 
     # --- Live / engine detection ----------------------------------------
     if df is None and source in {"auto", "live", "engine"}:
@@ -1136,31 +1135,96 @@ def _choose_combos_df(
                 df = None
             resolved = "engine"
 
+    df = _normalize_combos_columns(df)
+    raw_n = len(df)
+    df = _filter_true_combos(df)
+    kept_n = len(df)
+    logger.info("Combos chosen: %d (source=%s, raw=%d)", kept_n, resolved, raw_n)
+
     return df, resolved
+
+
+def _filter_true_combos(df: pd.DataFrame) -> pd.DataFrame:
+    """Return only multi-leg option combos.
+
+    A row is kept if any of the following hold:
+
+    * ``legs`` column exists and indicates at least two legs.
+    * ``type`` matches a known multi-leg structure.
+    * ``structure`` matches a known multi-leg structure.
+
+    All columns from the input are preserved; only rows are filtered.
+    """
+
+    if df.empty:
+        return df
+
+    combos = {"vertical", "iron condor", "butterfly", "calendar"}
+
+    if "legs" in df.columns:
+
+        def _has_two(v: Any) -> bool:
+            if isinstance(v, (list, tuple, set)):
+                return len(v) >= 2
+            try:
+                return float(v) >= 2
+            except Exception:
+                return False
+
+        legs_mask = df["legs"].apply(_has_two)
+    else:
+        legs_mask = pd.Series(False, index=df.index)
+
+    type_series = (
+        df["type"].astype(str).str.strip().str.lower()
+        if "type" in df.columns
+        else pd.Series("", index=df.index)
+    )
+    structure_series = (
+        df["structure"].astype(str).str.strip().str.lower()
+        if "structure" in df.columns
+        else pd.Series("", index=df.index)
+    )
+
+    mask = legs_mask | type_series.isin(combos) | structure_series.isin(combos)
+    return df.loc[mask].copy()
 
 
 def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
     """Ensure expected columns exist and normalize values."""
 
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    cols = [
+    if df is None:
+        df = pd.DataFrame()
+    else:
+        df = df.copy()
+    required = [
         "underlying",
         "expiry",
-        "legs",
-        "qty",
+        "structure",
         "type",
         "width",
         "credit_debit",
         "parent_combo_id",
-        "closed_date",
+        "legs",
     ]
-    for c in cols:
-        if c not in df.columns:
-            df[c] = None
+    for col in required:
+        if col not in df.columns:
+            if col in {"width", "credit_debit"}:
+                df[col] = float("nan")
+            elif col == "parent_combo_id":
+                df[col] = None
+            elif col == "legs":
+                df[col] = pd.NA
+            else:
+                df[col] = None
 
-    df["expiry"] = pd.to_datetime(df["expiry"], errors="coerce").dt.strftime("%Y-%m-%d")
+    # Normalize expiry to YYYY-MM-DD when parseable; otherwise keep original
+    parsed = pd.to_datetime(df["expiry"], errors="coerce")
+    df.loc[parsed.notna(), "expiry"] = parsed.dt.strftime("%Y-%m-%d")
+
+    # Preserve existing qty logic if present
+    if "qty" not in df.columns:
+        df["qty"] = None
 
     if df["qty"].isna().all():
 
@@ -1413,12 +1477,6 @@ def run(
         combos_df, resolved_source = _choose_combos_df(
             combos_source, pos_df, combo_types
         )
-        combos_df = _normalize_combos_columns(combos_df)
-        logger.info(
-            "Combos chosen: %d (source=%s)",
-            len(combos_df) if combos_df is not None else 0,
-            resolved_source,
-        )
         if persist_combos and resolved_source in {"live", "engine"}:
             try:
                 count = _persist_combos(combos_df)
@@ -1426,13 +1484,14 @@ def run(
             except Exception as exc:  # pragma: no cover - defensive
                 logger.warning("Persist combos failed: %s", exc)
 
-    outdir = settings.output_dir
+    outdir = config_core.settings.output_dir
     if write_positions:
         io_core.save(pos_df, "portfolio_greeks_positions", fmt, outdir)
     if write_totals:
         io_core.save(totals, "portfolio_greeks_totals", fmt, outdir)
-        if combos and combos_df is not None:
+        if combos:
             io_core.save(combos_df, "portfolio_greeks_combos", fmt, outdir)
+            logger.info("Combos saved: %d", len(combos_df))
 
     print(f"✅ Greeks exported → {outdir}")
 
@@ -1450,7 +1509,7 @@ def run(
             _print_positions(console, pos_df)
         except Exception:
             pass
-        if combos and combos_df is not None and not combos_df.empty:
+        if combos and not combos_df.empty:
             try:
                 _print_combos(console, combos_df)
             except Exception:
