@@ -230,19 +230,27 @@ def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
                                     pass
                     if prem is not None:
                         credit_debit = "credit" if prem > 0 else "debit"
-            # --- simple roll-lineage heuristic ---
+            # --- strict roll-lineage heuristic ---
             if has_expiry and all_combos_meta.get(cid, {}).get("expiry"):
-                this_exp = all_combos_meta[cid]["expiry"]
-                for pid, meta in all_combos_meta.items():
-                    if pid == cid:
-                        continue
-                    if (
-                        meta["underlying"] == underlying
-                        and meta.get("expiry")
-                        and meta["expiry"] < this_exp
-                    ):
-                        parent_combo_id = pid
-                        break
+                try:
+                    from datetime import datetime
+
+                    this_exp = all_combos_meta[cid]["expiry"]
+                    if this_exp:
+                        this_dt = datetime.fromisoformat(str(this_exp))
+                        for pid, meta in all_combos_meta.items():
+                            if pid == cid or not meta.get("expiry"):
+                                continue
+                            if meta["underlying"] != underlying:
+                                continue
+                            parent_dt = datetime.fromisoformat(str(meta["expiry"]))
+                            gap_days = (this_dt - parent_dt).days
+                            # parent must expire before this one, and within 14 days gap
+                            if 0 < gap_days <= 14:
+                                parent_combo_id = pid
+                                break
+                except Exception as e:  # pragma: no cover - defensive
+                    print(f"[WARN] expiry parse failed for combo {cid}: {e}")
             # Update only if we inferred something meaningful
             sets, vals = [], []
             if ctype is not None:
