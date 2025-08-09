@@ -1074,13 +1074,17 @@ def _load_db_combos_or_none():
         return None
 
 
+# Known multi-leg structures
+KNOWN_MULTI = {"vertical", "iron condor", "butterfly", "calendar"}
+
+
 def _choose_combos_df(
     source: str, positions_df: pd.DataFrame, combo_types: str
 ) -> tuple[pd.DataFrame, str]:
     """Resolve combo DataFrame from desired *source* and filter to true combos."""
 
     resolved = source
-    df: pd.DataFrame | None = None
+    df_raw: pd.DataFrame | None = None
 
     # --- DB path ---------------------------------------------------------
     if source in {"auto", "db"}:
@@ -1093,9 +1097,7 @@ def _choose_combos_df(
                 lc = db_df["type"].str.lower()
             else:
                 lc = pd.Series(dtype=str)
-            informative = lc.isin(
-                {"vertical", "iron condor", "butterfly", "calendar"}
-            ).any()
+            informative = lc.isin(KNOWN_MULTI).any()
             if not informative and "width" in db_df.columns:
                 informative = (
                     pd.to_numeric(db_df["width"], errors="coerce").fillna(0) > 0
@@ -1107,148 +1109,166 @@ def _choose_combos_df(
                     .any()
                 )
         if informative and db_df is not None:
-            df = db_df
+            df_raw = db_df
             resolved = "db"
         elif source == "db":
-            df = pd.DataFrame()
+            df_raw = pd.DataFrame()
             resolved = "db"
 
     # --- Live / engine detection ----------------------------------------
-    if df is None and source in {"auto", "live", "engine"}:
+    if df_raw is None and source in {"auto", "live", "engine"}:
         try:
             try:
                 live_df = combo_core.detect_from_positions(
-                    positions_df, combo_types=combo_types
+                    positions_df, mode=combo_types
                 )
-            except TypeError:
+            except TypeError:  # backward compat
                 live_df = combo_core.detect_from_positions(positions_df)
-            df = live_df
+            df_raw = live_df
             resolved = source if source != "auto" else "live"
         except Exception as e:  # pragma: no cover - defensive
             logger.warning("Combo detection failed: %s", e)
-            df = None
-        if (df is None or df.empty) and source == "auto":
+            df_raw = None
+        if (df_raw is None or df_raw.empty) and source == "auto":
             try:
-                df = combo_core.detect_from_positions(positions_df)
+                df_raw = combo_core.detect_from_positions(positions_df)
             except Exception as e:  # pragma: no cover - defensive
                 logger.warning("Combo engine detection failed: %s", e)
-                df = None
+                df_raw = pd.DataFrame()
             resolved = "engine"
 
-    df = _normalize_combos_columns(df)
-    raw_n = len(df)
-    df = _filter_true_combos(df)
-    kept_n = len(df)
-    logger.info("Combos chosen: %d (source=%s, raw=%d)", kept_n, resolved, raw_n)
+    df_norm = _normalize_combos_columns(df_raw)
+    df_keep = _filter_true_combos(df_norm)
 
-    return df, resolved
+    if df_keep.empty and resolved in {"auto", "live", "engine"}:
+        logger.info(
+            "Combos empty after %s; attempting live detection fallback…", resolved
+        )
+        try:
+            try:
+                df_live = combo_core.detect_from_positions(
+                    positions_df, mode=combo_types
+                )
+            except TypeError:
+                df_live = combo_core.detect_from_positions(positions_df)
+        except Exception as e:
+            logger.warning("Live detection failed: %s", e)
+            df_live = pd.DataFrame()
+        df_keep = _filter_true_combos(_normalize_combos_columns(df_live))
+
+    logger.info(
+        "Combos chosen: %d (source=%s, raw=%d)",
+        len(df_keep),
+        resolved,
+        len(df_raw) if df_raw is not None else 0,
+    )
+
+    return df_keep, resolved
 
 
 def _filter_true_combos(df: pd.DataFrame) -> pd.DataFrame:
-    """Return only multi-leg option combos.
-
-    A row is kept if any of the following hold:
-
-    * ``legs`` column exists and indicates at least two legs.
-    * ``type`` matches a known multi-leg structure.
-    * ``structure`` matches a known multi-leg structure.
-
-    All columns from the input are preserved; only rows are filtered.
-    """
-
-    if df.empty:
+    if df is None or df.empty:
         return df
 
-    combos = {"vertical", "iron condor", "butterfly", "calendar"}
+    tmp = df.copy()
 
-    if "legs" in df.columns:
+    s_low = tmp["structure"].astype(str).str.strip().str.lower()
+    t_low = tmp["type"].astype(str).str.strip().str.lower()
 
-        def _has_two(v: Any) -> bool:
-            if isinstance(v, (list, tuple, set)):
-                return len(v) >= 2
-            try:
-                return float(v) >= 2
-            except Exception:
-                return False
+    is_known = s_low.isin(KNOWN_MULTI) | t_low.isin(KNOWN_MULTI)
 
-        legs_mask = df["legs"].apply(_has_two)
+    has_legs = False
+    if "legs" in tmp.columns:
+        with np.errstate(invalid="ignore"):
+            legs_ok = pd.to_numeric(tmp["legs"], errors="coerce").fillna(-1) >= 2
+        has_legs = True
     else:
-        legs_mask = pd.Series(False, index=df.index)
+        legs_ok = pd.Series([False] * len(tmp), index=tmp.index)
 
-    type_series = (
-        df["type"].astype(str).str.strip().str.lower()
-        if "type" in df.columns
-        else pd.Series("", index=df.index)
-    )
-    structure_series = (
-        df["structure"].astype(str).str.strip().str.lower()
-        if "structure" in df.columns
-        else pd.Series("", index=df.index)
-    )
+    keep = is_known | legs_ok
+    kept = tmp[keep].copy()
 
-    mask = legs_mask | type_series.isin(combos) | structure_series.isin(combos)
-    return df.loc[mask].copy()
+    logger.info(
+        "Combos filter: raw=%s kept=%s (known=%s legs_col=%s)",
+        len(tmp),
+        len(kept),
+        int(is_known.sum()),
+        has_legs,
+    )
+    return kept
 
 
 def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
-    """Ensure expected columns exist and normalize values."""
+    if df is None or df.empty:
+        return pd.DataFrame(
+            columns=[
+                "underlying",
+                "expiry",
+                "structure",
+                "type",
+                "legs",
+                "width",
+                "credit_debit",
+                "parent_combo_id",
+                "closed_date",
+            ]
+        )
 
-    if df is None:
-        df = pd.DataFrame()
+    out = df.copy()
+
+    for col in ["structure", "type"]:
+        if col not in out.columns:
+            out[col] = ""
+        out[col] = out[col].fillna("").astype(str)
+
+    if "legs" not in out.columns:
+        out["legs"] = np.nan
+    if "width" not in out.columns:
+        out["width"] = np.nan
+    if "credit_debit" not in out.columns:
+        out["credit_debit"] = np.nan
+    for col in ["parent_combo_id", "closed_date"]:
+        if col not in out.columns:
+            out[col] = np.nan
+    if "underlying" not in out.columns:
+        out["underlying"] = ""
+
+    if "expiry" not in out.columns:
+        out["expiry"] = ""
     else:
-        df = df.copy()
-    required = [
-        "underlying",
-        "expiry",
-        "structure",
-        "type",
-        "width",
-        "credit_debit",
-        "parent_combo_id",
-        "legs",
+        def _norm_exp(x: Any) -> str:
+            s = str(x).strip()
+            if not s:
+                return ""
+            for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y%m%d"):
+                try:
+                    return (
+                        pd.to_datetime(s, format=fmt, errors="raise")
+                        .date()
+                        .isoformat()
+                    )
+                except Exception:
+                    pass
+            try:
+                return pd.to_datetime(s, errors="coerce").date().isoformat()
+            except Exception:
+                return s
+
+        out["expiry"] = out["expiry"].apply(_norm_exp)
+
+    return out[
+        [
+            "underlying",
+            "expiry",
+            "structure",
+            "type",
+            "legs",
+            "width",
+            "credit_debit",
+            "parent_combo_id",
+            "closed_date",
+        ]
     ]
-    for col in required:
-        if col not in df.columns:
-            if col in {"width", "credit_debit"}:
-                df[col] = float("nan")
-            elif col == "parent_combo_id":
-                df[col] = None
-            elif col == "legs":
-                df[col] = pd.NA
-            else:
-                df[col] = None
-
-    # Normalize expiry to YYYY-MM-DD when parseable; otherwise keep original
-    parsed = pd.to_datetime(df["expiry"], errors="coerce")
-    df.loc[parsed.notna(), "expiry"] = parsed.dt.strftime("%Y-%m-%d")
-
-    # Preserve existing qty logic if present
-    if "qty" not in df.columns:
-        df["qty"] = None
-
-    if df["qty"].isna().all():
-
-        def _min_qty(legs: Any) -> Any:
-            if isinstance(legs, list):
-                qs: list[float] = []
-                for leg in legs:
-                    if isinstance(leg, dict):
-                        q = leg.get("qty")
-                    elif isinstance(leg, (list, tuple)) and len(leg) >= 3:
-                        q = leg[2]
-                    else:
-                        q = getattr(leg, "qty", None)
-                    if q is not None:
-                        try:
-                            qs.append(abs(float(q)))
-                        except Exception:
-                            pass
-                return min(qs) if qs else None
-            return None
-
-        df["qty"] = df["legs"].apply(_min_qty)
-
-    return df
 
 
 def _stable_combo_id(row: pd.Series) -> str:
@@ -1383,6 +1403,7 @@ def _print_positions(console: Console, pos_df: Optional[pd.DataFrame]) -> None:
 
 def _print_combos(console: Console, combos_df: Optional[pd.DataFrame]) -> None:
     if combos_df is None or combos_df.empty:
+        console.print("Combos: (no combos)")
         return
     order = [
         "underlying",
@@ -1509,7 +1530,7 @@ def run(
             _print_positions(console, pos_df)
         except Exception:
             pass
-        if combos and not combos_df.empty:
+        if combos:
             try:
                 _print_combos(console, combos_df)
             except Exception:
