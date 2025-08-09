@@ -1000,6 +1000,7 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
                 "symbol": c.localSymbol,
                 "underlying": c.symbol,
                 "secType": c.secType,
+                "conId": getattr(c, "conId", None),
                 "qty": qty,
                 "multiplier": mult,
                 "right": getattr(c, "right", None),  # "C"/"P" for options
@@ -1374,38 +1375,69 @@ def _stable_combo_id(row: pd.Series) -> str:
         else ""
     )
     legs = row.get("legs") or []
-    parts = []
+    parts: list = []
     if isinstance(legs, list):
-        for leg in legs:
-            if isinstance(leg, dict):
-                parts.append((leg.get("right"), leg.get("strike"), leg.get("qty")))
-            elif isinstance(leg, (list, tuple)):
-                right = leg[0] if len(leg) > 0 else None
-                strike = leg[1] if len(leg) > 1 else None
-                qty = leg[2] if len(leg) > 2 else None
-                parts.append((right, strike, qty))
-            else:
-                parts.append(
-                    (
-                        getattr(leg, "right", None),
-                        getattr(leg, "strike", None),
-                        getattr(leg, "qty", None),
+        # If ints, treat as conId list
+        if all(isinstance(x, (int,)) for x in legs):
+            parts = sorted(int(x) for x in legs)
+        else:
+            for leg in legs:
+                if isinstance(leg, dict):
+                    parts.append((leg.get("right"), leg.get("strike"), leg.get("qty")))
+                elif isinstance(leg, (list, tuple)):
+                    right = leg[0] if len(leg) > 0 else None
+                    strike = leg[1] if len(leg) > 1 else None
+                    qty = leg[2] if len(leg) > 2 else None
+                    parts.append((right, strike, qty))
+                else:
+                    parts.append(
+                        (
+                            getattr(leg, "right", None),
+                            getattr(leg, "strike", None),
+                            getattr(leg, "qty", None),
+                        )
                     )
-                )
     sig = json.dumps(sorted(parts), sort_keys=True)
     payload = json.dumps(
-        {"u": row.get("underlying"), "e": expiry, "l": sig}, sort_keys=True
+        {"u": row.get("underlying"), "e": expiry, "t": row.get("type"), "s": row.get("structure"), "w": row.get("width"), "l": sig}, sort_keys=True
     )
     return hashlib.sha1(payload.encode()).hexdigest()
 
 
-def _persist_combos(df: pd.DataFrame) -> int:
+def _persist_combos(df: pd.DataFrame, positions_df: pd.DataFrame | None = None) -> int:
     """Upsert combos into SQLite DB. Returns number of rows written."""
 
     if df is None or df.empty:
         return 0
     db = os.environ.get("PE_DB_PATH") or (Path(settings.output_dir) / "combos.db")
     with sqlite3.connect(db) as con:
+        # Ensure base tables exist (mirror of core.combos schema)
+        _DDL = (
+            "CREATE TABLE IF NOT EXISTS combos ("
+            " combo_id TEXT PRIMARY KEY,"
+            " ts_created TEXT,"
+            " ts_closed TEXT,"
+            " structure TEXT,"
+            " underlying TEXT,"
+            " expiry TEXT,"
+            " type TEXT,"
+            " width REAL,"
+            " credit_debit REAL,"
+            " parent_combo_id TEXT,"
+            " closed_date TEXT"
+            ");"
+            "CREATE TABLE IF NOT EXISTS legs ("
+            " combo_id TEXT,"
+            " conid INTEGER,"
+            " strike REAL,"
+            " right TEXT,"
+            " PRIMARY KEY(combo_id, conid)"
+            ");"
+        )
+        try:
+            con.executescript(_DDL)
+        except Exception:
+            pass
         io_core.migrate_combo_schema(con)
         cols = [c[1] for c in con.execute("PRAGMA table_info(combos);")]
         work = df.copy()
@@ -1427,6 +1459,61 @@ def _persist_combos(df: pd.DataFrame) -> int:
             f"INSERT OR REPLACE INTO combos ({','.join(to_write)}) VALUES ({placeholders})",
             rows,
         )
+        # Backfill legs if provided
+        try:
+            con.execute(
+                "CREATE TABLE IF NOT EXISTS legs ( combo_id TEXT, conid INTEGER, strike REAL, right TEXT, PRIMARY KEY(combo_id, conid) )"
+            )
+        except Exception:
+            pass
+        if "legs" in work.columns:
+            # Normalize a positions lookup if available
+            pos_lookup = None
+            if positions_df is not None and not positions_df.empty:
+                try:
+                    p = positions_df.copy()
+                    if "conId" in p.columns:
+                        p = p.rename(columns={"conId": "conid"})
+                    elif "conid" not in p.columns:
+                        p["conid"] = pd.NA
+                    pos_lookup = p.set_index("conid")
+                except Exception:
+                    pos_lookup = None
+            inserts = []
+            for _, rr in work.iterrows():
+                cmb_id = rr.get("combo_id")
+                v = rr.get("legs")
+                if isinstance(v, str) and v.startswith("["):
+                    try:
+                        import ast
+                        v = ast.literal_eval(v)
+                    except Exception:
+                        v = []
+                if not isinstance(v, (list, tuple)):
+                    continue
+                for cid in v:
+                    try:
+                        cc = int(cid)
+                    except Exception:
+                        continue
+                    k_strike = None
+                    k_right = None
+                    if pos_lookup is not None and cc in pos_lookup.index:
+                        try:
+                            ks = pos_lookup.loc[cc].get("strike")
+                            try:
+                                k_strike = float(ks) if ks is not None else None
+                            except Exception:
+                                k_strike = None
+                            k_right = pos_lookup.loc[cc].get("right")
+                        except Exception:
+                            pass
+                    inserts.append((cmb_id, cc, k_strike, k_right))
+            if inserts:
+                con.executemany(
+                    "INSERT OR IGNORE INTO legs (combo_id, conid, strike, right) VALUES (?,?,?,?)",
+                    inserts,
+                )
         con.commit()
         return len(rows)
 
@@ -1578,6 +1665,7 @@ def run(
             "qty",
             "multiplier",
             "underlying",
+            "conId",
             "delta",
             "gamma",
             "vega",
@@ -1587,6 +1675,19 @@ def run(
             if c not in csv_df.columns:
                 csv_df[c] = np.nan
         pos_df = csv_df[cols].copy()
+        # synthesize conId if missing
+        if pos_df.get("conId").isna().any():
+            def _synth(row):
+                try:
+                    v = row.get("conId")
+                    if pd.notna(v):
+                        return int(v)
+                except Exception:
+                    pass
+                key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike','')}"
+                import hashlib as _hl
+                return -int(int.from_bytes(_hl.sha1(key.encode()).digest()[:4], 'big'))
+            pos_df["conId"] = pos_df.apply(_synth, axis=1).astype("Int64")
     if pos_df.empty:
         pos_df = pd.DataFrame(
             columns=[
@@ -1636,7 +1737,7 @@ def run(
         )
         if persist_combos and resolved_source in {"live", "engine"}:
             try:
-                count = _persist_combos(combos_df)
+                count = _persist_combos(combos_df, positions_df=pos_df)
                 logger.info("Combos persisted: %d", count)
             except Exception as exc:  # pragma: no cover - defensive
                 logger.warning("Persist combos failed: %s", exc)

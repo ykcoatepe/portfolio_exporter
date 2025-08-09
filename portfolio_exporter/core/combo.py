@@ -195,7 +195,10 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
     if rename_map:
         out = out.rename(columns=rename_map)
 
-    for col in ["underlying","expiry","right","strike","qty","secType"]:
+    # ensure conId column presence
+    if "conId" not in out.columns:
+        out["conId"] = pd.NA
+    for col in ["underlying","expiry","right","strike","qty","secType","conId"]:
         if col not in out.columns:
             out[col] = np.nan
 
@@ -218,6 +221,11 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
     # --- numeric coercions ---
     out["strike"] = pd.to_numeric(out["strike"], errors="coerce")
     out["qty"] = pd.to_numeric(out["qty"], errors="coerce")
+    # conId may be a string – coerce when possible
+    try:
+        out["conId"] = pd.to_numeric(out["conId"], errors="coerce").astype("Int64")
+    except Exception:
+        pass
 
     # Drop rows without meaningful qty (0/NaN) for option legs
     out = out[~out["qty"].isna() & (out["qty"] != 0)]
@@ -247,8 +255,27 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
 
     out["expiry"] = out["expiry"].apply(parse_exp)
 
+    # Synthesize conId for missing rows so we can persist legs
+    def _synth_conid(row):
+        try:
+            val = row.get("conId")
+            if pd.notna(val):
+                return int(val)
+        except Exception:
+            pass
+        key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike','')}"
+        import hashlib as _hl
+        # Use 32-bit slice and negate to avoid colliding with real conIds
+        v = int.from_bytes(_hl.sha1(key.encode()).digest()[:4], "big")
+        return -int(v)
+
+    try:
+        out["conId"] = out.apply(_synth_conid, axis=1).astype("Int64")
+    except Exception:
+        pass
+
     # Keep only columns the detector needs
-    out = out[["underlying","expiry","right","strike","qty","secType"]].copy()
+    out = out[["underlying","expiry","right","strike","qty","secType","conId"]].copy()
 
     # Focus detection on option-like instruments only
     out = out[out["secType"].isin(["OPT", "FOP"])].copy()
@@ -281,6 +308,7 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                 "structure",
                 "type",
                 "legs",
+                "legs_n",
                 "width",
                 "credit_debit",
                 "parent_combo_id",
@@ -321,6 +349,7 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                 "structure",
                 "type",
                 "legs",
+                "legs_n",
                 "width",
                 "credit_debit",
                 "parent_combo_id",
@@ -337,6 +366,11 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
     totals = {"vertical": 0, "iron condor": 0, "butterfly": 0, "calendar": 0}
     for u_sym, u_df in norm.groupby("underlying"):
         u_df = u_df.sort_values(["expiry", "right", "strike"]).copy()
+        # Map row index -> conId for leg persistence
+        try:
+            row_conid = {int(i): int(u_df.loc[i, "conId"]) for i in u_df.index}
+        except Exception:
+            row_conid = {int(i): None for i in u_df.index}
 
         # Index helpers
         def _legs_for(exp: str, right: str) -> List[int]:
@@ -581,13 +615,23 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
         # Verticals (residual)
         for exp, right, k1, k2, q, used_rows in vertical_keep:
             vname = _classify_vertical(right, used_rows)
+            # Ratio labeling: if total longs != total shorts in this (exp,right) group, mark as ratio
+            grp_all = u_df[(u_df["expiry"] == exp) & (u_df["right"] == right)]
+            try:
+                tot_long = int(grp_all.loc[grp_all["side"] == "long", "abs_qty"].sum())
+                tot_short = int(grp_all.loc[grp_all["side"] == "short", "abs_qty"].sum())
+            except Exception:
+                tot_long = tot_short = q
+            is_ratio = tot_long != tot_short
+            leg_ids = [row_conid.get(int(r)) for r in used_rows if int(r) in row_conid]
             rows.append(
                 {
                     "underlying": u_sym,
                     "expiry": exp,
-                    "structure": vname,
-                    "type": "vertical",
-                    "legs": 2,
+                    "structure": ("ratio call" if right == "C" else "ratio put") if is_ratio else vname,
+                    "type": "ratio" if is_ratio else "vertical",
+                    "legs": leg_ids,
+                    "legs_n": len([x for x in leg_ids if x is not None]),
                     "width": float(abs(k2 - k1)),
                     "credit_debit": None,
                     "parent_combo_id": None,
@@ -598,13 +642,15 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
 
         # Butterflies
         for exp, right, k1, k2, k3, q, used_rows in butterfly_records:
+            leg_ids = [row_conid.get(int(r)) for r in used_rows if int(r) in row_conid]
             rows.append(
                 {
                     "underlying": u_sym,
                     "expiry": exp,
                     "structure": "butterfly",
                     "type": "butterfly",
-                    "legs": 3,
+                    "legs": leg_ids,
+                    "legs_n": len([x for x in leg_ids if x is not None]),
                     "width": float(min(k2 - k1, k3 - k2)),
                     "credit_debit": None,
                     "parent_combo_id": None,
@@ -615,13 +661,15 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
 
         # Iron condors
         for exp, width, q, used_rows in condor_records:
+            leg_ids = [row_conid.get(int(r)) for r in used_rows if int(r) in row_conid]
             rows.append(
                 {
                     "underlying": u_sym,
                     "expiry": exp,
                     "structure": "iron condor",
                     "type": "iron condor",
-                    "legs": 4,
+                    "legs": leg_ids,
+                    "legs_n": len([x for x in leg_ids if x is not None]),
                     "width": float(width),
                     "credit_debit": None,
                     "parent_combo_id": None,
@@ -657,13 +705,15 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     remaining[a] -= m
                     remaining[b] -= m
                     used_for_calendar.update([a, b])
+                    leg_ids = [row_conid.get(int(a)), row_conid.get(int(b))]
                     rows.append(
                         {
                             "underlying": u_sym,
                             "expiry": exp_use,
                             "structure": "calendar",
                             "type": "calendar",
-                            "legs": 2,
+                            "legs": leg_ids,
+                            "legs_n": len([x for x in leg_ids if x is not None]),
                             "width": 0.0,
                             "credit_debit": None,
                             "parent_combo_id": None,
@@ -671,6 +721,48 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                         }
                     )
                     totals["calendar"] += 1
+
+        # ── 5) Diagonals (across expiries, same right, different strikes, opposite sides) ──
+        for right in ["C", "P"]:
+            grp = u_df[u_df["right"] == right].sort_values(["strike", "expiry"])  # stable order
+            if grp.empty:
+                continue
+            idxs = [i for i in grp.index if remaining.get(i, 0) > 0]
+            for i in range(len(idxs)):
+                a = idxs[i]
+                if remaining.get(a, 0) <= 0:
+                    continue
+                for j in range(i + 1, len(idxs)):
+                    b = idxs[j]
+                    if remaining.get(b, 0) <= 0:
+                        continue
+                    if u_df.loc[a, "side"] == u_df.loc[b, "side"]:
+                        continue
+                    # skip equal-strike pairs (those are calendars handled earlier)
+                    if float(u_df.loc[a, "strike"]) == float(u_df.loc[b, "strike"]):
+                        continue
+                    m = min(remaining[a], remaining[b])
+                    if m <= 0:
+                        continue
+                    exp_use = max(u_df.loc[a, "expiry"], u_df.loc[b, "expiry"])  # later expiry
+                    width = abs(float(u_df.loc[a, "strike"]) - float(u_df.loc[b, "strike"]))
+                    remaining[a] -= m
+                    remaining[b] -= m
+                    leg_ids = [row_conid.get(int(a)), row_conid.get(int(b))]
+                    rows.append(
+                        {
+                            "underlying": u_sym,
+                            "expiry": exp_use,
+                            "structure": "diagonal",
+                            "type": "diagonal",
+                            "legs": leg_ids,
+                            "legs_n": len([x for x in leg_ids if x is not None]),
+                            "width": float(width),
+                            "credit_debit": None,
+                            "parent_combo_id": None,
+                            "closed_date": None,
+                        }
+                    )
 
         # Per-underlying log
         log.info(
