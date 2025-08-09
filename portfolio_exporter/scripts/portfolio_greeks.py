@@ -41,7 +41,7 @@ from utils.bs import bs_greeks
 from legacy.option_chain_snapshot import fetch_yf_open_interest
 from portfolio_exporter.core.ui import run_with_spinner
 from portfolio_exporter.core.combo import detect_combos
-from portfolio_exporter.core.chain import get_combo_db_path
+from portfolio_exporter.core import combo as combo_core
 from portfolio_exporter.core import io as io_core
 
 import numpy as np
@@ -1036,39 +1036,55 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
     return pd.DataFrame(opt_rows + stk_rows)
 
 
-def _load_combos_preview(limit: int = 200) -> Optional[pd.DataFrame]:
+def _load_db_combos_or_none() -> "pd.DataFrame|None":
+    """
+    Try to load combo metadata from the DB. Return None if:
+      - DB missing, or
+      - table has no informative multi-leg records, or
+      - width/type is mostly null, or
+      - combo_legs table is absent.
+    """
+    import sqlite3, os
+    from portfolio_exporter.core.config import settings
+
+    db = os.environ.get("PE_DB_PATH") or (Path(settings.output_dir) / "combos.db")
+    if not Path(db).exists():
+        return None
     try:
-        db_path = get_combo_db_path()
-        conn = sqlite3.connect(str(db_path))
-        cur = conn.cursor()
-        cur.execute("PRAGMA table_info(combos);")
-        present = {row[1] for row in cur.fetchall()}
-        wanted = [
-            "underlying",
-            "expiry",
-            "type",
-            "width",
-            "credit_debit",
-            "parent_combo_id",
-            "legs",
-            "qty",
-        ]
-        cols = [c for c in wanted if c in present]
-        if not cols:
+        import pandas as pd
+
+        with sqlite3.connect(db) as con:
+            # tolerant: handle both “type/width/credit_debit” existing or not
+            cols = [c[1] for c in con.execute("PRAGMA table_info(combos);")]
+            sel = [
+                c
+                for c in [
+                    "underlying",
+                    "expiry",
+                    "type",
+                    "width",
+                    "credit_debit",
+                    "parent_combo_id",
+                    "closed_date",
+                    "structure",
+                ]
+                if c in cols
+            ]
+            if not sel:
+                return None
+            df = pd.read_sql_query(
+                f"SELECT {', '.join(sel)} FROM combos", con
+            )
+        # Heuristic: if all rows are 'single' or width all null → not informative
+        if "type" in df.columns and (
+            df["type"].str.lower().fillna("single") == "single"
+        ).all():
             return None
-        cur.execute(
-            f"SELECT {', '.join(cols)} FROM combos ORDER BY rowid DESC LIMIT ?",
-            (limit,),
-        )
-        rows = cur.fetchall()
-        return pd.DataFrame(rows, columns=cols)
+        if "width" in df.columns and df["width"].notna().sum() == 0:
+            return None
+        return df
     except Exception:
         return None
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
 
 
 def _fmt_float(x: Optional[float]) -> str:
@@ -1247,7 +1263,22 @@ def run(
         console = Console()
         totals_df = totals
         pos_df_pretty = pos_df
-        combos_preview = _load_combos_preview()
+        db_combos = _load_db_combos_or_none()
+        combos_for_display = None
+        if db_combos is not None:
+            combos_for_display = db_combos
+        else:
+            # Fallback: live-detect combos from positions for TTY preview
+            try:
+                combos_for_display = combo_core.detect_from_positions(pos_df_pretty)
+                logging.getLogger(__name__).info(
+                    "No combo legs in DB; showing live-detected combos."
+                )
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "Combo live-detect failed: %s", e
+                )
+                combos_for_display = None
         try:
             _print_totals(console, totals_df)
         except Exception:
@@ -1257,9 +1288,15 @@ def run(
         except Exception:
             pass
         try:
-            _print_combos(console, combos_preview)
+            if combos_for_display is not None and not combos_for_display.empty:
+                _print_combos(console, combos_for_display)
         except Exception:
             pass
+        logging.getLogger(__name__).info(
+            "Combos shown: %s (source=%s)",
+            len(combos_for_display) if combos_for_display is not None else 0,
+            "DB" if db_combos is not None else "LIVE",
+        )
 
     if return_dict:
         totals_row = totals.iloc[0].to_dict()

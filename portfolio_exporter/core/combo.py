@@ -173,6 +173,30 @@ def detect_combos(pos_df: pd.DataFrame, mode: str = "all") -> pd.DataFrame:
     return combo_df
 
 
+def detect_from_positions(df_positions: pd.DataFrame) -> pd.DataFrame:
+    """
+    Use existing v2 combo engine to cluster legs into combos from a positions DF.
+    Return columns at least: ['structure','underlying','expiry','qty','width','type','legs']
+    (re-use existing internal functions; this is a thin wrapper)
+    """
+
+    combo_df = detect_combos(df_positions, mode="all")
+    cols = [
+        c
+        for c in [
+            "structure",
+            "underlying",
+            "expiry",
+            "qty",
+            "width",
+            "type",
+            "legs",
+        ]
+        if c in combo_df.columns
+    ]
+    return combo_df[cols]
+
+
 # ---------- helpers -------------------------------------------------------
 def _row(
     structure: str,
