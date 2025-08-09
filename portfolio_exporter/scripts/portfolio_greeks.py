@@ -24,6 +24,7 @@ import math
 import os
 import sys
 import json
+import hashlib
 import requests
 import calendar
 import time
@@ -40,7 +41,6 @@ import pandas as pd
 from utils.bs import bs_greeks
 from legacy.option_chain_snapshot import fetch_yf_open_interest
 from portfolio_exporter.core.ui import run_with_spinner
-from portfolio_exporter.core.combo import detect_combos
 from portfolio_exporter.core import combo as combo_core
 from portfolio_exporter.core import io as io_core
 
@@ -1058,25 +1058,197 @@ def _load_db_combos_or_none():
                     "credit_debit",
                     "parent_combo_id",
                     "closed_date",
+                    "structure",
+                    "legs",
                 ]
                 if c in cols
             ]
             if not want:
                 return None
             df = pd.read_sql_query(f"SELECT {', '.join(want)} FROM combos", con)
-        # Heuristics to skip non-informative tables
         if df.empty:
-            return None
-        if (
-            "type" in df.columns
-            and (df["type"].str.lower().fillna("single") == "single").all()
-        ):
-            return None
-        if "width" in df.columns and df["width"].notna().sum() == 0:
             return None
         return df
     except Exception:
         return None
+
+
+def _choose_combos_df(
+    source: str, positions_df: pd.DataFrame, combo_types: str
+) -> tuple[pd.DataFrame | None, str]:
+    """Resolve combo DataFrame from desired *source*.
+
+    Returns tuple of (DataFrame or None, resolved_source).
+    """
+
+    resolved = source
+    df: pd.DataFrame | None = None
+
+    # --- DB path ---------------------------------------------------------
+    if source in {"auto", "db"}:
+        db_df = _load_db_combos_or_none()
+        informative = False
+        if db_df is not None:
+            if "structure" in db_df.columns:
+                lc = db_df["structure"].str.lower()
+            elif "type" in db_df.columns:
+                lc = db_df["type"].str.lower()
+            else:
+                lc = pd.Series(dtype=str)
+            informative = lc.isin(
+                {"vertical", "iron condor", "butterfly", "calendar"}
+            ).any()
+            if not informative and "width" in db_df.columns:
+                informative = (
+                    pd.to_numeric(db_df["width"], errors="coerce").fillna(0) > 0
+                ).any()
+            if not informative and "legs" in db_df.columns:
+                informative = (
+                    db_df["legs"]
+                    .apply(lambda v: isinstance(v, (list, tuple)) and len(v) >= 2)
+                    .any()
+                )
+        if informative and db_df is not None:
+            df = db_df
+            resolved = "db"
+        elif source == "db":
+            return None, "db"
+
+    # --- Live / engine detection ----------------------------------------
+    if df is None and source in {"auto", "live", "engine"}:
+        try:
+            try:
+                live_df = combo_core.detect_from_positions(
+                    positions_df, combo_types=combo_types
+                )
+            except TypeError:
+                live_df = combo_core.detect_from_positions(positions_df)
+            df = live_df
+            resolved = source if source != "auto" else "live"
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning("Combo detection failed: %s", e)
+            df = None
+        if (df is None or df.empty) and source == "auto":
+            try:
+                df = combo_core.detect_from_positions(positions_df)
+            except Exception as e:  # pragma: no cover - defensive
+                logger.warning("Combo engine detection failed: %s", e)
+                df = None
+            resolved = "engine"
+
+    return df, resolved
+
+
+def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
+    """Ensure expected columns exist and normalize values."""
+
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    cols = [
+        "underlying",
+        "expiry",
+        "legs",
+        "qty",
+        "type",
+        "width",
+        "credit_debit",
+        "parent_combo_id",
+        "closed_date",
+    ]
+    for c in cols:
+        if c not in df.columns:
+            df[c] = None
+
+    df["expiry"] = pd.to_datetime(df["expiry"], errors="coerce").dt.strftime("%Y-%m-%d")
+
+    if df["qty"].isna().all():
+
+        def _min_qty(legs: Any) -> Any:
+            if isinstance(legs, list):
+                qs: list[float] = []
+                for leg in legs:
+                    if isinstance(leg, dict):
+                        q = leg.get("qty")
+                    elif isinstance(leg, (list, tuple)) and len(leg) >= 3:
+                        q = leg[2]
+                    else:
+                        q = getattr(leg, "qty", None)
+                    if q is not None:
+                        try:
+                            qs.append(abs(float(q)))
+                        except Exception:
+                            pass
+                return min(qs) if qs else None
+            return None
+
+        df["qty"] = df["legs"].apply(_min_qty)
+
+    return df
+
+
+def _stable_combo_id(row: pd.Series) -> str:
+    expiry = (
+        pd.to_datetime(row.get("expiry"), errors="coerce").strftime("%Y-%m-%d")
+        if row.get("expiry")
+        else ""
+    )
+    legs = row.get("legs") or []
+    parts = []
+    if isinstance(legs, list):
+        for leg in legs:
+            if isinstance(leg, dict):
+                parts.append((leg.get("right"), leg.get("strike"), leg.get("qty")))
+            elif isinstance(leg, (list, tuple)):
+                right = leg[0] if len(leg) > 0 else None
+                strike = leg[1] if len(leg) > 1 else None
+                qty = leg[2] if len(leg) > 2 else None
+                parts.append((right, strike, qty))
+            else:
+                parts.append(
+                    (
+                        getattr(leg, "right", None),
+                        getattr(leg, "strike", None),
+                        getattr(leg, "qty", None),
+                    )
+                )
+    sig = json.dumps(sorted(parts), sort_keys=True)
+    payload = json.dumps(
+        {"u": row.get("underlying"), "e": expiry, "l": sig}, sort_keys=True
+    )
+    return hashlib.sha1(payload.encode()).hexdigest()
+
+
+def _persist_combos(df: pd.DataFrame) -> int:
+    """Upsert combos into SQLite DB. Returns number of rows written."""
+
+    if df is None or df.empty:
+        return 0
+    db = os.environ.get("PE_DB_PATH") or (Path(settings.output_dir) / "combos.db")
+    with sqlite3.connect(db) as con:
+        io_core.migrate_combo_schema(con)
+        cols = [c[1] for c in con.execute("PRAGMA table_info(combos);")]
+        work = df.copy()
+        if "combo_id" not in work.columns:
+            if work.index.name == "combo_id":
+                work = work.reset_index()
+            work["combo_id"] = work.apply(_stable_combo_id, axis=1)
+        elif work.index.name == "combo_id":
+            work = work.reset_index()
+
+        now = datetime.now(timezone.utc).isoformat()
+        if "ts_created" in cols and "ts_created" not in work.columns:
+            work["ts_created"] = now
+
+        to_write = [c for c in work.columns if c in cols]
+        rows = [tuple(r[c] for c in to_write) for _, r in work.iterrows()]
+        placeholders = ",".join(["?"] * len(to_write))
+        con.executemany(
+            f"INSERT OR REPLACE INTO combos ({','.join(to_write)}) VALUES ({placeholders})",
+            rows,
+        )
+        con.commit()
+        return len(rows)
 
 
 def _fmt_float(x: Optional[float]) -> str:
@@ -1157,6 +1329,7 @@ def _print_combos(console: Console, combos_df: Optional[pd.DataFrame]) -> None:
         "width",
         "credit_debit",
         "parent_combo_id",
+        "closed_date",
     ]
     present = [c for c in order if c in combos_df.columns]
     t = Table(title="Combos", box=box.SIMPLE_HEAVY)
@@ -1182,10 +1355,11 @@ def run(
     return_dict: bool = False,
     combos: bool = True,
     combo_types: str = "simple",
+    combos_source: str = "auto",
+    persist_combos: bool = False,
 ) -> dict | None:
     """Aggregate per-position Greeks and optionally persist the results."""
 
-    # Ensure output directory exists when generating files (avoid import-time side effects)
     try:
         os.makedirs(OUTPUT_DIR, exist_ok=True)
     except Exception:
@@ -1209,7 +1383,6 @@ def run(
             ]
         )
 
-    # ensure contract multipliers are populated correctly
     pos_df.loc[(pos_df.secType == "OPT") & (pos_df.multiplier.isna()), "multiplier"] = (
         100
     )
@@ -1227,8 +1400,6 @@ def run(
     for greek in ["delta", "gamma", "vega", "theta"]:
         pos_df[f"{greek}_exposure"] = pos_df[greek] * pos_df.qty * pos_df.multiplier
 
-    combos_df = detect_combos(pos_df, mode=combo_types) if combos else pd.DataFrame()
-
     totals = (
         pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
         .sum()
@@ -1236,114 +1407,31 @@ def run(
         .T
     )
 
-    df_positions = pos_df
-    _df_totals = totals
-    df_combos = combos_df
-
-    combos_source = getattr(
-        globals().get("args", argparse.Namespace()), "combos_source", "auto"
-    )
-
-    # 4a) pick metadata source
-    meta_df = None
-    if combos_source in ("auto", "db"):
-        meta_df = _load_db_combos_or_none()
-        if meta_df is None and combos_source == "db":
-            logging.getLogger(__name__).warning(
-                "Requested DB combos, but DB is not informative/absent."
-            )
-    if meta_df is None and combos_source in ("auto", "live"):
-        try:
-            # live detection from positions for metadata
-            meta_df = combo_core.detect_from_positions(df_positions)
-        except Exception as e:
-            logging.getLogger(__name__).warning("Live combo detection failed: %s", e)
-            meta_df = None
-
-    # 4b) normalize keys and merge metadata into the engine combos
-    # We keep engine df (with Greeks/qty) as the base, and splice in metadata columns when present.
-    if meta_df is not None and not meta_df.empty:
-        # Normalize expiry to string for robust join (engine may have float-like or str)
-        def _norm_exp(s):
-            if pd.api.types.is_numeric_dtype(s):
-                return s.astype("Int64").astype(str)
-            return s.astype(str)
-
-        # Prepare join keys
-        left = df_combos.copy()
-        right = meta_df.copy()
-
-        if "expiry" in left.columns:
-            left["expiry_key"] = _norm_exp(left["expiry"])
-        if "expiry" in right.columns:
-            right["expiry_key"] = _norm_exp(right["expiry"])
-
-        # Prefer merge on ['underlying','expiry_key'] when both present
-        join_keys = []
-        if "underlying" in left.columns and "underlying" in right.columns:
-            join_keys.append("underlying")
-        if "expiry_key" in left.columns and "expiry_key" in right.columns:
-            join_keys.append("expiry_key")
-
-        # metadata columns to splice
-        meta_cols = [
-            c
-            for c in [
-                "type",
-                "width",
-                "credit_debit",
-                "parent_combo_id",
-                "closed_date",
-            ]
-            if c in right.columns
-        ]
-
-        if join_keys and meta_cols:
-            merged = left.merge(
-                right[["underlying", "expiry_key"] + meta_cols].drop_duplicates(),
-                on=join_keys,
-                how="left",
-                suffixes=("", "_meta"),
-            )
-            # Prefer metadata when engine columns are missing/NaN
-            for c in meta_cols:
-                base_has = c in merged.columns
-                if base_has:
-                    merged[c] = merged[c].combine_first(merged.get(f"{c}_meta"))
-                else:
-                    merged[c] = merged.get(f"{c}_meta")
-                dropcol = f"{c}_meta"
-                if dropcol in merged.columns:
-                    merged.drop(columns=[dropcol], inplace=True)
-            # Replace df_combos used for saving
-            df_combos = merged
-            logging.getLogger(__name__).info(
-                "Combos CSV enriched from %s",
-                (
-                    "DB"
-                    if combos_source in ("auto", "db") and meta_df is not None
-                    else "LIVE"
-                ),
-            )
-        else:
-            logging.getLogger(__name__).warning(
-                "Could not join combo metadata; keys missing."
-            )
-    else:
-        if combos_source != "engine":
-            logging.getLogger(__name__).info(
-                "No combo metadata available; saving engine combos only."
-            )
-
-    combos_df = df_combos
+    combos_df = pd.DataFrame()
+    resolved_source = "none"
+    if combos:
+        combos_df, resolved_source = _choose_combos_df(
+            combos_source, pos_df, combo_types
+        )
+        combos_df = _normalize_combos_columns(combos_df)
+        logger.info(
+            "Combos chosen: %d (source=%s)",
+            len(combos_df) if combos_df is not None else 0,
+            resolved_source,
+        )
+        if persist_combos and resolved_source in {"live", "engine"}:
+            try:
+                count = _persist_combos(combos_df)
+                logger.info("Combos persisted: %d", count)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("Persist combos failed: %s", exc)
 
     outdir = settings.output_dir
-
     if write_positions:
         io_core.save(pos_df, "portfolio_greeks_positions", fmt, outdir)
     if write_totals:
         io_core.save(totals, "portfolio_greeks_totals", fmt, outdir)
-        if combos:
+        if combos and combos_df is not None:
             io_core.save(combos_df, "portfolio_greeks_combos", fmt, outdir)
 
     print(f"✅ Greeks exported → {outdir}")
@@ -1354,51 +1442,30 @@ def run(
     use_pretty = (not no_pretty) and sys.stdout.isatty()
     if use_pretty:
         console = Console()
-        totals_df = totals
-        pos_df_pretty = pos_df
-        db_combos = _load_db_combos_or_none()
-        combos_for_display = None
-        if db_combos is not None:
-            combos_for_display = db_combos
-        else:
-            # Fallback: live-detect combos from positions for TTY preview
+        try:
+            _print_totals(console, totals)
+        except Exception:
+            pass
+        try:
+            _print_positions(console, pos_df)
+        except Exception:
+            pass
+        if combos and combos_df is not None and not combos_df.empty:
             try:
-                combos_for_display = combo_core.detect_from_positions(pos_df_pretty)
-                logging.getLogger(__name__).info(
-                    "No combo legs in DB; showing live-detected combos."
-                )
-            except Exception as e:
-                logging.getLogger(__name__).warning("Combo live-detect failed: %s", e)
-                combos_for_display = None
-        try:
-            _print_totals(console, totals_df)
-        except Exception:
-            pass
-        try:
-            _print_positions(console, pos_df_pretty)
-        except Exception:
-            pass
-        try:
-            if combos_for_display is not None and not combos_for_display.empty:
-                _print_combos(console, combos_for_display)
-        except Exception:
-            pass
-        logging.getLogger(__name__).info(
-            "Combos shown: %s (source=%s)",
-            len(combos_for_display) if combos_for_display is not None else 0,
-            "DB" if db_combos is not None else "LIVE",
-        )
+                _print_combos(console, combos_df)
+            except Exception:
+                pass
 
     if return_dict:
         totals_row = totals.iloc[0].to_dict()
-        if combos:
-            return {
-                "legs": totals_row,
-                "combos": combos_df[["delta", "gamma", "vega", "theta"]]
-                .sum()
-                .to_dict(),
-            }
-        return {"legs": totals_row, "combos": {}}
+        combo_sum: Dict[str, float] = {}
+        if (
+            combos
+            and not combos_df.empty
+            and {"delta", "gamma", "vega", "theta"}.issubset(combos_df.columns)
+        ):
+            combo_sum = combos_df[["delta", "gamma", "vega", "theta"]].sum().to_dict()
+        return {"legs": totals_row, "combos": combo_sum}
     return None
 
 
@@ -1424,6 +1491,11 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry
         ),
     )
     parser.add_argument(
+        "--persist-combos",
+        action="store_true",
+        help="Persist detected combos into SQLite when sourced live/engine",
+    )
+    parser.add_argument(
         "--no-pretty",
         action="store_true",
         help="Disable Rich pretty output; only write files.",
@@ -1433,4 +1505,6 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry
         fmt=args.fmt,
         combos=not args.no_combos,
         combo_types=args.combo_types,
+        combos_source=args.combos_source,
+        persist_combos=args.persist_combos,
     )
