@@ -29,16 +29,22 @@ import calendar
 import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 from pathlib import Path
+from rich.console import Console
+from rich.table import Table
+from rich import box
+import sqlite3
+import pandas as pd
 
 from utils.bs import bs_greeks
 from legacy.option_chain_snapshot import fetch_yf_open_interest
 from portfolio_exporter.core.ui import run_with_spinner
 from portfolio_exporter.core.combo import detect_combos
+from portfolio_exporter.core.chain import get_combo_db_path
+from portfolio_exporter.core import io as io_core
 
 import numpy as np
-import pandas as pd
 
 try:  # optional dependency
     import xlsxwriter  # type: ignore
@@ -1030,6 +1036,137 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
     return pd.DataFrame(opt_rows + stk_rows)
 
 
+def _load_combos_preview(limit: int = 200) -> Optional[pd.DataFrame]:
+    try:
+        db_path = get_combo_db_path()
+        conn = sqlite3.connect(str(db_path))
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(combos);")
+        present = {row[1] for row in cur.fetchall()}
+        wanted = [
+            "underlying",
+            "expiry",
+            "type",
+            "width",
+            "credit_debit",
+            "parent_combo_id",
+            "legs",
+            "qty",
+        ]
+        cols = [c for c in wanted if c in present]
+        if not cols:
+            return None
+        cur.execute(
+            f"SELECT {', '.join(cols)} FROM combos ORDER BY rowid DESC LIMIT ?",
+            (limit,),
+        )
+        rows = cur.fetchall()
+        return pd.DataFrame(rows, columns=cols)
+    except Exception:
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def _fmt_float(x: Optional[float]) -> str:
+    try:
+        return f"{x:,.2f}"
+    except Exception:
+        return "-"
+
+
+def _print_totals(console: Console, totals_df: Optional[pd.DataFrame]) -> None:
+    if totals_df is None or totals_df.empty:
+        return
+    t = Table(title="Totals", box=box.SIMPLE_HEAVY)
+    for col in totals_df.columns:
+        t.add_column(col, justify="right")
+    for _, row in totals_df.iterrows():
+        t.add_row(
+            *[
+                _fmt_float(row[c]) if isinstance(row[c], (int, float)) else str(row[c])
+                for c in totals_df.columns
+            ]
+        )
+    console.print(t)
+
+
+def _print_positions(console: Console, pos_df: Optional[pd.DataFrame]) -> None:
+    if pos_df is None or pos_df.empty:
+        return
+    cols = [
+        c
+        for c in [
+            "symbol",
+            "qty",
+            "price",
+            "delta",
+            "gamma",
+            "theta",
+            "vega",
+            "greeks_source",
+        ]
+        if c in pos_df.columns
+    ]
+    t = Table(title="Positions", box=box.SIMPLE_HEAVY)
+    t.add_column("Symbol")
+    if "qty" in cols:
+        t.add_column("Qty", justify="right")
+    if "price" in cols:
+        t.add_column("Price", justify="right")
+    for c in ["delta", "gamma", "theta", "vega"]:
+        if c in cols:
+            t.add_column(c.capitalize(), justify="right")
+    if "greeks_source" in cols:
+        t.add_column("Src", justify="center")
+    for _, r in pos_df.iterrows():
+        row = [str(r.get("symbol", ""))]
+        if "qty" in cols:
+            row.append(_fmt_float(r.get("qty")))
+        if "price" in cols:
+            row.append(_fmt_float(r.get("price")))
+        for c in ["delta", "gamma", "theta", "vega"]:
+            if c in cols:
+                row.append(_fmt_float(r.get(c)))
+        if "greeks_source" in cols:
+            row.append(str(r.get("greeks_source") or ""))
+        t.add_row(*row)
+    console.print(t)
+
+
+def _print_combos(console: Console, combos_df: Optional[pd.DataFrame]) -> None:
+    if combos_df is None or combos_df.empty:
+        return
+    order = [
+        "underlying",
+        "expiry",
+        "legs",
+        "qty",
+        "type",
+        "width",
+        "credit_debit",
+        "parent_combo_id",
+    ]
+    present = [c for c in order if c in combos_df.columns]
+    t = Table(title="Combos", box=box.SIMPLE_HEAVY)
+    for col in present:
+        justify = "right" if col in {"width", "qty", "legs"} else "left"
+        t.add_column(col.capitalize().replace("_", " "), justify=justify)
+    for _, r in combos_df.iterrows():
+        cells = []
+        for col in present:
+            val = r.get(col, "")
+            if isinstance(val, (int, float)) and col in {"width", "qty", "legs"}:
+                cells.append(_fmt_float(val))
+            else:
+                cells.append(str(val) if val is not None else "")
+        t.add_row(*cells)
+    console.print(t)
+
+
 def run(
     fmt: str = "csv",
     write_positions: bool = True,
@@ -1070,6 +1207,15 @@ def run(
     )
     pos_df.loc[pos_df.secType.isin(["STK", "ETF"]), "multiplier"] = 1
 
+    if "greeks_source" not in pos_df.columns:
+        pos_df["greeks_source"] = "IB"
+    else:
+        pos_df["greeks_source"] = pos_df["greeks_source"].apply(
+            lambda v: "IB"
+            if v in (True, 1, "IB")
+            else "BS" if v in (False, 0, "BS") else ""
+        )
+
     for greek in ["delta", "gamma", "vega", "theta"]:
         pos_df[f"{greek}_exposure"] = pos_df[greek] * pos_df.qty * pos_df.multiplier
 
@@ -1082,19 +1228,38 @@ def run(
         .T
     )
 
-    from portfolio_exporter.core.io import save
-    from portfolio_exporter.core.config import settings
-
     outdir = settings.output_dir
 
     if write_positions:
-        save(pos_df, "portfolio_greeks_positions", fmt, outdir)
+        io_core.save(pos_df, "portfolio_greeks_positions", fmt, outdir)
     if write_totals:
-        save(totals, "portfolio_greeks_totals", fmt, outdir)
+        io_core.save(totals, "portfolio_greeks_totals", fmt, outdir)
         if combos:
-            save(combos_df, "portfolio_greeks_combos", fmt, outdir)
+            io_core.save(combos_df, "portfolio_greeks_combos", fmt, outdir)
 
     print(f"✅ Greeks exported → {outdir}")
+
+    no_pretty = False
+    if "args" in globals():
+        no_pretty = getattr(globals()["args"], "no_pretty", False)
+    use_pretty = (not no_pretty) and sys.stdout.isatty()
+    if use_pretty:
+        console = Console()
+        totals_df = totals
+        pos_df_pretty = pos_df
+        combos_preview = _load_combos_preview()
+        try:
+            _print_totals(console, totals_df)
+        except Exception:
+            pass
+        try:
+            _print_positions(console, pos_df_pretty)
+        except Exception:
+            pass
+        try:
+            _print_combos(console, combos_preview)
+        except Exception:
+            pass
 
     if return_dict:
         totals_row = totals.iloc[0].to_dict()
@@ -1120,6 +1285,11 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry
         choices=["simple", "all"],
         default="simple",
         help="Combo detection complexity",
+    )
+    parser.add_argument(
+        "--no-pretty",
+        action="store_true",
+        help="Disable Rich pretty output; only write files.",
     )
     args = parser.parse_args()
     run(
