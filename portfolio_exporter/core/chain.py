@@ -2,10 +2,27 @@ from __future__ import annotations
 
 import itertools
 import os
+from pathlib import Path
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
+import logging
+
+
+def get_combo_db_path() -> Path:
+    """
+    Resolve the current combos.db path.
+    Prefers PE_DB_PATH env var if set, otherwise defaults to settings.output_dir/combos.db.
+    """
+    try:
+        from portfolio_exporter.core.config import settings
+
+        default_path = Path(settings.output_dir).expanduser() / "combos.db"
+    except Exception:
+        default_path = Path.home() / "combos.db"  # fallback if settings import fails
+    db_path = Path(os.getenv("PE_DB_PATH", default_path)).expanduser()
+    return db_path
 
 
 def fetch_chain(
@@ -40,19 +57,55 @@ def _table_exists(cur: sqlite3.Cursor, name: str) -> bool:
     return cur.fetchone() is not None
 
 
-def _fetch_combos(cur: sqlite3.Cursor, date_from: str) -> List[Tuple[int, str]]:
-    # tolerate older schemas missing opened_date
-    try:
-        cur.execute(
-            "SELECT id, underlying FROM combos WHERE opened_date >= ? OR opened_date IS NULL;",
-            (date_from,),
-        )
-    except sqlite3.OperationalError:
-        cur.execute("SELECT id, underlying FROM combos;")
-    return list(cur.fetchall())
+# --- Schema helpers ---------------------------------------------------------
+def _combo_table_columns(cur: sqlite3.Cursor) -> set[str]:
+    cur.execute("PRAGMA table_info(combos);")
+    return {row[1] for row in cur.fetchall()}
 
 
-def _fetch_legs_for_combo(cur: sqlite3.Cursor, combo_id: int) -> List[Dict[str, Any]]:
+def _detect_id_column(cur: sqlite3.Cursor) -> str:
+    cols = _combo_table_columns(cur)
+    if "id" in cols:
+        return "id"
+    if "combo_id" in cols:
+        return "combo_id"
+    # Fallback for legacy tables: every normal SQLite table has rowid unless created WITHOUT ROWID
+    return "rowid"
+
+def _normalize_key(v: Any) -> Any:
+    # Keep type as-is for SQLite to match on equality.
+    # Decode bytes/memoryview just in case.
+    if isinstance(v, (bytes, bytearray, memoryview)):
+        try:
+            return bytes(v).decode()
+        except Exception:
+            return bytes(v).hex()
+    return v
+
+
+def _fetch_combos(cur: sqlite3.Cursor, date_from: str) -> List[Tuple[Any, str]]:
+    # Use detected id column and tolerate older schemas missing opened_date
+    cols = _combo_table_columns(cur)
+    id_col = _detect_id_column(cur)
+    has_opened = "opened_date" in cols
+
+    if has_opened:
+        try:
+            cur.execute(
+                f"SELECT {id_col}, underlying FROM combos "
+                "WHERE opened_date >= ? OR opened_date IS NULL;",
+                (date_from,),
+            )
+        except sqlite3.OperationalError:
+            # defensive fallback if predicate fails for some reason
+            cur.execute(f"SELECT {id_col}, underlying FROM combos;")
+    else:
+        cur.execute(f"SELECT {id_col}, underlying FROM combos;")
+
+    rows = cur.fetchall()
+    return [(_normalize_key(r[0]), r[1]) for r in rows if r and r[1]]
+
+def _fetch_legs_for_combo(cur: sqlite3.Cursor, combo_id: Any) -> List[Dict[str, Any]]:
     # Expected flexible columns: strike, right, expiry, qty, premium/price (some may be missing)
     cur.execute("PRAGMA table_info(combo_legs);")
     info = cur.fetchall()
@@ -189,6 +242,12 @@ def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     try:
+        # Detect id column once per connection/transaction
+        id_col = _detect_id_column(cur)
+        if id_col == "rowid":
+            logging.warning(
+                "Using rowid as combo key; consider migrating schema to include an 'id' column."
+            )
         combos = _fetch_combos(cur, date_from)
         if not combos:
             print(f"[backfill] No combos found from {date_from}.")
@@ -198,10 +257,10 @@ def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
         # For parent lineage, grab all combos with expiry if present
         colnames = [r[1] for r in cur.execute("PRAGMA table_info(combos);").fetchall()]
         has_expiry = "expiry" in colnames
-        all_combos_meta: Dict[int, Dict[str, Any]] = {}
+        all_combos_meta: Dict[Any, Dict[str, Any]] = {}
         if has_expiry:
             for cid, underlying in combos:
-                cur.execute("SELECT expiry FROM combos WHERE id = ?;", (cid,))
+                cur.execute(f"SELECT expiry FROM combos WHERE {id_col} = ?;", (cid,))
                 r = cur.fetchone()
                 all_combos_meta[cid] = {
                     "underlying": underlying,
@@ -267,7 +326,7 @@ def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
                 vals.append(parent_combo_id)
             if sets:
                 vals.append(cid)
-                sql = f"UPDATE combos SET {', '.join(sets)} WHERE id = ?;"
+                sql = f"UPDATE combos SET {', '.join(sets)} WHERE {id_col} = ?;"
                 cur.execute(sql, tuple(vals))
                 updated += 1
         conn.commit()
