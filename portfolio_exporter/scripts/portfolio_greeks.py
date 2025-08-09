@@ -1036,27 +1036,19 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
     return pd.DataFrame(opt_rows + stk_rows)
 
 
-def _load_db_combos_or_none() -> "pd.DataFrame|None":
-    """
-    Try to load combo metadata from the DB. Return None if:
-      - DB missing, or
-      - table has no informative multi-leg records, or
-      - width/type is mostly null, or
-      - combo_legs table is absent.
-    """
-    import sqlite3, os
+def _load_db_combos_or_none():
+    import os, sqlite3
+    import pandas as pd
+    from pathlib import Path
     from portfolio_exporter.core.config import settings
 
     db = os.environ.get("PE_DB_PATH") or (Path(settings.output_dir) / "combos.db")
     if not Path(db).exists():
         return None
     try:
-        import pandas as pd
-
         with sqlite3.connect(db) as con:
-            # tolerant: handle both “type/width/credit_debit” existing or not
             cols = [c[1] for c in con.execute("PRAGMA table_info(combos);")]
-            sel = [
+            want = [
                 c
                 for c in [
                     "underlying",
@@ -1066,19 +1058,19 @@ def _load_db_combos_or_none() -> "pd.DataFrame|None":
                     "credit_debit",
                     "parent_combo_id",
                     "closed_date",
-                    "structure",
                 ]
                 if c in cols
             ]
-            if not sel:
+            if not want:
                 return None
-            df = pd.read_sql_query(
-                f"SELECT {', '.join(sel)} FROM combos", con
-            )
-        # Heuristic: if all rows are 'single' or width all null → not informative
-        if "type" in df.columns and (
-            df["type"].str.lower().fillna("single") == "single"
-        ).all():
+            df = pd.read_sql_query(f"SELECT {', '.join(want)} FROM combos", con)
+        # Heuristics to skip non-informative tables
+        if df.empty:
+            return None
+        if (
+            "type" in df.columns
+            and (df["type"].str.lower().fillna("single") == "single").all()
+        ):
             return None
         if "width" in df.columns and df["width"].notna().sum() == 0:
             return None
@@ -1227,9 +1219,9 @@ def run(
         pos_df["greeks_source"] = "IB"
     else:
         pos_df["greeks_source"] = pos_df["greeks_source"].apply(
-            lambda v: "IB"
-            if v in (True, 1, "IB")
-            else "BS" if v in (False, 0, "BS") else ""
+            lambda v: (
+                "IB" if v in (True, 1, "IB") else "BS" if v in (False, 0, "BS") else ""
+            )
         )
 
     for greek in ["delta", "gamma", "vega", "theta"]:
@@ -1243,6 +1235,107 @@ def run(
         .to_frame()
         .T
     )
+
+    df_positions = pos_df
+    _df_totals = totals
+    df_combos = combos_df
+
+    combos_source = getattr(
+        globals().get("args", argparse.Namespace()), "combos_source", "auto"
+    )
+
+    # 4a) pick metadata source
+    meta_df = None
+    if combos_source in ("auto", "db"):
+        meta_df = _load_db_combos_or_none()
+        if meta_df is None and combos_source == "db":
+            logging.getLogger(__name__).warning(
+                "Requested DB combos, but DB is not informative/absent."
+            )
+    if meta_df is None and combos_source in ("auto", "live"):
+        try:
+            # live detection from positions for metadata
+            meta_df = combo_core.detect_from_positions(df_positions)
+        except Exception as e:
+            logging.getLogger(__name__).warning("Live combo detection failed: %s", e)
+            meta_df = None
+
+    # 4b) normalize keys and merge metadata into the engine combos
+    # We keep engine df (with Greeks/qty) as the base, and splice in metadata columns when present.
+    if meta_df is not None and not meta_df.empty:
+        # Normalize expiry to string for robust join (engine may have float-like or str)
+        def _norm_exp(s):
+            if pd.api.types.is_numeric_dtype(s):
+                return s.astype("Int64").astype(str)
+            return s.astype(str)
+
+        # Prepare join keys
+        left = df_combos.copy()
+        right = meta_df.copy()
+
+        if "expiry" in left.columns:
+            left["expiry_key"] = _norm_exp(left["expiry"])
+        if "expiry" in right.columns:
+            right["expiry_key"] = _norm_exp(right["expiry"])
+
+        # Prefer merge on ['underlying','expiry_key'] when both present
+        join_keys = []
+        if "underlying" in left.columns and "underlying" in right.columns:
+            join_keys.append("underlying")
+        if "expiry_key" in left.columns and "expiry_key" in right.columns:
+            join_keys.append("expiry_key")
+
+        # metadata columns to splice
+        meta_cols = [
+            c
+            for c in [
+                "type",
+                "width",
+                "credit_debit",
+                "parent_combo_id",
+                "closed_date",
+            ]
+            if c in right.columns
+        ]
+
+        if join_keys and meta_cols:
+            merged = left.merge(
+                right[["underlying", "expiry_key"] + meta_cols].drop_duplicates(),
+                on=join_keys,
+                how="left",
+                suffixes=("", "_meta"),
+            )
+            # Prefer metadata when engine columns are missing/NaN
+            for c in meta_cols:
+                base_has = c in merged.columns
+                if base_has:
+                    merged[c] = merged[c].combine_first(merged.get(f"{c}_meta"))
+                else:
+                    merged[c] = merged.get(f"{c}_meta")
+                dropcol = f"{c}_meta"
+                if dropcol in merged.columns:
+                    merged.drop(columns=[dropcol], inplace=True)
+            # Replace df_combos used for saving
+            df_combos = merged
+            logging.getLogger(__name__).info(
+                "Combos CSV enriched from %s",
+                (
+                    "DB"
+                    if combos_source in ("auto", "db") and meta_df is not None
+                    else "LIVE"
+                ),
+            )
+        else:
+            logging.getLogger(__name__).warning(
+                "Could not join combo metadata; keys missing."
+            )
+    else:
+        if combos_source != "engine":
+            logging.getLogger(__name__).info(
+                "No combo metadata available; saving engine combos only."
+            )
+
+    combos_df = df_combos
 
     outdir = settings.output_dir
 
@@ -1275,9 +1368,7 @@ def run(
                     "No combo legs in DB; showing live-detected combos."
                 )
             except Exception as e:
-                logging.getLogger(__name__).warning(
-                    "Combo live-detect failed: %s", e
-                )
+                logging.getLogger(__name__).warning("Combo live-detect failed: %s", e)
                 combos_for_display = None
         try:
             _print_totals(console, totals_df)
@@ -1322,6 +1413,15 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry
         choices=["simple", "all"],
         default="simple",
         help="Combo detection complexity",
+    )
+    parser.add_argument(
+        "--combos-source",
+        choices=["auto", "db", "live", "engine"],
+        default="auto",
+        help=(
+            "Source for combo metadata in saved CSV: "
+            "auto=db else live; engine=original behavior."
+        ),
     )
     parser.add_argument(
         "--no-pretty",
