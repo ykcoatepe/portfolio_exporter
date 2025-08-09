@@ -76,6 +76,8 @@ LOG_FMT = "%(asctime)s %(levelname)s %(name)s %(message)s"
 # Default to WARNING to keep console noise down
 logging.basicConfig(level=logging.WARNING, format=LOG_FMT)
 logger = logging.getLogger(__name__)
+# Alias for consistency with other modules/snippets
+log = logger
 # Silence verbose ib_insync chatter – only show truly critical issues
 for _n in ("ib_insync", "ib_insync.ib", "ib_insync.wrapper"):
     logging.getLogger(_n).setLevel(logging.CRITICAL)
@@ -984,6 +986,7 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
         c = pos.contract
         mult = _multiplier(c)
         qty = pos.position
+        # Try to pick a greeks source if available; otherwise leave NaN and let downstream handle
         src = next(
             (
                 getattr(tk, n)
@@ -992,8 +995,6 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
             ),
             None,
         )
-        if not src:
-            continue
         opt_rows.append(
             {
                 "symbol": c.localSymbol,
@@ -1004,10 +1005,10 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
                 "right": getattr(c, "right", None),  # "C"/"P" for options
                 "strike": getattr(c, "strike", None),
                 "expiry": getattr(c, "lastTradeDateOrContractMonth", None),
-                "delta": src.delta,
-                "gamma": src.gamma,
-                "vega": src.vega,
-                "theta": src.theta,
+                "delta": getattr(src, "delta", float("nan")),
+                "gamma": getattr(src, "gamma", float("nan")),
+                "vega": getattr(src, "vega", float("nan")),
+                "theta": getattr(src, "theta", float("nan")),
             }
         )
 
@@ -1118,84 +1119,134 @@ def _choose_combos_df(
     # --- Live / engine detection ----------------------------------------
     if df_raw is None and source in {"auto", "live", "engine"}:
         try:
-            try:
-                live_df = combo_core.detect_from_positions(
-                    positions_df, mode=combo_types
-                )
-            except TypeError:  # backward compat
+            if source in {"live", "auto"}:
+                # New greedy live detector; do not re-append singles
                 live_df = combo_core.detect_from_positions(positions_df)
-            df_raw = live_df
-            resolved = source if source != "auto" else "live"
+                df_raw = live_df
+                resolved = source if source != "auto" else "live"
+            else:  # engine
+                # Preserve existing engine behavior via core.detect_combos
+                try:
+                    engine_df = combo_core.detect_combos(
+                        positions_df, mode=combo_types
+                    )
+                except TypeError:
+                    engine_df = combo_core.detect_combos(positions_df)
+                df_raw = engine_df
+                resolved = "engine"
         except Exception as e:  # pragma: no cover - defensive
             logger.warning("Combo detection failed: %s", e)
             df_raw = None
         if (df_raw is None or df_raw.empty) and source == "auto":
+            # Auto fallback to engine
             try:
-                df_raw = combo_core.detect_from_positions(positions_df)
-            except Exception as e:  # pragma: no cover - defensive
-                logger.warning("Combo engine detection failed: %s", e)
-                df_raw = pd.DataFrame()
+                engine_df = combo_core.detect_combos(positions_df, mode=combo_types)
+            except TypeError:  # backward compat
+                engine_df = combo_core.detect_combos(positions_df)
+            df_raw = engine_df
             resolved = "engine"
 
-    df_norm = _normalize_combos_columns(df_raw)
-    df_keep = _filter_true_combos(df_norm)
+    combos_df = _normalize_combos_columns(df_raw)
+    try:
+        log.info("Combos raw columns: %s", list(combos_df.columns))
+    except Exception:
+        pass
+    raw_count = 0 if df_raw is None else len(df_raw)
+    combos_df = _filter_true_combos(combos_df)
 
-    if df_keep.empty and resolved in {"auto", "live", "engine"}:
-        logger.info(
-            "Combos empty after %s; attempting live detection fallback…", resolved
+    # One-line summary of live detection results
+    try:
+        s = combos_df.get("structure", pd.Series(dtype=str)).astype(str).str.lower().str.strip()
+        v_cnt = int((s == "vertical").sum())
+        ic_cnt = int((s == "iron condor").sum())
+        bf_cnt = int((s == "butterfly").sum())
+        cal_cnt = int((s == "calendar").sum())
+        total = int(len(combos_df))
+        log.info(
+            "Live combos detected: %s vertical, %s condor, %s butterfly, %s calendar; total=%s",
+            v_cnt,
+            ic_cnt,
+            bf_cnt,
+            cal_cnt,
+            total,
         )
-        try:
-            try:
-                df_live = combo_core.detect_from_positions(
-                    positions_df, mode=combo_types
-                )
-            except TypeError:
-                df_live = combo_core.detect_from_positions(positions_df)
-        except Exception as e:
-            logger.warning("Live detection failed: %s", e)
-            df_live = pd.DataFrame()
-        df_keep = _filter_true_combos(_normalize_combos_columns(df_live))
+    except Exception:
+        pass
 
-    logger.info(
+    log.info(
         "Combos chosen: %d (source=%s, raw=%d)",
-        len(df_keep),
+        len(combos_df),
         resolved,
-        len(df_raw) if df_raw is not None else 0,
+        raw_count,
     )
 
-    return df_keep, resolved
+    if os.getenv("PE_DEBUG_COMBOS") == "1":
+        try:
+            dbg = df_raw if df_raw is not None else pd.DataFrame()
+            io_core.save(dbg, "combos_raw_debug", "csv", config_core.settings.output_dir)
+        except Exception:
+            pass
+
+    return combos_df, resolved
 
 
 def _filter_true_combos(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
+    raw = 0 if df is None else len(df)
+    if raw == 0:
+        log.info("Combos filter: raw=0 kept=0 (nothing to do)")
         return df
 
-    tmp = df.copy()
+    s_norm = df.get("structure", pd.Series(index=df.index, dtype="object")).astype(str).str.lower().str.strip()
+    t_norm = df.get("type", pd.Series(index=df.index, dtype="object")).astype(str).str.lower().str.strip()
+    legs = df.get("legs", pd.Series(index=df.index, dtype="object"))
+    legs_n = df.get("legs_n", pd.Series(index=df.index, dtype="Int64"))
 
-    s_low = tmp["structure"].astype(str).str.strip().str.lower()
-    t_low = tmp["type"].astype(str).str.strip().str.lower()
+    known_multi = {"vertical", "iron condor", "butterfly", "calendar", "diagonal", "diag", "strangle", "straddle", "ratio"}
+    has_known = s_norm.isin(known_multi) | t_norm.isin(known_multi)
 
-    is_known = s_low.isin(KNOWN_MULTI) | t_low.isin(KNOWN_MULTI)
+    non_empty = lambda s: s.notna() & (s != "") & (s != "nan")
+    has_non_single = (non_empty(s_norm) & ~s_norm.eq("single")) | (non_empty(t_norm) & ~t_norm.eq("single"))
+    def _has2(v):
+        if isinstance(v, (list, tuple)):
+            return len(v) >= 2
+        try:
+            x = pd.to_numeric(pd.Series([v]), errors="coerce").iloc[0]
+            return bool(pd.notna(x) and x >= 2)
+        except Exception:
+            return False
 
-    has_legs = False
-    if "legs" in tmp.columns:
-        with np.errstate(invalid="ignore"):
-            legs_ok = pd.to_numeric(tmp["legs"], errors="coerce").fillna(-1) >= 2
-        has_legs = True
-    else:
-        legs_ok = pd.Series([False] * len(tmp), index=tmp.index)
+    has_legs2 = legs.apply(_has2)
+    if not legs_n.isna().all():
+        has_legs2 = has_legs2 | legs_n.fillna(0).ge(2)
 
-    keep = is_known | legs_ok
-    kept = tmp[keep].copy()
+    keep = has_known | has_legs2 | has_non_single
 
-    logger.info(
-        "Combos filter: raw=%s kept=%s (known=%s legs_col=%s)",
-        len(tmp),
-        len(kept),
-        int(is_known.sum()),
-        has_legs,
-    )
-    return kept
+    kept_df = df[keep].copy()
+    kept = len(kept_df)
+
+    # Debug logging for diagnostics
+    try:
+        s_vals = s_norm[non_empty(s_norm)].value_counts().head(10).to_dict()
+        t_vals = t_norm[non_empty(t_norm)].value_counts().head(10).to_dict()
+        log.info(
+            "Combos filter: raw=%d kept=%d (known=%d legs2=%d) struct_top=%s type_top=%s",
+            raw,
+            kept,
+            int(has_known.sum()),
+            int(has_legs2.fillna(False).sum()),
+            s_vals,
+            t_vals,
+        )
+    except Exception:
+        log.info(
+            "Combos filter: raw=%d kept=%d (known=%d legs2=%d)",
+            raw,
+            kept,
+            int(has_known.sum()),
+            int(has_legs2.fillna(False).sum()),
+        )
+
+    return kept_df
 
 
 def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
@@ -1222,7 +1273,8 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
         out[col] = out[col].fillna("").astype(str)
 
     if "legs" not in out.columns:
-        out["legs"] = np.nan
+        # Ensure nullable integer dtype; do not force default 1
+        out["legs"] = pd.Series([pd.NA] * len(out), dtype="Int64")
     if "width" not in out.columns:
         out["width"] = np.nan
     if "credit_debit" not in out.columns:
@@ -1256,6 +1308,49 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
 
         out["expiry"] = out["expiry"].apply(_norm_exp)
 
+    # New: standardize structure/type strings (lower, stripped) without overriding non-empty values
+    for col in ("structure", "type"):
+        if col in out.columns:
+            out[col] = out[col].astype(str).str.strip()
+
+    # ---- Fill structure/type from alternates & normalize ----
+    if out["structure"].replace("", np.nan).isna().all():
+        for alt in ["strategy", "kind", "combo_type", "structure_name"]:
+            if alt in out.columns and not out[alt].replace("", np.nan).isna().all():
+                out["structure"] = out[alt].astype(str)
+                break
+
+    if out["type"].replace("", np.nan).isna().all():
+        # mirror structure if type missing
+        if out["structure"].notna().any():
+            mask = out["type"].isin(["", "nan"]) | out["type"].isna()
+            out.loc[mask, "type"] = out["structure"].astype(str)
+
+    out["structure"] = out["structure"].astype(str).str.strip()
+    out["type"] = out["type"].astype(str).str.strip()
+
+    # ---- Derive numeric legs_n (keep original 'legs' as-is) ----
+    def _lenish(v):
+        if isinstance(v, (list, tuple)):
+            return len(v)
+        if isinstance(v, str) and v.startswith("[") and v.endswith("]"):
+            try:
+                import ast
+                parsed = ast.literal_eval(v)
+                return len(parsed) if isinstance(parsed, (list, tuple)) else np.nan
+            except Exception:
+                return np.nan
+        try:
+            x = pd.to_numeric(pd.Series([v]), errors="coerce").iloc[0]
+            return int(x) if pd.notna(x) else np.nan
+        except Exception:
+            return np.nan
+
+    if "legs" in out.columns:
+        out["legs_n"] = out["legs"].apply(_lenish).astype("Int64")
+    else:
+        out["legs_n"] = pd.Series([pd.NA] * len(out), dtype="Int64")
+
     return out[
         [
             "underlying",
@@ -1263,6 +1358,7 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
             "structure",
             "type",
             "legs",
+            "legs_n",
             "width",
             "credit_debit",
             "parent_combo_id",
@@ -1450,7 +1546,47 @@ def run(
     except Exception:
         pass
 
-    pos_df = run_with_spinner("Fetching positions…", _load_positions).copy()
+    # Optional offline positions override
+    positions_override: pd.DataFrame | None = None
+    if "args" in globals() and getattr(globals()["args"], "positions_csv", None):
+        try:
+            positions_override = pd.read_csv(os.path.expanduser(globals()["args"].positions_csv))
+            logger.info(
+                f"Loaded positions from CSV: {globals()['args'].positions_csv} rows={len(positions_override)}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to read --positions-csv: {e}")
+            positions_override = None
+
+    pos_df: pd.DataFrame
+    if positions_override is None:
+        pos_df = run_with_spinner("Fetching positions…", _load_positions).copy()
+    else:
+        csv_df = positions_override.copy()
+        for col in ["delta", "gamma", "vega", "theta", "multiplier"]:
+            if col not in csv_df.columns:
+                csv_df[col] = np.nan
+        if "symbol" not in csv_df.columns and "underlying" in csv_df.columns:
+            csv_df["symbol"] = csv_df["underlying"]
+        # Build a minimal positions DataFrame compatible with downstream logic
+        cols = [
+            "symbol",
+            "secType",
+            "expiry",
+            "strike",
+            "right",
+            "qty",
+            "multiplier",
+            "underlying",
+            "delta",
+            "gamma",
+            "vega",
+            "theta",
+        ]
+        for c in cols:
+            if c not in csv_df.columns:
+                csv_df[c] = np.nan
+        pos_df = csv_df[cols].copy()
     if pos_df.empty:
         pos_df = pd.DataFrame(
             columns=[
@@ -1574,6 +1710,11 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry
         "--persist-combos",
         action="store_true",
         help="Persist detected combos into SQLite when sourced live/engine",
+    )
+    parser.add_argument(
+        "--positions-csv",
+        type=str,
+        help="Path to a positions CSV to use instead of pulling live positions from IBKR.",
     )
     parser.add_argument(
         "--no-pretty",

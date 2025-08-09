@@ -6,7 +6,7 @@ import logging
 import os
 import pathlib
 import sqlite3
-from typing import Dict, List
+from typing import Dict, List, Tuple, Optional
 
 from .io import migrate_combo_schema
 from .config import settings
@@ -173,28 +173,575 @@ def detect_combos(pos_df: pd.DataFrame, mode: str = "all") -> pd.DataFrame:
     return combo_df
 
 
-def detect_from_positions(df_positions: pd.DataFrame) -> pd.DataFrame:
-    """
-    Use existing v2 combo engine to cluster legs into combos from a positions DF.
-    Return columns at least: ['structure','underlying','expiry','qty','width','type','legs']
-    (re-use existing internal functions; this is a thin wrapper)
+def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
+    import pandas as pd
+    import numpy as np
+
+    if df is None or df.empty:
+        return pd.DataFrame(columns=[
+            "underlying","expiry","right","strike","qty","secType"
+        ])
+
+    out = df.copy()
+
+    # --- column presence / aliases ---
+    # Accept common variants and map into canonical set
+    rename_map = {}
+    if "position" in out.columns and "qty" not in out.columns:
+        rename_map["position"] = "qty"
+    if "symbol" in out.columns and "underlying" not in out.columns:
+        # use symbol as a fallback only for stocks; options carry 'underlying'
+        pass
+    if rename_map:
+        out = out.rename(columns=rename_map)
+
+    for col in ["underlying","expiry","right","strike","qty","secType"]:
+        if col not in out.columns:
+            out[col] = np.nan
+
+    # --- underlying fallback ---
+    # if underlying is blank but symbol present, fill with symbol
+    if "symbol" in out.columns:
+        mask_u = out["underlying"].isna() | (out["underlying"].astype(str).str.strip() == "")
+        out.loc[mask_u, "underlying"] = out.loc[mask_u, "symbol"]
+
+    # --- normalize right to C/P ---
+    def norm_right(x):
+        if x is None:
+            return np.nan
+        s = str(x).strip().upper()
+        if s in ("C","CALL"): return "C"
+        if s in ("P","PUT"):  return "P"
+        return np.nan
+    out["right"] = out["right"].apply(norm_right)
+
+    # --- numeric coercions ---
+    out["strike"] = pd.to_numeric(out["strike"], errors="coerce")
+    out["qty"] = pd.to_numeric(out["qty"], errors="coerce")
+
+    # Drop rows without meaningful qty (0/NaN) for option legs
+    out = out[~out["qty"].isna() & (out["qty"] != 0)]
+
+    # --- expiry parsing ---
+    # Accept YYYYMM / YYYYMMDD / YYYY-MM-DD / YYYY/MM/DD etc.
+    def parse_exp(s):
+        if s is None:
+            return ""
+        t = str(s).strip()
+        if t == "":
+            return ""
+        # try pandas parsing first
+        try:
+            dt = pd.to_datetime(t, errors="raise", utc=False)
+            return dt.strftime("%Y%m%d")
+        except Exception:
+            pass
+        # compact numeric forms
+        t2 = t.replace("-","").replace("/","").replace(" ","")
+        if t2.isdigit():
+            if len(t2) >= 8:
+                return t2[:8]
+            if len(t2) == 6:
+                return t2
+        return t  # last resort, leave as-is
+
+    out["expiry"] = out["expiry"].apply(parse_exp)
+
+    # Keep only columns the detector needs
+    out = out[["underlying","expiry","right","strike","qty","secType"]].copy()
+
+    # Focus detection on option-like instruments only
+    out = out[out["secType"].isin(["OPT", "FOP"])].copy()
+
+    # Optional debug dump
+    import os
+    if os.getenv("PE_DEBUG_COMBOS") == "1":
+        try:
+            from portfolio_exporter.core import io as io_core, config as config_core
+            io_core.save(out, "positions_normalized_debug", "csv", config_core.settings.output_dir)
+        except Exception:
+            pass
+
+    return out.reset_index(drop=True)
+
+
+def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> pd.DataFrame:
+    """Greedy live detector for true multi‑leg combos.
+
+    - Normalizes the positions DataFrame.
+    - Consumes legs into combos in priority: verticals, butterflies, iron condors, calendars.
+    - Returns only multi‑leg structures; never emits singles.
     """
 
-    combo_df = detect_combos(df_positions, mode="all")
-    cols = [
-        c
-        for c in [
-            "structure",
-            "underlying",
-            "expiry",
-            "qty",
-            "width",
-            "type",
-            "legs",
-        ]
-        if c in combo_df.columns
-    ]
-    return combo_df[cols]
+    if df_positions is None or df_positions.empty:
+        return pd.DataFrame(
+            columns=[
+                "underlying",
+                "expiry",
+                "structure",
+                "type",
+                "legs",
+                "width",
+                "credit_debit",
+                "parent_combo_id",
+                "closed_date",
+            ]
+        )
+
+    norm = _normalize_positions_df(df_positions)
+    # Derive helpers expected by the detector
+    if not {"abs_qty", "side"}.issubset(norm.columns):
+        try:
+            norm["abs_qty"] = norm["qty"].abs().astype(int)
+            norm["side"] = norm["qty"].apply(lambda q: "long" if float(q) > 0 else "short")
+        except Exception:
+            norm["abs_qty"] = 0
+            norm["side"] = ""
+    norm = norm[norm["abs_qty"] >= int(min_abs_qty)].copy()
+    if norm.empty:
+        # Optional debug: emit a diagnostic when no option rows found
+        import os
+        if os.getenv("PE_DEBUG_COMBOS") == "1":
+            try:
+                from portfolio_exporter.core import io as io_core, config as config_core
+                # Build minimal diagnostic frame
+                diag = pd.DataFrame(
+                    [{
+                        "reason": "no_option_rows_after_normalization",
+                        "total_input_rows": int(len(df_positions) if df_positions is not None else 0),
+                    }]
+                )
+                io_core.save(diag, "combos_diag_debug", "csv", config_core.settings.output_dir)
+            except Exception:
+                pass
+        return pd.DataFrame(
+            columns=[
+                "underlying",
+                "expiry",
+                "structure",
+                "type",
+                "legs",
+                "width",
+                "credit_debit",
+                "parent_combo_id",
+                "closed_date",
+            ]
+        )
+
+    # Track remaining lots per row
+    remaining = norm["abs_qty"].to_dict()
+
+    rows: List[Dict[str, object]] = []
+
+    # Per-underlying processing
+    totals = {"vertical": 0, "iron condor": 0, "butterfly": 0, "calendar": 0}
+    for u_sym, u_df in norm.groupby("underlying"):
+        u_df = u_df.sort_values(["expiry", "right", "strike"]).copy()
+
+        # Index helpers
+        def _legs_for(exp: str, right: str) -> List[int]:
+            sub = u_df[(u_df["expiry"] == exp) & (u_df["right"] == right)]
+            # Sorted by strike for verticals/butterflies
+            return list(sub.sort_values("strike").index)
+
+        def _legs_for_strike(strike: float, right: str) -> List[int]:
+            sub = u_df[(u_df["strike"] == strike) & (u_df["right"] == right)]
+            return list(sub.sort_values("expiry").index)
+
+        # ── 1) Verticals (same expiry, same right) ──────────────────────
+        vertical_records: List[Tuple[str, str, float, float, int, List[int]]] = []
+        # (expiry, right, k_low, k_high, matched_qty, [row_i,row_j])
+        for (exp, right), grp in u_df.groupby(["expiry", "right"]):
+            idxs = list(grp.sort_values("strike").index)
+            # Separate longs/shorts
+            longs = [i for i in idxs if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == "long"]
+            shorts = [i for i in idxs if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == "short"]
+            if not longs or not shorts:
+                continue
+            # Greedy pairing preference by option type
+            # For calls prefer long lowerK with short higherK; for puts prefer short higherK with long lowerK.
+            def _strike(i: int) -> float:
+                return float(u_df.loc[i, "strike"])
+
+            longs_sorted = sorted(longs, key=_strike)
+            shorts_sorted = sorted(shorts, key=_strike)
+
+            # Two-pointer scan over strikes
+            li, si = 0, 0
+            while li < len(longs_sorted) and si < len(shorts_sorted):
+                i_long = longs_sorted[li]
+                i_short = shorts_sorted[si]
+                kL, kS = _strike(i_long), _strike(i_short)
+
+                # Enforce different strikes
+                if kL == kS:
+                    # Advance the one with smaller remaining to find off-strike pair
+                    if remaining[i_long] <= remaining[i_short]:
+                        li += 1
+                    else:
+                        si += 1
+                    continue
+
+                prefer = (right == "C" and kL < kS) or (right == "P" and kS > kL)
+                alt = (right == "C" and kL > kS) or (right == "P" and kS < kL)
+                if not (prefer or alt):
+                    # Move pointers towards valid orientation
+                    if right == "C":
+                        # want kL < kS ideally
+                        if kL < kS:
+                            pass  # valid but caught by prefer
+                        # adjust whichever is out of place
+                        if kL >= kS:
+                            si += 1
+                            continue
+                    else:  # Puts prefer kS > kL
+                        if kS <= kL:
+                            li += 1
+                            continue
+
+                m = min(remaining[i_long], remaining[i_short])
+                if m <= 0:
+                    if remaining[i_long] <= 0:
+                        li += 1
+                    if remaining[i_short] <= 0:
+                        si += 1
+                    continue
+                k_low, k_high = (kL, kS) if kL < kS else (kS, kL)
+                vertical_records.append((exp, right, k_low, k_high, m, [i_long, i_short]))
+                remaining[i_long] -= m
+                remaining[i_short] -= m
+                if remaining[i_long] <= 0:
+                    li += 1
+                if remaining[i_short] <= 0:
+                    si += 1
+
+        # ── 2) Butterflies (same expiry, same right, 1:-2:1) ────────────
+        butterfly_records: List[Tuple[str, str, float, float, float, int, List[int]]] = []
+        for (exp, right), grp in u_df.groupby(["expiry", "right"]):
+            g = grp.sort_values("strike")
+            strikes = list(g["strike"].unique())
+            if len(strikes) < 3:
+                continue
+            # Build per-strike remaining longs/shorts counts and row indices
+            rows_by_strike = {k: list(g[g["strike"] == k].index) for k in strikes}
+            def _avail(side: str, row_ids: List[int]) -> int:
+                return sum(remaining[i] for i in row_ids if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == side)
+
+            for i in range(1, len(strikes) - 1):
+                k1, k2, k3 = strikes[i - 1], strikes[i], strikes[i + 1]
+                rows1, rows2, rows3 = rows_by_strike[k1], rows_by_strike[k2], rows_by_strike[k3]
+                # Long wings, short body
+                lots1 = _avail("long", rows1)
+                lots2_short = _avail("short", rows2)
+                lots3 = _avail("long", rows3)
+                m1 = min(lots1, lots2_short // 2, lots3)
+                if m1 > 0:
+                    # Consume greedily across rows
+                    used_rows: List[int] = []
+                    need = {"long@k1": m1, "short@k2": 2 * m1, "long@k3": m1}
+                    for rid in rows1:
+                        if need["long@k1"] == 0:
+                            break
+                        if u_df.loc[rid, "side"] == "long" and remaining.get(rid, 0) > 0:
+                            take = min(remaining[rid], need["long@k1"])
+                            remaining[rid] -= take
+                            if take > 0:
+                                used_rows.append(rid)
+                                need["long@k1"] -= take
+                    for rid in rows2:
+                        if need["short@k2"] == 0:
+                            break
+                        if u_df.loc[rid, "side"] == "short" and remaining.get(rid, 0) > 0:
+                            take = min(remaining[rid], need["short@k2"])
+                            remaining[rid] -= take
+                            if take > 0:
+                                used_rows.append(rid)
+                                need["short@k2"] -= take
+                    for rid in rows3:
+                        if need["long@k3"] == 0:
+                            break
+                        if u_df.loc[rid, "side"] == "long" and remaining.get(rid, 0) > 0:
+                            take = min(remaining[rid], need["long@k3"])
+                            remaining[rid] -= take
+                            if take > 0:
+                                used_rows.append(rid)
+                                need["long@k3"] -= take
+                    width = float(min(k2 - k1, k3 - k2))
+                    butterfly_records.append((exp, right, k1, k2, k3, m1, used_rows))
+                    continue
+                # Short wings, long body (short butterfly)
+                lots1s = _avail("short", rows1)
+                lots2l = _avail("long", rows2)
+                lots3s = _avail("short", rows3)
+                m2 = min(lots1s, lots2l // 2, lots3s)
+                if m2 > 0:
+                    used_rows = []
+                    need = {"short@k1": m2, "long@k2": 2 * m2, "short@k3": m2}
+                    for rid in rows1:
+                        if need["short@k1"] == 0:
+                            break
+                        if u_df.loc[rid, "side"] == "short" and remaining.get(rid, 0) > 0:
+                            take = min(remaining[rid], need["short@k1"])
+                            remaining[rid] -= take
+                            if take > 0:
+                                used_rows.append(rid)
+                                need["short@k1"] -= take
+                    for rid in rows2:
+                        if need["long@k2"] == 0:
+                            break
+                        if u_df.loc[rid, "side"] == "long" and remaining.get(rid, 0) > 0:
+                            take = min(remaining[rid], need["long@k2"])
+                            remaining[rid] -= take
+                            if take > 0:
+                                used_rows.append(rid)
+                                need["long@k2"] -= take
+                    for rid in rows3:
+                        if need["short@k3"] == 0:
+                            break
+                        if u_df.loc[rid, "side"] == "short" and remaining.get(rid, 0) > 0:
+                            take = min(remaining[rid], need["short@k3"])
+                            remaining[rid] -= take
+                            if take > 0:
+                                used_rows.append(rid)
+                                need["short@k3"] -= take
+                    width = float(min(k2 - k1, k3 - k2))
+                    butterfly_records.append((exp, right, k1, k2, k3, m2, used_rows))
+
+        # ── 3) Iron condors (pair one call vertical with one put vertical) ──
+        # Aggregate vertical units by expiry
+        condor_records: List[Tuple[str, float, int, List[int]]] = []
+        # Map expiry -> lists of (width, qty, rows)
+        from collections import defaultdict
+
+        exp_call: Dict[str, List[Tuple[float, int, List[int]]]] = defaultdict(list)
+        exp_put: Dict[str, List[Tuple[float, int, List[int]]]] = defaultdict(list)
+        for exp, right, k1, k2, q, rows_used in vertical_records:
+            width = float(abs(k2 - k1))
+            rec = (width, q, rows_used)
+            if right == "C":
+                exp_call[exp].append(rec)
+            else:
+                exp_put[exp].append(rec)
+
+        # Greedy pairing by matched qty
+        vertical_keep: List[Tuple[str, str, float, float, int, List[int]]] = []
+        for exp in set(list(exp_call.keys()) + list(exp_put.keys())):
+            calls = exp_call.get(exp, [])
+            puts = exp_put.get(exp, [])
+            ci, pi = 0, 0
+            calls.sort(key=lambda t: t[0])
+            puts.sort(key=lambda t: t[0])
+            while ci < len(calls) and pi < len(puts):
+                c_w, c_q, c_rows = calls[ci]
+                p_w, p_q, p_rows = puts[pi]
+                m = min(c_q, p_q)
+                if m <= 0:
+                    if c_q <= 0:
+                        ci += 1
+                    if p_q <= 0:
+                        pi += 1
+                    continue
+                width = float(min(c_w, p_w))
+                condor_records.append((exp, width, m, c_rows + p_rows))
+                # Reduce vertical lots and advance when exhausted
+                calls[ci] = (c_w, c_q - m, c_rows)
+                puts[pi] = (p_w, p_q - m, p_rows)
+                if calls[ci][1] <= 0:
+                    ci += 1
+                if puts[pi][1] <= 0:
+                    pi += 1
+            # Any residual verticals remain as vertical structures
+            for c_w, c_q, c_rows in calls[ci:]:
+                if c_q > 0:
+                    # infer strikes from rows
+                    ks = [float(u_df.loc[i, "strike"]) for i in c_rows]
+                    k1, k2 = min(ks), max(ks)
+                    vertical_keep.append((exp, "C", k1, k2, c_q, c_rows))
+            for p_w, p_q, p_rows in puts[pi:]:
+                if p_q > 0:
+                    ks = [float(u_df.loc[i, "strike"]) for i in p_rows]
+                    k1, k2 = min(ks), max(ks)
+                    vertical_keep.append((exp, "P", k1, k2, p_q, p_rows))
+
+        # Compose rows for this underlying
+        # Helper: classify vertical orientation
+        def _classify_vertical(right_val: str, row_ids: List[int]) -> str:
+            if len(row_ids) != 2:
+                return "vertical"
+            i1, i2 = row_ids[0], row_ids[1]
+            s1, s2 = float(u_df.loc[i1, "strike"]), float(u_df.loc[i2, "strike"])
+            side1, side2 = str(u_df.loc[i1, "side"]), str(u_df.loc[i2, "side"])
+            long_k = s1 if side1 == "long" else s2
+            short_k = s1 if side1 == "short" else s2
+            if right_val == "C":
+                return "bull call" if long_k < short_k else "bear call"
+            else:  # P
+                return "bull put" if long_k < short_k else "bear put"
+
+        # Verticals (residual)
+        for exp, right, k1, k2, q, used_rows in vertical_keep:
+            vname = _classify_vertical(right, used_rows)
+            rows.append(
+                {
+                    "underlying": u_sym,
+                    "expiry": exp,
+                    "structure": vname,
+                    "type": "vertical",
+                    "legs": 2,
+                    "width": float(abs(k2 - k1)),
+                    "credit_debit": None,
+                    "parent_combo_id": None,
+                    "closed_date": None,
+                }
+            )
+            totals["vertical"] += 1
+
+        # Butterflies
+        for exp, right, k1, k2, k3, q, used_rows in butterfly_records:
+            rows.append(
+                {
+                    "underlying": u_sym,
+                    "expiry": exp,
+                    "structure": "butterfly",
+                    "type": "butterfly",
+                    "legs": 3,
+                    "width": float(min(k2 - k1, k3 - k2)),
+                    "credit_debit": None,
+                    "parent_combo_id": None,
+                    "closed_date": None,
+                }
+            )
+            totals["butterfly"] += 1
+
+        # Iron condors
+        for exp, width, q, used_rows in condor_records:
+            rows.append(
+                {
+                    "underlying": u_sym,
+                    "expiry": exp,
+                    "structure": "iron condor",
+                    "type": "iron condor",
+                    "legs": 4,
+                    "width": float(width),
+                    "credit_debit": None,
+                    "parent_combo_id": None,
+                    "closed_date": None,
+                }
+            )
+            totals["iron condor"] += 1
+
+        # ── 4) Calendars (across expiries, same strike+right, opposite sides) ──
+        used_for_calendar: set[int] = set()
+        for (strike, right), grp in u_df.groupby(["strike", "right"]):
+            # Build list of rows with remaining > 0
+            cand = [i for i in grp.index if remaining.get(i, 0) > 0]
+            if len(cand) < 2:
+                continue
+            # Sort by expiry
+            cand_sorted = sorted(cand, key=lambda i: (u_df.loc[i, "expiry"]))
+            # Try to pair earliest vs later with opposite sides
+            for i in range(len(cand_sorted) - 1):
+                a = cand_sorted[i]
+                if remaining.get(a, 0) <= 0:
+                    continue
+                for j in range(i + 1, len(cand_sorted)):
+                    b = cand_sorted[j]
+                    if remaining.get(b, 0) <= 0:
+                        continue
+                    if u_df.loc[a, "side"] == u_df.loc[b, "side"]:
+                        continue
+                    m = min(remaining[a], remaining[b])
+                    if m <= 0:
+                        continue
+                    exp_use = max(u_df.loc[a, "expiry"], u_df.loc[b, "expiry"])  # later expiry
+                    remaining[a] -= m
+                    remaining[b] -= m
+                    used_for_calendar.update([a, b])
+                    rows.append(
+                        {
+                            "underlying": u_sym,
+                            "expiry": exp_use,
+                            "structure": "calendar",
+                            "type": "calendar",
+                            "legs": 2,
+                            "width": 0.0,
+                            "credit_debit": None,
+                            "parent_combo_id": None,
+                            "closed_date": None,
+                        }
+                    )
+                    totals["calendar"] += 1
+
+        # Per-underlying log
+        log.info(
+            "Live combos [%s]: %s vertical, %s condor, %s butterfly, %s calendar",
+            u_sym,
+            totals["vertical"],
+            totals["iron condor"],
+            totals["butterfly"],
+            totals["calendar"],
+        )
+
+    # Grand total log
+    grand_total = sum(totals.values())
+    log.info(
+        "Live combos total: %s vertical, %s condor, %s butterfly, %s calendar; total=%s",
+        totals["vertical"],
+        totals["iron condor"],
+        totals["butterfly"],
+        totals["calendar"],
+        grand_total,
+    )
+
+    if not rows:
+        # Optional debug: emit per (underlying, expiry, right) sign/strike availability
+        import os
+        if os.getenv("PE_DEBUG_COMBOS") == "1":
+            try:
+                from portfolio_exporter.core import io as io_core, config as config_core
+                def _signs(s: pd.Series) -> tuple[bool, bool]:
+                    return (bool((s > 0).any()), bool((s < 0).any()))
+                # Group diagnostics
+                grp = (
+                    norm.groupby(["underlying", "expiry", "right"], dropna=False)
+                    .agg(
+                        rows=("qty", "size"),
+                        longs=("qty", lambda s: int((s > 0).sum())),
+                        shorts=("qty", lambda s: int((s < 0).sum())),
+                        strikes_unique=("strike", lambda s: int(pd.Series(s).nunique()))
+                    )
+                    .reset_index()
+                )
+                if grp.empty:
+                    grp = pd.DataFrame([
+                        {
+                            "underlying": "",
+                            "expiry": "",
+                            "right": "",
+                            "rows": 0,
+                            "longs": 0,
+                            "shorts": 0,
+                            "strikes_unique": 0,
+                        }
+                    ])
+                io_core.save(grp, "combos_diag_debug", "csv", config_core.settings.output_dir)
+            except Exception:
+                pass
+        return pd.DataFrame(
+            columns=[
+                "underlying",
+                "expiry",
+                "structure",
+                "type",
+                "legs",
+                "width",
+                "credit_debit",
+                "parent_combo_id",
+                "closed_date",
+            ]
+        )
+
+    return pd.DataFrame(rows)
 
 
 # ---------- helpers -------------------------------------------------------
