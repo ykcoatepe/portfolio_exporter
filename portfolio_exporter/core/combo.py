@@ -364,6 +364,35 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
 
     # Per-underlying processing
     totals = {"vertical": 0, "iron condor": 0, "butterfly": 0, "calendar": 0}
+    # Build equity positions lookup for covered-call detection
+    eq_lookup: Dict[str, Dict[str, object]] = {}
+    try:
+        eq_src = df_positions.copy()
+        if "underlying" not in eq_src.columns and "symbol" in eq_src.columns:
+            eq_src["underlying"] = eq_src["symbol"]
+        eq_src = eq_src[eq_src.get("secType").isin(["STK", "ETF"])]
+        if not eq_src.empty:
+            for u, g in eq_src.groupby("underlying"):
+                try:
+                    total_shares = float(pd.to_numeric(g["qty"], errors="coerce").fillna(0).sum())
+                except Exception:
+                    total_shares = 0.0
+                # pick a representative conId for the stock row (or synthesize)
+                conid = None
+                try:
+                    cval = g.get("conId")
+                    if cval is not None and not pd.isna(cval).all():
+                        conid = int(pd.to_numeric(cval, errors="coerce").dropna().iloc[0])
+                except Exception:
+                    conid = None
+                if conid is None:
+                    key = f"{u}|STK"
+                    v = int.from_bytes(hashlib.sha1(key.encode()).digest()[:4], "big")
+                    conid = -int(v)
+                eq_lookup[str(u)] = {"shares": total_shares, "conId": int(conid)}
+    except Exception:
+        eq_lookup = {}
+
     for u_sym, u_df in norm.groupby("underlying"):
         u_df = u_df.sort_values(["expiry", "right", "strike"]).copy()
         # Map row index -> conId for leg persistence
@@ -623,12 +652,19 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             except Exception:
                 tot_long = tot_short = q
             is_ratio = tot_long != tot_short
+            ratio_suffix = ""
+            try:
+                a, b = sorted([tot_long, tot_short])
+                if is_ratio and a > 0 and b > 0:
+                    ratio_suffix = f" {a}x{b}"
+            except Exception:
+                pass
             leg_ids = [row_conid.get(int(r)) for r in used_rows if int(r) in row_conid]
             rows.append(
                 {
                     "underlying": u_sym,
                     "expiry": exp,
-                    "structure": ("ratio call" if right == "C" else "ratio put") if is_ratio else vname,
+                    "structure": (vname + ratio_suffix) if is_ratio else vname,
                     "type": "ratio" if is_ratio else "vertical",
                     "legs": leg_ids,
                     "legs_n": len([x for x in leg_ids if x is not None]),
@@ -764,15 +800,141 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                         }
                     )
 
+        # ── 6) Straddles (same expiry & strike, call+put, same side) ──
+        for exp, grp in u_df.groupby("expiry"):
+            strikes = sorted(grp["strike"].unique())
+            for k in strikes:
+                gk = grp[grp["strike"] == k]
+                for side in ["long", "short"]:
+                    c_rows = [i for i in gk.index if u_df.loc[i, "right"] == "C" and u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0]
+                    p_rows = [i for i in gk.index if u_df.loc[i, "right"] == "P" and u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0]
+                    if not c_rows or not p_rows:
+                        continue
+                    c_lots = sum(remaining[i] for i in c_rows)
+                    p_lots = sum(remaining[i] for i in p_rows)
+                    m_target = min(c_lots, p_lots)
+                    if m_target <= 0:
+                        continue
+                    used_rows: List[int] = []
+                    # consume from first available rows
+                    for rid in c_rows:
+                        if m_target <= 0:
+                            break
+                        take = min(remaining.get(rid, 0), m_target)
+                        if take > 0:
+                            remaining[rid] -= take
+                            used_rows.append(rid)
+                            m_target -= take
+                    m2 = min(sum(remaining[i] for i in p_rows), min(c_lots, p_lots))
+                    for rid in p_rows:
+                        if m2 <= 0:
+                            break
+                        take = min(remaining.get(rid, 0), m2)
+                        if take > 0:
+                            remaining[rid] -= take
+                            used_rows.append(rid)
+                            m2 -= take
+                    if used_rows:
+                        leg_ids = [row_conid.get(int(r)) for r in used_rows if int(r) in row_conid]
+                        rows.append(
+                            {
+                                "underlying": u_sym,
+                                "expiry": exp,
+                                "structure": "straddle",
+                                "type": "straddle",
+                                "legs": leg_ids,
+                                "legs_n": len([x for x in leg_ids if x is not None]),
+                                "width": 0.0,
+                                "credit_debit": None,
+                                "parent_combo_id": None,
+                                "closed_date": None,
+                            }
+                        )
+
+        # ── 7) Strangles (same expiry, different strikes, call+put, same side) ──
+        for exp, grp in u_df.groupby("expiry"):
+            calls = grp[grp["right"] == "C"].sort_values("strike")
+            puts = grp[grp["right"] == "P"].sort_values("strike")
+            for side in ["long", "short"]:
+                ci, pi = 0, 0
+                c_idx = [i for i in calls.index if u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0]
+                p_idx = [i for i in puts.index if u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0]
+                while ci < len(c_idx) and pi < len(p_idx):
+                    ic, ip = c_idx[ci], p_idx[pi]
+                    kc, kp = float(u_df.loc[ic, "strike"]), float(u_df.loc[ip, "strike"])
+                    if kc == kp:  # straddle handled already
+                        # advance the one with less remaining
+                        if remaining.get(ic, 0) <= remaining.get(ip, 0):
+                            ci += 1
+                        else:
+                            pi += 1
+                        continue
+                    m = min(remaining.get(ic, 0), remaining.get(ip, 0))
+                    if m <= 0:
+                        if remaining.get(ic, 0) <= 0:
+                            ci += 1
+                        if remaining.get(ip, 0) <= 0:
+                            pi += 1
+                        continue
+                    remaining[ic] -= m
+                    remaining[ip] -= m
+                    leg_ids = [row_conid.get(int(ic)), row_conid.get(int(ip))]
+                    rows.append(
+                        {
+                            "underlying": u_sym,
+                            "expiry": exp,
+                            "structure": "strangle",
+                            "type": "strangle",
+                            "legs": leg_ids,
+                            "legs_n": len([x for x in leg_ids if x is not None]),
+                            "width": float(abs(kc - kp)),
+                            "credit_debit": None,
+                            "parent_combo_id": None,
+                            "closed_date": None,
+                        }
+                    )
+                    if remaining.get(ic, 0) <= 0:
+                        ci += 1
+                    if remaining.get(ip, 0) <= 0:
+                        pi += 1
+
+        # ── 8) Covered calls (short calls paired with long stock) ──
+        stock_info = eq_lookup.get(str(u_sym))
+        if stock_info and float(stock_info.get("shares", 0)) > 0:
+            shares_avail = float(stock_info.get("shares", 0))
+            stk_conid = int(stock_info.get("conId"))
+            shorts = [i for i in u_df.index if u_df.loc[i, "right"] == "C" and u_df.loc[i, "side"] == "short" and remaining.get(i, 0) > 0]
+            for rid in shorts:
+                lots_cover = int(min(remaining.get(rid, 0), shares_avail // 100))
+                if lots_cover <= 0:
+                    continue
+                remaining[rid] -= lots_cover
+                shares_avail -= lots_cover * 100
+                leg_ids = [row_conid.get(int(rid)), stk_conid]
+                rows.append(
+                    {
+                        "underlying": u_sym,
+                        "expiry": u_df.loc[rid, "expiry"],
+                        "structure": "covered call",
+                        "type": "covered",
+                        "legs": leg_ids,
+                        "legs_n": len([x for x in leg_ids if x is not None]),
+                        "width": 0.0,
+                        "credit_debit": None,
+                        "parent_combo_id": None,
+                        "closed_date": None,
+                    }
+                )
+
         # Per-underlying log
         log.info(
             "Live combos [%s]: %s vertical, %s condor, %s butterfly, %s calendar",
             u_sym,
             totals["vertical"],
             totals["iron condor"],
-            totals["butterfly"],
-            totals["calendar"],
-        )
+                totals["butterfly"],
+                totals["calendar"],
+            )
 
     # Grand total log
     grand_total = sum(totals.values())
@@ -845,9 +1007,32 @@ def _row(
     credit_debit: float | None = None,
 ) -> Dict:
     combo_id = _hash_combo(list(legs_df.index))
+    # Derive a user-facing structure label without changing existing structure values
+    structure_label = structure
+    try:
+        if type_ == "vertical" and len(legs_df) == 2 and {
+            "right",
+            "strike",
+            "qty",
+        } <= set(legs_df.columns):
+            right = str(legs_df["right"].iloc[0])
+            # Identify long vs short strikes
+            s0, s1 = float(legs_df["strike"].iloc[0]), float(legs_df["strike"].iloc[1])
+            q0, q1 = float(legs_df["qty"].iloc[0]), float(legs_df["qty"].iloc[1])
+            # Long strike is attached to the positive-qty leg
+            long_k = s0 if q0 > 0 else s1
+            short_k = s0 if q0 < 0 else s1
+            if right == "C":
+                structure_label = "bull call" if long_k < short_k else "bear call"
+            elif right == "P":
+                structure_label = "bull put" if long_k < short_k else "bear put"
+    except Exception:
+        pass
+
     return dict(
         combo_id=combo_id,
         structure=structure,
+        structure_label=structure_label,
         underlying=legs_df["underlying"].iloc[0],
         expiry=legs_df["expiry"].iloc[0],
         qty=legs_df["qty"].sum(),
@@ -991,7 +1176,7 @@ def _sync_with_db(combo_df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
         for conid in row.legs:
             leg = pos_df.loc[conid]
             conn.execute(
-                "INSERT OR IGNORE INTO legs VALUES (?,?,?,?)",
+                "INSERT OR IGNORE INTO legs (combo_id, conid, strike, right) VALUES (?,?,?,?)",
                 (cid, int(conid), leg.strike, leg.right),
             )
 

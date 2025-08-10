@@ -1257,8 +1257,10 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
                 "underlying",
                 "expiry",
                 "structure",
+                "structure_label",
                 "type",
                 "legs",
+                "legs_n",
                 "width",
                 "credit_debit",
                 "parent_combo_id",
@@ -1267,6 +1269,11 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
         )
 
     out = df.copy()
+
+    # carry optional user-facing label if provided
+    if "structure_label" not in out.columns:
+        out["structure_label"] = ""
+    out["structure_label"] = out["structure_label"].fillna("").astype(str)
 
     for col in ["structure", "type"]:
         if col not in out.columns:
@@ -1357,6 +1364,7 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
             "underlying",
             "expiry",
             "structure",
+            "structure_label",
             "type",
             "legs",
             "legs_n",
