@@ -29,6 +29,9 @@ The `portfolio_greeks` workflow generates an additional combos CSV alongside the
 - CLI flag: `--debug-combos` is equivalent to setting `PE_DEBUG_COMBOS=1` and forces the same debug artifacts to be written.
 - Edge case: if neither positions nor DB legs contain strike/right data, strike columns remain empty for that combo.
 
+Trades pipeline
+- `trades_report.py` now also emits `trades_combos.csv` with the same fields and enrichment behavior as portfolio combos. Use `--debug-combos` (or `PE_DEBUG_COMBOS=1`) to force debug artifacts (`combos_enriched_debug.csv`). Existing outputs remain unchanged.
+
 ### Golden Sample Test
 
 Run the golden test to validate strike enrichment end-to-end with a deterministic offline sample:
