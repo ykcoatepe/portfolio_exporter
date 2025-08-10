@@ -995,7 +995,30 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             ]
         )
 
-    return pd.DataFrame(rows)
+    if not rows:
+        return pd.DataFrame(
+            columns=[
+                "underlying",
+                "expiry",
+                "structure",
+                "structure_label",
+                "type",
+                "legs",
+                "legs_n",
+                "width",
+                "credit_debit",
+                "parent_combo_id",
+                "closed_date",
+            ]
+        )
+    # Ensure required columns exist and are typed consistently
+    out = pd.DataFrame(rows)
+    if "structure_label" not in out.columns:
+        out["structure_label"] = out.get("structure", "")
+    # Coerce lists for legs and count into legs_n if missing
+    if "legs_n" not in out.columns:
+        out["legs_n"] = out.get("legs").apply(lambda v: len(v) if isinstance(v, (list, tuple)) else 0)
+    return out
 
 
 # ---------- helpers -------------------------------------------------------

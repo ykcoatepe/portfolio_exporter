@@ -1068,8 +1068,9 @@ def _load_db_legs_map() -> dict[str, list[dict[str, object]]]:
                 return {}
 
             cols = [c[1] for c in con.execute(f"PRAGMA table_info({table});")]
-            # Build SELECT with available columns
-            sel_cols = [c for c in ["combo_id", "conid", "right", "strike", "secType"] if c in cols]
+            # Build SELECT with available columns (support 'conId' alias)
+            base_candidates = ["combo_id", "conid", "conId", "right", "strike", "secType", "sec_type"]
+            sel_cols = [c for c in base_candidates if c in cols]
             if "combo_id" not in sel_cols:
                 return {}
             q = f"SELECT {', '.join(sel_cols)} FROM {table}"
@@ -1078,6 +1079,10 @@ def _load_db_legs_map() -> dict[str, list[dict[str, object]]]:
                 return {}
 
             # Normalise columns
+            if "conId" in df.columns and "conid" not in df.columns:
+                df = df.rename(columns={"conId": "conid"})
+            if "sec_type" in df.columns and "secType" not in df.columns:
+                df = df.rename(columns={"sec_type": "secType"})
             for c in ["conid", "strike"]:
                 if c in df.columns:
                     df[c] = pd.to_numeric(df[c], errors="coerce")
@@ -1133,7 +1138,15 @@ def _load_db_combos_or_none():
             ]
             if not want:
                 return None
-            df = pd.read_sql_query(f"SELECT {', '.join(want)} FROM combos", con)
+            # Optionally pull embedded legs columns if they exist on combos
+            extra = []
+            for c in ("legs", "combo_legs"):
+                if c in cols:
+                    extra.append(c)
+            sel_cols = want + extra
+            df = pd.read_sql_query(f"SELECT {', '.join(sel_cols)} FROM combos", con)
+            if "combo_legs" in df.columns and "legs" not in df.columns:
+                df["legs"] = df["combo_legs"]
             # Attach legs and detailed legs from DB if present
             legs_map = _load_db_legs_map()
             if legs_map:
@@ -1142,33 +1155,24 @@ def _load_db_combos_or_none():
                 legs_detail_col: list[object] = []
                 for _, r in df.iterrows():
                     cid = str(r.get("combo_id"))
+                    pid = str(r.get("parent_combo_id")) if "parent_combo_id" in r and pd.notna(r.get("parent_combo_id")) else None
                     items = legs_map.get(cid, [])
+                    if not items and pid:
+                        items = legs_map.get(pid, [])
                     legs_detail_col.append(items)
-                    # Build 'legs' as list of conids where present; if missing, keep placeholder dict
-                    mix: list[object] = []
+                    # Build 'legs' as list of conids where present; if missing, append None
+                    mix: list[int | None] = []
                     for it in items:
                         conid = it.get("conid")
                         if isinstance(conid, (int,)):
                             mix.append(int(conid))
                         else:
-                            mix.append(
-                                {
-                                    k: it.get(k)
-                                    for k in ["right", "strike", "secType"]
-                                    if k in it
-                                }
-                            )
+                            mix.append(None)
                     legs_col.append(mix)
                 df["legs"] = legs_col
                 df["__db_legs_detail"] = legs_detail_col
         if df.empty:
             return None
-        # Drop combo_id for presentation; enrichment will use legs
-        if "combo_id" in df.columns:
-            try:
-                df = df.drop(columns=["combo_id"])
-            except Exception:
-                pass
         return df
     except Exception:
         return None
@@ -1457,6 +1461,12 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
     else:
         out["legs_n"] = pd.Series([pd.NA] * len(out), dtype="Int64")
 
+    # Preserve helper/internal columns if present
+    extra_cols: list[str] = []
+    for c in ("combo_id", "__db_legs_detail"):
+        if c in out.columns:
+            extra_cols.append(c)
+
     return out[
         [
             "underlying",
@@ -1471,6 +1481,7 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
             "parent_combo_id",
             "closed_date",
         ]
+        + extra_cols
     ]
 
 
@@ -1527,6 +1538,8 @@ def _enrich_combo_strikes(
     df["call_count"] = 0
     df["put_count"] = 0
     df["has_stock_leg"] = False
+    # Helper column to indicate enrichment source for debug CSV
+    df["__strike_source"] = ""
 
     # Track DB fallback rows for logging
     db_fallback_rows = 0
@@ -1589,25 +1602,44 @@ def _enrich_combo_strikes(
     for _, row in df.iterrows():
         v = row.get("legs")
         leg_ids: list[int] = []
+        leg_dicts: list[dict] = []
+        def _collect_from_seq(seq):
+            nonlocal leg_ids, leg_dicts
+            for x in seq:
+                if isinstance(x, (int,)) or (isinstance(x, str) and str(x).lstrip("-").isdigit()):
+                    try:
+                        leg_ids.append(int(x))
+                    except Exception:
+                        pass
+                elif isinstance(x, dict):
+                    leg_dicts.append(x)
+                elif isinstance(x, (list, tuple)):
+                    # Support [right, strike, qty] or similar shapes
+                    try:
+                        right = str(x[0]).upper() if len(x) > 0 else ""
+                    except Exception:
+                        right = ""
+                    try:
+                        strike = float(x[1]) if len(x) > 1 and x[1] is not None else None
+                    except Exception:
+                        strike = None
+                    entry = {"right": right if right in ("C", "P") else "", "strike": strike, "secType": None}
+                    leg_dicts.append(entry)
+                else:
+                    # Unknown element type; ignore
+                    pass
+
         if isinstance(v, (list, tuple)):
-            leg_ids = [
-                int(x)
-                for x in v
-                if isinstance(x, (int,)) or (isinstance(x, str) and str(x).lstrip("-").isdigit())
-            ]
+            _collect_from_seq(v)
         elif isinstance(v, str):
             s = v.strip()
             if s.startswith("[") and s.endswith("]"):
                 try:
                     parsed = ast.literal_eval(s)
                     if isinstance(parsed, (list, tuple)):
-                        for x in parsed:
-                            try:
-                                leg_ids.append(int(x))
-                            except Exception:
-                                pass
+                        _collect_from_seq(parsed)
                 except Exception:
-                    leg_ids = []
+                    leg_ids = leg_ids  # keep whatever was collected
 
         call_k: set[float] = set()
         put_k: set[float] = set()
@@ -1616,6 +1648,7 @@ def _enrich_combo_strikes(
         stock_flag = False
         used_db = False
 
+        source_tag = ""
         for cid in leg_ids:
             if cid in pos_lookup.index:
                 rec = pos_lookup.loc[cid]
@@ -1644,9 +1677,27 @@ def _enrich_combo_strikes(
                     pass
                 if sec_type == "STK" or right == "":
                     stock_flag = True
+                source_tag = source_tag or "pos"
             else:
-                # Unknown conId: cannot resolve via positions
+                # Unknown conId: cannot resolve via positions; try to match from leg_dicts later
                 used_db = used_db or False
+
+        # Use dict-style legs from 'legs' column when present (works for live/engine sources that carry details)
+        if leg_dicts:
+            for ent in leg_dicts:
+                if not isinstance(ent, dict):
+                    continue
+                right, strike, sec_type = _norm_db_leg(ent)
+                if sec_type == "STK" or right == "":
+                    stock_flag = True
+                if right == "C":
+                    call_n += 1
+                    if strike is not None:
+                        call_k.add(float(strike))
+                elif right == "P":
+                    put_n += 1
+                    if strike is not None:
+                        put_k.add(float(strike))
 
         # DB fallback: include legs from __db_legs_detail that positions lookup couldn't resolve
         db_detail = row.get("__db_legs_detail")
@@ -1674,6 +1725,8 @@ def _enrich_combo_strikes(
                     if strike is not None:
                         put_k.add(float(strike))
                     used_db = True
+            if used_db and source_tag != "pos":
+                source_tag = "db"
 
         # Compose output fields
         all_k = sorted(call_k.union(put_k))
@@ -1688,6 +1741,7 @@ def _enrich_combo_strikes(
         results["put_count"].append(int(put_n))
         results["has_stock_leg"].append(bool(stock_flag))
         db_fallback_rows += 1 if used_db else 0
+        results.setdefault("__strike_source", []).append(source_tag)
 
     for k, v in results.items():
         df[k] = v
@@ -1707,16 +1761,6 @@ def _enrich_combo_strikes(
     try:
         if os.getenv("PE_DEBUG_COMBOS") == "1":
             dbg_df = df.copy()
-            # Best-effort source tag: mark 'db' if row has __db_legs_detail and any counts
-            src_flags: list[str] = []
-            for _, r in dbg_df.iterrows():
-                tag = "pos"
-                if isinstance(r.get("__db_legs_detail"), (list, tuple)) and r.get("__db_legs_detail") and (
-                    int(r.get("call_count") or 0) + int(r.get("put_count") or 0)
-                ):
-                    tag = "db"
-                src_flags.append(tag)
-            dbg_df["__strike_source"] = src_flags
             io_core.save(dbg_df, "combos_enriched_debug", "csv", config_core.settings.output_dir)
             # Do not propagate debug-only column to main df
             try:
@@ -2103,11 +2147,127 @@ def run(
         combos_df, resolved_source = _choose_combos_df(
             combos_source, pos_df, combo_types
         )
-        # Enrich with per-leg strike details if possible (before saving/printing)
+        # Enrich with per-leg strike details (before saving/printing)
         try:
             combos_df = _enrich_combo_strikes(combos_df, positions_df=pos_df)
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Combos enrichment failed: %s", exc)
+
+        # Self-heal missing legs when sourcing from DB
+        try:
+            if resolved_source == "db":
+                # Identify rows with empty/none legs
+                def _legs_empty(v: object) -> bool:
+                    if isinstance(v, (list, tuple)):
+                        return len([x for x in v if x is not None]) == 0
+                    import ast
+                    if isinstance(v, str) and v.strip().startswith("["):
+                        try:
+                            parsed = ast.literal_eval(v)
+                            return not isinstance(parsed, (list, tuple)) or len([x for x in parsed if x is not None]) == 0
+                        except Exception:
+                            return True
+                    return True
+
+                mask_empty = combos_df.get("legs").apply(_legs_empty) if "legs" in combos_df.columns else pd.Series([False] * len(combos_df))
+                if bool(mask_empty.any()):
+                    # Detect live combos once
+                    try:
+                        live_df = combo_core.detect_from_positions(pos_df)
+                    except Exception:
+                        live_df = pd.DataFrame(columns=["underlying","expiry","type","structure_label","legs","width"]) 
+
+                    # Build helper keys for matching
+                    def _norm_exp(s: str) -> str:
+                        try:
+                            return pd.to_datetime(str(s)).date().isoformat()
+                        except Exception:
+                            return str(s)
+
+                    def _key(df_row: pd.Series) -> tuple:
+                        return (
+                            str(df_row.get("underlying", "")),
+                            _norm_exp(df_row.get("expiry", "")),
+                            str(df_row.get("type", "")) or str(df_row.get("structure", "")) or str(df_row.get("structure_label", "")),
+                        )
+
+                    # Precompute live map by key -> list of rows
+                    live_groups: dict[tuple, list[pd.Series]] = {}
+                    for _, r in live_df.iterrows():
+                        live_groups.setdefault(_key(r), []).append(r)
+
+                    healed = 0
+                    new_legs: list[object] = []
+                    healed_flags: list[bool] = []
+                    for i, r in combos_df.iterrows():
+                        if not mask_empty.loc[i]:
+                            new_legs.append(r.get("legs"))
+                            healed_flags.append(False)
+                            continue
+                        cand = live_groups.get(_key(r), [])
+                        match_row: Optional[pd.Series] = None
+                        if len(cand) == 1:
+                            match_row = cand[0]
+                        elif len(cand) > 1:
+                            # choose by width proximity then max legs overlap on strike/right if possible
+                            def _width(x):
+                                try:
+                                    return float(x.get("width")) if pd.notna(x.get("width")) else 0.0
+                                except Exception:
+                                    return 0.0
+                            target_w = _width(r)
+                            cand_sorted = sorted(cand, key=lambda x: abs(_width(x) - target_w))
+                            match_row = cand_sorted[0]
+                        if match_row is not None and isinstance(match_row.get("legs"), (list, tuple)) and len(match_row.get("legs")) > 0:
+                            new_legs.append(list(match_row.get("legs")))
+                            healed_flags.append(True)
+                            healed += 1
+                        else:
+                            new_legs.append(r.get("legs"))
+                            healed_flags.append(False)
+
+                    if healed > 0:
+                        combos_df = combos_df.copy()
+                        combos_df["legs"] = new_legs
+                        combos_df["__healed_legs"] = healed_flags
+                        # Re-enrich strikes with new legs
+                        try:
+                            combos_df = _enrich_combo_strikes(combos_df, positions_df=pos_df)
+                        except Exception:
+                            pass
+                        # Optionally persist healed legs into DB
+                        if persist_combos:
+                            try:
+                                _persist_combos(combos_df, positions_df=pos_df)
+                                persisted = True
+                            except Exception:
+                                persisted = False
+                        else:
+                            persisted = False
+                        logger.info("Combos self-heal: healed_rows=%d (persisted=%s)", healed, "yes" if persisted else "no")
+        except Exception as exc:
+            logger.warning("Combos self-heal failed: %s", exc)
+
+        # Ensure 'legs' is a parsed list and recompute legs_n before saving/persisting
+        try:
+            import json as _json
+            def _parse_legs(v):
+                if isinstance(v, list):
+                    return v
+                if isinstance(v, str):
+                    s = v.strip()
+                    if s.startswith("[") and s.endswith("]"):
+                        try:
+                            return _json.loads(s)
+                        except Exception:
+                            return []
+                return []
+            if "legs" in combos_df.columns:
+                combos_df["legs"] = combos_df["legs"].apply(_parse_legs)
+                combos_df["legs_n"] = combos_df["legs"].apply(lambda x: len(x) if isinstance(x, list) else 0).astype("Int64")
+        except Exception:
+            pass
+
         # Optional debug dump of enriched combos
         if os.getenv("PE_DEBUG_COMBOS"):
             try:
@@ -2141,7 +2301,7 @@ def run(
         io_core.save(totals, "portfolio_greeks_totals", fmt, outdir)
         if combos:
             # Drop auxiliary columns from CSV output
-            save_df = combos_df.drop(columns=["__db_legs_detail", "__strike_source"], errors="ignore")
+            save_df = combos_df.drop(columns=["__db_legs_detail", "__strike_source", "__healed_legs"], errors="ignore")
             io_core.save(save_df, "portfolio_greeks_combos", fmt, outdir)
             logger.info("Combos saved: %d", len(combos_df))
 
