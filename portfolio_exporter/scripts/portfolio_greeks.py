@@ -1041,12 +1041,23 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
 
 def _load_db_legs_map() -> dict[str, list[dict[str, object]]]:
     """
-    Load combo legs from SQLite and return a mapping:
-      { combo_id: [ {"conid": int|None, "right": 'C'/'P'/'' , "strike": float|None, "secType": str|None}, ... ] }
+    Build a mapping of combo legs from the SQLite DB.
 
-    Supports either table name: 'combo_legs' or 'legs'. If a table lacks
-    right/strike/secType, entries are still returned with available fields.
-    Gracefully returns an empty dict when DB or tables are missing.
+    Purpose
+    - Return a dictionary keyed by `combo_id` with a list of per‑leg detail dicts:
+      { combo_id: [{"conid": int|None, "right": 'C'/'P'/'' , "strike": float|None, "secType": str|None}, ...] }.
+
+    Data sources
+    - Reads from either `combo_legs` or `legs` table if present.
+
+    Supported columns
+    - Accepts any available subset of: `combo_id`, `conid`/`conId`, `right`, `strike`, `secType`/`sec_type`.
+
+    Normalization
+    - Coerces `conid` to int when possible; `strike` to float; `right` to 'C'/'P' or empty string for non‑options; keeps `secType` as provided.
+
+    Behavior
+    - Returns an empty mapping if the DB file or legs table does not exist; tolerates missing fields by including what is available without failing.
     """
     try:
         db_path = os.environ.get("PE_DB_PATH") or (Path(settings.output_dir) / "combos.db")
@@ -1110,6 +1121,20 @@ def _load_db_legs_map() -> dict[str, list[dict[str, object]]]:
 
 
 def _load_db_combos_or_none():
+    """
+    Load combos from the `combos` table in the SQLite DB.
+
+    Purpose
+    - Retrieve stored combos and attach legs information for downstream enrichment.
+
+    Behavior
+    - Pulls base columns from `combos` and, when present, also reads embedded JSON legs from `legs` or `combo_legs` columns on the same table.
+    - Calls `_load_db_legs_map()` to attach two helper columns when available:
+      • `legs`: a list of conIds (missing items preserved as `None`).
+      • `__db_legs_detail`: list of dicts with leg details (right/strike/secType).
+    - If a combo has no direct legs but `parent_combo_id` exists and parent legs are available, uses the parent’s legs as a fallback.
+    - Keeps `combo_id` for downstream processing. Helper columns are subsequently dropped before writing the final CSV to disk.
+    """
     import os, sqlite3
     import pandas as pd
     from pathlib import Path
@@ -1489,17 +1514,30 @@ def _enrich_combo_strikes(
     combos_df: pd.DataFrame, positions_df: pd.DataFrame | None
 ) -> pd.DataFrame:
     """
-    Enrich combos with per-leg strikes and counts using a positions lookup.
+    Populate strike details and leg counts for all combos.
 
-    Adds/overwrites the following columns (preserving others):
-      - strikes: all option-leg strikes sorted ascending, joined with '/'
-      - call_strikes: unique CALL strikes sorted ascending, joined with '/'
-      - put_strikes: unique PUT strikes sorted ascending, joined with '/'
-      - call_count: count of CALL legs
-      - put_count: count of PUT legs
-      - has_stock_leg: True if any leg is a stock (secType == 'STK' or right is empty)
+    Purpose
+    - Ensure the following columns are present and populated when possible for every combo row:
+      • `strikes` (all strikes), `call_strikes`, `put_strikes`
+      • `call_count`, `put_count`, `has_stock_leg`
 
-    If positions_df is None or a conId cannot be resolved, leaves values empty/zero.
+    Enrichment order
+    1) Prefer `positions_df` mapping by conId → (right/strike/secType) when provided.
+    2) Fallback to DB legs via `__db_legs_detail` for legs that positions cannot resolve.
+
+    Leg sources supported
+    - Separate `legs`/`combo_legs` table rows (via `_load_db_legs_map`).
+    - Embedded JSON legs (or `combo_legs`) column on the `combos` table.
+    - Parent combo legs when a child `combo_id` lacks its own legs.
+
+    Debug mode
+    - When `PE_DEBUG_COMBOS=1`, writes `combos_enriched_debug.csv` including a `__strike_source` hint per row ('pos' or 'db').
+
+    Data normalization
+    - Prior to saving the final CSV, the `legs` column is normalized to a JSON list and `legs_n` matches its length.
+
+    Edge cases
+    - If neither positions nor DB legs contain strike/right information, the strike columns remain empty and counts may be zero for that combo.
     """
     if combos_df is None or combos_df.empty:
         # Nothing to do – still ensure the columns exist for downstream code
@@ -2372,11 +2410,38 @@ if __name__ == "__main__":  # pragma: no cover - CLI entry
         help="Path to a positions CSV to use instead of pulling live positions from IBKR.",
     )
     parser.add_argument(
+        "--debug-combos",
+        action="store_true",
+        help="Force writing combos debug artifacts (same as PE_DEBUG_COMBOS=1).",
+    )
+    parser.add_argument(
         "--no-pretty",
         action="store_true",
         help="Disable Rich pretty output; only write files.",
     )
     args = parser.parse_args()
+    # Lightweight offline-only validator for --positions-csv
+    if getattr(args, "positions_csv", None):
+        import pandas as _pd
+        _path = os.path.expanduser(args.positions_csv)
+        ok = True
+        if not os.path.exists(_path):
+            ok = False
+        else:
+            try:
+                _df = _pd.read_csv(_path)
+                if _df is None or _df.empty:
+                    ok = False
+            except Exception:
+                ok = False
+        if not ok:
+            print(
+                "WARNING: --positions-csv looks empty or malformed; continuing without guarantees for combos.",
+                file=sys.stderr,
+            )
+    # Map --debug-combos to env var expected by internals
+    if getattr(args, "debug_combos", False):
+        os.environ["PE_DEBUG_COMBOS"] = "1"
     run(
         fmt=args.fmt,
         combos=not args.no_combos,
