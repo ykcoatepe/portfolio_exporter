@@ -1,12 +1,18 @@
 import builtins
 import datetime as dt
 from pathlib import Path
-
+import importlib.util
+import pathlib
+import types
 import pandas as pd
 
-from portfolio_exporter.scripts import roll_manager
+spec = importlib.util.spec_from_file_location(
+    "roll_manager",
+    pathlib.Path(__file__).resolve().parents[1] / "portfolio_exporter/scripts/roll_manager.py",
+)
+roll_manager = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(roll_manager)
 from portfolio_exporter.core.config import settings
-from portfolio_exporter.scripts import portfolio_greeks
 
 
 def _setup(monkeypatch, tmp_path: Path):
@@ -27,7 +33,8 @@ def _setup(monkeypatch, tmp_path: Path):
         },
         index=[1, 2],
     )
-    monkeypatch.setattr(portfolio_greeks, "_load_positions", lambda: pos_df)
+    fake_pg = types.SimpleNamespace(_load_positions=lambda: pos_df)
+    monkeypatch.setattr(roll_manager, "portfolio_greeks", fake_pg)
 
     combo_df = pd.DataFrame(
         {
@@ -49,9 +56,7 @@ def _setup(monkeypatch, tmp_path: Path):
             {"strike": 105.0, "right": "C", "mid": 0.5, "delta": 0.15, "theta": -0.01},
         ]
     )
-    monkeypatch.setattr(
-        roll_manager, "fetch_chain", lambda sym, exp, strikes=None: chain_df
-    )
+    monkeypatch.setattr(roll_manager, "fetch_chain", lambda sym, exp, strikes=None: chain_df)
 
     monkeypatch.setattr(settings, "output_dir", str(tmp_path))
 
