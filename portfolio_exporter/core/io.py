@@ -6,9 +6,26 @@ from .config import settings
 
 
 def save(
-    obj: pd.DataFrame | dict | list, name: str, fmt: str = "csv", outdir: str | Path | None = None
-):
-    # Default to configured output directory when not explicitly provided
+    obj: pd.DataFrame | dict | list | str,
+    name: str,
+    fmt: str = "csv",
+    outdir: str | Path | None = None,
+) -> Path:
+    """Persist *obj* to *outdir* in the given *fmt*.
+
+    Parameters
+    ----------
+    obj:
+        DataFrame, JSON-serializable object, HTML string, or a list of
+        ReportLab flowables for PDFs.
+    name:
+        Base filename without extension.
+    fmt:
+        One of ``csv``, ``excel``, ``html``, ``pdf``, or ``json``.
+    outdir:
+        Destination directory; defaults to :data:`settings.output_dir`.
+    """
+
     outdir = Path(outdir or settings.output_dir).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
     ext_map = {"csv": "csv", "excel": "xlsx", "pdf": "pdf", "json": "json", "html": "html"}
@@ -20,15 +37,27 @@ def save(
         assert isinstance(obj, pd.DataFrame)
         obj.to_excel(fname, index=False)
     elif fmt == "html":
-        assert isinstance(obj, pd.DataFrame)
-        obj.to_html(fname, index=False)
+        if isinstance(obj, str):
+            fname.write_text(obj)
+        else:
+            assert isinstance(obj, pd.DataFrame)
+            obj.to_html(fname, index=False)
     elif fmt == "pdf":
-        import reportlab  # noqa: F401 – ensure dep
+        from reportlab.platypus import SimpleDocTemplate, Paragraph
+        from reportlab.lib.styles import getSampleStyleSheet
 
-        assert isinstance(obj, pd.DataFrame)
-        obj.to_html(fname.with_suffix(".html"), index=False)
-        # simple placeholder: touch pdf so path exists
-        fname.touch()
+        if isinstance(obj, list):
+            doc = SimpleDocTemplate(str(fname))
+            doc.build(obj)
+        elif isinstance(obj, str):
+            doc = SimpleDocTemplate(str(fname))
+            styles = getSampleStyleSheet()
+            doc.build([Paragraph(obj, styles["Normal"])])
+        else:
+            assert isinstance(obj, pd.DataFrame)
+            obj.to_html(fname.with_suffix(".html"), index=False)
+            # simple placeholder: touch pdf so path exists
+            fname.touch()
     elif fmt == "json":
         with fname.open("w") as fh:
             json.dump(obj, fh, indent=2)

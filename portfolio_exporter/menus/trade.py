@@ -6,7 +6,9 @@ from portfolio_exporter.scripts import (
     roll_manager,
     option_chain_snapshot,
     net_liq_history_export,
+    daily_report,
 )
+import os
 
 # Menu for trade-related utilities
 
@@ -21,6 +23,7 @@ def launch(status, default_fmt):
             ("l", "Roll positions"),
             ("q", "Quick option chain"),
             ("v", "View Net-Liq chart"),
+            ("d", "Daily report (HTML/PDF)"),
             ("r", "Return"),
         ]:
             tbl.add_row(k, lbl)
@@ -34,6 +37,7 @@ def launch(status, default_fmt):
             "l": lambda: roll_manager.run(),
             "q": lambda: option_chain_snapshot.run(fmt=default_fmt),
             "v": lambda: net_liq_history_export.run(fmt=default_fmt, plot=True),
+            "d": lambda: daily_report.main(["--no-pretty"] if os.getenv("PE_QUIET") else []),
         }.get(ch)
         if dispatch:
             if status:
