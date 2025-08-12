@@ -112,14 +112,30 @@ def _load_data(source: str, fixture_csv: Path | None) -> pd.DataFrame:
     if source in {"clientportal", "cp"}:
         return _pa_rest_download()
     if source == "auto":
+        # Prefer local TWS export when present
         df = _read_tws_file()
         if df is not None:
             return df
+        # Then try Client Portal if token is available
         if CP_TOKEN:
             return _pa_rest_download()
+        # If a fixture was explicitly provided, use it
         if fixture_csv:
             return _read_fixture_csv(fixture_csv)
-        sys.exit("❌  No data source available.")
+        # As a developer-friendly fallback, try the repo fixture if present
+        try:
+            repo_root = Path(__file__).resolve().parents[2]
+            candidate = repo_root / "tests/data/net_liq_fixture.csv"
+            if candidate.exists():
+                return _read_fixture_csv(candidate)
+        except Exception:
+            # Best-effort only; continue to error message below
+            pass
+        # No viable source found – provide actionable guidance
+        sys.exit(
+            "❌  No data source available. Set CP_REFRESH_TOKEN, place TWS 'dailyNetLiq.csv' "
+            f"at {TWS_NET_LIQ_CSV}, or run with --source fixture --fixture-csv <path>."
+        )
     sys.exit("❌  Unknown source.")
 
 
