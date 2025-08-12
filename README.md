@@ -160,6 +160,29 @@ Tips
 - `--output-dir`: Override the destination directory for artifacts.
 - Env override: set `OUTPUT_DIR=./.outputs` in a `.env` file to change the default output path (picked up by settings).
 
+### Net-Liq chart (CLI)
+
+JSON only:
+
+```bash
+PYTHONPATH=. python -m portfolio_exporter.scripts.net_liq_history_export \
+  --source fixture --fixture-csv tests/data/net_liq_fixture.csv --json --quiet
+```
+
+Multi-format to custom dir:
+
+```bash
+OUT=.tmp_nlh PYTHONPATH=. python -m portfolio_exporter.scripts.net_liq_history_export \
+  --source fixture --fixture-csv tests/data/net_liq_fixture.csv \
+  --csv --pdf --output-dir "$OUT" --quiet
+```
+
+Date filtering:
+
+```bash
+python -m portfolio_exporter.scripts.net_liq_history_export --start 2025-01-01 --end 2025-03-31 --json
+```
+
 ### Build Order (CLI)
 
 The non-interactive order builder creates normalized ticket JSONs for common strategies.

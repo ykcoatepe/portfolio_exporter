@@ -100,18 +100,26 @@ def _filter_range(df: pd.DataFrame, start: str | None, end: str | None) -> pd.Da
 
 
 def _load_data(source: str, fixture_csv: Path | None) -> pd.DataFrame:
-    if fixture_csv:
+    if source == "fixture":
+        if not fixture_csv:
+            sys.exit("❌  --fixture-csv is required when source=fixture.")
         return _read_fixture_csv(fixture_csv)
     if source == "tws":
         df = _read_tws_file()
         if df is None:
             sys.exit("❌  dailyNetLiq.csv not found.")
         return df
-    if source == "cp":
+    if source in {"clientportal", "cp"}:
         return _pa_rest_download()
     if source == "auto":
         df = _read_tws_file()
-        return df if df is not None else _pa_rest_download()
+        if df is not None:
+            return df
+        if CP_TOKEN:
+            return _pa_rest_download()
+        if fixture_csv:
+            return _read_fixture_csv(fixture_csv)
+        sys.exit("❌  No data source available.")
     sys.exit("❌  Unknown source.")
 
 
@@ -126,32 +134,30 @@ def _run_core(ns: argparse.Namespace) -> tuple[pd.DataFrame, dict]:
         sys.exit("❌  No data in the selected date range.")
     df = df.rename(columns={"net_liq": "NetLiq"})
 
-    formats: list[str]
-    if ns.csv or ns.excel or ns.pdf:
-        formats = []
-        if ns.csv:
-            formats.append("csv")
-        if ns.excel:
-            formats.append("excel")
-        if ns.pdf:
-            formats.append("pdf")
-    else:
+    formats: list[str] = []
+    if ns.csv:
+        formats.append("csv")
+    if ns.excel:
+        formats.append("excel")
+    if ns.pdf:
+        formats.append("pdf")
+    if not formats and not ns.json:
         formats = ["csv"]
 
     outputs = {"csv": "", "excel": "", "pdf": ""}
-    write_files = (not ns.json) or ns.write
-    if write_files:
-        # Allow env override to keep tests and sandboxed runs isolated
+    if formats:
         outdir_env = os.getenv("PE_OUTPUT_DIR")
         outdir = Path(ns.output_dir or outdir_env or settings.output_dir).expanduser()
         df_save = df.rename_axis("date").reset_index()
         for fmt in formats:
-            outputs[fmt] = str(core_io.save(df_save, "net_liq_history_export", fmt, outdir))
+            outputs[fmt] = str(
+                core_io.save(df_save, "net_liq_history_export", fmt, outdir)
+            )
 
     summary = {
         "rows": len(df),
-        "date_min": df.index.min().isoformat(),
-        "date_max": df.index.max().isoformat(),
+        "start": df.index.min().isoformat(),
+        "end": df.index.max().isoformat(),
         "outputs": outputs,
     }
     return df, summary
@@ -174,7 +180,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Export Net-Liq history")
     parser.add_argument("--start")
     parser.add_argument("--end")
-    parser.add_argument("--source", choices=["tws", "cp", "auto"], default="auto")
+    parser.add_argument(
+        "--source",
+        choices=["auto", "tws", "clientportal", "fixture"],
+        default="auto",
+    )
+    parser.add_argument("--fixture-csv", type=Path)
     parser.add_argument("--csv", action="store_true")
     parser.add_argument("--excel", action="store_true")
     parser.add_argument("--pdf", action="store_true")
@@ -182,8 +193,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--no-pretty", action="store_true")
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--write", action="store_true")
-    parser.add_argument("--fixture-csv", type=Path)
     args = parser.parse_args(argv)
     summary = cli(args)
     if args.json:
@@ -203,7 +212,6 @@ def run(fmt: str = "csv", plot: bool = False) -> None:  # pragma: no cover - leg
         quiet=False,
         no_pretty=False,
         json=False,
-        write=True,
         fixture_csv=None,
     )
     df, _summary = _run_core(ns)

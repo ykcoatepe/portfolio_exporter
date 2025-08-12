@@ -22,7 +22,7 @@ def launch(status, default_fmt):
             ("b", "Build order"),
             ("l", "Roll positions"),
             ("q", "Quick option chain"),
-            ("v", "View Net-Liq chart"),
+            ("n", "Net-Liq (CLI)"),
             ("d", "Daily report (HTML/PDF)"),
             ("r", "Return"),
         ]:
@@ -36,8 +36,12 @@ def launch(status, default_fmt):
             "b": order_builder.run,
             "l": lambda: roll_manager.run(),
             "q": lambda: option_chain_snapshot.run(fmt=default_fmt),
-            "v": lambda: net_liq_history_export.run(fmt=default_fmt, plot=True),
-            "d": lambda: daily_report.main(["--no-pretty"] if os.getenv("PE_QUIET") else []),
+            "n": lambda: net_liq_history_export.main(
+                ["--quiet", "--no-pretty"] if os.getenv("PE_QUIET") else []
+            ),
+            "d": lambda: daily_report.main(
+                ["--no-pretty"] if os.getenv("PE_QUIET") else []
+            ),
         }.get(ch)
         if dispatch:
             if status:
