@@ -233,12 +233,33 @@ python -m portfolio_exporter.scripts.quick_chain --symbols SPY --target-delta 0.
 
 # Offline fixture (no network)
 python -m portfolio_exporter.scripts.quick_chain --chain-csv tests/data/quick_chain_fixture.csv --target-delta 0.30 --side put --tenor weekly
+
+# Override output directory
+python -m portfolio_exporter.scripts.quick_chain --chain-csv tests/data/quick_chain_fixture.csv --output-dir /tmp
+
+# JSON summary (no files written)
+python -m portfolio_exporter.scripts.quick_chain --chain-csv tests/data/quick_chain_fixture.csv --json
 ```
 
 Outputs:
 - CSV: base chain table plus new columns: `call_same_delta_strike`, `call_same_delta_delta`, `call_same_delta_mid`, `call_same_delta_iv`, and corresponding `put_*` fields.
 - HTML: optional minimal table when `--html` is provided.
 - PDF: optional table when `--pdf` is provided and `reportlab` is installed.
+
+JSON summary schema:
+
+```
+{
+  "rows": <int>,
+  "underlyings": [<str>],
+  "tenor": "<value or ''>",
+  "target_delta": <float | null>,
+  "side": "<call|put|both|''>",
+  "outputs": {"csv": "<path or ''>", "html": "<path or ''>", "pdf": "<path or ''>"}
+}
+```
+
+CSV-only runs skip IBKR and Yahoo Finance imports thanks to lazy dependencies.
 
 ## Contributing
 

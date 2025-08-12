@@ -1,22 +1,3 @@
-from . import (
-    update_tickers,
-    historic_prices,
-    daily_pulse,
-    option_chain_snapshot,
-    net_liq_history_export,
-    orchestrate_dataset,
-    tech_scan,
-    live_feed,
-    tech_signals_ibkr,
-    portfolio_greeks,
-    risk_watch,
-    theta_cap,
-    gamma_scalp,
-    trades_report,
-    order_builder,
-    roll_manager,
-)
-
 __all__ = [
     "update_tickers",
     "historic_prices",
@@ -34,4 +15,5 @@ __all__ = [
     "trades_report",
     "order_builder",
     "roll_manager",
+    "quick_chain",
 ]
