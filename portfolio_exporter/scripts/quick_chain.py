@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from datetime import date, datetime, timedelta
@@ -14,7 +15,6 @@ from rich.table import Table
 
 from portfolio_exporter.core import chain as core_chain
 from portfolio_exporter.core.config import settings
-from portfolio_exporter.core.ib import quote_stock
 from portfolio_exporter.core.io import save as io_save
 from portfolio_exporter.core.ui import render_chain, run_with_spinner
 
@@ -22,6 +22,8 @@ from portfolio_exporter.core.ui import render_chain, run_with_spinner
 def _calc_strikes(symbol: str, width: int) -> List[float]:
     """Return a list of strikes around ATM using 5-point increments."""
     try:
+        from portfolio_exporter.core.ib import quote_stock
+
         spot = quote_stock(symbol)["mid"]
     except Exception:
         spot = 0
@@ -336,48 +338,6 @@ def _filter_tenor(df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]) 
         return d.loc[kinds == "weekly"].copy()
 
 
-def _to_html(df: pd.DataFrame, base_name: str) -> str:
-    outdir = os.getenv("PE_OUTPUT_DIR", settings.output_dir)
-    os.makedirs(outdir, exist_ok=True)
-    path = os.path.join(outdir, f"{base_name}.html")
-    try:
-        df.to_html(path, index=False)
-    except Exception:
-        # fall back to CSV if HTML fails for some reason
-        io_save(df, base_name, fmt="csv", outdir=outdir)
-    return path
-
-
-def _to_pdf(df: pd.DataFrame, base_name: str) -> str | None:
-    try:
-        from reportlab.lib.pagesizes import landscape, letter
-        from reportlab.lib import colors
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-    except Exception:
-        return None
-    outdir = os.getenv("PE_OUTPUT_DIR", settings.output_dir)
-    os.makedirs(outdir, exist_ok=True)
-    path = os.path.join(outdir, f"{base_name}.pdf")
-    doc = SimpleDocTemplate(path, pagesize=landscape(letter), rightMargin=18, leftMargin=18, topMargin=18, bottomMargin=18)
-    data = [list(df.columns)] + df.astype(str).values.tolist()
-    tbl = Table(data, repeatRows=1, hAlign="LEFT")
-    tbl.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-                ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 9),
-                ("FONTSIZE", (0, 1), (-1, -1), 8),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
-            ]
-        )
-    )
-    doc.build([tbl])
-    return path
 
 
 def _run_cli_v3() -> int:
@@ -390,7 +350,11 @@ def _run_cli_v3() -> int:
     parser.add_argument("--html", action="store_true", default=False)
     parser.add_argument("--pdf", action="store_true", default=False)
     parser.add_argument("--no-pretty", action="store_true", default=False)
+    parser.add_argument("--output-dir", help="Override output directory", default=None)
+    parser.add_argument("--json", action="store_true", default=False, help="Emit summary JSON and exit")
     args = parser.parse_args()
+    if args.json:
+        args.no_pretty = True
 
     # Build base DataFrame
     df = None
@@ -439,15 +403,30 @@ def _run_cli_v3() -> int:
 
     # Outputs
     base_name = "quick_chain"
-    csv_path = io_save(df_out, base_name, fmt="csv")
+    if args.json:
+        summary = {
+            "rows": int(len(df_out)),
+            "underlyings": [
+                str(u)
+                for u in df_out.get("underlying", pd.Series(dtype=str)).dropna().unique().tolist()
+            ],
+            "tenor": args.tenor or "",
+            "target_delta": float(args.target_delta) if args.target_delta is not None else None,
+            "side": args.side or "",
+            "outputs": {"csv": "", "html": "", "pdf": ""},
+        }
+        print(json.dumps(summary, separators=(",", ":")))
+        return 0
+
+    outdir = args.output_dir or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
+    csv_path = io_save(df_out, base_name, fmt="csv", outdir=outdir)
     print(f"CSV saved → {csv_path}")
     if args.html:
-        html_path = _to_html(df_out, base_name)
+        html_path = io_save(df_out, base_name, fmt="html", outdir=outdir)
         print(f"HTML saved → {html_path}")
     if args.pdf:
-        pdf_path = _to_pdf(df_out, base_name)
-        if pdf_path:
-            print(f"PDF saved → {pdf_path}")
+        pdf_path = io_save(df_out, base_name, fmt="pdf", outdir=outdir)
+        print(f"PDF saved → {pdf_path}")
     # Pretty print only when TTY and not suppressed
     if sys.stdout.isatty() and not args.no_pretty:
         con = Console()

@@ -11,7 +11,7 @@ def save(
     # Default to configured output directory when not explicitly provided
     outdir = Path(outdir or settings.output_dir).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
-    ext_map = {"csv": "csv", "excel": "xlsx", "pdf": "pdf", "json": "json"}
+    ext_map = {"csv": "csv", "excel": "xlsx", "pdf": "pdf", "json": "json", "html": "html"}
     fname = outdir / f"{name}.{ext_map[fmt]}"
     if fmt == "csv":
         assert isinstance(obj, pd.DataFrame)
@@ -19,6 +19,9 @@ def save(
     elif fmt == "excel":
         assert isinstance(obj, pd.DataFrame)
         obj.to_excel(fname, index=False)
+    elif fmt == "html":
+        assert isinstance(obj, pd.DataFrame)
+        obj.to_html(fname, index=False)
     elif fmt == "pdf":
         import reportlab  # noqa: F401 – ensure dep
 
