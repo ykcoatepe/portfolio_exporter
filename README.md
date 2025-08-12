@@ -145,6 +145,31 @@ Schedule `update_tickers.py` with cron or another task scheduler to run daily:
 
 This keeps `tickers_live.txt` synced with your IBKR portfolio.
 
+## Utilities
+
+Quickly inspect where scripts write their outputs (as configured by `OUTPUT_DIR` in your environment or `.env`):
+
+```bash
+python -m portfolio_exporter.scripts.show_output_dir
+python -m portfolio_exporter.scripts.show_output_dir --json
+```
+
+### Orchestrator
+
+Run the overnight dataset orchestrator directly:
+
+```bash
+python -m portfolio_exporter.scripts.orchestrate_dataset
+```
+
+Strict mode (fail on any missing expected files):
+
+```bash
+python -m portfolio_exporter.scripts.orchestrate_dataset --strict
+```
+
+Note: By default, missing files are skipped and the archive is still produced. Use `--strict` to return a non‑zero exit code if any expected file is missing.
+
 ## Contributing
 
 See Repository Guidelines in [AGENTS.md](AGENTS.md) for project structure, style, testing, and PR expectations. In short: use Python 3.11+, run `make setup`, lint with `make lint`, test with `make test`, and keep commits small and descriptive.
