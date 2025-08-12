@@ -151,13 +151,18 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument("--html", action="store_true")
     parser.add_argument("--pdf", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--no-files", action="store_true", help="Do not write HTML/PDF outputs; emit JSON only if --json is set")
     parser.add_argument("--no-pretty", action="store_true")
     parser.add_argument("--since")
     parser.add_argument("--until")
     parser.add_argument("--combos-source", default="csv")
     args = parser.parse_args(argv)
 
-    if not args.html and not args.pdf:
+    # Default to writing both HTML and PDF unless explicitly disabled.
+    # When --no-files is provided, suppress file outputs (useful for sandboxed JSON-only runs).
+    if args.no_files:
+        args.html = args.pdf = False
+    elif not args.html and not args.pdf:
         args.html = args.pdf = True
 
     console = Console() if not args.no_pretty else None

@@ -148,11 +148,17 @@ Create a one-page portfolio snapshot from the latest greeks exports:
 python -m portfolio_exporter.scripts.daily_report
 python -m portfolio_exporter.scripts.daily_report --json
 python -m portfolio_exporter.scripts.daily_report --output-dir ./reports --html --pdf
+python -m portfolio_exporter.scripts.daily_report --json --no-files   # JSON only, no files written
 ```
 
 The script reads the newest `portfolio_greeks_positions*.csv`,
 `portfolio_greeks_totals*.csv`, and `portfolio_greeks_combos*.csv` files.
 `--since` and `--until` filter positions by expiry when that column exists.
+
+Tips
+- `--no-files`: Suppress writing HTML/PDF; useful in CI/sandboxes with `--json`.
+- `--output-dir`: Override the destination directory for artifacts.
+- Env override: set `OUTPUT_DIR=./.outputs` in a `.env` file to change the default output path (picked up by settings).
 
 ### Build Order (CLI)
 
