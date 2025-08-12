@@ -19,14 +19,13 @@ import pathlib
 from typing import List
 
 import pandas as pd
-from rich.console import Console
-from rich.table import Table
-
+from portfolio_exporter.core import io
 from portfolio_exporter.core.combo import detect_combos
 from portfolio_exporter.core.chain import fetch_chain
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.ui import run_with_spinner
-from portfolio_exporter.scripts import portfolio_greeks
+
+portfolio_greeks = None  # lazy import to avoid optional deps at module import
 
 
 def _third_friday(year: int, month: int) -> dt.date:
@@ -58,18 +57,15 @@ def _next_expiry(today: dt.date, weekly: bool) -> str:
     return exp.isoformat()
 
 
-def _write_files(df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
+def _write_files(
+    df: pd.DataFrame, pos_df: pd.DataFrame, outdir: str | pathlib.Path | None = None
+) -> dict[str, pathlib.Path]:
     """Persist ticket JSON and CSV preview for selected rolls."""
 
     if df.empty:
-        return
+        return {}
 
-    outdir = pathlib.Path(settings.output_dir).expanduser()
-    outdir.mkdir(parents=True, exist_ok=True)
     ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    ticket_path = outdir / f"roll_ticket_{ts}.json"
-    preview_path = outdir / f"roll_preview_{ts}.csv"
 
     combos_out = []
     for _, row in df.iterrows():
@@ -96,7 +92,7 @@ def _write_files(df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
         )
 
     ticket = {"timestamp": dt.datetime.utcnow().isoformat(), "combos": combos_out}
-    ticket_path.write_text(json.dumps(ticket, indent=2))
+    ticket_path = io.save(ticket, f"roll_ticket_{ts}", "json", outdir)
 
     csv_df = pd.DataFrame(
         {
@@ -111,7 +107,8 @@ def _write_files(df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
             "Θ_after": df.theta_after,
         }
     )
-    csv_df.to_csv(preview_path, index=False)
+    preview_path = io.save(csv_df, f"roll_preview_{ts}", "csv", outdir)
+    return {"ticket": ticket_path, "preview": preview_path}
 
 
 def run(
@@ -120,6 +117,9 @@ def run(
     fmt: str = "csv",
     return_df: bool = False,
     include_cal: bool = False,
+    tenor: str = "all",
+    pretty: bool = True,
+    output_dir: str | pathlib.Path | None = None,
 ):
     """Interactive roll manager.
 
@@ -138,12 +138,20 @@ def run(
         When ``True`` the DataFrame of candidate rolls is returned.
     """
 
+    interactive = not return_df
+
     cfg = getattr(settings, "roll", None)
     slippage = getattr(cfg, "slippage", 0.05) if cfg else 0.05
     if days is None:
         days = getattr(cfg, "default_days", 7) if cfg else 7
     if weekly is None:
         weekly = getattr(cfg, "use_weekly", False) if cfg else False
+
+    global portfolio_greeks
+    if portfolio_greeks is None:
+        from portfolio_exporter.scripts import portfolio_greeks as _pg
+
+        portfolio_greeks = _pg
 
     pos_df = run_with_spinner("Fetching positions…", portfolio_greeks._load_positions)
     if pos_df.empty:
@@ -163,10 +171,25 @@ def run(
     combos_df["expiry"] = pd.to_datetime(combos_df["expiry"]).dt.date
     mask = combos_df["expiry"] <= today + dt.timedelta(days=days)
     soon = combos_df[mask]
+    if tenor != "all":
+        def _is_weekly(d: dt.date) -> bool:
+            return d != _third_friday(d.year, d.month)
+
+        if tenor == "weekly":
+            soon = soon[soon["expiry"].apply(_is_weekly)]
+        else:
+            soon = soon[~soon["expiry"].apply(_is_weekly)]
     if soon.empty:
         if return_df:
             return pd.DataFrame()
-    console = Console(force_terminal=True)
+        return None
+
+    console = None
+    if interactive and pretty:
+        from rich.console import Console
+        from rich.table import Table
+
+        console = Console(force_terminal=True)
     rows: List[dict] = []
     for cid, cmb in soon.iterrows():
         new_exp = _next_expiry(today, weekly)
@@ -199,9 +222,14 @@ def run(
                 (chain["right"] == right) & (abs(chain["strike"] - strike) < 0.25)
             ]
             if sel.empty:
-                console.print(
-                    f"[yellow]⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
-                )
+                if console:
+                    console.print(
+                        f"[yellow]⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
+                    )
+                else:
+                    print(
+                        f"⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
+                    )
                 continue
             ch = sel.iloc[0]
             new_legs.append(
@@ -241,24 +269,40 @@ def run(
         )
 
     if not rows:
-        console.print("[yellow]No eligible combos found or priced; nothing to roll.")
-        return
+        msg = "No eligible combos found or priced; nothing to roll."
+        if console:
+            console.print(f"[yellow]{msg}")
+        else:
+            print(msg)
+        return pd.DataFrame() if return_df else None
 
     df = pd.DataFrame(rows).set_index("combo_id")
+    if not interactive:
+        return df if return_df else None
+
     selected: set = set()
 
-    def _render() -> Table:
-        tbl = Table(show_edge=False)
-        tbl.add_column("*")
-        tbl.add_column("Under")
-        tbl.add_column("Old")
-        tbl.add_column("New")
+    def _render() -> str | Table:
+        if console:
+            tbl = Table(show_edge=False)
+            tbl.add_column("*")
+            tbl.add_column("Under")
+            tbl.add_column("Old")
+            tbl.add_column("New")
+            for idx, row in df.iterrows():
+                mark = "*" if idx in selected else ""
+                tbl.add_row(mark, row.underlying, str(row.old_exp), str(row.new_exp))
+            return tbl
+        lines = []
         for idx, row in df.iterrows():
             mark = "*" if idx in selected else ""
-            tbl.add_row(mark, row.underlying, str(row.old_exp), str(row.new_exp))
-        return tbl
+            lines.append(f"{mark} {row.underlying} {row.old_exp} {row.new_exp}")
+        return "\n".join(lines)
 
-    console.print(_render())
+    if console:
+        console.print(_render())
+    else:
+        print(_render())
     while True:
         ch = input()
         if ch == " ":
@@ -268,21 +312,64 @@ def run(
             else:
                 selected.add(idx)
         elif ch.lower() == "r":
-            _write_files(df.loc[list(selected)], pos_df)
+            _write_files(df.loc[list(selected)], pos_df, output_dir)
         elif ch.lower() == "q":
             break
-        console.print(_render())
+        if console:
+            console.print(_render())
+        else:
+            print(_render())
 
-    if return_df:
-        return df
+    return df if return_df else None
+
+
+def cli(args: argparse.Namespace | None = None) -> dict | None:
+    """CLI entry point for ``python -m portfolio_exporter.scripts.roll_manager``."""
+
+    parser = argparse.ArgumentParser(description="Roll manager")
+    cfg = getattr(settings, "roll", None)
+    default_days = getattr(cfg, "default_days", 7) if cfg else 7
+    parser.add_argument("--include-cal", action="store_true", help="Include calendars")
+    parser.add_argument("--days", type=int, default=default_days, help="Expiry window")
+    parser.add_argument(
+        "--tenor", choices=["weekly", "monthly", "all"], default="all", help="Filter candidates"
+    )
+    parser.add_argument("--no-pretty", action="store_true", help="Disable rich tables")
+    parser.add_argument("--json", action="store_true", help="Print JSON summary")
+    parser.add_argument("--output-dir", help="Override output directory")
+    if args is None:
+        args = parser.parse_args()
+    pretty = not args.no_pretty
+    if args.json:
+        df = run(
+            days=args.days,
+            include_cal=args.include_cal,
+            tenor=args.tenor,
+            pretty=False,
+            output_dir=args.output_dir,
+            return_df=True,
+        )
+        summary = {
+            "n_candidates": int(len(df)),
+            "n_selected": 0,
+            "underlyings": sorted(df["underlying"].unique()) if not df.empty else [],
+            "by_structure": df["structure"].value_counts().to_dict() if not df.empty else {},
+            "outputs": [],
+        }
+        print(json.dumps(summary))
+        return summary
+    run(
+        days=args.days,
+        include_cal=args.include_cal,
+        tenor=args.tenor,
+        pretty=pretty,
+        output_dir=args.output_dir,
+    )
     return None
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry
-    parser = argparse.ArgumentParser(description="Roll manager")
-    parser.add_argument("--include-cal", action="store_true", help="Include calendars")
-    args = parser.parse_args()
-    run(include_cal=args.include_cal)
+    cli()
 
 
-__all__ = ["run"]
+__all__ = ["run", "cli"]

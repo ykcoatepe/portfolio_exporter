@@ -1,25 +1,33 @@
 from pathlib import Path
 import sqlite3
+import json
 import pandas as pd
 from .config import settings
 
 
 def save(
-    df: pd.DataFrame, name: str, fmt: str = "csv", outdir: str | Path | None = None
+    obj: pd.DataFrame | dict | list, name: str, fmt: str = "csv", outdir: str | Path | None = None
 ):
     # Default to configured output directory when not explicitly provided
     outdir = Path(outdir or settings.output_dir).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
-    fname = outdir / f"{name}.{ {'csv':'csv','excel':'xlsx','pdf':'pdf'}[fmt] }"
+    ext_map = {"csv": "csv", "excel": "xlsx", "pdf": "pdf", "json": "json"}
+    fname = outdir / f"{name}.{ext_map[fmt]}"
     if fmt == "csv":
-        df.to_csv(fname, index=False)
+        assert isinstance(obj, pd.DataFrame)
+        obj.to_csv(fname, index=False)
     elif fmt == "excel":
-        df.to_excel(fname, index=False)
+        assert isinstance(obj, pd.DataFrame)
+        obj.to_excel(fname, index=False)
     elif fmt == "pdf":
-        import pandas as pd, reportlab  # noqa: F401 – ensure dep
+        import reportlab  # noqa: F401 – ensure dep
 
-        df.to_html(fname.with_suffix(".html"), index=False)
+        assert isinstance(obj, pd.DataFrame)
+        obj.to_html(fname.with_suffix(".html"), index=False)
         # simple html→pdf placeholder; real impl later
+    elif fmt == "json":
+        with fname.open("w") as fh:
+            json.dump(obj, fh, indent=2)
     return fname
 
 

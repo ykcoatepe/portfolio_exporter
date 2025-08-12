@@ -112,6 +112,13 @@ python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL:2
 # Export today's executions and open orders
 python trades_report.py --today
 
+### Roll Manager CLI
+
+```bash
+python -m portfolio_exporter.scripts.roll_manager --days 28 --tenor monthly --no-pretty
+python -m portfolio_exporter.scripts.roll_manager --json
+```
+
 ### Trades Report
 
 Examples with date filters and summaries:
