@@ -141,7 +141,9 @@ def _run_core(ns: argparse.Namespace) -> tuple[pd.DataFrame, dict]:
     outputs = {"csv": "", "excel": "", "pdf": ""}
     write_files = (not ns.json) or ns.write
     if write_files:
-        outdir = Path(ns.output_dir or settings.output_dir).expanduser()
+        # Allow env override to keep tests and sandboxed runs isolated
+        outdir_env = os.getenv("PE_OUTPUT_DIR")
+        outdir = Path(ns.output_dir or outdir_env or settings.output_dir).expanduser()
         df_save = df.rename_axis("date").reset_index()
         for fmt in formats:
             outputs[fmt] = str(core_io.save(df_save, "net_liq_history_export", fmt, outdir))
@@ -217,4 +219,3 @@ def run(fmt: str = "csv", plot: bool = False) -> None:  # pragma: no cover - leg
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry
     raise SystemExit(main())
-
