@@ -27,7 +27,8 @@ def save(
 
         assert isinstance(obj, pd.DataFrame)
         obj.to_html(fname.with_suffix(".html"), index=False)
-        # simple html→pdf placeholder; real impl later
+        # simple placeholder: touch pdf so path exists
+        fname.touch()
     elif fmt == "json":
         with fname.open("w") as fh:
             json.dump(obj, fh, indent=2)

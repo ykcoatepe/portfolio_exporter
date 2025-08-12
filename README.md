@@ -261,6 +261,13 @@ JSON summary schema:
 
 CSV-only runs skip IBKR and Yahoo Finance imports thanks to lazy dependencies.
 
+### Net-Liq chart
+
+```bash
+python -m portfolio_exporter.scripts.net_liq_history_export --fixture-csv tests/data/net_liq_fixture.csv --json
+python -m portfolio_exporter.scripts.net_liq_history_export --fixture-csv tests/data/net_liq_fixture.csv --csv --pdf --output-dir ./.tmp_nlh
+```
+
 ## Contributing
 
 See Repository Guidelines in [AGENTS.md](AGENTS.md) for project structure, style, testing, and PR expectations. In short: use Python 3.11+, run `make setup`, lint with `make lint`, test with `make test`, and keep commits small and descriptive.
