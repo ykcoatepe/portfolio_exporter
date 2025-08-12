@@ -339,7 +339,9 @@ def cli(args: argparse.Namespace | None = None) -> dict | None:
     parser.add_argument("--output-dir", help="Override output directory")
     if args is None:
         args = parser.parse_args()
-    pretty = not args.no_pretty
+    # Honor PE_QUIET by disabling Rich pretty output
+    import os as _os
+    pretty = not args.no_pretty and (_os.getenv("PE_QUIET") in (None, "", "0"))
     if args.json:
         df = run(
             days=args.days,

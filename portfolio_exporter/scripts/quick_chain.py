@@ -353,6 +353,9 @@ def _run_cli_v3() -> int:
     parser.add_argument("--output-dir", help="Override output directory", default=None)
     parser.add_argument("--json", action="store_true", default=False, help="Emit summary JSON and exit")
     args = parser.parse_args()
+    # Honor PE_QUIET by disabling pretty output
+    if os.getenv("PE_QUIET") not in (None, "", "0"):
+        args.no_pretty = True
     if args.json:
         args.no_pretty = True
 

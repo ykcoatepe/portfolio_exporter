@@ -144,9 +144,12 @@ def run(
 
     files_by_script: List[Tuple[str, List[str]]] = []
     failed: list[str] = []
-    console = Console(
-        force_terminal=True
-    )  # force Rich to treat IDE/CI output as a real TTY
+    # Honor PE_QUIET by routing progress output to a sink
+    quiet_env = os.getenv("PE_QUIET") not in (None, "", "0")
+    if quiet_env:
+        console = Console(file=io.StringIO(), force_terminal=False)
+    else:
+        console = Console(force_terminal=True)  # treat IDE/CI as TTY for richer output
     progress = Progress(
         BarColumn(),
         TextColumn("{task.percentage:>3.0f}%"),

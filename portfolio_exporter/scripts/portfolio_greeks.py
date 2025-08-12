@@ -2344,11 +2344,15 @@ def run(
             io_core.save(save_df, "portfolio_greeks_combos", fmt, outdir)
             logger.info("Combos saved: %d", len(combos_df))
 
-    print(f"✅ Greeks exported → {outdir}")
+    if os.getenv("PE_QUIET") in (None, "", "0"):
+        print(f"✅ Greeks exported → {outdir}")
 
     no_pretty = False
     if "args" in globals():
         no_pretty = getattr(globals()["args"], "no_pretty", False)
+    # Honor PE_QUIET by suppressing Rich pretty printing
+    if os.getenv("PE_QUIET") not in (None, "", "0"):
+        no_pretty = True
     use_pretty = (not no_pretty) and sys.stdout.isatty()
     if use_pretty:
         console = Console()

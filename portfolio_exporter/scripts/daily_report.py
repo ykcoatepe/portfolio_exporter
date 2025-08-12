@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 from datetime import datetime
 from pathlib import Path
@@ -165,7 +166,8 @@ def main(argv: list[str] | None = None) -> dict:
     elif not args.html and not args.pdf:
         args.html = args.pdf = True
 
-    console = Console() if not args.no_pretty else None
+    quiet_env = os.getenv("PE_QUIET") not in (None, "", "0")
+    console = Console() if (not args.no_pretty and not quiet_env) else None
 
     positions = _prep_positions(_load_csv("portfolio_greeks_positions"), args.since, args.until)
     totals = _load_csv("portfolio_greeks_totals")

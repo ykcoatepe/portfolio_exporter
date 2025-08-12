@@ -165,7 +165,10 @@ def _run_core(ns: argparse.Namespace) -> tuple[pd.DataFrame, dict]:
 
 def cli(ns: argparse.Namespace) -> dict:
     df, summary = _run_core(ns)
-    if not ns.json and not ns.quiet:
+    # Honor PE_QUIET=1 from the environment without requiring --quiet
+    quiet_env = os.getenv("PE_QUIET") not in (None, "", "0")
+    effective_quiet = ns.quiet or quiet_env
+    if not ns.json and not effective_quiet:
         df_print = df.rename_axis("date").reset_index()
         if ns.no_pretty:
             print(df_print.to_string(index=False))
