@@ -14,6 +14,7 @@ from portfolio_exporter.scripts import (
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
 import builtins
 from types import SimpleNamespace
+import os
 
 _input_buffer: list[str] = []
 
