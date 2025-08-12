@@ -139,6 +139,46 @@ JSON summary fields: `n_total`, `n_kept`, `u_count`, `underlyings`, `net_credit_
 
 Open interest values are sourced from Yahoo Finance rather than the IBKR feed.
 
+### Build Order (CLI)
+
+The non-interactive order builder creates normalized ticket JSONs for common strategies.
+Each strategy defaults to the house leg directions; flipping the sign of `--qty`
+switches between credit and debit orientations.
+
+```bash
+# Bull call (debit) vs. bear call (credit)
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty 1
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty -1
+
+# Bull put (credit) vs. bear put (debit)
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty 1
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty -1
+
+# Short vs. long iron condor (strike order auto-sorted)
+python -m portfolio_exporter.scripts.order_builder --strategy iron_condor --symbol SPY --expiry 2025-06-20 --strikes 380,390,410,420 --qty -1
+python -m portfolio_exporter.scripts.order_builder --strategy iron_condor --symbol SPY --expiry 2025-06-20 --strikes 380,390,410,420 --qty 1
+
+# Long vs. short butterfly
+python -m portfolio_exporter.scripts.order_builder --strategy butterfly --symbol SPY --right C --expiry 2025-06-20 --strikes 390,400,410 --qty 1
+python -m portfolio_exporter.scripts.order_builder --strategy butterfly --right C --symbol SPY --expiry 2025-06-20 --strikes 390,400,410 --qty -1
+
+# Long vs. short calendar
+python -m portfolio_exporter.scripts.order_builder --strategy calendar --symbol SPY --right C --strike 400 --expiry-near 2025-05-17 --expiry-far 2025-06-20 --qty 1
+python -m portfolio_exporter.scripts.order_builder --strategy calendar --symbol SPY --right C --strike 400 --expiry-near 2025-05-17 --expiry-far 2025-06-20 --qty -1
+
+# Long vs. short straddle
+python -m portfolio_exporter.scripts.order_builder --strategy straddle --symbol SPY --expiry 2025-06-20 --strike 400 --qty 1
+python -m portfolio_exporter.scripts.order_builder --strategy straddle --symbol SPY --expiry 2025-06-20 --strike 400 --qty -1
+
+# Long vs. short strangle
+python -m portfolio_exporter.scripts.order_builder --strategy strangle --symbol SPY --expiry 2025-06-20 --strikes 390,410 --qty 1
+python -m portfolio_exporter.scripts.order_builder --strategy strangle --symbol SPY --expiry 2025-06-20 --strikes 390,410 --qty -1
+
+# Covered call income vs. buy-write
+python -m portfolio_exporter.scripts.order_builder --strategy covered_call --symbol SPY --expiry 2025-06-20 --call-strike 410 --qty -1
+python -m portfolio_exporter.scripts.order_builder --strategy covered_call --symbol SPY --expiry 2025-06-20 --call-strike 410 --qty 1
+```
+
 ### Expiry hint formats
 
 When prompted for an expiry, you may provide:
