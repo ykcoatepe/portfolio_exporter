@@ -1125,6 +1125,10 @@ def _run_cli() -> int:
     parser.add_argument("--executions-csv", dest="exec_csv", help="Path to offline executions CSV", default=None)
     parser.add_argument("--no-pretty", action="store_true", help="Disable pretty/TTY output", default=False)
     parser.add_argument("--debug-combos", action="store_true", help="Force combos debug artifacts (equivalent to PE_DEBUG_COMBOS=1)", default=False)
+    parser.add_argument("--since", help="Start datetime (YYYY-MM-DD or ISO)", default=None)
+    parser.add_argument("--until", help="End datetime (YYYY-MM-DD or ISO)", default=None)
+    parser.add_argument("--summary-only", action="store_true", help="Print summary only; do not write CSV outputs", default=False)
+    parser.add_argument("--json", action="store_true", help="Print summary as JSON and exit", default=False)
     args = parser.parse_args()
 
     if args.debug_combos:
@@ -1149,25 +1153,201 @@ def _run_cli() -> int:
         except Exception:
             df_open = None
 
-    # Save the combined trades/open report as before (additive only)
+    # Apply date filters and compute summary metrics
+    n_total = len(df_exec) if isinstance(df_exec, pd.DataFrame) else 0
+    since_dt = _parse_when(args.since)
+    until_dt = _parse_when(args.until)
+    df_exec = _filter_by_date(df_exec, since_dt, until_dt, col="datetime")
+    n_kept = len(df_exec)
+    # Avoid extra noise when JSON output is requested
+    if not args.json:
+        print(
+            f"Trades filter: total={n_total} kept={n_kept} (since={args.since} until={args.until})"
+        )
+
+    # Build positions-like for summary
+    pos_like = _build_positions_like_df(df_exec, None)
+    uvals = []
+    if not pos_like.empty and "underlying" in pos_like.columns:
+        try:
+            uvals = sorted(set(x for x in pos_like["underlying"].dropna().tolist() if str(x)))
+        except Exception:
+            uvals = []
+    u_count = len(uvals)
+    try:
+        # multiplier defaults handled in builder
+        m = pd.to_numeric(pos_like.get("multiplier", 0), errors="coerce").fillna(0)
+        qty = pd.to_numeric(pos_like.get("qty", 0), errors="coerce").fillna(0)
+        price = pd.to_numeric(pos_like.get("price", 0), errors="coerce").fillna(0)
+        net_credit_debit = float((-price * qty * m).sum())
+    except Exception:
+        net_credit_debit = 0.0
+
+    # Detect + enrich combos from executions/open orders (filtered)
+    combos_df = _detect_and_enrich_trades_combos(df_exec, df_open)
+    c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
+    try:
+        by_structure = (
+            combos_df.get("structure_label", combos_df.get("structure"))
+            .astype(str)
+            .str.lower()
+            .value_counts()
+            .to_dict()
+            if not combos_df.empty
+            else {}
+        )
+    except Exception:
+        by_structure = {}
+
+    summary = {
+        "n_total": n_total,
+        "n_kept": n_kept,
+        "u_count": u_count,
+        "underlyings": uvals,
+        "net_credit_debit": round(net_credit_debit, 2),
+        "combos_total": c_total,
+        "combos_by_structure": by_structure,
+        "outputs": {},
+    }
+
+    # Honor summary-only / json flags
+    if args.json:
+        print(json.dumps(summary, default=str))
+        return 0
+
+    if args.summary_only:
+        print(
+            "Trades summary: total={n_total} kept={n_kept} underlyings={u_count} "
+            "net_credit_debit={net:+.2f} combos={c_total} breakdown={breakdown}".format(
+                n_total=n_total,
+                n_kept=n_kept,
+                u_count=u_count,
+                net=net_credit_debit,
+                c_total=c_total,
+                breakdown=by_structure,
+            )
+        )
+        return 0
+
+    # Save the combined trades/open report as before
     try:
         df_all = df_exec.copy()
         if isinstance(df_open, pd.DataFrame) and not df_open.empty:
             df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
         date_tag = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
-        io_core.save(df_all, f"trades_report_{date_tag}", "csv", config_core.settings.output_dir)
+        path_report = io_core.save(
+            df_all, f"trades_report_{date_tag}", "csv", config_core.settings.output_dir
+        )
+        summary["outputs"]["trades_report"] = str(path_report)
     except Exception:
         pass
 
-    # Detect + enrich combos from executions/open orders
-    combos_df = _detect_and_enrich_trades_combos(df_exec, df_open)
-    path = _save_trades_combos(combos_df, fmt="csv")
-    print(f"✅ Trades combos exported → {path}")
+    # Detect + enrich combos already done; save CSV
+    path_combos = _save_trades_combos(combos_df, fmt="csv")
+    summary["outputs"]["trades_combos"] = str(path_combos)
+    print(f"✅ Trades combos exported → {path_combos}")
 
-    # Write debug combos CSV when requested (handled inside enrichment via env)
+    # Also print concise summary (text)
+    print(
+        "Trades summary: total={n_total} kept={n_kept} underlyings={u_count} "
+        "net_credit_debit={net:+.2f} combos={c_total} breakdown={breakdown}".format(
+            n_total=n_total,
+            n_kept=n_kept,
+            u_count=u_count,
+            net=net_credit_debit,
+            c_total=c_total,
+            breakdown=by_structure,
+        )
+    )
+
     # no-pretty is respected by doing nothing extra when printing
     return 0
 
 
+# ───── Date parsing & filtering helpers (import-safe) ─────
+def _parse_when(s: str | None) -> datetime | None:
+    """
+    Parse a date/datetime string.
+    Accepts YYYY-MM-DD (local midnight) or full ISO.
+    Uses dateparser if available; otherwise falls back to fromisoformat.
+    Returns naive datetime in local time for consistent comparisons.
+    """
+    if not s:
+        return None
+    s = s.strip()
+    if not s:
+        return None
+    # Try dateparser for flexibility if available
+    try:
+        import dateparser  # type: ignore
+
+        dt = dateparser.parse(s)
+        if dt is not None:
+            return dt.replace(tzinfo=None)
+    except Exception:
+        pass
+    # Fallback to ISO-like handling
+    try:
+        if len(s) == 10 and s.count("-") == 2:
+            # YYYY-MM-DD → midnight
+            y, m, d = map(int, s.split("-"))
+            return datetime(y, m, d)
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+
+def _filter_by_date(
+    df: pd.DataFrame,
+    since: datetime | None,
+    until: datetime | None,
+    col: str = "datetime",
+) -> pd.DataFrame:
+    """
+    Ensure df[col] exists and is datetime-like (parse if needed), then filter inclusive:
+      since <= col <= until
+    If only date is provided, interpret:
+      since_date -> 00:00:00
+      until_date -> 23:59:59.999999
+    If col missing or all NaT, return df unchanged but record a warning.
+    """
+    if df is None or df.empty:
+        return df
+    d = df.copy()
+    if col not in d.columns:
+        # try common alternatives
+        for alt in ("time", "timestamp"):
+            if alt in d.columns:
+                try:
+                    d[col] = pd.to_datetime(d[alt], errors="coerce")
+                except Exception:
+                    d[col] = pd.NaT
+                break
+    if col not in d.columns:
+        logger.warning("trades_report: datetime column missing; skipping date filter")
+        return d
+    try:
+        d[col] = pd.to_datetime(d[col], errors="coerce")
+    except Exception:
+        pass
+    if d[col].isna().all():
+        logger.warning("trades_report: all datetime values are NaT; skipping date filter")
+        return d
+
+    # Interpret pure-date 'until' as end-of-day if time looks like midnight
+    if until is not None and (
+        until.hour == 0 and until.minute == 0 and until.second == 0 and until.microsecond == 0
+    ):
+        until = until.replace(hour=23, minute=59, second=59, microsecond=999_999)
+
+    mask = pd.Series([True] * len(d), index=d.index)
+    if since is not None:
+        mask &= d[col] >= since
+    if until is not None:
+        mask &= d[col] <= until
+    return d.loc[mask].copy()
+
+
 if __name__ == "__main__":  # pragma: no cover - exercised by CLI tests
+    # Ensure all helpers are defined before invoking CLI
     raise SystemExit(_run_cli())

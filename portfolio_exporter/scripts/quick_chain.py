@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import argparse
 import os
-from portfolio_exporter.core.config import settings
 import sys
-from typing import List
+from datetime import date, datetime, timedelta
+from typing import Iterable, List, Literal, Tuple
 
-import pandas as pd
 import dateparser
+import pandas as pd
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
 
 from portfolio_exporter.core import chain as core_chain
+from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.ib import quote_stock
+from portfolio_exporter.core.io import save as io_save
 from portfolio_exporter.core.ui import render_chain, run_with_spinner
 
 
@@ -92,7 +95,10 @@ def run(
 
     # ------------- CSV toggle (default = ON) -------------------------
     save_csv_env = os.getenv("PE_CHAIN_CSV", "1")  # allow override
-    save_csv = save_csv_env not in {"0", "false", "no"}
+    # In tests, default to no CSV unless explicitly forced on
+    if os.getenv("PYTEST_CURRENT_TEST") and save_csv_env == "1":
+        save_csv_env = "0"
+    save_csv = save_csv_env.lower() not in {"0", "false", "no"}
 
     def _fetch(cur_width: int, cur_expiry: str) -> pd.DataFrame:
         exp = _nearest(cur_expiry) if normalize_exps else cur_expiry
@@ -179,3 +185,275 @@ def run(
                 order_builder.run()
                 marked.clear()
             live.update(_grid())
+
+
+# ───────────────────────────── V3 CLI (additive) ─────────────────────────────
+def _is_third_friday(d: date) -> bool:
+    # 3rd Friday: weekday() == 4 (Mon=0..Sun=6) and day in 15..21
+    return d.weekday() == 4 and 15 <= d.day <= 21
+
+
+def _classify_tenor(expiry_str: str) -> Literal["weekly", "monthly"] | None:
+    try:
+        d = date.fromisoformat(expiry_str)
+    except Exception:
+        try:
+            d = pd.to_datetime(expiry_str, errors="coerce").date()
+        except Exception:
+            return None
+    if d is None:
+        return None
+    return "monthly" if _is_third_friday(d) else "weekly"
+
+
+def _norm_delta(x: float) -> float:
+    try:
+        if x is None:
+            return float("nan")
+        xv = float(x)
+        # Heuristic: if magnitude > 1, assume percent-style (×100)
+        if abs(xv) > 1.0:
+            xv = xv / 100.0
+        return xv
+    except Exception:
+        return float("nan")
+
+
+def _ensure_delta(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure a usable 'delta' column exists and normalized to [-1,1]."""
+    if df is None or df.empty:
+        return df
+    d = df.copy()
+    if "delta" not in d.columns:
+        d["delta"] = pd.NA
+    d["delta"] = d["delta"].apply(_norm_delta)
+    # Best-effort BS fallback if IV and last/mid are present
+    missing = d["delta"].isna() | (~d["delta"].apply(lambda v: isinstance(v, (int, float))))
+    if missing.any():
+        try:
+            from portfolio_exporter.core.greeks import bs_greeks
+
+            # Compute t in years based on expiry vs today
+            def _row_delta(row) -> float:
+                try:
+                    exp = date.fromisoformat(str(row.get("expiry")))
+                except Exception:
+                    return float("nan")
+                t = max((exp - date.today()).days, 1) / 365.0
+                spot = row.get("last")
+                if pd.isna(spot) or not spot:
+                    spot = row.get("mid")
+                if pd.isna(spot) or not spot:
+                    return float("nan")
+                strike = float(row.get("strike"))
+                iv = row.get("iv")
+                if pd.isna(iv) or not iv:
+                    return float("nan")
+                g = bs_greeks(
+                    float(spot),
+                    float(strike),
+                    float(t),
+                    float(getattr(settings.greeks, "risk_free", 0.0) or 0.0),
+                    float(iv),
+                    call=str(row.get("right", "C")).upper() == "C",
+                    multiplier=1,
+                )
+                return float(g.get("delta", float("nan")))
+
+            calc = d.apply(_row_delta, axis=1)
+            d.loc[missing, "delta"] = calc[missing]
+        except Exception:
+            pass
+    # Final normalization in [-1,1]
+    d["delta"] = d["delta"].apply(_norm_delta)
+    return d
+
+
+def _same_delta_by_expiry(
+    df: pd.DataFrame,
+    target: float,
+    side: Literal["call", "put", "both"] = "both",
+) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    d = _ensure_delta(df)
+
+    # Prepare output columns
+    out = d.copy()
+    cols = []
+    if side in {"call", "both"}:
+        cols += [
+            "call_same_delta_strike",
+            "call_same_delta_delta",
+            "call_same_delta_mid",
+            "call_same_delta_iv",
+        ]
+    if side in {"put", "both"}:
+        cols += [
+            "put_same_delta_strike",
+            "put_same_delta_delta",
+            "put_same_delta_mid",
+            "put_same_delta_iv",
+        ]
+    for c in cols:
+        out[c] = pd.NA
+
+    # Compute nearest picks per expiry and assign to all rows of that expiry
+    def _assign_for_exp(expiry: str, g: pd.DataFrame) -> None:
+        if side in {"call", "both"}:
+            calls = g[g["right"].astype(str).str.upper() == "C"]
+            if not calls.empty:
+                calls = calls.assign(dist=(calls["delta"] - abs(target)).abs())
+                best = calls.loc[calls["dist"].idxmin()]
+                out.loc[g.index, "call_same_delta_strike"] = best.get("strike")
+                out.loc[g.index, "call_same_delta_delta"] = best.get("delta")
+                out.loc[g.index, "call_same_delta_mid"] = best.get("mid") if "mid" in best else best.get("last")
+                out.loc[g.index, "call_same_delta_iv"] = best.get("iv")
+        if side in {"put", "both"}:
+            puts = g[g["right"].astype(str).str.upper() == "P"]
+            if not puts.empty:
+                puts = puts.assign(dist=(puts["delta"] - -abs(target)).abs())
+                best = puts.loc[puts["dist"].idxmin()]
+                out.loc[g.index, "put_same_delta_strike"] = best.get("strike")
+                out.loc[g.index, "put_same_delta_delta"] = best.get("delta")
+                out.loc[g.index, "put_same_delta_mid"] = best.get("mid") if "mid" in best else best.get("last")
+                out.loc[g.index, "put_same_delta_iv"] = best.get("iv")
+
+    for exp, grp in d.groupby("expiry"):
+        _assign_for_exp(str(exp), grp)
+
+    return out
+
+
+def _filter_tenor(df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]) -> pd.DataFrame:
+    if df is None or df.empty or tenor == "all":
+        return df
+    d = df.copy()
+    kinds = d["expiry"].astype(str).apply(_classify_tenor)
+    if tenor == "monthly":
+        return d.loc[kinds == "monthly"].copy()
+    else:
+        return d.loc[kinds == "weekly"].copy()
+
+
+def _to_html(df: pd.DataFrame, base_name: str) -> str:
+    outdir = os.getenv("PE_OUTPUT_DIR", settings.output_dir)
+    os.makedirs(outdir, exist_ok=True)
+    path = os.path.join(outdir, f"{base_name}.html")
+    try:
+        df.to_html(path, index=False)
+    except Exception:
+        # fall back to CSV if HTML fails for some reason
+        io_save(df, base_name, fmt="csv", outdir=outdir)
+    return path
+
+
+def _to_pdf(df: pd.DataFrame, base_name: str) -> str | None:
+    try:
+        from reportlab.lib.pagesizes import landscape, letter
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+    except Exception:
+        return None
+    outdir = os.getenv("PE_OUTPUT_DIR", settings.output_dir)
+    os.makedirs(outdir, exist_ok=True)
+    path = os.path.join(outdir, f"{base_name}.pdf")
+    doc = SimpleDocTemplate(path, pagesize=landscape(letter), rightMargin=18, leftMargin=18, topMargin=18, bottomMargin=18)
+    data = [list(df.columns)] + df.astype(str).values.tolist()
+    tbl = Table(data, repeatRows=1, hAlign="LEFT")
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                ("ALIGN", (0, 1), (-1, -1), "RIGHT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 9),
+                ("FONTSIZE", (0, 1), (-1, -1), 8),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ]
+        )
+    )
+    doc.build([tbl])
+    return path
+
+
+def _run_cli_v3() -> int:
+    parser = argparse.ArgumentParser(description="Quick-Chain v3: Same-Delta & Tenor Filters")
+    parser.add_argument("--chain-csv", help="Offline chain CSV (fixture)", default=None)
+    parser.add_argument("--symbols", nargs="*", help="Symbols to fetch (demo)", default=None)
+    parser.add_argument("--target-delta", type=float, default=0.30)
+    parser.add_argument("--side", choices=["call", "put", "both"], default="both")
+    parser.add_argument("--tenor", choices=["weekly", "monthly", "all"], default="all")
+    parser.add_argument("--html", action="store_true", default=False)
+    parser.add_argument("--pdf", action="store_true", default=False)
+    parser.add_argument("--no-pretty", action="store_true", default=False)
+    args = parser.parse_args()
+
+    # Build base DataFrame
+    df = None
+    if args.chain_csv:
+        try:
+            df = pd.read_csv(args.chain_csv)
+        except Exception as exc:
+            print(f"❌ Failed to read chain CSV: {exc}")
+            return 2
+    else:
+        # Live/demo path (kept minimal; not used in tests)
+        syms = args.symbols or []
+        if not syms:
+            print("No symbols provided; nothing to do.")
+            return 1
+        frames = []
+        for sym in syms:
+            # attempt next available weekly expiry ~30 days from now
+            exp = (date.today() + timedelta(days=30)).isoformat()
+            try:
+                df_sym = core_chain.fetch_chain(sym, exp, strikes=None)
+                df_sym.insert(0, "underlying", sym)
+                df_sym.insert(1, "expiry", exp)
+                frames.append(df_sym)
+            except Exception:
+                continue
+        df = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+
+    if df is None or df.empty:
+        print("⚠ No chain data available")
+        return 0
+
+    # Ensure required columns
+    for c in ("underlying", "expiry", "right", "strike"):
+        if c not in df.columns:
+            df[c] = pd.NA
+    if "mid" not in df.columns:
+        if "last" in df.columns:
+            df["mid"] = df["last"]
+        else:
+            df["mid"] = pd.NA
+
+    # Tenor filter then same-delta augmentation
+    df_f = _filter_tenor(df, args.tenor)
+    df_out = _same_delta_by_expiry(df_f, float(args.target_delta), args.side)
+
+    # Outputs
+    base_name = "quick_chain"
+    csv_path = io_save(df_out, base_name, fmt="csv")
+    print(f"CSV saved → {csv_path}")
+    if args.html:
+        html_path = _to_html(df_out, base_name)
+        print(f"HTML saved → {html_path}")
+    if args.pdf:
+        pdf_path = _to_pdf(df_out, base_name)
+        if pdf_path:
+            print(f"PDF saved → {pdf_path}")
+    # Pretty print only when TTY and not suppressed
+    if sys.stdout.isatty() and not args.no_pretty:
+        con = Console()
+        con.print(df_out.head(min(30, len(df_out))))
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(_run_cli_v3())

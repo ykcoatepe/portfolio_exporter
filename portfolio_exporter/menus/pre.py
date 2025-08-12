@@ -81,6 +81,7 @@ def launch(status: StatusBar, default_fmt: str):
             ("o", "Option chain snapshot"),
             ("n", "Net-Liq history"),
             ("x", "External technical scan"),
+            ("y", "Pre-flight check (env & CSVs)"),
             ("z", "Run overnight batch"),
             ("f", f"Toggle output format (current: {current_fmt})"),
             ("r", "Return"),
@@ -112,6 +113,9 @@ def launch(status: StatusBar, default_fmt: str):
             "o": option_chain_snapshot.run,
             "n": net_liq_history_export.run,
             "x": lambda fmt=default_fmt: _external_scan(fmt),
+            "y": lambda fmt=default_fmt: orchestrate_dataset.preflight_check(
+                no_pretty=bool(os.getenv("PE_QUIET"))
+            ),
             "z": orchestrate_dataset.run,
         }
         action = action_map.get(choice)

@@ -111,6 +111,23 @@ python option_chain_snapshot.py
 python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL:20250620'
 # Export today's executions and open orders
 python trades_report.py --today
+
+### Trades Report
+
+Examples with date filters and summaries:
+
+```bash
+# Last week only, summary as text
+python -m portfolio_exporter.scripts.trades_report --since 2025-08-01 --until 2025-08-08 --no-pretty
+
+# Single day in JSON (no files written)
+python -m portfolio_exporter.scripts.trades_report --since 2025-08-09 --until 2025-08-09 --summary-only --json
+
+# Offline CSV + filter + debug combos
+python -m portfolio_exporter.scripts.trades_report --executions-csv tests/data/offline_executions_combo_sample.csv --since 2025-08-01 --until 2025-08-31 --debug-combos
+```
+
+JSON summary fields: `n_total`, `n_kept`, `u_count`, `underlyings`, `net_credit_debit`, `combos_total`, `combos_by_structure`, and `outputs` (paths when written).
 ```
 
 Open interest values are sourced from Yahoo Finance rather than the IBKR feed.
@@ -169,6 +186,52 @@ python -m portfolio_exporter.scripts.orchestrate_dataset --strict
 ```
 
 Note: By default, missing files are skipped and the archive is still produced. Use `--strict` to return a non‑zero exit code if any expected file is missing.
+
+#### Deterministic expectations
+
+You can supply an explicit list of expected outputs so `--strict` behaves consistently even as scripts evolve:
+
+```bash
+# JSON array
+echo '["portfolio_greeks_positions.csv","portfolio_greeks_combos.csv"]' > expect.json
+
+# or an object with a files array
+echo '{"files":["portfolio_greeks_positions.csv","live_quotes.csv"]}' > expect.json
+
+python -m portfolio_exporter.scripts.orchestrate_dataset --expect expect.json --strict
+```
+
+Relative names resolve under `OUTPUT_DIR`; absolute paths are used as‑is.
+
+#### Pre-flight
+
+Run pre-flight validations (environment, optional imports, and recent CSV header sanity):
+
+```bash
+python -m portfolio_exporter.scripts.orchestrate_dataset --preflight
+python -m portfolio_exporter.scripts.orchestrate_dataset --preflight --preflight-strict
+```
+
+Pre-flight does not run the batch; it only reports on the environment and most recent CSVs.
+
+### Quick-Chain v3: Same-Δ & Tenor Filters
+
+Compute nearest-to-target delta strikes per expiry and side, and filter expiries by tenor (weekly/monthly) while preserving existing quick_chain behavior.
+
+Examples:
+
+```bash
+# Live/demo (requires network for yfinance if IB is unavailable)
+python -m portfolio_exporter.scripts.quick_chain --symbols SPY --target-delta 0.25 --side both --tenor monthly --html
+
+# Offline fixture (no network)
+python -m portfolio_exporter.scripts.quick_chain --chain-csv tests/data/quick_chain_fixture.csv --target-delta 0.30 --side put --tenor weekly
+```
+
+Outputs:
+- CSV: base chain table plus new columns: `call_same_delta_strike`, `call_same_delta_delta`, `call_same_delta_mid`, `call_same_delta_iv`, and corresponding `put_*` fields.
+- HTML: optional minimal table when `--html` is provided.
+- PDF: optional table when `--pdf` is provided and `reportlab` is installed.
 
 ## Contributing
 

@@ -2,6 +2,7 @@ import io
 import os
 import sys
 import zipfile
+import socket
 from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,9 @@ from rich.console import Console
 
 # Directory where orchestrated dataset and script outputs are stored.
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
+
+# Cache for preflight results within this process/session
+_PREFLIGHT_CACHE: dict | None = None
 
 
 def run_script(func: Callable[[], None]) -> List[str]:
@@ -113,7 +117,12 @@ def cleanup(files: List[str]) -> None:
             pass
 
 
-def run(fmt: str = "csv", strict: bool = False, no_pretty: bool = False) -> tuple[str, int, list[str]] | None:
+def run(
+    fmt: str = "csv",
+    strict: bool = False,
+    no_pretty: bool = False,
+    expect: list[str] | None = None,
+) -> tuple[str, int, list[str]] | None:
     fmt = fmt.lower()
 
     from portfolio_exporter.scripts import (
@@ -173,6 +182,23 @@ def run(fmt: str = "csv", strict: bool = False, no_pretty: bool = False) -> tupl
         return None
     ts = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%Y%m%d_%H%M")
     all_files = [f for _, file_list in files_by_script for f in file_list]
+    # If expectations were provided, include them in the zip attempt to make
+    # strict mode deterministic even as scripts evolve.
+    if expect:
+        exp_paths: list[str] = []
+        for item in expect:
+            p = Path(item)
+            if not p.is_absolute():
+                p = Path(OUTPUT_DIR) / p
+            exp_paths.append(str(p))
+        # Deduplicate while preserving order
+        seen = set()
+        combined: list[str] = []
+        for x in list(all_files) + exp_paths:
+            if x not in seen:
+                seen.add(x)
+                combined.append(x)
+        all_files = combined
     if fmt == "pdf":
         dest = os.path.join(OUTPUT_DIR, f"dataset_{ts}.pdf")
         merge_pdfs(files_by_script, dest)
@@ -196,7 +222,7 @@ def run(fmt: str = "csv", strict: bool = False, no_pretty: bool = False) -> tupl
             if not quiet and not no_pretty:
                 try:
                     from rich.table import Table
-
+                    
                     tbl = Table(title="Missing files", show_header=True)
                     tbl.add_column("Path")
                     limit = 30
@@ -215,6 +241,9 @@ def run(fmt: str = "csv", strict: bool = False, no_pretty: bool = False) -> tupl
                 for path in missing_list:
                     print(f"WARN missing file: {path}")
 
+            # One-liner summary of skipped files
+            print(f"Skipped {len(missing_list)} missing; see list above")
+
         if failed:
             print(f"⚠ Batch finished with {len(failed)} failure(s):", failed)
         else:
@@ -227,6 +256,189 @@ def run(fmt: str = "csv", strict: bool = False, no_pretty: bool = False) -> tupl
             # Return info so main() can sys.exit(2).
             return dest, added_count, missing_list
         return dest, added_count, missing_list
+
+
+def _print_preflight_summary(report: dict, no_pretty: bool) -> None:
+    quiet = bool(os.getenv("PE_QUIET"))
+    if quiet:
+        # single line summary
+        csv_bad = sum(1 for c in report["recent_csv_checks"] if c["ok"] is False)
+        print(
+            f"Pre-flight: outdir={'OK' if report['output_dir_writable'] else 'NO'}; "
+            f"csv_bad={csv_bad}; ibkr={report['ibkr_socket_ok']}"
+        )
+        for w in report["warnings"]:
+            print(f"WARN: {w}")
+        for e in report["errors"]:
+            print(f"ERROR: {e}")
+        return
+
+    try:
+        from rich.console import Console
+        from rich.table import Table
+
+        console = Console()
+
+        # Imports table
+        t_imp = Table(title="Imports", show_header=True)
+        t_imp.add_column("Package")
+        t_imp.add_column("Status")
+        for pkg, ok in report["imports"].items():
+            t_imp.add_row(pkg, "✅" if ok else "⚠️")
+        if not no_pretty:
+            console.print(t_imp)
+
+        # CSV checks table
+        t_csv = Table(title="Recent CSV checks", show_header=True)
+        t_csv.add_column("Name")
+        t_csv.add_column("Exists")
+        t_csv.add_column("Missing cols")
+        for c in report["recent_csv_checks"]:
+            miss = ", ".join(c["missing_cols"]) if c["missing_cols"] else ""
+            t_csv.add_row(c["name"], "yes" if c["exists"] else "no", miss)
+        if not no_pretty:
+            console.print(t_csv)
+
+        # One-liner statuses
+        console.print(
+            f"Output dir writable: {'yes' if report['output_dir_writable'] else 'no'}"
+        )
+        if report["ibkr_socket_ok"] is not None:
+            console.print(
+                f"IBKR socket reachable: {'yes' if report['ibkr_socket_ok'] else 'no'}"
+            )
+
+        # Warnings/errors plainly listed
+        for w in report["warnings"]:
+            console.print(f"[yellow]WARN[/]: {w}")
+        for e in report["errors"]:
+            console.print(f"[red]ERROR[/]: {e}")
+    except Exception:
+        # Fallback plain text
+        csv_bad = sum(1 for c in report["recent_csv_checks"] if c["ok"] is False)
+        print(
+            f"Pre-flight: outdir={'OK' if report['output_dir_writable'] else 'NO'}; "
+            f"csv_bad={csv_bad}; ibkr={report['ibkr_socket_ok']}"
+        )
+        for w in report["warnings"]:
+            print(f"WARN: {w}")
+        for e in report["errors"]:
+            print(f"ERROR: {e}")
+
+
+def preflight_check(no_pretty: bool = False) -> dict:
+    """
+    Perform lightweight environment checks and optional CSV sanity checks.
+    Returns a report dict with fields described in the CLI prompt.
+    """
+    global _PREFLIGHT_CACHE
+    if _PREFLIGHT_CACHE is not None:
+        # Reuse previous result to avoid repeated socket probes; still print summary.
+        _print_preflight_summary(_PREFLIGHT_CACHE, no_pretty=no_pretty)
+        return _PREFLIGHT_CACHE
+
+    report: dict = {
+        "output_dir_writable": False,
+        "imports": {
+            "pandas": False,
+            "yfinance": False,
+            "reportlab": False,
+            "ib_insync": False,
+        },
+        "ibkr_socket_ok": None,
+        "recent_csv_checks": [],
+        "errors": [],
+        "warnings": [],
+    }
+
+    # Output dir writable check
+    outdir = Path(os.path.expanduser(settings.output_dir))
+    try:
+        outdir.mkdir(parents=True, exist_ok=True)
+        probe = outdir / ".pe_preflight_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        report["output_dir_writable"] = True
+    except Exception as exc:  # pragma: no cover - depends on FS permissions
+        report["output_dir_writable"] = False
+        report["errors"].append(f"Output directory not writable: {outdir} ({exc})")
+
+    # Imports
+    try:
+        import pandas as _p  # noqa: F401
+
+        report["imports"]["pandas"] = True
+    except Exception:
+        report["warnings"].append("Optional dependency missing: pandas")
+    try:
+        import yfinance as _y  # noqa: F401
+
+        report["imports"]["yfinance"] = True
+    except Exception:
+        report["warnings"].append("Optional dependency missing: yfinance")
+    try:
+        import reportlab as _r  # noqa: F401
+
+        report["imports"]["reportlab"] = True
+    except Exception:
+        report["warnings"].append("Optional dependency missing: reportlab")
+    try:
+        import ib_insync as _ib  # noqa: F401
+
+        report["imports"]["ib_insync"] = True
+    except Exception:
+        report["warnings"].append("Optional dependency missing: ib_insync")
+
+    # IBKR socket check (best-effort)
+    if report["imports"]["ib_insync"]:
+        try:
+            with socket.create_connection(("127.0.0.1", 7497), timeout=0.25):
+                pass
+            report["ibkr_socket_ok"] = True
+        except Exception:
+            report["ibkr_socket_ok"] = False
+            report["warnings"].append(
+                "IBKR TWS/Gateway not reachable on 127.0.0.1:7497"
+            )
+
+    # CSV header sanity checks (best-effort)
+    from portfolio_exporter.core import io as io_core
+
+    checks = [
+        ("portfolio_greeks_positions", {"underlying", "right", "strike", "expiry", "qty"}),
+        ("live_quotes", {"symbol", "bid", "ask"}),
+    ]
+    for name, expected in checks:
+        path = io_core.latest_file(name, "csv")
+        entry = {
+            "name": name,
+            "path": str(path) if path else "",
+            "exists": bool(path),
+            "ok": None,
+            "missing_cols": [],
+        }
+        if path and Path(path).exists():
+            try:
+                # minimal header reader without pandas dependency
+                with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+                    header = fh.readline().strip().split(",")
+                present = {h.strip().strip('"').lower() for h in header if h}
+                missing = sorted(col for col in expected if col not in present)
+                entry["missing_cols"] = missing
+                entry["ok"] = len(missing) == 0
+                if missing:
+                    report["warnings"].append(
+                        f"CSV {name} missing columns: {', '.join(missing)}"
+                    )
+            except Exception as exc:  # pragma: no cover - unexpected format
+                entry["ok"] = None
+                report["warnings"].append(f"Could not read CSV {name}: {exc}")
+        report["recent_csv_checks"].append(entry)
+
+    # Pretty output
+    _PREFLIGHT_CACHE = report
+    _print_preflight_summary(report, no_pretty=no_pretty)
+    return report
 
 
 def main() -> None:
@@ -242,9 +454,54 @@ def main() -> None:
         action="store_true",
         help="disable Rich tables even on TTY",
     )
+    parser.add_argument(
+        "--expect",
+        metavar="JSON",
+        help="path to JSON list or {\"files\":[...]} of expected output files",
+    )
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="run environment and CSV sanity checks only",
+    )
+    parser.add_argument(
+        "--preflight-strict",
+        action="store_true",
+        help="non-zero exit if any preflight error or CSV issue",
+    )
     args = parser.parse_args()
 
-    result = run(fmt=args.format, strict=args.strict, no_pretty=args.no_pretty)
+    if args.preflight:
+        report = preflight_check(no_pretty=args.no_pretty)
+        if args.preflight_strict:
+            any_error = bool(report["errors"]) or any(
+                c.get("ok") is False for c in report["recent_csv_checks"]
+            )
+            if any_error:
+                sys.exit(2)
+        sys.exit(0)
+
+    # Optional: expected outputs JSON to augment zip list
+    expect: list[str] | None = None
+    if hasattr(args, "expect") and args.expect:
+        try:
+            import json
+
+            with open(args.expect, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            if isinstance(data, dict) and "files" in data and isinstance(data["files"], list):
+                expect = [str(x) for x in data["files"]]
+            elif isinstance(data, list):
+                expect = [str(x) for x in data]
+        except Exception as exc:
+            print(f"WARN could not read --expect file: {exc}")
+
+    result = run(
+        fmt=args.format,
+        strict=args.strict,
+        no_pretty=args.no_pretty,
+        expect=expect,
+    )
     if args.strict and result is not None:
         _, _, missing = result
         if missing:
