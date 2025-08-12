@@ -12,6 +12,7 @@ __all__ = [
     "risk_watch",
     "theta_cap",
     "gamma_scalp",
+    "daily_report",
     "trades_report",
     "order_builder",
     "roll_manager",

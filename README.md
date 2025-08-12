@@ -15,6 +15,7 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `update_tickers.py` | Writes the current IBKR stock positions to `tickers_live.txt` so other scripts always use a fresh portfolio. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. Supports `--excel` and `--pdf` outputs. |
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
+| `daily_report.py` | Render a one-page HTML/PDF snapshot from the latest portfolio greeks CSVs. |
 
 ## Strike Enrichment in Combos
 
@@ -138,6 +139,20 @@ JSON summary fields: `n_total`, `n_kept`, `u_count`, `underlyings`, `net_credit_
 ```
 
 Open interest values are sourced from Yahoo Finance rather than the IBKR feed.
+
+### Daily Report
+
+Create a one-page portfolio snapshot from the latest greeks exports:
+
+```bash
+python -m portfolio_exporter.scripts.daily_report
+python -m portfolio_exporter.scripts.daily_report --json
+python -m portfolio_exporter.scripts.daily_report --output-dir ./reports --html --pdf
+```
+
+The script reads the newest `portfolio_greeks_positions*.csv`,
+`portfolio_greeks_totals*.csv`, and `portfolio_greeks_combos*.csv` files.
+`--since` and `--until` filter positions by expiry when that column exists.
 
 ### Build Order (CLI)
 
