@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+from portfolio_exporter.core.ib_config import HOST as _IB_HOST, PORT as _IB_PORT, client_id as _client_id
 import math
 import threading
 from typing import Any, Dict
@@ -10,7 +12,7 @@ from ib_insync import IB, Option, Stock
 
 from portfolio_exporter.core.config import settings
 
-_IB_HOST, _IB_PORT, _IB_CID = "127.0.0.1", 7497, 29
+_IB_CID = _client_id("core", default=29)
 
 _ib_singleton: IB | None = None
 

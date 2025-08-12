@@ -13,6 +13,7 @@ import argparse
 import json
 
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
 
 from typing import Iterable, List, Tuple
 from typing import Optional
@@ -117,9 +118,9 @@ def _load_open_orders() -> pd.DataFrame:
 
     ib = IB()
     try:
-        ib.connect("127.0.0.1", 7497, clientId=19, timeout=5)
+        ib.connect(IB_HOST, IB_PORT, clientId=IB_OPEN_CID, timeout=5)
     except Exception as exc:  # pragma: no cover - connection optional
-        logger.error(f"IBKR connect failed: {exc}")
+        logger.warning("IBKR connection failed for open orders: host=%s port=%s cid=%s err=%s", IB_HOST, IB_PORT, IB_OPEN_CID, exc)
         return pd.DataFrame()
 
     rows = []
@@ -225,7 +226,8 @@ class OpenOrder:
 
 # ───────────────────────── CONFIG ──────────────────────────
 # Use Türkiye local time (Europe/Istanbul) for timestamp tags
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 5  # dedicated clientId
+IB_CID = _cid("trades_report", default=5)
+IB_OPEN_CID = _cid("trades_report_open", default=19)
 
 
 MONTH_MAP = {m.lower(): i for i, m in enumerate(calendar.month_name) if m}
@@ -308,10 +310,13 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=10)
     except Exception as exc:
-        print(
-            f"❌  Unable to connect to IBKR at {IB_HOST}:{IB_PORT} "
-            f"(clientId={IB_CID}).\n"
-            f"    Exception: {exc}"
+        # Align with other scripts: downgrade to a warning and continue offline
+        logger.warning(
+            "IBKR connection failed for executions: host=%s port=%s cid=%s err=%s",
+            IB_HOST,
+            IB_PORT,
+            IB_CID,
+            exc,
         )
         return [], []
 
@@ -712,16 +717,24 @@ def run(
     show_actions: bool = False,
     include_open: bool = True,
     return_df: bool = False,
+    save_combos: bool = True,
 ) -> pd.DataFrame | None:
-    """Generate trades report and export in desired format."""
+    """Generate trades report and export in desired format.
+
+    When invoked from the menu ("Executions / open orders"), this also saves
+    a `trades_combos.csv` file by default, mirroring the CLI behavior.
+    """
     trades = _load_trades()
     if trades is None:
         return None
 
-    df = trades.copy()
+    df_exec = trades.copy()
+    open_df = None
     if include_open:
         open_df = _load_open_orders()
-        df = pd.concat([df, open_df], ignore_index=True, sort=False)
+        df = pd.concat([df_exec, open_df], ignore_index=True, sort=False)
+    else:
+        df = df_exec
 
     if df.empty:
         print("⚠️ No trades found for the specified date range; no report generated.")
@@ -738,6 +751,16 @@ def run(
     date_tag = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
     path = save(df, f"trades_report_{date_tag}", fmt, settings.output_dir)
     print(f"✅ Trades report exported → {path}")
+
+    # Also detect and save combos unless disabled
+    if save_combos:
+        try:
+            combos_df = _detect_and_enrich_trades_combos(df_exec, open_df)
+            path_combos = _save_trades_combos(combos_df, fmt="csv")
+            print(f"✅ Trades combos exported → {path_combos}")
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"⚠️ Trades combos export skipped: {exc}")
+
     if return_df:
         return df
     return None
@@ -870,11 +893,95 @@ def _build_positions_like_df(execs: pd.DataFrame, opens: pd.DataFrame | None = N
             "datetime": df.get("datetime"),
         }
     )
+
+    # Expand combo legs from BAG rows when available so combo structures have strikes/rights
+    try:
+        if "secType" in df.columns and "combo_legs" in df.columns:
+            import ast
+            leg_rows = []
+            for _, r in df[df["secType"] == "BAG"].iterrows():
+                legs_val = r.get("combo_legs")
+                if legs_val is None or (isinstance(legs_val, float) and np.isnan(legs_val)):
+                    continue
+                seq = None
+                if isinstance(legs_val, str):
+                    s = legs_val.strip()
+                    if s.startswith("[") and s.endswith("]"):
+                        try:
+                            seq = ast.literal_eval(s)
+                        except Exception:
+                            seq = None
+                elif isinstance(legs_val, (list, tuple)):
+                    seq = legs_val
+                if not isinstance(seq, (list, tuple)):
+                    continue
+                pkg_qty = r.get("qty", 1)
+                try:
+                    pkg_qty = float(pkg_qty)
+                except Exception:
+                    pkg_qty = 1.0
+                for ent in seq:
+                    if not isinstance(ent, dict):
+                        continue
+                    # Derive signed leg qty from leg action and package qty
+                    action = str(ent.get("action", "")).upper()
+                    ratio = ent.get("ratio", 1)
+                    try:
+                        ratio = float(ratio)
+                    except Exception:
+                        ratio = 1.0
+                    signed_qty = ratio * pkg_qty * (1 if action == "BUY" else -1)
+                    # Build a leg-like row
+                    leg_rows.append(
+                        {
+                            "underlying": ent.get("symbol", r.get("symbol")),
+                            "expiry": ent.get("expiry", r.get("expiry")),
+                            "right": ent.get("right", ""),
+                            "strike": ent.get("strike", np.nan),
+                            "qty": signed_qty,
+                            "secType": ent.get("sec_type", "OPT"),
+                            "conId": np.nan,
+                            "multiplier": 100,
+                            "price": np.nan,
+                            "order_id": r.get("order_id"),
+                            "perm_id": r.get("perm_id"),
+                            "datetime": r.get("datetime"),
+                        }
+                    )
+            if leg_rows:
+                legs_df = pd.DataFrame(leg_rows)
+                # Normalize numeric types and rights
+                legs_df["strike"] = pd.to_numeric(legs_df["strike"], errors="coerce")
+                legs_df["qty"] = pd.to_numeric(legs_df["qty"], errors="coerce")
+                legs_df["multiplier"] = pd.to_numeric(legs_df["multiplier"], errors="coerce").fillna(100).astype(int)
+                legs_df["right"] = legs_df["right"].astype(str).str.upper().replace({"CALL": "C", "PUT": "P", "NAN": ""})
+                legs_df.loc[~legs_df["right"].isin(["C", "P"]) , "right"] = ""
+                # Prefer leg rows for option-like records and drop BAG placeholders
+                out = pd.concat([out[out.get("secType") != "BAG"], legs_df], ignore_index=True, sort=False)
+    except Exception:
+        # Non-fatal; continue with whatever we have
+        pass
     # type coercions
     out["strike"] = pd.to_numeric(out["strike"], errors="coerce")
     out["qty"] = pd.to_numeric(out["qty"], errors="coerce")
     try:
         out["conId"] = pd.to_numeric(out["conId"], errors="coerce").astype("Int64")
+    except Exception:
+        pass
+    # Synthesize conId for rows missing it so that combo legs (which rely on conId) can map back
+    try:
+        import hashlib as _hl
+        def _synth(row):
+            try:
+                val = row.get("conId")
+                if pd.notna(val):
+                    return int(val)
+            except Exception:
+                pass
+            key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike','')}"
+            v = int.from_bytes(_hl.sha1(str(key).encode()).digest()[:4], "big")
+            return -int(v)
+        out["conId"] = out.apply(_synth, axis=1).astype("Int64")
     except Exception:
         pass
     try:

@@ -47,17 +47,35 @@ def _macd(
 
 
 def run(tickers: Sequence[str], fmt: str = "csv") -> None:
-    frames = []
+    # Normalize and de-duplicate user input
+    symbols = []
+    seen = set()
     for t in tickers:
-        hist = yf.download(t, period="90d", progress=False)
-        if hist.empty:
+        norm = (t or "").strip().upper()
+        if not norm or norm in seen:
+            continue
+        seen.add(norm)
+        symbols.append(norm)
+
+    frames = []
+    for t in symbols:
+        try:
+            hist = yf.download(t, period="90d", progress=False)
+        except Exception as exc:  # network or symbol errors
+            print(f"⚠️  Download failed for {t}: {exc}")
+            continue
+        if hist is None or getattr(hist, "empty", True):
+            print(f"⚠️  No data for {t}")
             continue
         hist = hist.rename_axis("Date").reset_index()
+        if "Close" not in hist.columns:
+            print(f"⚠️  Unexpected columns for {t}; skipping")
+            continue
         ind = _calc_indicators(hist)
         ind.insert(0, "Ticker", t)
         frames.append(ind)
     if not frames:
         print("⚠️  No data downloaded.")
         return
-    df = pd.concat(frames)
+    df = pd.concat(frames, ignore_index=True)
     io.save(df, name="tech_scan", fmt=fmt, outdir=settings.output_dir)

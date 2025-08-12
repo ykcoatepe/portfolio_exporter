@@ -251,7 +251,8 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"live_quotes_{DATE_TAG}_{TIME_TAG}.csv")
 OUTPUT_POS_CSV = os.path.join(OUTPUT_DIR, f"live_positions_{DATE_TAG}_{TIME_TAG}.csv")
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 2  # separate clientId
+from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+IB_CID = _cid("live_feed", default=2)  # separate clientId
 IB_TIMEOUT = 4.0  # seconds to wait per batch
 
 # yfinance proxy map for friendly tickers

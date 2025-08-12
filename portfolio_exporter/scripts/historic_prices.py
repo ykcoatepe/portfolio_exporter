@@ -36,7 +36,8 @@ try:
 except ImportError:
     IB_AVAILABLE = False
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 3  # separate clientId for historic pull
+from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+IB_CID = _cid("historic_prices", default=3)  # separate clientId for historic pull
 
 EXTRA_TICKERS = ["SPY", "QQQ", "IWM", "^VIX", "DX-Y.NYB"]  # core indices
 PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}

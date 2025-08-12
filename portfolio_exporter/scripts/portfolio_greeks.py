@@ -193,7 +193,8 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 
 NAV_LOG = Path(os.path.join(OUTPUT_DIR, "nav_history.csv"))
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 11  # separate clientId from snapshots
+from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+IB_CID = _cid("portfolio_greeks", default=11)  # separate clientId from snapshots
 
 # contract multipliers by secType (IB doesn't always fill this field)
 DEFAULT_MULT = {

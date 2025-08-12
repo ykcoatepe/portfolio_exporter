@@ -542,6 +542,7 @@ def cli(argv: List[str] | None = None) -> int:
     parser.add_argument("--call-strike", dest="call_strike", type=float, default=None)
     parser.add_argument("--qty", type=int, default=1)
     parser.add_argument("--account", default=None)
+    parser.add_argument("--json", action="store_true", help="Print ticket JSON to stdout and do not write files")
     args = parser.parse_args(argv)
 
     strat = args.strategy.lower().replace("-", "_")
@@ -612,6 +613,9 @@ def cli(argv: List[str] | None = None) -> int:
     else:
         parser.error(f"Unknown strategy {args.strategy}")
 
+    if args.json:
+        print(json.dumps(ticket, separators=(",", ":")))
+        return 0
     ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     name = f"ticket_{args.symbol}_{ts}"
     io_save(ticket, name, fmt="json")

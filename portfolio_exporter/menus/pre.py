@@ -63,7 +63,8 @@ def launch(status: StatusBar, default_fmt: str):
     console = status.console if status else Console()
 
     def _external_scan(fmt: str) -> None:
-        tickers = _input("\u27b7  Enter tickers comma-separated: ").upper().split(",")
+        raw = _input("\u27b7  Enter tickers comma-separated: ")
+        tickers = [t.strip().upper() for t in raw.split(",") if t.strip()]
         if status:
             status.update(f"Tech scan: {','.join(tickers)} …", "cyan")
         from portfolio_exporter.scripts import tech_scan

@@ -124,7 +124,8 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 10
+from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+IB_CID = _cid("option_chain", default=10)
 LOG_FMT = "%(asctime)s %(levelname)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FMT)
 

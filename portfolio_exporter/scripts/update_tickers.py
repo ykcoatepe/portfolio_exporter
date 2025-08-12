@@ -6,13 +6,14 @@ import os
 from typing import List
 from pathlib import Path
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
 
 try:
     from ib_insync import IB
 except ImportError:  # pragma: no cover - optional dependency
     IB = None  # type: ignore
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 4  # dedicated clientId
+IB_CID = _cid("update_tickers", default=4)  # dedicated clientId
 PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}
 TICKERS_FILE = "tickers_live.txt"
 

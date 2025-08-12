@@ -96,7 +96,8 @@ RISK_FREE_RATE = 0.01
 # Store IV history alongside other outputs
 DATA_DIR = os.path.join(OUTPUT_DIR, "iv_history")
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 1  # tweak if needed
+from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+IB_CID = _cid("tech_signals", default=1)  # tweak if needed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
