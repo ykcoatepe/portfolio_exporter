@@ -22,7 +22,9 @@ from typing import Optional
 import pandas as pd
 import requests
 
+from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import io as core_io
+from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.config import settings
 
 
@@ -143,55 +145,56 @@ def _load_data(source: str, fixture_csv: Path | None) -> pd.DataFrame:
 # core logic
 
 
-def _run_core(ns: argparse.Namespace) -> tuple[pd.DataFrame, dict]:
+def _run_core(
+    ns: argparse.Namespace,
+    formats: dict[str, bool],
+    outdir: Path,
+) -> tuple[pd.DataFrame, dict]:
     df = _load_data(ns.source, ns.fixture_csv)
     df = _filter_range(df, ns.start, ns.end)
     if df.empty:
         sys.exit("❌  No data in the selected date range.")
     df = df.rename(columns={"net_liq": "NetLiq"})
 
-    formats: list[str] = []
-    if ns.csv:
-        formats.append("csv")
-    if ns.excel:
-        formats.append("excel")
-    if ns.pdf:
-        formats.append("pdf")
-    if not formats and not ns.json:
-        formats = ["csv"]
-
-    outputs = {"csv": "", "excel": "", "pdf": ""}
-    if formats:
-        outdir_env = os.getenv("PE_OUTPUT_DIR")
-        outdir = Path(ns.output_dir or outdir_env or settings.output_dir).expanduser()
+    outputs = {k: "" for k in formats}
+    if any(formats.values()):
         df_save = df.rename_axis("date").reset_index()
-        for fmt in formats:
-            outputs[fmt] = str(
-                core_io.save(df_save, "net_liq_history_export", fmt, outdir)
-            )
+        for fmt, do in formats.items():
+            if do:
+                outputs[fmt] = str(
+                    core_io.save(df_save, "net_liq_history_export", fmt, outdir)
+                )
 
-    summary = {
-        "rows": len(df),
-        "start": df.index.min().isoformat(),
-        "end": df.index.max().isoformat(),
-        "outputs": outputs,
-    }
+    summary = json_helpers.time_series_summary(
+        rows=len(df),
+        start=df.index.min().isoformat(),
+        end=df.index.max().isoformat(),
+        outputs=outputs,
+    )
     return df, summary
 
 
 def cli(ns: argparse.Namespace) -> dict:
-    df, summary = _run_core(ns)
-    # Honor PE_QUIET=1 from the environment without requiring --quiet
-    quiet_env = os.getenv("PE_QUIET") not in (None, "", "0")
-    effective_quiet = ns.quiet or quiet_env
+    outdir = cli_helpers.resolve_output_dir(getattr(ns, "output_dir", None))
+    defaults = {"csv": bool(getattr(ns, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR"))}
+    defaults.update({"excel": False, "pdf": False})
+    formats = cli_helpers.decide_file_writes(
+        ns,
+        json_only_default=True,
+        defaults=defaults,
+    )
+
+    df, summary = _run_core(ns, formats, outdir)
+    quiet, pretty = cli_helpers.resolve_quiet(ns.no_pretty)
+    effective_quiet = quiet or getattr(ns, "quiet", False)
     if not ns.json and not effective_quiet:
         df_print = df.rename_axis("date").reset_index()
-        if ns.no_pretty:
-            print(df_print.to_string(index=False))
-        else:
+        if pretty:
             from rich.console import Console
 
             Console().print(df_print)
+        else:
+            print(df_print.to_string(index=False))
     return summary
 
 
@@ -209,13 +212,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--excel", action="store_true")
     parser.add_argument("--pdf", action="store_true")
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--no-files", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--no-pretty", action="store_true")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     summary = cli(args)
     if args.json:
-        print(json.dumps(summary))
+        quiet, _ = cli_helpers.resolve_quiet(args.no_pretty)
+        cli_helpers.print_json(summary, quiet)
     return 0
 
 
@@ -228,12 +233,15 @@ def run(fmt: str = "csv", plot: bool = False) -> None:  # pragma: no cover - leg
         excel=(fmt == "excel"),
         pdf=(fmt == "pdf"),
         output_dir=None,
+        no_files=False,
         quiet=False,
         no_pretty=False,
         json=False,
         fixture_csv=None,
     )
-    df, _summary = _run_core(ns)
+    formats = {"csv": ns.csv, "excel": ns.excel, "pdf": ns.pdf}
+    outdir = cli_helpers.resolve_output_dir(None)
+    df, _summary = _run_core(ns, formats, outdir)
     if plot:
         try:
             import matplotlib.pyplot as plt  # type: ignore

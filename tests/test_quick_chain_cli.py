@@ -3,6 +3,8 @@ import os
 import subprocess
 import sys
 import importlib
+import os
+import json
 
 
 def test_json_summary_no_files(tmp_path):
@@ -18,7 +20,6 @@ def test_json_summary_no_files(tmp_path):
             "portfolio_exporter/scripts/quick_chain.py",
             "--chain-csv",
             "tests/data/quick_chain_fixture.csv",
-            "--no-pretty",
             "--json",
         ],
         capture_output=True,
@@ -27,8 +28,8 @@ def test_json_summary_no_files(tmp_path):
         env=env,
     )
     data = json.loads(result.stdout)
-    assert data["rows"] > 0
-    assert data["underlyings"]
+    assert data["sections"]["chain"] > 0
+    assert data["meta"]["underlyings"]
     assert not any(tmp_path.iterdir())
 
 
@@ -71,5 +72,5 @@ def test_lazy_deps(monkeypatch, tmp_path, capsys):
     out = capsys.readouterr().out
     data = json.loads(out)
     assert code == 0
-    assert data["rows"] > 0
+    assert data["sections"]["chain"] > 0
     assert not any(tmp_path.iterdir())
