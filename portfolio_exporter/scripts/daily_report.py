@@ -154,6 +154,41 @@ def _expiry_radar(
 
 
 # ---------------------------------------------------------------------------
+# analytics
+
+
+def _delta_buckets(df: pd.DataFrame) -> dict[str, int]:
+    labels = [
+        "(-1,-0.6]",
+        "(-0.6,-0.3]",
+        "(-0.3,0]",
+        "(0,0.3]",
+        "(0.3,0.6]",
+        "(0.6,1]",
+    ]
+    counts = {label: 0 for label in labels}
+    if df.empty or "delta" not in df.columns:
+        return counts
+    bins = [-1.0, -0.6, -0.3, 0.0, 0.3, 0.6, 1.0]
+    binned = pd.cut(df["delta"], bins=bins, labels=labels, include_lowest=True)
+    vc = binned.value_counts().reindex(labels, fill_value=0)
+    return {label: int(vc[label]) for label in labels}
+
+
+def _theta_decay_5d(df: pd.DataFrame) -> float:
+    if df.empty:
+        return 0.0
+    theta_col = (
+        "theta_exposure"
+        if "theta_exposure" in df.columns
+        else "theta" if "theta" in df.columns else None
+    )
+    if theta_col is None:
+        return 0.0
+    return float(df[theta_col].sum() * 5)
+
+
+# ---------------------------------------------------------------------------
 # output builders
 
 
@@ -164,6 +199,8 @@ def _build_html(
     positions: pd.DataFrame,
     account: str | None,
     expiry_radar: dict[str, Any] | None,
+    delta_buckets: dict[str, int] | None = None,
+    theta_decay_5d: float | None = None,
 ) -> str:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     parts = ["<h1>Daily Portfolio Report</h1>"]
@@ -188,6 +225,16 @@ def _build_html(
             parts.append(pd.DataFrame(tab_rows).to_html(index=False))
         else:
             parts.append("<p>No expiries within window.</p>")
+    if delta_buckets is not None:
+        parts.append("<h2>Delta Buckets</h2>")
+        db_df = pd.DataFrame({
+            "bucket": list(delta_buckets.keys()),
+            "count": list(delta_buckets.values()),
+        })
+        parts.append(db_df.to_html(index=False))
+    if theta_decay_5d is not None:
+        parts.append("<h2>Theta Decay 5d</h2>")
+        parts.append(f"<p>{theta_decay_5d}</p>")
     if not totals.empty:
         parts.append("<h2>Totals</h2>")
         parts.append(totals.to_html(index=False))
@@ -207,6 +254,8 @@ def _build_pdf_flowables(
     positions: pd.DataFrame,
     account: str | None,
     expiry_radar: dict[str, Any] | None,
+    delta_buckets: dict[str, int] | None = None,
+    theta_decay_5d: float | None = None,
 ):
     if SimpleDocTemplate is None:
         return []
@@ -237,6 +286,16 @@ def _build_pdf_flowables(
             flow.append(RLTable([df_r.columns.tolist()] + df_r.values.tolist()))
         else:
             flow.append(Paragraph("No expiries within window.", styles["Normal"]))
+    if delta_buckets is not None:
+        flow.append(Paragraph("Delta Buckets", styles["Heading2"]))
+        df_b = pd.DataFrame({
+            "bucket": list(delta_buckets.keys()),
+            "count": list(delta_buckets.values()),
+        })
+        flow.append(RLTable([df_b.columns.tolist()] + df_b.values.tolist()))
+    if theta_decay_5d is not None:
+        flow.append(Paragraph("Theta Decay 5d", styles["Heading2"]))
+        flow.append(Paragraph(str(theta_decay_5d), styles["Normal"]))
     if not totals.empty:
         flow.append(Paragraph("Totals", styles["Heading2"]))
         flow.append(RLTable([totals.columns.tolist()] + totals.values.tolist()))
@@ -307,9 +366,23 @@ def main(argv: list[str] | None = None) -> dict:
         expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
         meta["expiry_radar"] = expiry_radar
 
+    delta_buckets = _delta_buckets(positions)
+    theta_decay_5d = _theta_decay_5d(positions)
+    meta["delta_buckets"] = delta_buckets
+    meta["theta_decay_5d"] = theta_decay_5d
+
     html_str = None
     if formats.get("html") or formats.get("pdf"):
-        html_str = _build_html(outdir, totals, combos, positions, account, expiry_radar)
+        html_str = _build_html(
+            outdir,
+            totals,
+            combos,
+            positions,
+            account,
+            expiry_radar,
+            delta_buckets,
+            theta_decay_5d,
+        )
 
     if formats.get("html") and html_str is not None:
         path_html = core_io.save(html_str, "daily_report", "html", outdir)
@@ -318,7 +391,14 @@ def main(argv: list[str] | None = None) -> dict:
             console.print(f"HTML report → {path_html}")
     if formats.get("pdf"):
         flowables = _build_pdf_flowables(
-            outdir, totals, combos, positions, account, expiry_radar
+            outdir,
+            totals,
+            combos,
+            positions,
+            account,
+            expiry_radar,
+            delta_buckets,
+            theta_decay_5d,
         )
         path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
         outputs["pdf"] = str(path_pdf)
@@ -334,6 +414,11 @@ def main(argv: list[str] | None = None) -> dict:
         outputs=outputs,
         meta=meta or None,
     )
+
+    summary["positions_rows"] = len(positions)
+    summary["combos_rows"] = len(combos)
+    summary["totals_rows"] = len(totals)
+    summary.update(meta)
 
     if args.json:
         cli_helpers.print_json(summary, quiet)
