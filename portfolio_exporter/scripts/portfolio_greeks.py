@@ -64,6 +64,7 @@ from portfolio_exporter.core import io as io_core
 from portfolio_exporter.core import config as config_core
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
+from portfolio_exporter.core.runlog import RunLog
 
 import numpy as np
 
@@ -2457,38 +2458,51 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
     outdir = cli_helpers.resolve_output_dir(args.output_dir)
     quiet, _pretty = cli_helpers.resolve_quiet(args.no_pretty)
 
-    pos_df, totals, combos_df = run(
-        fmt="csv",
-        write_positions=formats["positions"],
-        write_totals=formats["totals"],
-        combos=formats["combos"],
-        combo_types=args.combo_types,
-        combos_source=args.combos_source,
-        persist_combos=args.persist_combos,
-        output_dir=outdir,
-        return_frames=True,
-    )
+    with RunLog(script="portfolio_greeks", args=vars(args), output_dir=outdir) as rl:
+        pos_df, totals, combos_df = run(
+            fmt="csv",
+            write_positions=formats["positions"],
+            write_totals=formats["totals"],
+            combos=formats["combos"],
+            combo_types=args.combo_types,
+            combos_source=args.combos_source,
+            persist_combos=args.persist_combos,
+            output_dir=outdir,
+            return_frames=True,
+        )
 
-    outputs: Dict[str, str] = {}
-    if formats["positions"]:
-        outputs["positions"] = str(Path(outdir) / "portfolio_greeks_positions.csv")
-    if formats["totals"]:
-        outputs["totals"] = str(Path(outdir) / "portfolio_greeks_totals.csv")
-        if formats["combos"]:
-            outputs["combos"] = str(Path(outdir) / "portfolio_greeks_combos.csv")
+        outputs: Dict[str, str] = {}
+        written: list[Path] = []
+        if formats["positions"]:
+            p = Path(outdir) / "portfolio_greeks_positions.csv"
+            outputs["positions"] = str(p)
+            written.append(p)
+        if formats["totals"]:
+            p = Path(outdir) / "portfolio_greeks_totals.csv"
+            outputs["totals"] = str(p)
+            written.append(p)
+            if formats["combos"]:
+                pc = Path(outdir) / "portfolio_greeks_combos.csv"
+                outputs["combos"] = str(pc)
+                written.append(pc)
 
-    summary = json_helpers.report_summary(
-        {
-            "positions": len(pos_df),
-            "totals": 1,
-            "combos": len(combos_df),
-        },
-        outputs=outputs,
-        meta={"script": "portfolio_greeks"},
-    )
-    if args.json:
-        cli_helpers.print_json(summary, quiet)
-    return summary
+        rl.add_outputs(written)
+        manifest_path = rl.finalize(write=bool(written))
+
+        summary = json_helpers.report_summary(
+            {
+                "positions": len(pos_df),
+                "totals": 1,
+                "combos": len(combos_df),
+            },
+            outputs=outputs,
+            meta={"script": "portfolio_greeks"},
+        )
+        if manifest_path:
+            summary["outputs"].append(str(manifest_path))
+        if args.json:
+            cli_helpers.print_json(summary, quiet)
+        return summary
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry
