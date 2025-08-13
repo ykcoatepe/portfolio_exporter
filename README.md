@@ -58,6 +58,20 @@ If the token is not present, the script will attempt to read `dailyNetLiq.csv` f
 make setup
 ```
 
+Quick start (recommended flow)
+- make lint: run Ruff with project rules
+- make test: run pytest locally
+- make build: validate packaging
+- Quiet CI runs: export `PE_QUIET=1` to suppress Rich output
+
+Environment and configuration
+- `OUTPUT_DIR`: default directory for generated files (honored via settings)
+- `PE_OUTPUT_DIR`: legacy override used by some scripts (e.g., Net‑Liq CLI)
+- `PE_QUIET`: when set and non‑zero, suppresses pretty console output
+- `CP_REFRESH_TOKEN`: Client Portal refresh token for PortfolioAnalyst API
+- `TWS_EXPORT_DIR`: path to Trader Workstation exports (for `dailyNetLiq.csv`)
+
+See `.env.example` for a starter file; any values there are read by the app.
 
 ## Upgrading dependencies
 
@@ -159,6 +173,7 @@ Tips
 - `--no-files`: Suppress writing HTML/PDF; useful in CI/sandboxes with `--json`.
 - `--output-dir`: Override the destination directory for artifacts.
 - Env override: set `OUTPUT_DIR=./.outputs` in a `.env` file to change the default output path (picked up by settings).
+- Quiet mode: set `PE_QUIET=1` to suppress pretty console output (same effect as adding `--no-pretty` in menus or CLI where available).
 
 ### Net-Liq chart (CLI)
 
@@ -352,9 +367,26 @@ python -m portfolio_exporter.scripts.net_liq_history_export --fixture-csv tests/
 python -m portfolio_exporter.scripts.net_liq_history_export --fixture-csv tests/data/net_liq_fixture.csv --csv --pdf --output-dir ./.tmp_nlh
 ```
 
+## Documentation
+
+- docs/CONFIGURATION.md: environment variables, default paths, and output directory behavior.
+- docs/TROUBLESHOOTING.md: common issues (data sources, PDF dependency, IBKR connectivity) and how to resolve them.
+
 ## Contributing
 
 See Repository Guidelines in [AGENTS.md](AGENTS.md) for project structure, style, testing, and PR expectations. In short: use Python 3.11+, run `make setup`, lint with `make lint`, test with `make test`, and keep commits small and descriptive.
+Sources and auto‑fallback
+- `--source auto` tries, in order: local TWS `dailyNetLiq.csv`, Client Portal via `CP_REFRESH_TOKEN`, explicit `--fixture-csv`, and finally the repo fixture at `tests/data/net_liq_fixture.csv` when running from this repository.
+- If no source is available, the error message explains the three options and shows the expected TWS path.
+
+Quiet/CI mode
+- Export `PE_QUIET=1` to disable Rich tables in script output without changing flags.
+- Most CLIs also support `--quiet` and `--no-pretty` to suppress console rendering.
+
+Troubleshooting
+- No data source: ensure one of TWS export, CP token, or a fixture CSV is available; see docs/TROUBLESHOOTING.md.
+- Missing PDF output: install `reportlab` (already included in `requirements.txt` for dev) or skip `--pdf`.
+
 
 
 ## License
