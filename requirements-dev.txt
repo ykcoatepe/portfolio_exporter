@@ -22,6 +22,8 @@ idna==3.10
     # via requests
 iniconfig==2.1.0
     # via pytest
+jsonschema==4.25.0
+    # via -r requirements-dev.in
 mypy-extensions==1.1.0
     # via black
 numpy==2.3.2
@@ -34,6 +36,8 @@ packaging==25.0
     #   build
     #   pytest
 pandas==2.3.1
+    # via -r requirements-dev.in
+pandera==0.26.0
     # via -r requirements-dev.in
 pathspec==0.12.1
     # via black

@@ -332,6 +332,7 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument("--combos-source", default="csv")
     parser.add_argument("--expiry-window", type=int, nargs="?", const=10, default=None)
     parser.add_argument("--symbol")
+    parser.add_argument("--preflight", action="store_true")
     args = parser.parse_args(argv)
 
     formats = cli_helpers.decide_file_writes(
@@ -342,6 +343,37 @@ def main(argv: list[str] | None = None) -> dict:
     outdir = cli_helpers.resolve_output_dir(args.output_dir)
     quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
     console = Console() if pretty else None
+
+    if args.preflight:
+        from portfolio_exporter.core import schemas as pa_schemas
+
+        warnings: list[str] = []
+        ok = True
+        files = {
+            "positions": core_io.latest_file("portfolio_greeks_positions"),
+            "totals": core_io.latest_file("portfolio_greeks_totals"),
+            "combos": core_io.latest_file("portfolio_greeks_combos"),
+        }
+        for name, path in files.items():
+            if not path or not path.exists():
+                warnings.append(f"missing {name} csv")
+                ok = False
+                continue
+            try:
+                df = pd.read_csv(path)
+            except Exception as e:
+                warnings.append(f"{path.name}: {e}")
+                ok = False
+                continue
+            msgs = pa_schemas.check_headers(name, df)
+            warnings.extend([f"{path.name}: {m}" for m in msgs])
+            if msgs and not any("pandera" in m for m in msgs):
+                ok = False
+        summary = json_helpers.report_summary({}, outputs={}, warnings=warnings, meta={"script": "daily_report"})
+        summary["ok"] = ok
+        if args.json:
+            cli_helpers.print_json(summary, quiet)
+        return summary
 
     with RunLog(script="daily_report", args=vars(args), output_dir=outdir) as rl:
         # Load data

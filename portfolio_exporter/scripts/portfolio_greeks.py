@@ -2440,7 +2440,33 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--output-dir")
     parser.add_argument("--no-files", action="store_true")
+    parser.add_argument("--preflight", action="store_true")
     args = parser.parse_args(argv)
+
+    if args.preflight:
+        from portfolio_exporter.core import schemas as pa_schemas
+
+        warnings: list[str] = []
+        ok = True
+        if args.positions_csv:
+            try:
+                df = pd.read_csv(os.path.expanduser(args.positions_csv))
+            except Exception as e:
+                warnings.append(str(e))
+                ok = False
+            else:
+                msgs = pa_schemas.check_headers("positions", df)
+                warnings.extend(msgs)
+                if msgs and not any("pandera" in m for m in msgs):
+                    ok = False
+        else:
+            warnings.append("--positions-csv required for preflight")
+            ok = False
+        summary = json_helpers.report_summary({}, outputs={}, warnings=warnings, meta={"script": "portfolio_greeks"})
+        summary["ok"] = ok
+        if args.json:
+            cli_helpers.print_json(summary, True)
+        return summary
 
     globals()["args"] = args
     if args.debug_combos:
