@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import os
 import json
+import os
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from rich.console import Console
@@ -33,8 +34,7 @@ except Exception:  # pragma: no cover - optional
 
 
 # ---------------------------------------------------------------------------
-# data loaders
-
+# data loaders & helpers
 
 def _load_csv(name: str) -> pd.DataFrame:
     path = core_io.latest_file(name)
@@ -92,12 +92,76 @@ def _prep_combos(df: pd.DataFrame) -> pd.DataFrame:
     return df.sort_values(["underlying", "expiry"], ascending=[True, False]).head(50)
 
 
+def _filter_symbol(df: pd.DataFrame, symbol: str | None) -> pd.DataFrame:
+    if not symbol or df.empty or "underlying" not in df.columns:
+        return df
+    return df[df["underlying"].str.upper() == symbol.upper()]
+
+
+def _expiry_radar(
+    df_combos: pd.DataFrame,
+    df_positions: pd.DataFrame,
+    window_days: int,
+    console: Console | None = None,
+) -> dict[str, Any]:
+    basis = "combos" if not df_combos.empty else "positions"
+    df = df_combos if basis == "combos" else df_positions
+    result: dict[str, Any] = {
+        "window_days": window_days,
+        "basis": basis,
+        "rows": [],
+    }
+    if df.empty or window_days <= 0:
+        return result
+    if "expiry" not in df.columns:
+        if console:
+            console.print("Expiry radar: missing 'expiry' column", style="yellow")
+        return result
+    exp = pd.to_datetime(df["expiry"], errors="coerce")
+    now = pd.Timestamp(datetime.now().date())
+    df = df.copy()
+    df["expiry_dt"] = exp
+    df = df.dropna(subset=["expiry_dt"])
+    df["days"] = (df["expiry_dt"] - now).dt.days
+    df = df[(df["days"] >= 0) & (df["days"] <= window_days)]
+    if df.empty:
+        return result
+    delta_col = (
+        "delta_exposure"
+        if "delta_exposure" in df.columns
+        else "delta" if "delta" in df.columns else None
+    )
+    theta_col = (
+        "theta_exposure"
+        if "theta_exposure" in df.columns
+        else "theta" if "theta" in df.columns else None
+    )
+    rows: list[dict[str, Any]] = []
+    for date, grp in df.groupby(df["expiry_dt"].dt.date):
+        row: dict[str, Any] = {"date": date.isoformat(), "count": int(len(grp))}
+        if delta_col:
+            row["delta_total"] = float(grp[delta_col].sum())
+        if theta_col:
+            row["theta_total"] = float(grp[theta_col].sum())
+        if basis == "combos" and "structure" in grp.columns:
+            by_struct = grp.groupby("structure").size().to_dict()
+            row["by_structure"] = {str(k): int(v) for k, v in by_struct.items()}
+        rows.append(row)
+    result["rows"] = sorted(rows, key=lambda r: r["date"])
+    return result
+
+
 # ---------------------------------------------------------------------------
 # output builders
 
 
 def _build_html(
-    outdir: Path, totals: pd.DataFrame, combos: pd.DataFrame, positions: pd.DataFrame, account: str | None
+    outdir: Path,
+    totals: pd.DataFrame,
+    combos: pd.DataFrame,
+    positions: pd.DataFrame,
+    account: str | None,
+    expiry_radar: dict[str, Any] | None,
 ) -> str:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     parts = ["<h1>Daily Portfolio Report</h1>"]
@@ -105,6 +169,23 @@ def _build_html(
     if account:
         parts.append(f"<p>Account: {account}</p>")
     parts.append(f"<p>Output dir: {outdir}</p>")
+    if expiry_radar is not None:
+        parts.append(
+            f"<h2>Expiry Radar (next {expiry_radar['window_days']} days)</h2>"
+        )
+        rows = expiry_radar.get("rows", [])
+        if rows:
+            tab_rows = []
+            for r in rows:
+                r = r.copy()
+                if "by_structure" in r:
+                    r["by_structure"] = "; ".join(
+                        f"{k}: {v}" for k, v in r["by_structure"].items()
+                    )
+                tab_rows.append(r)
+            parts.append(pd.DataFrame(tab_rows).to_html(index=False))
+        else:
+            parts.append("<p>No expiries within window.</p>")
     if not totals.empty:
         parts.append("<h2>Totals</h2>")
         parts.append(totals.to_html(index=False))
@@ -118,7 +199,12 @@ def _build_html(
 
 
 def _build_pdf_flowables(
-    outdir: Path, totals: pd.DataFrame, combos: pd.DataFrame, positions: pd.DataFrame, account: str | None
+    outdir: Path,
+    totals: pd.DataFrame,
+    combos: pd.DataFrame,
+    positions: pd.DataFrame,
+    account: str | None,
+    expiry_radar: dict[str, Any] | None,
 ):
     if SimpleDocTemplate is None:
         return []
@@ -128,6 +214,27 @@ def _build_pdf_flowables(
     if account:
         flow.append(Paragraph(f"Account: {account}", styles["Normal"]))
     flow.append(Paragraph(f"Output dir: {outdir}", styles["Normal"]))
+    if expiry_radar is not None:
+        flow.append(
+            Paragraph(
+                f"Expiry Radar (next {expiry_radar['window_days']} days)",
+                styles["Heading2"],
+            )
+        )
+        rows = expiry_radar.get("rows", [])
+        if rows:
+            tab_rows = []
+            for r in rows:
+                r = r.copy()
+                if "by_structure" in r:
+                    r["by_structure"] = ", ".join(
+                        f"{k}: {v}" for k, v in r["by_structure"].items()
+                    )
+                tab_rows.append(r)
+            df_r = pd.DataFrame(tab_rows)
+            flow.append(RLTable([df_r.columns.tolist()] + df_r.values.tolist()))
+        else:
+            flow.append(Paragraph("No expiries within window.", styles["Normal"]))
     if not totals.empty:
         flow.append(Paragraph("Totals", styles["Heading2"]))
         flow.append(RLTable([totals.columns.tolist()] + totals.values.tolist()))
@@ -157,6 +264,8 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument("--since")
     parser.add_argument("--until")
     parser.add_argument("--combos-source", default="csv")
+    parser.add_argument("--expiry-window", type=int, nargs="?", const=10, default=None)
+    parser.add_argument("--symbol")
     args = parser.parse_args(argv)
 
     # Default to writing both HTML and PDF unless explicitly disabled.
@@ -171,7 +280,12 @@ def main(argv: list[str] | None = None) -> dict:
 
     positions = _prep_positions(_load_csv("portfolio_greeks_positions"), args.since, args.until)
     totals = _load_csv("portfolio_greeks_totals")
-    combos = _prep_combos(_load_csv("portfolio_greeks_combos"))
+    combos_raw = _load_csv("portfolio_greeks_combos")
+    if args.symbol:
+        positions = _filter_symbol(positions, args.symbol)
+        totals = _filter_symbol(totals, args.symbol)
+        combos_raw = _filter_symbol(combos_raw, args.symbol)
+    combos = _prep_combos(combos_raw)
 
     outdir = Path(args.output_dir or settings.output_dir).expanduser()
     account = totals["account"].iloc[0] if "account" in totals.columns and not totals.empty else None
@@ -182,10 +296,16 @@ def main(argv: list[str] | None = None) -> dict:
         "totals_rows": len(totals),
         "outputs": {},
     }
+    if args.symbol:
+        summary["filters"] = {"symbol": args.symbol.upper()}
+    expiry_radar = None
+    if args.expiry_window and args.expiry_window > 0:
+        expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
+        summary["expiry_radar"] = expiry_radar
 
     html_str = None
     if args.html or args.pdf:
-        html_str = _build_html(outdir, totals, combos, positions, account)
+        html_str = _build_html(outdir, totals, combos, positions, account, expiry_radar)
 
     if args.html and html_str is not None:
         path_html = core_io.save(html_str, "daily_report", "html", outdir)
@@ -193,7 +313,7 @@ def main(argv: list[str] | None = None) -> dict:
         if console:
             console.print(f"HTML report → {path_html}")
     if args.pdf:
-        flowables = _build_pdf_flowables(outdir, totals, combos, positions, account)
+        flowables = _build_pdf_flowables(outdir, totals, combos, positions, account, expiry_radar)
         path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
         summary["outputs"]["pdf"] = str(path_pdf)
         if console:

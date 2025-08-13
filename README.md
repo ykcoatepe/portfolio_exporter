@@ -163,11 +163,41 @@ python -m portfolio_exporter.scripts.daily_report
 python -m portfolio_exporter.scripts.daily_report --json
 python -m portfolio_exporter.scripts.daily_report --output-dir ./reports --html --pdf
 python -m portfolio_exporter.scripts.daily_report --json --no-files   # JSON only, no files written
+python -m portfolio_exporter.scripts.daily_report --expiry-window 10
+python -m portfolio_exporter.scripts.daily_report --symbol AAPL
+python -m portfolio_exporter.scripts.daily_report --symbol AAPL --expiry-window 7 --json --no-files --quiet
 ```
 
 The script reads the newest `portfolio_greeks_positions*.csv`,
 `portfolio_greeks_totals*.csv`, and `portfolio_greeks_combos*.csv` files.
 `--since` and `--until` filter positions by expiry when that column exists.
+`--expiry-window N` adds an "Expiry Radar" section for contracts expiring in the
+next `N` days (defaults to 10 when the flag is provided without a value).
+`--symbol TICKER` restricts report inputs to the given underlying (case-insensitive).
+
+When `--json` is used, the output includes an `expiry_radar` block:
+
+```json
+{
+  "expiry_radar": {
+    "window_days": 7,
+    "basis": "combos",
+    "rows": [
+      {
+        "date": "YYYY-MM-DD",
+        "count": 2,
+        "delta_total": 0.5,
+        "theta_total": -1.2,
+        "by_structure": {"vertical": 1, "iron condor": 1}
+      }
+    ]
+  },
+  "filters": {"symbol": "AAPL"}
+}
+```
+
+`basis` falls back to `"positions"` if combo data is unavailable. Roll-off greek
+totals appear only when the relevant columns exist.
 
 Tips
 - `--no-files`: Suppress writing HTML/PDF; useful in CI/sandboxes with `--json`.
