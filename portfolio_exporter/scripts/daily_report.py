@@ -365,12 +365,12 @@ def main(argv: list[str] | None = None) -> dict:
             else None
         )
 
-        written: list[Path] = []
+        # Metadata
         meta: dict[str, Any] = {}
         if args.symbol:
             meta["filters"] = {"symbol": args.symbol.upper()}
 
-        # Expiry radar (kept in meta for back-compat)
+        # Expiry radar (exposed at top-level via meta back-compat)
         expiry_radar = None
         if args.expiry_window and args.expiry_window > 0:
             expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
@@ -380,7 +380,7 @@ def main(argv: list[str] | None = None) -> dict:
         delta_buckets = _delta_buckets(positions)
         theta_decay_5d = _theta_decay_5d(positions)
 
-        # Pre-build HTML if HTML/PDF is requested
+        # Pre-build HTML for HTML/PDF requests
         html_str = None
         if formats.get("html") or formats.get("pdf"):
             html_str = _build_html(
@@ -393,35 +393,10 @@ def main(argv: list[str] | None = None) -> dict:
                 delta_buckets,
                 theta_decay_5d,
             )
-        )
 
-        outputs = {k: "" for k in formats}
+        # File outputs plan and writes
+        outputs: dict[str, str] = {k: "" for k in formats}
         written: list[Path] = []
-        meta: dict[str, Any] = {}
-        if args.symbol:
-            meta["filters"] = {"symbol": args.symbol.upper()}
-        expiry_radar = None
-        if args.expiry_window and args.expiry_window > 0:
-            expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
-            meta["expiry_radar"] = expiry_radar
-
-        delta_buckets = _delta_buckets(positions)
-        theta_decay_5d = _theta_decay_5d(positions)
-        meta["delta_buckets"] = delta_buckets
-        meta["theta_decay_5d"] = theta_decay_5d
-
-        html_str = None
-        if formats.get("html") or formats.get("pdf"):
-            html_str = _build_html(
-                outdir,
-                totals,
-                combos,
-                positions,
-                account,
-                expiry_radar,
-                delta_buckets,
-                theta_decay_5d,
-            )
 
         if formats.get("html") and html_str is not None:
             path_html = core_io.save(html_str, "daily_report", "html", outdir)
@@ -429,6 +404,7 @@ def main(argv: list[str] | None = None) -> dict:
             written.append(path_html)
             if console:
                 console.print(f"HTML report → {path_html}")
+
         if formats.get("pdf"):
             flowables = _build_pdf_flowables(
                 outdir,
@@ -446,44 +422,11 @@ def main(argv: list[str] | None = None) -> dict:
             if console:
                 console.print(f"PDF report → {path_pdf}")
 
-        rl.add_outputs(written)
-        manifest_path = rl.finalize(write=bool(written))
-
-        summary = json_helpers.report_summary(
-            {
-                "positions": len(positions),
-                "combos": len(combos),
-                "totals": len(totals),
-            },
-            outputs=outputs,
-            meta=meta or None,
-        )
-        # Write artifacts according to plan
-        if formats.get("html") and html_str is not None:
-            path_html = core_io.save(html_str, "daily_report", "html", outdir)
-            written.append(path_html)
-            if console:
-                console.print(f"HTML report → {path_html}")
-
-        if formats.get("pdf"):
-            flowables = _build_pdf_flowables(
-                outdir,
-                totals,
-                combos,
-                positions,
-                account,
-                expiry_radar,
-                delta_buckets,
-                theta_decay_5d,
-            )
-            path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
-            written.append(path_pdf)
-            if console:
-                console.print(f"PDF report → {path_pdf}")
-
         # Manifest
         rl.add_outputs(written)
         manifest_path = rl.finalize(write=bool(written))
+        if manifest_path:
+            written.append(manifest_path)
 
         # Sections: counts + analytics
         sections: dict[str, Any] = {
@@ -494,14 +437,10 @@ def main(argv: list[str] | None = None) -> dict:
             "theta_decay_5d": theta_decay_5d,
         }
 
-        # outputs is a LIST; append manifest if present
-        outputs_list = [str(p) for p in written]
-        if manifest_path:
-            outputs_list.append(str(manifest_path))
-
+        # Summary: outputs mapping becomes list via helper
         summary = json_helpers.report_summary(
             sections,
-            outputs=outputs_list,
+            outputs=outputs,
             meta=meta or None,
         )
 
@@ -511,9 +450,6 @@ def main(argv: list[str] | None = None) -> dict:
         summary["totals_rows"] = len(totals)
         summary.update(meta)
 
-        if args.json:
-            cli_helpers.print_json(summary, quiet)
-        return summary
         if args.json:
             cli_helpers.print_json(summary, quiet)
         return summary
