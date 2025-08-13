@@ -25,6 +25,7 @@ import requests
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import json as json_helpers
+from portfolio_exporter.core.runlog import RunLog
 from portfolio_exporter.core.config import settings
 
 
@@ -149,7 +150,7 @@ def _run_core(
     ns: argparse.Namespace,
     formats: dict[str, bool],
     outdir: Path,
-) -> tuple[pd.DataFrame, dict]:
+) -> tuple[pd.DataFrame, dict, list[Path]]:
     df = _load_data(ns.source, ns.fixture_csv)
     df = _filter_range(df, ns.start, ns.end)
     if df.empty:
@@ -157,13 +158,14 @@ def _run_core(
     df = df.rename(columns={"net_liq": "NetLiq"})
 
     outputs = {k: "" for k in formats}
+    written: list[Path] = []
     if any(formats.values()):
         df_save = df.rename_axis("date").reset_index()
         for fmt, do in formats.items():
             if do:
-                outputs[fmt] = str(
-                    core_io.save(df_save, "net_liq_history_export", fmt, outdir)
-                )
+                p = core_io.save(df_save, "net_liq_history_export", fmt, outdir)
+                outputs[fmt] = str(p)
+                written.append(p)
 
     summary = json_helpers.time_series_summary(
         rows=len(df),
@@ -171,7 +173,7 @@ def _run_core(
         end=df.index.max().isoformat(),
         outputs=outputs,
     )
-    return df, summary
+    return df, summary, written
 
 
 def cli(ns: argparse.Namespace) -> dict:
@@ -184,9 +186,15 @@ def cli(ns: argparse.Namespace) -> dict:
         defaults=defaults,
     )
 
-    df, summary = _run_core(ns, formats, outdir)
+    with RunLog(script="net_liq_history_export", args=vars(ns), output_dir=outdir) as rl:
+        df, summary, written = _run_core(ns, formats, outdir)
+        rl.add_outputs(written)
+        manifest_path = rl.finalize(write=bool(written))
+
     quiet, pretty = cli_helpers.resolve_quiet(ns.no_pretty)
     effective_quiet = quiet or getattr(ns, "quiet", False)
+    if manifest_path:
+        summary["outputs"].append(str(manifest_path))
     if not ns.json and not effective_quiet:
         df_print = df.rename_axis("date").reset_index()
         if pretty:
@@ -241,7 +249,7 @@ def run(fmt: str = "csv", plot: bool = False) -> None:  # pragma: no cover - leg
     )
     formats = {"csv": ns.csv, "excel": ns.excel, "pdf": ns.pdf}
     outdir = cli_helpers.resolve_output_dir(None)
-    df, _summary = _run_core(ns, formats, outdir)
+    df, _summary, _written = _run_core(ns, formats, outdir)
     if plot:
         try:
             import matplotlib.pyplot as plt  # type: ignore

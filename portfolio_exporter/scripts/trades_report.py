@@ -35,6 +35,7 @@ from portfolio_exporter.core import io as io_core
 from portfolio_exporter.core import config as config_core
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
+from portfolio_exporter.core.runlog import RunLog
 
 # Reuse enrichment from portfolio_greeks to keep behavior identical
 try:
@@ -1272,73 +1273,82 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
     outdir = cli_helpers.resolve_output_dir(args.output_dir)
     quiet, _pretty = cli_helpers.resolve_quiet(args.no_pretty)
 
-    df_exec: pd.DataFrame | None = None
-    df_open: pd.DataFrame | None = None
-    if args.exec_csv:
+    with RunLog(script="trades_report", args=vars(args), output_dir=outdir) as rl:
+        df_exec: pd.DataFrame | None = None
+        df_open: pd.DataFrame | None = None
+        if args.exec_csv:
+            try:
+                df_exec = pd.read_csv(args.exec_csv)
+            except Exception as exc:  # pragma: no cover - defensive
+                print(f"❌ Failed to read executions CSV: {exc}")
+                return {}
+        else:
+            t = _load_trades()
+            if t is None:
+                return {}
+            df_exec = t
+            try:
+                df_open = _load_open_orders()
+            except Exception:
+                df_open = None
+
+        n_total = len(df_exec) if isinstance(df_exec, pd.DataFrame) else 0
+        since_dt = _parse_when(args.since)
+        until_dt = _parse_when(args.until)
+        df_exec = _filter_by_date(df_exec, since_dt, until_dt, col="datetime")
+        n_kept = len(df_exec)
+
+        pos_like = _build_positions_like_df(df_exec, None)
+        uvals: list[str] = []
+        if not pos_like.empty and "underlying" in pos_like.columns:
+            try:
+                uvals = sorted(
+                    {
+                        str(x)
+                        for x in pos_like["underlying"].dropna().tolist()
+                        if str(x)
+                    }
+                )
+            except Exception:
+                uvals = []
         try:
-            df_exec = pd.read_csv(args.exec_csv)
-        except Exception as exc:  # pragma: no cover - defensive
-            print(f"❌ Failed to read executions CSV: {exc}")
-            return {}
-    else:
-        t = _load_trades()
-        if t is None:
-            return {}
-        df_exec = t
-        try:
-            df_open = _load_open_orders()
+            m = pd.to_numeric(pos_like.get("multiplier", 0), errors="coerce").fillna(0)
+            qty = pd.to_numeric(pos_like.get("qty", 0), errors="coerce").fillna(0)
+            price = pd.to_numeric(pos_like.get("price", 0), errors="coerce").fillna(0)
+            net_credit_debit = float((-price * qty * m).sum())
         except Exception:
-            df_open = None
+            net_credit_debit = 0.0
 
-    n_total = len(df_exec) if isinstance(df_exec, pd.DataFrame) else 0
-    since_dt = _parse_when(args.since)
-    until_dt = _parse_when(args.until)
-    df_exec = _filter_by_date(df_exec, since_dt, until_dt, col="datetime")
-    n_kept = len(df_exec)
+        combos_df = _detect_and_enrich_trades_combos(df_exec, df_open)
+        c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
 
-    pos_like = _build_positions_like_df(df_exec, None)
-    uvals: list[str] = []
-    if not pos_like.empty and "underlying" in pos_like.columns:
-        try:
-            uvals = sorted(
-                {
-                    str(x)
-                    for x in pos_like["underlying"].dropna().tolist()
-                    if str(x)
-                }
-            )
-        except Exception:
-            uvals = []
-    try:
-        m = pd.to_numeric(pos_like.get("multiplier", 0), errors="coerce").fillna(0)
-        qty = pd.to_numeric(pos_like.get("qty", 0), errors="coerce").fillna(0)
-        price = pd.to_numeric(pos_like.get("price", 0), errors="coerce").fillna(0)
-        net_credit_debit = float((-price * qty * m).sum())
-    except Exception:
-        net_credit_debit = 0.0
+        outputs: Dict[str, str] = {}
+        written: list[Path] = []
+        if formats.get("csv"):
+            df_all = df_exec.copy()
+            if isinstance(df_open, pd.DataFrame) and not df_open.empty:
+                df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
+            path_report = io_core.save(df_all, "trades_report", "csv", outdir)
+            outputs["trades_report"] = str(path_report)
+            written.append(path_report)
+            path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
+            outputs["trades_combos"] = str(path_combos)
+            written.append(path_combos)
 
-    combos_df = _detect_and_enrich_trades_combos(df_exec, df_open)
-    c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
+        rl.add_outputs(written)
+        manifest_path = rl.finalize(write=bool(written))
 
-    outputs: Dict[str, str] = {}
-    if formats.get("csv"):
-        df_all = df_exec.copy()
-        if isinstance(df_open, pd.DataFrame) and not df_open.empty:
-            df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
-        path_report = io_core.save(df_all, "trades_report", "csv", outdir)
-        outputs["trades_report"] = str(path_report)
-        path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
-        outputs["trades_combos"] = str(path_combos)
+        summary = json_helpers.report_summary(
+            {"executions": n_kept, "combos": c_total},
+            outputs=outputs,
+            meta={"script": "trades_report"},
+        )
+        if manifest_path:
+            summary["outputs"].append(str(manifest_path))
 
-    summary = json_helpers.report_summary(
-        {"executions": n_kept, "combos": c_total},
-        outputs=outputs,
-        meta={"script": "trades_report"},
-    )
-
-    if args.json:
-        cli_helpers.print_json(summary, quiet)
-    return summary
+        if args.json:
+            cli_helpers.print_json(summary, quiet)
+        return summary
 
 
 # ───── Date parsing & filtering helpers (import-safe) ─────

@@ -15,6 +15,7 @@ from rich.console import Console
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core import io as core_io
+from portfolio_exporter.core.runlog import RunLog
 from portfolio_exporter.core.config import settings
 
 try:  # optional dependency for PDF output
@@ -342,92 +343,180 @@ def main(argv: list[str] | None = None) -> dict:
     quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
     console = Console() if pretty else None
 
-    positions = _prep_positions(_load_csv("portfolio_greeks_positions"), args.since, args.until)
-    totals = _load_csv("portfolio_greeks_totals")
-    combos_raw = _load_csv("portfolio_greeks_combos")
-    if args.symbol:
-        positions = _filter_symbol(positions, args.symbol)
-        totals = _filter_symbol(totals, args.symbol)
-        combos_raw = _filter_symbol(combos_raw, args.symbol)
-    combos = _prep_combos(combos_raw)
+    with RunLog(script="daily_report", args=vars(args), output_dir=outdir) as rl:
+        # Load data
+        positions = _prep_positions(
+            _load_csv("portfolio_greeks_positions"), args.since, args.until
+        )
+        totals = _load_csv("portfolio_greeks_totals")
+        combos_raw = _load_csv("portfolio_greeks_combos")
 
-    account = (
-        totals["account"].iloc[0]
-        if "account" in totals.columns and not totals.empty
-        else None
-    )
+        # Optional symbol filter
+        if args.symbol:
+            positions = _filter_symbol(positions, args.symbol)
+            totals = _filter_symbol(totals, args.symbol)
+            combos_raw = _filter_symbol(combos_raw, args.symbol)
 
-    outputs = {k: "" for k in formats}
-    meta: dict[str, Any] = {}
-    if args.symbol:
-        meta["filters"] = {"symbol": args.symbol.upper()}
-    expiry_radar = None
-    if args.expiry_window and args.expiry_window > 0:
-        expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
-        meta["expiry_radar"] = expiry_radar
+        combos = _prep_combos(combos_raw)
 
-    # New analytics sections
-    delta_buckets = _delta_buckets(positions)
-    theta_decay_5d = _theta_decay_5d(positions)
-
-    html_str = None
-    if formats.get("html") or formats.get("pdf"):
-        html_str = _build_html(
-            outdir,
-            totals,
-            combos,
-            positions,
-            account,
-            expiry_radar,
-            delta_buckets,
-            theta_decay_5d,
+        account = (
+            totals["account"].iloc[0]
+            if "account" in totals.columns and not totals.empty
+            else None
         )
 
-    if formats.get("html") and html_str is not None:
-        path_html = core_io.save(html_str, "daily_report", "html", outdir)
-        outputs["html"] = str(path_html)
-        if console:
-            console.print(f"HTML report → {path_html}")
-    if formats.get("pdf"):
-        flowables = _build_pdf_flowables(
-            outdir,
-            totals,
-            combos,
-            positions,
-            account,
-            expiry_radar,
-            delta_buckets,
-            theta_decay_5d,
+        written: list[Path] = []
+        meta: dict[str, Any] = {}
+        if args.symbol:
+            meta["filters"] = {"symbol": args.symbol.upper()}
+
+        # Expiry radar (kept in meta for back-compat)
+        expiry_radar = None
+        if args.expiry_window and args.expiry_window > 0:
+            expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
+            meta["expiry_radar"] = expiry_radar
+
+        # Analytics (live under sections)
+        delta_buckets = _delta_buckets(positions)
+        theta_decay_5d = _theta_decay_5d(positions)
+
+        # Pre-build HTML if HTML/PDF is requested
+        html_str = None
+        if formats.get("html") or formats.get("pdf"):
+            html_str = _build_html(
+                outdir,
+                totals,
+                combos,
+                positions,
+                account,
+                expiry_radar,
+                delta_buckets,
+                theta_decay_5d,
+            )
         )
-        path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
-        outputs["pdf"] = str(path_pdf)
-        if console:
-            console.print(f"PDF report → {path_pdf}")
 
-    # Build sections with counts and analytics. Keep meta for filters/expiry_radar.
-    sections: dict[str, Any] = {
-        "positions": len(positions),
-        "combos": len(combos),
-        "totals": len(totals),
-        "delta_buckets": delta_buckets,
-        "theta_decay_5d": theta_decay_5d,
-    }
+        outputs = {k: "" for k in formats}
+        written: list[Path] = []
+        meta: dict[str, Any] = {}
+        if args.symbol:
+            meta["filters"] = {"symbol": args.symbol.upper()}
+        expiry_radar = None
+        if args.expiry_window and args.expiry_window > 0:
+            expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
+            meta["expiry_radar"] = expiry_radar
 
-    summary = json_helpers.report_summary(
-        sections,
-        outputs=outputs,
-        meta=meta or None,
-    )
+        delta_buckets = _delta_buckets(positions)
+        theta_decay_5d = _theta_decay_5d(positions)
+        meta["delta_buckets"] = delta_buckets
+        meta["theta_decay_5d"] = theta_decay_5d
 
-    summary["positions_rows"] = len(positions)
-    summary["combos_rows"] = len(combos)
-    summary["totals_rows"] = len(totals)
-    # Expose select meta keys at top-level for convenience and back-compat in tests
-    summary.update(meta)
+        html_str = None
+        if formats.get("html") or formats.get("pdf"):
+            html_str = _build_html(
+                outdir,
+                totals,
+                combos,
+                positions,
+                account,
+                expiry_radar,
+                delta_buckets,
+                theta_decay_5d,
+            )
 
-    if args.json:
-        cli_helpers.print_json(summary, quiet)
-    return summary
+        if formats.get("html") and html_str is not None:
+            path_html = core_io.save(html_str, "daily_report", "html", outdir)
+            outputs["html"] = str(path_html)
+            written.append(path_html)
+            if console:
+                console.print(f"HTML report → {path_html}")
+        if formats.get("pdf"):
+            flowables = _build_pdf_flowables(
+                outdir,
+                totals,
+                combos,
+                positions,
+                account,
+                expiry_radar,
+                delta_buckets,
+                theta_decay_5d,
+            )
+            path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
+            outputs["pdf"] = str(path_pdf)
+            written.append(path_pdf)
+            if console:
+                console.print(f"PDF report → {path_pdf}")
+
+        rl.add_outputs(written)
+        manifest_path = rl.finalize(write=bool(written))
+
+        summary = json_helpers.report_summary(
+            {
+                "positions": len(positions),
+                "combos": len(combos),
+                "totals": len(totals),
+            },
+            outputs=outputs,
+            meta=meta or None,
+        )
+        # Write artifacts according to plan
+        if formats.get("html") and html_str is not None:
+            path_html = core_io.save(html_str, "daily_report", "html", outdir)
+            written.append(path_html)
+            if console:
+                console.print(f"HTML report → {path_html}")
+
+        if formats.get("pdf"):
+            flowables = _build_pdf_flowables(
+                outdir,
+                totals,
+                combos,
+                positions,
+                account,
+                expiry_radar,
+                delta_buckets,
+                theta_decay_5d,
+            )
+            path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
+            written.append(path_pdf)
+            if console:
+                console.print(f"PDF report → {path_pdf}")
+
+        # Manifest
+        rl.add_outputs(written)
+        manifest_path = rl.finalize(write=bool(written))
+
+        # Sections: counts + analytics
+        sections: dict[str, Any] = {
+            "positions": len(positions),
+            "combos": len(combos),
+            "totals": len(totals),
+            "delta_buckets": delta_buckets,
+            "theta_decay_5d": theta_decay_5d,
+        }
+
+        # outputs is a LIST; append manifest if present
+        outputs_list = [str(p) for p in written]
+        if manifest_path:
+            outputs_list.append(str(manifest_path))
+
+        summary = json_helpers.report_summary(
+            sections,
+            outputs=outputs_list,
+            meta=meta or None,
+        )
+
+        # Back-compat row counts + select meta surfacing
+        summary["positions_rows"] = len(positions)
+        summary["combos_rows"] = len(combos)
+        summary["totals_rows"] = len(totals)
+        summary.update(meta)
+
+        if args.json:
+            cli_helpers.print_json(summary, quiet)
+        return summary
+        if args.json:
+            cli_helpers.print_json(summary, quiet)
+        return summary
 
 
 if __name__ == "__main__":  # pragma: no cover
