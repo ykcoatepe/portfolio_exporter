@@ -45,7 +45,7 @@ def test_json_no_write(tmp_path):
     assert data["rows"] == 10
     assert data["start"] == "2024-01-02"
     assert data["end"] == "2024-01-16"
-    assert data["outputs"] == {"csv": "", "excel": "", "pdf": ""}
+    assert data["outputs"] == []
     assert not any(tmp_path.iterdir())
 
 
@@ -68,9 +68,11 @@ def test_file_writes(tmp_path):
         env,
     )
     data = json.loads(out)
-    csv_path = Path(data["outputs"]["csv"])
+    assert isinstance(data["outputs"], list) and len(data["outputs"]) >= 1
+    csv_path = Path(data["outputs"][0])
     assert csv_path.exists()
-    assert data["outputs"]["pdf"] == ""
+    # Only CSV is written by default; ensure no PDF path
+    assert all(not p.endswith(".pdf") for p in data["outputs"]) 
     df = pd.read_csv(csv_path)
     assert list(df.columns) == ["date", "NetLiq"]
     assert len(df) == 10
@@ -123,4 +125,3 @@ def test_quiet_suppresses_table(tmp_path):
         env,
     )
     assert quiet.strip() == ""
-

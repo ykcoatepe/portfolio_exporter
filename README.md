@@ -126,6 +126,112 @@ pytest
 The scripts require Python 3.11+ and the packages listed in `requirements.txt`.
 `pandas_datareader` is needed for downloading FRED data in `live_feed.py`, and `requests` is required by `net_liq_history_export.py` for accessing the IBKR Client Portal API. `xlsxwriter` enables Excel exports and `reportlab` enables PDF output. `matplotlib` is optional and only needed when using the `--plot` flag with `net_liq_history_export.py`.
 
+## Quick Smoke
+
+Run these from the repo root to sanity check lint, focused tests, and the three CLIs in both JSON-only and file-write modes. Where possible, smokes use offline fixtures to avoid network.
+
+```bash
+# 0) Clean tmp
+rm -rf .tmp_* .outputs || true
+
+# 1) Lint + targeted tests
+ruff check portfolio_exporter/core/cli.py portfolio_exporter/core/json.py \
+  portfolio_exporter/scripts/daily_report.py portfolio_exporter/scripts/net_liq_history_export.py \
+  portfolio_exporter/scripts/quick_chain.py \
+  tests/test_daily_report.py tests/test_net_liq_cli.py tests/test_quick_chain_cli.py
+
+pytest -q tests/test_daily_report.py tests/test_net_liq_cli.py tests/test_quick_chain_cli.py
+
+# 2) CLI sanity: expected behavior & minimal asserts
+
+# daily_report — JSON-only → no files, outputs == []
+PYTHONPATH=. PE_QUIET=1 OUTPUT_DIR=tests/data \
+python -m portfolio_exporter.scripts.daily_report --expiry-window 7 --symbol AAPL --json --no-files \
+| python - <<'PY'
+import sys, json; d = json.load(sys.stdin)
+assert d["ok"] and "sections" in d and d["outputs"] == [], d
+print("PASS: daily_report JSON-only")
+PY
+
+# daily_report — Defaults with output dir (no explicit formats) → HTML+PDF written
+PYTHONPATH=. OUTPUT_DIR=tests/data \
+python -m portfolio_exporter.scripts.daily_report --expiry-window 10 --output-dir .tmp_daily >/dev/null
+test -f .tmp_daily/daily_report.html && echo "PASS: daily_report HTML" || (echo "FAIL: html"; exit 1)
+test -f .tmp_daily/daily_report.pdf  && echo "PASS: daily_report PDF"  || (echo "FAIL: pdf";  exit 1)
+
+# daily_report — JSON + output dir → JSON printed AND files written (expected: HTML+PDF)
+PYTHONPATH=. OUTPUT_DIR=tests/data \
+python -m portfolio_exporter.scripts.daily_report --expiry-window 5 --output-dir .tmp_daily2 --json \
+| python - <<'PY'
+import sys, json; d = json.load(sys.stdin)
+assert d["ok"] and "sections" in d, d
+print("PASS: daily_report JSON printed")
+PY
+test -f .tmp_daily2/daily_report.html && test -f .tmp_daily2/daily_report.pdf && echo "PASS: daily_report files with --json"
+
+# net_liq_history_export — JSON-only (fixture) → no files
+PYTHONPATH=. PE_QUIET=1 \
+python -m portfolio_exporter.scripts.net_liq_history_export --source fixture --fixture-csv tests/data/net_liq_fixture.csv --json \
+| python - <<'PY'
+import sys, json; d = json.load(sys.stdin)
+assert d["ok"] and "rows" in d and d["outputs"] == [], d
+print("PASS: net_liq JSON-only")
+PY
+
+# net_liq_history_export — With output dir (no explicit formats) → CSV by default
+PYTHONPATH=. \
+python -m portfolio_exporter.scripts.net_liq_history_export --source fixture --fixture-csv tests/data/net_liq_fixture.csv --output-dir .tmp_netliq >/dev/null
+ls .tmp_netliq | grep -E '^net_liq_history_export\\.csv$' >/dev/null && echo "PASS: net_liq CSV default"
+
+# quick_chain — JSON-only with fixture → no files
+PYTHONPATH=. PE_QUIET=1 \
+python -m portfolio_exporter.scripts.quick_chain --chain-csv tests/data/quick_chain_fixture.csv --tenor all --target-delta 0.3 --json --no-files \
+| python - <<'PY'
+import sys, json; d = json.load(sys.stdin)
+assert d["ok"] and "sections" in d and d["outputs"] == [], d
+print("PASS: quick_chain JSON-only")
+PY
+
+# quick_chain — With output dir (no explicit formats) → CSV by default
+PYTHONPATH=. \
+python -m portfolio_exporter.scripts.quick_chain --chain-csv tests/data/quick_chain_fixture.csv --tenor all --target-delta 0.3 --output-dir .tmp_qc >/dev/null
+ls .tmp_qc | grep -E '^quick_chain\\.csv$' >/dev/null && echo "PASS: quick_chain CSV default"
+
+# Edge cases (flags & env precedence)
+
+# --no-files always wins
+PYTHONPATH=. \
+python -m portfolio_exporter.scripts.quick_chain --chain-csv tests/data/quick_chain_fixture.csv --tenor all --target-delta 0.3 \
+  --output-dir .tmp_qc_nofiles --no-files >/dev/null || true
+test ! -d .tmp_qc_nofiles && echo "PASS: no-files prevents writes"
+
+# Explicit format flags override defaults (daily_report: only HTML)
+PYTHONPATH=. OUTPUT_DIR=tests/data \
+python -m portfolio_exporter.scripts.daily_report --output-dir .tmp_daily_html --html >/dev/null
+test -f .tmp_daily_html/daily_report.html && test ! -f .tmp_daily_html/daily_report.pdf \
+  && echo "PASS: explicit format respected"
+
+# PE_OUTPUT_DIR fallback is honored in CI by setting PE_TEST_MODE=1
+rm -rf .tmp_legacy && mkdir -p .tmp_legacy
+PYTHONPATH=. PE_TEST_MODE=1 PE_OUTPUT_DIR=.tmp_legacy \
+python -m portfolio_exporter.scripts.quick_chain --chain-csv tests/data/quick_chain_fixture.csv --tenor all --target-delta 0.3 --csv >/dev/null
+ls .tmp_legacy | grep -E '^quick_chain\\.csv$' >/dev/null && echo "PASS: PE_OUTPUT_DIR fallback"
+
+# Help screens (flags visible)
+python -m portfolio_exporter.scripts.daily_report -h             | grep -E -- '--json|--no-files|--no-pretty|--output-dir'
+python -m portfolio_exporter.scripts.net_liq_history_export -h   | grep -E -- '--json|--no-files|--no-pretty|--output-dir'
+python -m portfolio_exporter.scripts.quick_chain -h              | grep -E -- '--json|--no-files|--no-pretty|--output-dir'
+echo "PASS: help shows common flags"
+```
+
+JSON outputs
+- outputs: an array of file paths when files are written; an empty array (`[]`) in JSON-only runs.
+- meta.script: if present, matches the script name; not required for smokes.
+- sections/rows: present depending on the script (`sections` for reports, `rows` for time series).
+
+CI note
+- In CI or restricted sandboxes, set `PE_TEST_MODE=1` to make `PE_OUTPUT_DIR` take precedence over `OUTPUT_DIR` for write paths. This prevents accidental writes to system locations.
+
 ## Usage Examples
 
 ```bash

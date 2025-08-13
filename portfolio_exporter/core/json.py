@@ -4,10 +4,17 @@ from __future__ import annotations
 from typing import Dict, List, Mapping, Any
 
 
-def _base(outputs: Mapping[str, str], warnings: List[str] | None, meta: Dict[str, Any] | None) -> Dict[str, Any]:
+def _base(
+    outputs: Mapping[str, str],
+    warnings: List[str] | None,
+    meta: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    # Normalize outputs to a list of written file paths.
+    # When JSON-only or no files were written, "outputs" is an empty list.
+    out_list = [p for p in outputs.values() if p]
     return {
         "ok": True,
-        "outputs": {k: v for k, v in outputs.items()},
+        "outputs": out_list,
         "warnings": warnings or [],
         "meta": meta or {},
     }

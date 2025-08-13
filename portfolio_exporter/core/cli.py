@@ -25,7 +25,11 @@ def resolve_output_dir(arg: str | None) -> Path:
     4. ``settings.output_dir`` from configuration.
     """
 
-    env = os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR")
+    # In test mode, prefer legacy PE_OUTPUT_DIR to simplify sandboxing of writes
+    if os.getenv("PE_TEST_MODE"):
+        env = os.getenv("PE_OUTPUT_DIR") or os.getenv("OUTPUT_DIR")
+    else:
+        env = os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR")
     base = arg or env or settings.output_dir
     return Path(base).expanduser()
 

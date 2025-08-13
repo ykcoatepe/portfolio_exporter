@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import sqlite3
 import json
 import pandas as pd
@@ -26,7 +27,8 @@ def save(
         Destination directory; defaults to :data:`settings.output_dir`.
     """
 
-    outdir = Path(outdir or settings.output_dir).expanduser()
+    base = outdir or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
+    outdir = Path(base).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
     ext_map = {"csv": "csv", "excel": "xlsx", "pdf": "pdf", "json": "json", "html": "html"}
     fname = outdir / f"{name}.{ext_map[fmt]}"
@@ -86,7 +88,8 @@ def latest_file(
         Path to most recent matching file or ``None`` if none found.
     """
 
-    outdir = Path(outdir or settings.output_dir).expanduser()
+    base = outdir or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
+    outdir = Path(base).expanduser()
     pattern = f"{name}*.{fmt}"
     files = sorted(outdir.glob(pattern))
     return files[-1] if files else None
