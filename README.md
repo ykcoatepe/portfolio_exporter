@@ -94,6 +94,28 @@ Environment variables:
 JSON summaries returned by the scripts consistently use `sections` or `rows`
 and include an `outputs` mapping with file paths (empty strings when skipped).
 
+## Repo Memory (Agent-Shared)
+
+Lightweight, auditable repo “memory” helps Cloud/CLI agents keep context across sessions.
+
+- Location: `.codex/memory.json` (override with `--path`). No secrets; set `MEMORY_READONLY=1` to block writes.
+- Safe writes: lockfile + atomic replace (fsync → os.replace), sorted JSON.
+- Schema v1: required keys → preferences, workflows, tasks, questions, decisions, changelog.
+- Machine output: most read/list commands support `--json`.
+
+Common commands
+- Bootstrap: `python -m portfolio_exporter.scripts.memory bootstrap`
+- Validate: `make memory-validate`
+- Digest: `make memory-digest` (or add `--json`)
+- Rotate old changelog: `make memory-rotate` (default `--cutoff 30d`)
+
+Task lifecycle
+- Add: `memory add-task "Refactor exporter" --labels infra --priority 2`
+- Update: `memory update-task 1 --status in_progress --details "split writer"`
+- Close: `memory close-task 1 --reason "merged"`
+
+Tip: add a shell alias for convenience: `alias memory='python -m portfolio_exporter.scripts.memory'`.
+
 ## Upgrading dependencies
 
 This project uses the [pip-tools](https://github.com/jazzband/pip-tools) workflow to maintain fully pinned requirements.

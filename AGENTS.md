@@ -35,3 +35,101 @@ Typical loop: `make setup && make lint && make test`.
 - IBKR Client Portal flows require `CP_REFRESH_TOKEN` exported.
 - Do not commit secrets or local data (tokens, CSV/exports). Update `.gitignore` as needed.
 
+## Assistant Bootstrapping
+- On session start: run `python -m portfolio_exporter.scripts.memory bootstrap`.
+  - Ensures memory exists, logs `session_start`, prints concise context (preferences, workflows, open tasks/questions, decisions_count).
+- After notable changes: add a decision and a changelog entry.
+- For summaries: run `python -m portfolio_exporter.scripts.memory digest` (`--json` for machine output).
+- Useful commands:
+  - `make memory-context` → print context (summary)
+  - `make memory-digest` → human-friendly digest
+  - `make memory-validate` → quick schema check
+  - `make memory-view` → workflows overview
+  - `make memory-tasks` → open tasks list
+  - `make memory-questions` → open questions list
+  - Full CLI: `python -m portfolio_exporter.scripts.memory --help`
+
+---
+
+# 17 · Repo Memory (Agent-Shared)
+
+Purpose. Lightweight, auditable repo “memory” so Cloud/CLI agents keep context across sessions.
+Location. Default `.codex/memory.json` (override with `--path`).
+Privacy. No secrets; validation scans for common patterns. Set `MEMORY_READONLY=1` to block writes.
+
+## 17.1 Features
+
+- Safe writes: Lockfile + atomic write (`fsync` → `os.replace`), stable/sorted JSON.
+- Schema v1: required keys → `preferences, workflows, tasks, questions, decisions, changelog`.
+- Machine output: read/list commands support `--json`.
+- Digest & rotation:
+  - `digest` → compact summary (prefs, workflow keys, top open tasks/questions, recent decisions, counts). Text or `--json`.
+  - `rotate` → move old changelog entries to `memory.YYYYMM.json`.
+
+## 17.2 CLI Surface
+
+Note: use `python -m portfolio_exporter.scripts.memory …` (or the `memory` alias below).
+
+```
+memory
+  bootstrap | validate
+  view [--section preferences|workflows|tasks|questions|decisions|changelog] [--json]
+  list-tasks [--status open|in_progress|blocked|closed] [--owner name] [--json]
+  add-task "Title" [--details "..."] [--labels a,b] [--priority N] [--owner name]
+  update-task <id> [--status ...] [--title ...] [--details ...] [--append] [--priority N] [--labels a,b]
+  close-task <id> [--reason "..."]
+  add-decision "Title" "Decision" [--rationale "..."] [--context "..."]
+  changelog "Event" [--details "..."] | session-end
+  digest [--max-tokens 800] [--json] | rotate [--cutoff 30d]
+  format
+```
+
+Options: `--path <file>` to target a custom memory file • `MEMORY_READONLY=1` disables writes (exit 0 with note).
+
+## 17.3 Operating Rules
+
+- Validate before PRs: `memory validate` must pass.
+- Traceability: when tasks change, consider adding a decision or changelog entry.
+- Scope & minimalism: keep technical prefs/flows/tasks/decisions only; no sensitive data.
+- Merge hygiene: keep JSON sorted; prefer small, atomic edits.
+
+## 17.4 CI/Hooks
+
+- Pre-commit: run `memory validate` (and optional JSON formatter).
+- CI gates: include `make memory-validate`.
+- Optional reporting: print `make memory-digest` in CI logs for quick context.
+
+## 17.5 Examples
+
+```bash
+# Snapshot & validate
+make memory-validate
+memory digest
+memory digest --json > memory_digest.json
+
+# Task flow
+memory add-task "Refactor exporter" --labels infra --priority 2
+memory update-task 1 --status in_progress --details "split writer"
+memory close-task 1 --reason "merged"
+
+# Session & rotation
+memory session-end
+memory rotate --cutoff 45d
+```
+
+## 17.6 Acceptance Criteria
+
+- Validation passes; no schema/secret issues.
+- `digest` text stays concise (< 800 tokens) and `--json` is well-formed.
+- No JSON corruption under concurrent writes (lock + atomic write).
+- PR checklist includes “memory validate”.
+
+## 17.7 Shell Alias (optional)
+
+To use the short form `memory` locally, add to your shell profile (`~/.zshrc`/`~/.bashrc`):
+
+```sh
+alias memory='python -m portfolio_exporter.scripts.memory'
+```
+
+Reload your shell, then run `memory --help`.
