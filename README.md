@@ -83,6 +83,7 @@ Most scripts share a small set of flags for consistent ergonomics:
 | `--json` | Emit a compact JSON summary to STDOUT. |
 | `--no-files` | Skip writing any output files. |
 | `--no-pretty` | Disable rich/pretty console rendering. |
+| `--preflight` | Validate inputs only (schema/header checks; no files). |
 
 Environment variables:
 
@@ -324,6 +325,8 @@ The script reads the newest `portfolio_greeks_positions*.csv`,
 next `N` days (defaults to 10 when the flag is provided without a value).
 `--symbol TICKER` restricts report inputs to the given underlying (case-insensitive).
 
+Note: `--preflight` validates CSV headers (Pandera optional; warns if missing).
+
 #### New analytics
 
 Daily Report now includes:
@@ -362,6 +365,10 @@ Tips
 - `--output-dir`: Override the destination directory for artifacts.
 - Env override: set `OUTPUT_DIR=./.outputs` in a `.env` file to change the default output path (picked up by settings).
 - Quiet mode: set `PE_QUIET=1` to suppress pretty console output (same effect as adding `--no-pretty` in menus or CLI where available).
+
+### Portfolio Greeks (CLI)
+
+Note: `--preflight` validates CSV headers (Pandera optional; warns if missing).
 
 ### Net-Liq chart (CLI)
 
