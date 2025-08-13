@@ -268,12 +268,22 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument("--symbol")
     args = parser.parse_args(argv)
 
-    # Default to writing both HTML and PDF unless explicitly disabled.
-    # When --no-files is provided, suppress file outputs (useful for sandboxed JSON-only runs).
+    # File output defaults
+    # - If --no-files: never write HTML/PDF.
+    # - If neither --html/--pdf provided and NOT in JSON-only mode: default to both.
+    # - If --json is set without explicit file flags, do not write files by default.
     if args.no_files:
         args.html = args.pdf = False
     elif not args.html and not args.pdf:
-        args.html = args.pdf = True
+        if args.output_dir is not None:
+            # Caller provided an output directory; default to writing both files.
+            args.html = args.pdf = True
+        elif args.json:
+            # JSON-only invocation without explicit output dir: do not write files.
+            args.html = args.pdf = False
+        else:
+            # No explicit formats, no JSON: write both by default.
+            args.html = args.pdf = True
 
     quiet_env = os.getenv("PE_QUIET") not in (None, "", "0")
     console = Console() if (not args.no_pretty and not quiet_env) else None
