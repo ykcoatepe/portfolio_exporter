@@ -366,10 +366,9 @@ def main(argv: list[str] | None = None) -> dict:
         expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
         meta["expiry_radar"] = expiry_radar
 
+    # New analytics sections
     delta_buckets = _delta_buckets(positions)
     theta_decay_5d = _theta_decay_5d(positions)
-    meta["delta_buckets"] = delta_buckets
-    meta["theta_decay_5d"] = theta_decay_5d
 
     html_str = None
     if formats.get("html") or formats.get("pdf"):
@@ -405,12 +404,17 @@ def main(argv: list[str] | None = None) -> dict:
         if console:
             console.print(f"PDF report → {path_pdf}")
 
+    # Build sections with counts and analytics. Keep meta for filters/expiry_radar.
+    sections: dict[str, Any] = {
+        "positions": len(positions),
+        "combos": len(combos),
+        "totals": len(totals),
+        "delta_buckets": delta_buckets,
+        "theta_decay_5d": theta_decay_5d,
+    }
+
     summary = json_helpers.report_summary(
-        {
-            "positions": len(positions),
-            "combos": len(combos),
-            "totals": len(totals),
-        },
+        sections,
         outputs=outputs,
         meta=meta or None,
     )
@@ -418,6 +422,7 @@ def main(argv: list[str] | None = None) -> dict:
     summary["positions_rows"] = len(positions)
     summary["combos_rows"] = len(combos)
     summary["totals_rows"] = len(totals)
+    # Expose select meta keys at top-level for convenience and back-compat in tests
     summary.update(meta)
 
     if args.json:
