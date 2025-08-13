@@ -14,6 +14,8 @@ from rich.live import Live
 from rich.table import Table
 
 from portfolio_exporter.core import chain as core_chain
+from portfolio_exporter.core import cli as cli_helpers
+from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.io import save as io_save
 from portfolio_exporter.core.ui import render_chain, run_with_spinner
@@ -349,15 +351,20 @@ def _run_cli_v3() -> int:
     parser.add_argument("--tenor", choices=["weekly", "monthly", "all"], default="all")
     parser.add_argument("--html", action="store_true", default=False)
     parser.add_argument("--pdf", action="store_true", default=False)
+    parser.add_argument("--csv", action="store_true", default=False)
     parser.add_argument("--no-pretty", action="store_true", default=False)
+    parser.add_argument("--no-files", action="store_true", default=False)
     parser.add_argument("--output-dir", help="Override output directory", default=None)
     parser.add_argument("--json", action="store_true", default=False, help="Emit summary JSON and exit")
     args = parser.parse_args()
-    # Honor PE_QUIET by disabling pretty output
-    if os.getenv("PE_QUIET") not in (None, "", "0"):
-        args.no_pretty = True
-    if args.json:
-        args.no_pretty = True
+
+    formats = cli_helpers.decide_file_writes(
+        args,
+        json_only_default=True,
+        defaults={"csv": bool(args.output_dir), "html": False, "pdf": False},
+    )
+    outdir = cli_helpers.resolve_output_dir(args.output_dir)
+    quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
 
     # Build base DataFrame
     df = None
@@ -406,34 +413,47 @@ def _run_cli_v3() -> int:
 
     # Outputs
     base_name = "quick_chain"
+    outputs = {k: "" for k in formats}
+    if formats.get("csv"):
+        csv_path = io_save(df_out, base_name, fmt="csv", outdir=outdir)
+        outputs["csv"] = str(csv_path)
+        if pretty:
+            Console().print(f"CSV saved → {csv_path}")
+        elif not quiet:
+            print(f"CSV saved → {csv_path}")
+    if formats.get("html"):
+        html_path = io_save(df_out, base_name, fmt="html", outdir=outdir)
+        outputs["html"] = str(html_path)
+        if pretty:
+            Console().print(f"HTML saved → {html_path}")
+        elif not quiet:
+            print(f"HTML saved → {html_path}")
+    if formats.get("pdf"):
+        pdf_path = io_save(df_out, base_name, fmt="pdf", outdir=outdir)
+        outputs["pdf"] = str(pdf_path)
+        if pretty:
+            Console().print(f"PDF saved → {pdf_path}")
+        elif not quiet:
+            print(f"PDF saved → {pdf_path}")
+
+    meta = {
+        "underlyings": [
+            str(u)
+            for u in df_out.get("underlying", pd.Series(dtype=str)).dropna().unique().tolist()
+        ],
+        "tenor": args.tenor or "",
+        "target_delta": float(args.target_delta) if args.target_delta is not None else None,
+        "side": args.side or "",
+    }
+    summary = json_helpers.report_summary({"chain": int(len(df_out))}, outputs, meta=meta)
     if args.json:
-        summary = {
-            "rows": int(len(df_out)),
-            "underlyings": [
-                str(u)
-                for u in df_out.get("underlying", pd.Series(dtype=str)).dropna().unique().tolist()
-            ],
-            "tenor": args.tenor or "",
-            "target_delta": float(args.target_delta) if args.target_delta is not None else None,
-            "side": args.side or "",
-            "outputs": {"csv": "", "html": "", "pdf": ""},
-        }
-        print(json.dumps(summary, separators=(",", ":")))
+        cli_helpers.print_json(summary, quiet)
         return 0
 
-    outdir = args.output_dir or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
-    csv_path = io_save(df_out, base_name, fmt="csv", outdir=outdir)
-    print(f"CSV saved → {csv_path}")
-    if args.html:
-        html_path = io_save(df_out, base_name, fmt="html", outdir=outdir)
-        print(f"HTML saved → {html_path}")
-    if args.pdf:
-        pdf_path = io_save(df_out, base_name, fmt="pdf", outdir=outdir)
-        print(f"PDF saved → {pdf_path}")
-    # Pretty print only when TTY and not suppressed
-    if sys.stdout.isatty() and not args.no_pretty:
-        con = Console()
-        con.print(df_out.head(min(30, len(df_out))))
+    if sys.stdout.isatty() and pretty:
+        Console().print(df_out.head(min(30, len(df_out))))
+    elif not quiet:
+        print(df_out.head(min(30, len(df_out))).to_string(index=False))
     return 0
 
 

@@ -12,6 +12,8 @@ from typing import Any
 import pandas as pd
 from rich.console import Console
 
+from portfolio_exporter.core import cli as cli_helpers
+from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core.config import settings
 
@@ -259,7 +261,11 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument("--html", action="store_true")
     parser.add_argument("--pdf", action="store_true")
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--no-files", action="store_true", help="Do not write HTML/PDF outputs; emit JSON only if --json is set")
+    parser.add_argument(
+        "--no-files",
+        action="store_true",
+        help="Do not write HTML/PDF outputs; emit JSON only if --json is set",
+    )
     parser.add_argument("--no-pretty", action="store_true")
     parser.add_argument("--since")
     parser.add_argument("--until")
@@ -268,25 +274,14 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument("--symbol")
     args = parser.parse_args(argv)
 
-    # File output defaults
-    # - If --no-files: never write HTML/PDF.
-    # - If neither --html/--pdf provided and NOT in JSON-only mode: default to both.
-    # - If --json is set without explicit file flags, do not write files by default.
-    if args.no_files:
-        args.html = args.pdf = False
-    elif not args.html and not args.pdf:
-        if args.output_dir is not None:
-            # Caller provided an output directory; default to writing both files.
-            args.html = args.pdf = True
-        elif args.json:
-            # JSON-only invocation without explicit output dir: do not write files.
-            args.html = args.pdf = False
-        else:
-            # No explicit formats, no JSON: write both by default.
-            args.html = args.pdf = True
-
-    quiet_env = os.getenv("PE_QUIET") not in (None, "", "0")
-    console = Console() if (not args.no_pretty and not quiet_env) else None
+    formats = cli_helpers.decide_file_writes(
+        args,
+        json_only_default=True,
+        defaults={"html": True, "pdf": True},
+    )
+    outdir = cli_helpers.resolve_output_dir(args.output_dir)
+    quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
+    console = Console() if pretty else None
 
     positions = _prep_positions(_load_csv("portfolio_greeks_positions"), args.since, args.until)
     totals = _load_csv("portfolio_greeks_totals")
@@ -297,40 +292,51 @@ def main(argv: list[str] | None = None) -> dict:
         combos_raw = _filter_symbol(combos_raw, args.symbol)
     combos = _prep_combos(combos_raw)
 
-    outdir = Path(args.output_dir or settings.output_dir).expanduser()
-    account = totals["account"].iloc[0] if "account" in totals.columns and not totals.empty else None
+    account = (
+        totals["account"].iloc[0]
+        if "account" in totals.columns and not totals.empty
+        else None
+    )
 
-    summary = {
-        "positions_rows": len(positions),
-        "combos_rows": len(combos),
-        "totals_rows": len(totals),
-        "outputs": {},
-    }
+    outputs = {k: "" for k in formats}
+    meta: dict[str, Any] = {}
     if args.symbol:
-        summary["filters"] = {"symbol": args.symbol.upper()}
+        meta["filters"] = {"symbol": args.symbol.upper()}
     expiry_radar = None
     if args.expiry_window and args.expiry_window > 0:
         expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
-        summary["expiry_radar"] = expiry_radar
+        meta["expiry_radar"] = expiry_radar
 
     html_str = None
-    if args.html or args.pdf:
+    if formats.get("html") or formats.get("pdf"):
         html_str = _build_html(outdir, totals, combos, positions, account, expiry_radar)
 
-    if args.html and html_str is not None:
+    if formats.get("html") and html_str is not None:
         path_html = core_io.save(html_str, "daily_report", "html", outdir)
-        summary["outputs"]["html"] = str(path_html)
+        outputs["html"] = str(path_html)
         if console:
             console.print(f"HTML report → {path_html}")
-    if args.pdf:
-        flowables = _build_pdf_flowables(outdir, totals, combos, positions, account, expiry_radar)
+    if formats.get("pdf"):
+        flowables = _build_pdf_flowables(
+            outdir, totals, combos, positions, account, expiry_radar
+        )
         path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
-        summary["outputs"]["pdf"] = str(path_pdf)
+        outputs["pdf"] = str(path_pdf)
         if console:
             console.print(f"PDF report → {path_pdf}")
 
+    summary = json_helpers.report_summary(
+        {
+            "positions": len(positions),
+            "combos": len(combos),
+            "totals": len(totals),
+        },
+        outputs=outputs,
+        meta=meta or None,
+    )
+
     if args.json:
-        print(json.dumps(summary))
+        cli_helpers.print_json(summary, quiet)
     return summary
 
 

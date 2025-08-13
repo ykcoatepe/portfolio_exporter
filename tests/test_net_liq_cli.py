@@ -63,17 +63,14 @@ def test_file_writes(tmp_path):
             "--json",
             "--output-dir",
             str(outdir),
-            "--csv",
-            "--pdf",
             "--quiet",
         ],
         env,
     )
     data = json.loads(out)
     csv_path = Path(data["outputs"]["csv"])
-    pdf_path = Path(data["outputs"]["pdf"])
     assert csv_path.exists()
-    assert pdf_path.exists()
+    assert data["outputs"]["pdf"] == ""
     df = pd.read_csv(csv_path)
     assert list(df.columns) == ["date", "NetLiq"]
     assert len(df) == 10

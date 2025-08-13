@@ -73,6 +73,27 @@ Environment and configuration
 
 See `.env.example` for a starter file; any values there are read by the app.
 
+## Common CLI flags
+
+Most scripts share a small set of flags for consistent ergonomics:
+
+| Flag | Description |
+| ---- | ----------- |
+| `--output-dir PATH` | Directory for generated files (overrides `OUTPUT_DIR` env). |
+| `--json` | Emit a compact JSON summary to STDOUT. |
+| `--no-files` | Skip writing any output files. |
+| `--no-pretty` | Disable rich/pretty console rendering. |
+
+Environment variables:
+
+| Variable | Purpose |
+| -------- | ------- |
+| `OUTPUT_DIR` | Default directory for exports. |
+| `PE_QUIET` | When set to `1`, suppresses all pretty console output. |
+
+JSON summaries returned by the scripts consistently use `sections` or `rows`
+and include an `outputs` mapping with file paths (empty strings when skipped).
+
 ## Upgrading dependencies
 
 This project uses the [pip-tools](https://github.com/jazzband/pip-tools) workflow to maintain fully pinned requirements.

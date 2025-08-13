@@ -22,9 +22,9 @@ def test_daily_report_full(monkeypatch, tmp_path):
         "portfolio_exporter.core.io.latest_file", _fake_latest_factory(data_dir)
     )
     res = daily_report.main(["--json", "--output-dir", str(tmp_path)])
-    assert res["positions_rows"] == 2
-    assert res["combos_rows"] == 2
-    assert res["totals_rows"] == 1
+    assert res["sections"]["positions"] == 2
+    assert res["sections"]["combos"] == 2
+    assert res["sections"]["totals"] == 1
     assert (tmp_path / "daily_report.html").exists()
     assert (tmp_path / "daily_report.pdf").exists()
     assert set(res["outputs"].keys()) == {"html", "pdf"}
@@ -38,7 +38,19 @@ def test_daily_report_missing(monkeypatch, tmp_path):
 
     monkeypatch.setattr("portfolio_exporter.core.io.latest_file", _latest)
     res = daily_report.main(["--json", "--output-dir", str(tmp_path)])
-    assert res["positions_rows"] == 2
-    assert res["combos_rows"] == 0
-    assert res["totals_rows"] == 0
+    assert res["sections"]["positions"] == 2
+    assert res["sections"]["combos"] == 0
+    assert res["sections"]["totals"] == 0
     assert set(res["outputs"].keys()) == {"html", "pdf"}
+
+
+def test_daily_report_json_only(monkeypatch, tmp_path):
+    data_dir = Path(__file__).parent / "data"
+    monkeypatch.setattr(
+        "portfolio_exporter.core.io.latest_file", _fake_latest_factory(data_dir)
+    )
+    monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
+    res = daily_report.main(["--json"])
+    assert res["sections"]["positions"] == 2
+    assert res["outputs"] == {"html": "", "pdf": ""}
+    assert list(tmp_path.iterdir()) == []
