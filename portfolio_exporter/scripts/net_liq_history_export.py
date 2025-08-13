@@ -187,7 +187,14 @@ def cli(ns: argparse.Namespace) -> dict:
     )
 
     with RunLog(script="net_liq_history_export", args=vars(ns), output_dir=outdir) as rl:
-        df, summary, written = _run_core(ns, formats, outdir)
+        with rl.time("run_core"):
+            df, summary, written = _run_core(ns, formats, outdir)
+        if ns.debug_timings:
+            summary.setdefault("meta", {})["timings"] = rl.timings
+            if written:
+                tpath = core_io.save(pd.DataFrame(rl.timings), "timings", "csv", outdir)
+                summary["outputs"].append(str(tpath))
+                written.append(tpath)
         rl.add_outputs(written)
         manifest_path = rl.finalize(write=bool(written))
 
@@ -224,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--no-pretty", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--debug-timings", action="store_true")
     args = parser.parse_args(argv)
     summary = cli(args)
     if args.json:

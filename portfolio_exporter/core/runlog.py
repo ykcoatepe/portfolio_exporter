@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
@@ -19,6 +20,7 @@ class RunLog:
         self.start_ts = ""
         self._start = 0.0
         self.outputs: List[Path] = []
+        self.timings: list[dict[str, int]] = []
         self.env = {
             "OUTPUT_DIR": os.getenv("OUTPUT_DIR"),
             "PE_OUTPUT_DIR": os.getenv("PE_OUTPUT_DIR"),
@@ -42,6 +44,16 @@ class RunLog:
             if path.exists() and path.resolve() not in seen:
                 self.outputs.append(path)
                 seen.add(path.resolve())
+
+    @contextmanager
+    def time(self, stage: str):
+        """Record elapsed milliseconds for a code block labelled *stage*."""
+        start = perf_counter()
+        try:
+            yield
+        finally:
+            end = perf_counter()
+            self.timings.append({"stage": stage, "ms": int((end - start) * 1000)})
 
     def finalize(self, *, write: bool) -> Path | None:
         end_ts = datetime.utcnow().isoformat()

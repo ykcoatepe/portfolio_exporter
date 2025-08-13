@@ -75,3 +75,25 @@ def test_daily_report_json_only(monkeypatch, tmp_path):
     assert res["sections"]["theta_decay_5d"] == pytest.approx(0.025)
     assert res["outputs"] == []
     assert list(tmp_path.iterdir()) == []
+
+
+def test_daily_report_debug_timings_json(monkeypatch, tmp_path):
+    data_dir = Path(__file__).parent / "data"
+    monkeypatch.setattr(
+        "portfolio_exporter.core.io.latest_file", _fake_latest_factory(data_dir)
+    )
+    monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
+    res = daily_report.main(["--json", "--debug-timings"])
+    assert res["meta"]["timings"]
+    assert res["outputs"] == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_daily_report_debug_timings_file(monkeypatch, tmp_path):
+    data_dir = Path(__file__).parent / "data"
+    monkeypatch.setattr(
+        "portfolio_exporter.core.io.latest_file", _fake_latest_factory(data_dir)
+    )
+    res = daily_report.main(["--json", "--output-dir", str(tmp_path), "--debug-timings"])
+    assert any(str(p).endswith("timings.csv") for p in res["outputs"])
+    assert (tmp_path / "timings.csv").exists()

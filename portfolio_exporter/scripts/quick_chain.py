@@ -358,6 +358,7 @@ def _run_cli_v3() -> int:
     parser.add_argument("--no-files", action="store_true", default=False)
     parser.add_argument("--output-dir", help="Override output directory", default=None)
     parser.add_argument("--json", action="store_true", default=False, help="Emit summary JSON and exit")
+    parser.add_argument("--debug-timings", action="store_true")
     args = parser.parse_args()
 
     formats = cli_helpers.decide_file_writes(
@@ -369,81 +370,90 @@ def _run_cli_v3() -> int:
     quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
 
     with RunLog(script="quick_chain", args=vars(args), output_dir=outdir) as rl:
-        # Build base DataFrame
-        df = None
-        if args.chain_csv:
-            try:
-                df = pd.read_csv(args.chain_csv)
-            except Exception as exc:
-                print(f"❌ Failed to read chain CSV: {exc}")
-                return 2
-        else:
-            # Live/demo path (kept minimal; not used in tests)
-            syms = args.symbols or []
-            if not syms:
-                print("No symbols provided; nothing to do.")
-                return 1
-            frames = []
-            for sym in syms:
-                # attempt next available weekly expiry ~30 days from now
-                exp = (date.today() + timedelta(days=30)).isoformat()
+        with rl.time("build"):
+            # Build base DataFrame
+            df = None
+            if args.chain_csv:
                 try:
-                    df_sym = core_chain.fetch_chain(sym, exp, strikes=None)
-                    df_sym.insert(0, "underlying", sym)
-                    df_sym.insert(1, "expiry", exp)
-                    frames.append(df_sym)
-                except Exception:
-                    continue
-            df = (
-                pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
-            )
-
-        if df is None or df.empty:
-            print("⚠ No chain data available")
-            return 0
-
-        # Ensure required columns
-        for c in ("underlying", "expiry", "right", "strike"):
-            if c not in df.columns:
-                df[c] = pd.NA
-        if "mid" not in df.columns:
-            if "last" in df.columns:
-                df["mid"] = df["last"]
+                    df = pd.read_csv(args.chain_csv)
+                except Exception as exc:
+                    print(f"❌ Failed to read chain CSV: {exc}")
+                    return 2
             else:
-                df["mid"] = pd.NA
+                # Live/demo path (kept minimal; not used in tests)
+                syms = args.symbols or []
+                if not syms:
+                    print("No symbols provided; nothing to do.")
+                    return 1
+                frames = []
+                for sym in syms:
+                    # attempt next available weekly expiry ~30 days from now
+                    exp = (date.today() + timedelta(days=30)).isoformat()
+                    try:
+                        df_sym = core_chain.fetch_chain(sym, exp, strikes=None)
+                        df_sym.insert(0, "underlying", sym)
+                        df_sym.insert(1, "expiry", exp)
+                        frames.append(df_sym)
+                    except Exception:
+                        continue
+                df = (
+                    pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+                )
 
-        # Tenor filter then same-delta augmentation
-        df_f = _filter_tenor(df, args.tenor)
-        df_out = _same_delta_by_expiry(df_f, float(args.target_delta), args.side)
+            if df is None or df.empty:
+                print("⚠ No chain data available")
+                return 0
+
+            # Ensure required columns
+            for c in ("underlying", "expiry", "right", "strike"):
+                if c not in df.columns:
+                    df[c] = pd.NA
+            if "mid" not in df.columns:
+                if "last" in df.columns:
+                    df["mid"] = df["last"]
+                else:
+                    df["mid"] = pd.NA
+
+            # Tenor filter then same-delta augmentation
+            df_f = _filter_tenor(df, args.tenor)
+            df_out = _same_delta_by_expiry(df_f, float(args.target_delta), args.side)
 
         # Outputs
         base_name = "quick_chain"
         outputs = {k: "" for k in formats}
         written: list[Path] = []
-        if formats.get("csv"):
-            csv_path = io_save(df_out, base_name, fmt="csv", outdir=outdir)
-            outputs["csv"] = str(csv_path)
-            written.append(csv_path)
-            if pretty:
-                Console().print(f"CSV saved → {csv_path}")
-            elif not quiet:
-                print(f"CSV saved → {csv_path}")
-        if formats.get("html"):
-            html_path = io_save(df_out, base_name, fmt="html", outdir=outdir)
-            outputs["html"] = str(html_path)
-            written.append(html_path)
-            if pretty:
-                Console().print(f"HTML saved → {html_path}")
-            elif not quiet:
-                print(f"HTML saved → {html_path}")
-        if formats.get("pdf"):
-            pdf_path = io_save(df_out, base_name, fmt="pdf", outdir=outdir)
-            outputs["pdf"] = str(pdf_path)
-            written.append(pdf_path)
-            if pretty:
-                Console().print(f"PDF saved → {pdf_path}")
-            elif not quiet:
-                print(f"PDF saved → {pdf_path}")
+
+        with rl.time("write_outputs"):
+            if formats.get("csv"):
+                csv_path = io_save(df_out, base_name, fmt="csv", outdir=outdir)
+                outputs["csv"] = str(csv_path)
+                written.append(csv_path)
+                if pretty:
+                    Console().print(f"CSV saved → {csv_path}")
+                elif not quiet:
+                    print(f"CSV saved → {csv_path}")
+            if formats.get("html"):
+                html_path = io_save(df_out, base_name, fmt="html", outdir=outdir)
+                outputs["html"] = str(html_path)
+                written.append(html_path)
+                if pretty:
+                    Console().print(f"HTML saved → {html_path}")
+                elif not quiet:
+                    print(f"HTML saved → {html_path}")
+            if formats.get("pdf"):
+                pdf_path = io_save(df_out, base_name, fmt="pdf", outdir=outdir)
+                outputs["pdf"] = str(pdf_path)
+                written.append(pdf_path)
+                if pretty:
+                    Console().print(f"PDF saved → {pdf_path}")
+                elif not quiet:
+                    print(f"PDF saved → {pdf_path}")
+
+            if args.debug_timings:
+                if written:
+                    tpath = io_save(pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir)
+                    outputs["timings"] = str(tpath)
+                    written.append(tpath)
 
         rl.add_outputs(written)
         manifest_path = rl.finalize(write=bool(written))
@@ -459,6 +469,8 @@ def _run_cli_v3() -> int:
             else None,
             "side": args.side or "",
         }
+        if args.debug_timings:
+            meta["timings"] = rl.timings
         summary = json_helpers.report_summary({"chain": int(len(df_out))}, outputs, meta=meta)
         if manifest_path:
             summary["outputs"].append(str(manifest_path))

@@ -74,3 +74,49 @@ def test_lazy_deps(monkeypatch, tmp_path, capsys):
     assert code == 0
     assert data["sections"]["chain"] > 0
     assert not any(tmp_path.iterdir())
+
+
+def test_debug_timings_json(tmp_path):
+    env = os.environ.copy()
+    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_OUTPUT_DIR": str(tmp_path), "PE_QUIET": "1"})
+    result = subprocess.run(
+        [
+            sys.executable,
+            "portfolio_exporter/scripts/quick_chain.py",
+            "--chain-csv",
+            "tests/data/quick_chain_fixture.csv",
+            "--json",
+            "--debug-timings",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    data = json.loads(result.stdout)
+    assert data["meta"]["timings"]
+    assert not any(tmp_path.iterdir())
+
+
+def test_debug_timings_file(tmp_path):
+    env = os.environ.copy()
+    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_QUIET": "1"})
+    result = subprocess.run(
+        [
+            sys.executable,
+            "portfolio_exporter/scripts/quick_chain.py",
+            "--chain-csv",
+            "tests/data/quick_chain_fixture.csv",
+            "--json",
+            "--output-dir",
+            str(tmp_path),
+            "--debug-timings",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    data = json.loads(result.stdout)
+    assert any(p.endswith("timings.csv") for p in data["outputs"])
+    assert (tmp_path / "timings.csv").exists()
