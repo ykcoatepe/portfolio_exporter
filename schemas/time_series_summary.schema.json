@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Time Series Summary",
+  "type": "object",
+  "required": ["ok", "outputs", "warnings", "meta", "rows", "start", "end"],
+  "properties": {
+    "ok": {"type": "boolean"},
+    "outputs": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "meta": {
+      "type": "object",
+      "required": ["schema_id", "schema_version"],
+      "properties": {
+        "schema_id": {"const": "time_series_summary"},
+        "schema_version": {"const": "1.0.0"}
+      },
+      "additionalProperties": true
+    },
+    "rows": {"type": "integer"},
+    "start": {"type": ["string", "null"]},
+    "end": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

@@ -17,4 +17,6 @@ __all__ = [
     "order_builder",
     "roll_manager",
     "quick_chain",
+    "validate_json",
+    "doctor",
 ]

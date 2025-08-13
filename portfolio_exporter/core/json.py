@@ -1,7 +1,10 @@
 """Small helpers for consistent JSON summaries."""
 from __future__ import annotations
 
-from typing import Dict, List, Mapping, Any
+from typing import Any, Dict, List, Mapping
+
+
+SCHEMA_VERSION = "1.0.0"
 
 
 def _base(
@@ -30,6 +33,7 @@ def time_series_summary(
 ) -> Dict[str, Any]:
     """Build a standardised summary for time‑series exports."""
 
+    meta = {**(meta or {}), "schema_id": "time_series_summary", "schema_version": SCHEMA_VERSION}
     base = _base(outputs, warnings, meta)
     base.update({"rows": rows, "start": start, "end": end})
     return base
@@ -43,6 +47,7 @@ def report_summary(
 ) -> Dict[str, Any]:
     """Build a summary for multi‑section reports."""
 
+    meta = {**(meta or {}), "schema_id": "report_summary", "schema_version": SCHEMA_VERSION}
     base = _base(outputs, warnings, meta)
     base.update({"sections": dict(sections)})
     return base
