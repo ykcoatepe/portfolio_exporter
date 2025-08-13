@@ -11,12 +11,20 @@ from pathlib import Path
 import os
 import argparse
 import json
+import sys
 
 from portfolio_exporter.core.config import settings
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+try:  # optional IBKR config
+    from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+except Exception:  # pragma: no cover - fallback defaults
+    IB_HOST = "127.0.0.1"  # type: ignore
+    IB_PORT = 7497  # type: ignore
+
+    def _cid(name: str, default: int = 0) -> int:  # type: ignore
+        return default
 
 from typing import Iterable, List, Tuple
-from typing import Optional
+from typing import Optional, Any, Dict
 
 import pandas as pd
 import numpy as np
@@ -25,6 +33,8 @@ import logging
 from portfolio_exporter.core import combo as combo_core
 from portfolio_exporter.core import io as io_core
 from portfolio_exporter.core import config as config_core
+from portfolio_exporter.core import cli as cli_helpers
+from portfolio_exporter.core import json as json_helpers
 
 # Reuse enrichment from portfolio_greeks to keep behavior identical
 try:
@@ -75,7 +85,8 @@ if IB is None:
         "❌  ib_insync library not found. Install with:\n"
         "    pip install ib_insync\n"
         "and ensure the Interactive Brokers TWS or IB Gateway is running with "
-        "API enabled."
+        "API enabled.",
+        file=sys.stderr,
     )
 
 
@@ -1074,10 +1085,18 @@ def _detect_and_enrich_trades_combos(execs_df: pd.DataFrame, opens_df: pd.DataFr
     return combos_df
 
 
-def _save_trades_combos(df: pd.DataFrame, fmt: str = "csv") -> Path:
+def _save_trades_combos(
+    df: pd.DataFrame, fmt: str = "csv", outdir: Path | None = None
+) -> Path:
+    """Persist combos DataFrame using existing schema."""
+
     # Drop debug/helper columns from save output
-    out = df.drop(columns=["__db_legs_detail", "__strike_source", "__healed_legs"], errors="ignore")
-    return io_core.save(out, "trades_combos", fmt, config_core.settings.output_dir)
+    out = df.drop(
+        columns=["__db_legs_detail", "__strike_source", "__healed_legs"],
+        errors="ignore",
+    )
+    target = outdir or config_core.settings.output_dir
+    return io_core.save(out, "trades_combos", fmt, target)
 
 
 def _enrich_combo_strikes_fallback(combos_df: pd.DataFrame, positions_df: pd.DataFrame | None) -> pd.DataFrame:
@@ -1227,62 +1246,70 @@ def _enrich_combo_strikes_fallback(combos_df: pd.DataFrame, positions_df: pd.Dat
     return df
 
 
-def _run_cli() -> int:
+def main(argv: list[str] | None = None) -> Dict[str, Any]:
     parser = argparse.ArgumentParser(description="Trades report and combos export")
-    parser.add_argument("--executions-csv", dest="exec_csv", help="Path to offline executions CSV", default=None)
-    parser.add_argument("--no-pretty", action="store_true", help="Disable pretty/TTY output", default=False)
-    parser.add_argument("--debug-combos", action="store_true", help="Force combos debug artifacts (equivalent to PE_DEBUG_COMBOS=1)", default=False)
-    parser.add_argument("--since", help="Start datetime (YYYY-MM-DD or ISO)", default=None)
-    parser.add_argument("--until", help="End datetime (YYYY-MM-DD or ISO)", default=None)
-    parser.add_argument("--summary-only", action="store_true", help="Print summary only; do not write CSV outputs", default=False)
-    parser.add_argument("--json", action="store_true", help="Print summary as JSON and exit", default=False)
-    args = parser.parse_args()
+    parser.add_argument("--executions-csv", dest="exec_csv", default=None)
+    parser.add_argument("--no-pretty", action="store_true")
+    parser.add_argument("--debug-combos", action="store_true")
+    parser.add_argument("--since")
+    parser.add_argument("--until")
+    parser.add_argument("--summary-only", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--output-dir")
+    parser.add_argument("--no-files", action="store_true")
+    args = parser.parse_args(argv)
 
+    if args.summary_only:
+        args.no_files = True
     if args.debug_combos:
         os.environ["PE_DEBUG_COMBOS"] = "1"
 
-    df_exec = None
-    df_open = None
+    formats = cli_helpers.decide_file_writes(
+        args,
+        json_only_default=True,
+        defaults={"csv": bool(args.output_dir)},
+    )
+    outdir = cli_helpers.resolve_output_dir(args.output_dir)
+    quiet, _pretty = cli_helpers.resolve_quiet(args.no_pretty)
+
+    df_exec: pd.DataFrame | None = None
+    df_open: pd.DataFrame | None = None
     if args.exec_csv:
         try:
             df_exec = pd.read_csv(args.exec_csv)
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive
             print(f"❌ Failed to read executions CSV: {exc}")
-            return 2
+            return {}
     else:
-        # Fallback to interactive IBKR pull
         t = _load_trades()
         if t is None:
-            return 1
+            return {}
         df_exec = t
         try:
             df_open = _load_open_orders()
         except Exception:
             df_open = None
 
-    # Apply date filters and compute summary metrics
     n_total = len(df_exec) if isinstance(df_exec, pd.DataFrame) else 0
     since_dt = _parse_when(args.since)
     until_dt = _parse_when(args.until)
     df_exec = _filter_by_date(df_exec, since_dt, until_dt, col="datetime")
     n_kept = len(df_exec)
-    # Avoid extra noise when JSON output is requested
-    if not args.json:
-        print(
-            f"Trades filter: total={n_total} kept={n_kept} (since={args.since} until={args.until})"
-        )
 
-    # Build positions-like for summary
     pos_like = _build_positions_like_df(df_exec, None)
-    uvals = []
+    uvals: list[str] = []
     if not pos_like.empty and "underlying" in pos_like.columns:
         try:
-            uvals = sorted(set(x for x in pos_like["underlying"].dropna().tolist() if str(x)))
+            uvals = sorted(
+                {
+                    str(x)
+                    for x in pos_like["underlying"].dropna().tolist()
+                    if str(x)
+                }
+            )
         except Exception:
             uvals = []
-    u_count = len(uvals)
     try:
-        # multiplier defaults handled in builder
         m = pd.to_numeric(pos_like.get("multiplier", 0), errors="coerce").fillna(0)
         qty = pd.to_numeric(pos_like.get("qty", 0), errors="coerce").fillna(0)
         price = pd.to_numeric(pos_like.get("price", 0), errors="coerce").fillna(0)
@@ -1290,85 +1317,28 @@ def _run_cli() -> int:
     except Exception:
         net_credit_debit = 0.0
 
-    # Detect + enrich combos from executions/open orders (filtered)
     combos_df = _detect_and_enrich_trades_combos(df_exec, df_open)
     c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
-    try:
-        by_structure = (
-            combos_df.get("structure_label", combos_df.get("structure"))
-            .astype(str)
-            .str.lower()
-            .value_counts()
-            .to_dict()
-            if not combos_df.empty
-            else {}
-        )
-    except Exception:
-        by_structure = {}
 
-    summary = {
-        "n_total": n_total,
-        "n_kept": n_kept,
-        "u_count": u_count,
-        "underlyings": uvals,
-        "net_credit_debit": round(net_credit_debit, 2),
-        "combos_total": c_total,
-        "combos_by_structure": by_structure,
-        "outputs": {},
-    }
-
-    # Honor summary-only / json flags
-    if args.json:
-        print(json.dumps(summary, default=str))
-        return 0
-
-    if args.summary_only:
-        print(
-            "Trades summary: total={n_total} kept={n_kept} underlyings={u_count} "
-            "net_credit_debit={net:+.2f} combos={c_total} breakdown={breakdown}".format(
-                n_total=n_total,
-                n_kept=n_kept,
-                u_count=u_count,
-                net=net_credit_debit,
-                c_total=c_total,
-                breakdown=by_structure,
-            )
-        )
-        return 0
-
-    # Save the combined trades/open report as before
-    try:
+    outputs: Dict[str, str] = {}
+    if formats.get("csv"):
         df_all = df_exec.copy()
         if isinstance(df_open, pd.DataFrame) and not df_open.empty:
             df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
-        date_tag = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
-        path_report = io_core.save(
-            df_all, f"trades_report_{date_tag}", "csv", config_core.settings.output_dir
-        )
-        summary["outputs"]["trades_report"] = str(path_report)
-    except Exception:
-        pass
+        path_report = io_core.save(df_all, "trades_report", "csv", outdir)
+        outputs["trades_report"] = str(path_report)
+        path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
+        outputs["trades_combos"] = str(path_combos)
 
-    # Detect + enrich combos already done; save CSV
-    path_combos = _save_trades_combos(combos_df, fmt="csv")
-    summary["outputs"]["trades_combos"] = str(path_combos)
-    print(f"✅ Trades combos exported → {path_combos}")
-
-    # Also print concise summary (text)
-    print(
-        "Trades summary: total={n_total} kept={n_kept} underlyings={u_count} "
-        "net_credit_debit={net:+.2f} combos={c_total} breakdown={breakdown}".format(
-            n_total=n_total,
-            n_kept=n_kept,
-            u_count=u_count,
-            net=net_credit_debit,
-            c_total=c_total,
-            breakdown=by_structure,
-        )
+    summary = json_helpers.report_summary(
+        {"executions": n_kept, "combos": c_total},
+        outputs=outputs,
+        meta={"script": "trades_report"},
     )
 
-    # no-pretty is respected by doing nothing extra when printing
-    return 0
+    if args.json:
+        cli_helpers.print_json(summary, quiet)
+    return summary
 
 
 # ───── Date parsing & filtering helpers (import-safe) ─────
@@ -1456,5 +1426,4 @@ def _filter_by_date(
 
 
 if __name__ == "__main__":  # pragma: no cover - exercised by CLI tests
-    # Ensure all helpers are defined before invoking CLI
-    raise SystemExit(_run_cli())
+    main()

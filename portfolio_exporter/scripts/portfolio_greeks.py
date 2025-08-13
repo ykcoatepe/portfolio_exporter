@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 portfolio_greeks.py  –  Export per-position option Greeks and account-level totals
 
@@ -25,25 +27,43 @@ import os
 import sys
 import json
 import hashlib
-import requests
+try:
+    import requests
+except Exception:  # pragma: no cover - optional dependency
+    requests = None  # type: ignore
 import calendar
 import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Tuple, Optional
 from pathlib import Path
-from rich.console import Console
-from rich.table import Table
-from rich import box
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich import box
+except Exception:  # pragma: no cover - optional dependency
+    Console = None  # type: ignore
+    Table = None  # type: ignore
+    box = None  # type: ignore
 import sqlite3
 import pandas as pd
 
 from utils.bs import bs_greeks
-from legacy.option_chain_snapshot import fetch_yf_open_interest
-from portfolio_exporter.core.ui import run_with_spinner
+try:
+    from legacy.option_chain_snapshot import fetch_yf_open_interest
+except Exception:  # pragma: no cover - optional
+    def fetch_yf_open_interest(*args, **kwargs):  # type: ignore
+        return {}
+try:
+    from portfolio_exporter.core.ui import run_with_spinner
+except Exception:  # pragma: no cover - fallback
+    def run_with_spinner(msg, func, *args, **kwargs):
+        return func(*args, **kwargs)
 from portfolio_exporter.core import combo as combo_core
 from portfolio_exporter.core import io as io_core
 from portfolio_exporter.core import config as config_core
+from portfolio_exporter.core import cli as cli_helpers
+from portfolio_exporter.core import json as json_helpers
 
 import numpy as np
 
@@ -60,8 +80,11 @@ try:
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
 
-from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
-from ib_insync.contract import Contract
+try:
+    from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
+    from ib_insync.contract import Contract
+except Exception:  # pragma: no cover - optional dependency
+    Future = IB = Index = Option = Position = Stock = Ticker = util = Contract = None  # type: ignore
 
 try:
     from utils.progress import iter_progress
@@ -193,7 +216,14 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 
 NAV_LOG = Path(os.path.join(OUTPUT_DIR, "nav_history.csv"))
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+try:
+    from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+except Exception:  # pragma: no cover - optional fallback
+    IB_HOST = "127.0.0.1"  # type: ignore
+    IB_PORT = 7497  # type: ignore
+
+    def _cid(name: str, default: int = 0) -> int:  # type: ignore
+        return default
 IB_CID = _cid("portfolio_greeks", default=11)  # separate clientId from snapshots
 
 # contract multipliers by secType (IB doesn't always fill this field)
@@ -2076,11 +2106,15 @@ def run(
     combo_types: str = "simple",
     combos_source: str = "auto",
     persist_combos: bool = False,
-) -> dict | None:
+    *,
+    output_dir: str | Path | None = None,
+    return_frames: bool = False,
+) -> Any:
     """Aggregate per-position Greeks and optionally persist the results."""
 
+    outdir = Path(output_dir or config_core.settings.output_dir).expanduser()
     try:
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        os.makedirs(outdir, exist_ok=True)
     except Exception:
         pass
 
@@ -2319,7 +2353,7 @@ def run(
                         combos_df,
                         "combos_enriched_debug",
                         fmt,
-                        config_core.settings.output_dir,
+                        outdir,
                     )
                 except Exception:
                     pass
@@ -2333,7 +2367,6 @@ def run(
             except Exception as exc:  # pragma: no cover - defensive
                 logger.warning("Persist combos failed: %s", exc)
 
-    outdir = config_core.settings.output_dir
     if write_positions:
         io_core.save(pos_df, "portfolio_greeks_positions", fmt, outdir)
     if write_totals:
@@ -2379,78 +2412,84 @@ def run(
             and {"delta", "gamma", "vega", "theta"}.issubset(combos_df.columns)
         ):
             combo_sum = combos_df[["delta", "gamma", "vega", "theta"]].sum().to_dict()
-        return {"legs": totals_row, "combos": combo_sum}
+        result = {"legs": totals_row, "combos": combo_sum}
+        if return_frames:
+            return result, pos_df, totals, combos_df
+        return result
+    if return_frames:
+        return pos_df, totals, combos_df
     return None
 
 
-if __name__ == "__main__":  # pragma: no cover - CLI entry
+def main(argv: list[str] | None = None) -> Dict[str, Any]:
     parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
-    parser.add_argument("--fmt", default="csv", help="Output format")
+    parser.add_argument("--positions-csv")
+    parser.add_argument("--no-combos", action="store_true")
     parser.add_argument(
-        "--no-combos", action="store_true", help="Disable combo detection"
-    )
-    parser.add_argument(
-        "--combo-types",
-        choices=["simple", "all"],
-        default="simple",
-        help="Combo detection complexity",
+        "--combo-types", choices=["simple", "all"], default="simple"
     )
     parser.add_argument(
         "--combos-source",
         choices=["auto", "db", "live", "engine"],
         default="auto",
-        help=(
-            "Source for combo metadata in saved CSV: "
-            "auto=db else live; engine=original behavior."
-        ),
     )
-    parser.add_argument(
-        "--persist-combos",
-        action="store_true",
-        help="Persist detected combos into SQLite when sourced live/engine",
-    )
-    parser.add_argument(
-        "--positions-csv",
-        type=str,
-        help="Path to a positions CSV to use instead of pulling live positions from IBKR.",
-    )
-    parser.add_argument(
-        "--debug-combos",
-        action="store_true",
-        help="Force writing combos debug artifacts (same as PE_DEBUG_COMBOS=1).",
-    )
-    parser.add_argument(
-        "--no-pretty",
-        action="store_true",
-        help="Disable Rich pretty output; only write files.",
-    )
-    args = parser.parse_args()
-    # Lightweight offline-only validator for --positions-csv
-    if getattr(args, "positions_csv", None):
-        import pandas as _pd
-        _path = os.path.expanduser(args.positions_csv)
-        ok = True
-        if not os.path.exists(_path):
-            ok = False
-        else:
-            try:
-                _df = _pd.read_csv(_path)
-                if _df is None or _df.empty:
-                    ok = False
-            except Exception:
-                ok = False
-        if not ok:
-            print(
-                "WARNING: --positions-csv looks empty or malformed; continuing without guarantees for combos.",
-                file=sys.stderr,
-            )
-    # Map --debug-combos to env var expected by internals
-    if getattr(args, "debug_combos", False):
+    parser.add_argument("--persist-combos", action="store_true")
+    parser.add_argument("--debug-combos", action="store_true")
+    parser.add_argument("--no-pretty", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--output-dir")
+    parser.add_argument("--no-files", action="store_true")
+    args = parser.parse_args(argv)
+
+    globals()["args"] = args
+    if args.debug_combos:
         os.environ["PE_DEBUG_COMBOS"] = "1"
-    run(
-        fmt=args.fmt,
-        combos=not args.no_combos,
+
+    formats = cli_helpers.decide_file_writes(
+        args,
+        json_only_default=True,
+        defaults={
+            "positions": bool(args.output_dir),
+            "totals": bool(args.output_dir),
+            "combos": bool(args.output_dir) and not args.no_combos,
+        },
+    )
+    outdir = cli_helpers.resolve_output_dir(args.output_dir)
+    quiet, _pretty = cli_helpers.resolve_quiet(args.no_pretty)
+
+    pos_df, totals, combos_df = run(
+        fmt="csv",
+        write_positions=formats["positions"],
+        write_totals=formats["totals"],
+        combos=formats["combos"],
         combo_types=args.combo_types,
         combos_source=args.combos_source,
         persist_combos=args.persist_combos,
+        output_dir=outdir,
+        return_frames=True,
     )
+
+    outputs: Dict[str, str] = {}
+    if formats["positions"]:
+        outputs["positions"] = str(Path(outdir) / "portfolio_greeks_positions.csv")
+    if formats["totals"]:
+        outputs["totals"] = str(Path(outdir) / "portfolio_greeks_totals.csv")
+        if formats["combos"]:
+            outputs["combos"] = str(Path(outdir) / "portfolio_greeks_combos.csv")
+
+    summary = json_helpers.report_summary(
+        {
+            "positions": len(pos_df),
+            "totals": 1,
+            "combos": len(combos_df),
+        },
+        outputs=outputs,
+        meta={"script": "portfolio_greeks"},
+    )
+    if args.json:
+        cli_helpers.print_json(summary, quiet)
+    return summary
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry
+    main()
