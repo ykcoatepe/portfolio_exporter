@@ -24,6 +24,12 @@ def _default_db_path() -> pathlib.Path:
         p.parent.mkdir(parents=True, exist_ok=True)
         return p
 
+    # Honor lightweight test mode used by CLI tests
+    if os.environ.get("PE_TEST_MODE"):
+        local_p = pathlib.Path.cwd() / "tmp_test_run" / "combos.db"
+        local_p.parent.mkdir(parents=True, exist_ok=True)
+        return local_p
+
     # Under pytest, prefer a repo-local temporary path to avoid sandbox issues
     if os.environ.get("PYTEST_CURRENT_TEST"):
         local_p = pathlib.Path.cwd() / "tmp_test_run" / "combos.db"
