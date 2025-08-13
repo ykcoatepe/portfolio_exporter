@@ -1,0 +1,4 @@
+underlying,expiry,structure_label,type,width,strikes,call_strikes,put_strikes,call_count,put_count,legs_n
+aapl,2024-01-12,vertical,credit,5,"150/155","150","155",1,1,2
+msft,2024-01-15,iron condor,credit,10,"300/310/320/330","300/310","320/330",2,2,4
+goog,2024-01-20,calendar,debit,,"1350/1350","1350","1350",1,1,2
