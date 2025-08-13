@@ -333,6 +333,7 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument("--expiry-window", type=int, nargs="?", const=10, default=None)
     parser.add_argument("--symbol")
     parser.add_argument("--preflight", action="store_true")
+    parser.add_argument("--debug-timings", action="store_true")
     args = parser.parse_args(argv)
 
     formats = cli_helpers.decide_file_writes(
@@ -376,83 +377,91 @@ def main(argv: list[str] | None = None) -> dict:
         return summary
 
     with RunLog(script="daily_report", args=vars(args), output_dir=outdir) as rl:
-        # Load data
-        positions = _prep_positions(
-            _load_csv("portfolio_greeks_positions"), args.since, args.until
-        )
-        totals = _load_csv("portfolio_greeks_totals")
-        combos_raw = _load_csv("portfolio_greeks_combos")
+        with rl.time("load_data"):
+            positions = _prep_positions(
+                _load_csv("portfolio_greeks_positions"), args.since, args.until
+            )
+            totals = _load_csv("portfolio_greeks_totals")
+            combos_raw = _load_csv("portfolio_greeks_combos")
 
-        # Optional symbol filter
-        if args.symbol:
-            positions = _filter_symbol(positions, args.symbol)
-            totals = _filter_symbol(totals, args.symbol)
-            combos_raw = _filter_symbol(combos_raw, args.symbol)
+            # Optional symbol filter
+            if args.symbol:
+                positions = _filter_symbol(positions, args.symbol)
+                totals = _filter_symbol(totals, args.symbol)
+                combos_raw = _filter_symbol(combos_raw, args.symbol)
 
-        combos = _prep_combos(combos_raw)
-
-        account = (
-            totals["account"].iloc[0]
-            if "account" in totals.columns and not totals.empty
-            else None
-        )
-
-        # Metadata
         meta: dict[str, Any] = {}
         if args.symbol:
             meta["filters"] = {"symbol": args.symbol.upper()}
 
-        # Expiry radar (exposed at top-level via meta back-compat)
-        expiry_radar = None
-        if args.expiry_window and args.expiry_window > 0:
-            expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
-            meta["expiry_radar"] = expiry_radar
+        with rl.time("analytics"):
+            combos = _prep_combos(combos_raw)
 
-        # Analytics (live under sections)
-        delta_buckets = _delta_buckets(positions)
-        theta_decay_5d = _theta_decay_5d(positions)
-
-        # Pre-build HTML for HTML/PDF requests
-        html_str = None
-        if formats.get("html") or formats.get("pdf"):
-            html_str = _build_html(
-                outdir,
-                totals,
-                combos,
-                positions,
-                account,
-                expiry_radar,
-                delta_buckets,
-                theta_decay_5d,
+            account = (
+                totals["account"].iloc[0]
+                if "account" in totals.columns and not totals.empty
+                else None
             )
+
+            # Expiry radar (exposed at top-level via meta back-compat)
+            expiry_radar = None
+            if args.expiry_window and args.expiry_window > 0:
+                expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
+                meta["expiry_radar"] = expiry_radar
+
+            # Analytics (live under sections)
+            delta_buckets = _delta_buckets(positions)
+            theta_decay_5d = _theta_decay_5d(positions)
+
+            # Pre-build HTML for HTML/PDF requests
+            html_str = None
+            if formats.get("html") or formats.get("pdf"):
+                html_str = _build_html(
+                    outdir,
+                    totals,
+                    combos,
+                    positions,
+                    account,
+                    expiry_radar,
+                    delta_buckets,
+                    theta_decay_5d,
+                )
 
         # File outputs plan and writes
         outputs: dict[str, str] = {k: "" for k in formats}
         written: list[Path] = []
 
-        if formats.get("html") and html_str is not None:
-            path_html = core_io.save(html_str, "daily_report", "html", outdir)
-            outputs["html"] = str(path_html)
-            written.append(path_html)
-            if console:
-                console.print(f"HTML report → {path_html}")
+        with rl.time("write_outputs"):
+            if formats.get("html") and html_str is not None:
+                path_html = core_io.save(html_str, "daily_report", "html", outdir)
+                outputs["html"] = str(path_html)
+                written.append(path_html)
+                if console:
+                    console.print(f"HTML report → {path_html}")
 
-        if formats.get("pdf"):
-            flowables = _build_pdf_flowables(
-                outdir,
-                totals,
-                combos,
-                positions,
-                account,
-                expiry_radar,
-                delta_buckets,
-                theta_decay_5d,
-            )
-            path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
-            outputs["pdf"] = str(path_pdf)
-            written.append(path_pdf)
-            if console:
-                console.print(f"PDF report → {path_pdf}")
+            if formats.get("pdf"):
+                flowables = _build_pdf_flowables(
+                    outdir,
+                    totals,
+                    combos,
+                    positions,
+                    account,
+                    expiry_radar,
+                    delta_buckets,
+                    theta_decay_5d,
+                )
+                path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
+                outputs["pdf"] = str(path_pdf)
+                written.append(path_pdf)
+                if console:
+                    console.print(f"PDF report → {path_pdf}")
+
+            if args.debug_timings:
+                meta["timings"] = rl.timings
+                if written:
+                    path_t = core_io.save(pd.DataFrame(rl.timings), "timings", "csv", outdir)
+                    outputs["timings"] = str(path_t)
+                    written.append(path_t)
 
         # Manifest
         rl.add_outputs(written)

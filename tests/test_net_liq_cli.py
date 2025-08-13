@@ -125,3 +125,47 @@ def test_quiet_suppresses_table(tmp_path):
         env,
     )
     assert quiet.strip() == ""
+
+
+def test_debug_timings_json(tmp_path):
+    env = os.environ.copy()
+    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_OUTPUT_DIR": str(tmp_path)})
+    out = _run_cli(
+        [
+            "--source",
+            "fixture",
+            "--fixture-csv",
+            "tests/data/net_liq_fixture.csv",
+            "--json",
+            "--debug-timings",
+            "--quiet",
+        ],
+        env,
+    )
+    data = json.loads(out)
+    assert data["meta"]["timings"]
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.skipif(not _have_reportlab(), reason="reportlab not installed")
+def test_debug_timings_file(tmp_path):
+    env = os.environ.copy()
+    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1"})
+    outdir = tmp_path / ".tmp_nlh"
+    out = _run_cli(
+        [
+            "--source",
+            "fixture",
+            "--fixture-csv",
+            "tests/data/net_liq_fixture.csv",
+            "--json",
+            "--output-dir",
+            str(outdir),
+            "--debug-timings",
+            "--quiet",
+        ],
+        env,
+    )
+    data = json.loads(out)
+    assert any(p.endswith("timings.csv") for p in data["outputs"])
+    assert (outdir / "timings.csv").exists()
