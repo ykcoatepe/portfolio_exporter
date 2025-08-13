@@ -344,21 +344,55 @@ def main(argv: list[str] | None = None) -> dict:
     console = Console() if pretty else None
 
     with RunLog(script="daily_report", args=vars(args), output_dir=outdir) as rl:
+        # Load data
         positions = _prep_positions(
             _load_csv("portfolio_greeks_positions"), args.since, args.until
         )
         totals = _load_csv("portfolio_greeks_totals")
         combos_raw = _load_csv("portfolio_greeks_combos")
+
+        # Optional symbol filter
         if args.symbol:
             positions = _filter_symbol(positions, args.symbol)
             totals = _filter_symbol(totals, args.symbol)
             combos_raw = _filter_symbol(combos_raw, args.symbol)
+
         combos = _prep_combos(combos_raw)
 
         account = (
             totals["account"].iloc[0]
             if "account" in totals.columns and not totals.empty
             else None
+        )
+
+        written: list[Path] = []
+        meta: dict[str, Any] = {}
+        if args.symbol:
+            meta["filters"] = {"symbol": args.symbol.upper()}
+
+        # Expiry radar (kept in meta for back-compat)
+        expiry_radar = None
+        if args.expiry_window and args.expiry_window > 0:
+            expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
+            meta["expiry_radar"] = expiry_radar
+
+        # Analytics (live under sections)
+        delta_buckets = _delta_buckets(positions)
+        theta_decay_5d = _theta_decay_5d(positions)
+
+        # Pre-build HTML if HTML/PDF is requested
+        html_str = None
+        if formats.get("html") or formats.get("pdf"):
+            html_str = _build_html(
+                outdir,
+                totals,
+                combos,
+                positions,
+                account,
+                expiry_radar,
+                delta_buckets,
+                theta_decay_5d,
+            )
         )
 
         outputs = {k: "" for k in formats}
@@ -424,14 +458,62 @@ def main(argv: list[str] | None = None) -> dict:
             outputs=outputs,
             meta=meta or None,
         )
+        # Write artifacts according to plan
+        if formats.get("html") and html_str is not None:
+            path_html = core_io.save(html_str, "daily_report", "html", outdir)
+            written.append(path_html)
+            if console:
+                console.print(f"HTML report → {path_html}")
 
+        if formats.get("pdf"):
+            flowables = _build_pdf_flowables(
+                outdir,
+                totals,
+                combos,
+                positions,
+                account,
+                expiry_radar,
+                delta_buckets,
+                theta_decay_5d,
+            )
+            path_pdf = core_io.save(flowables, "daily_report", "pdf", outdir)
+            written.append(path_pdf)
+            if console:
+                console.print(f"PDF report → {path_pdf}")
+
+        # Manifest
+        rl.add_outputs(written)
+        manifest_path = rl.finalize(write=bool(written))
+
+        # Sections: counts + analytics
+        sections: dict[str, Any] = {
+            "positions": len(positions),
+            "combos": len(combos),
+            "totals": len(totals),
+            "delta_buckets": delta_buckets,
+            "theta_decay_5d": theta_decay_5d,
+        }
+
+        # outputs is a LIST; append manifest if present
+        outputs_list = [str(p) for p in written]
+        if manifest_path:
+            outputs_list.append(str(manifest_path))
+
+        summary = json_helpers.report_summary(
+            sections,
+            outputs=outputs_list,
+            meta=meta or None,
+        )
+
+        # Back-compat row counts + select meta surfacing
         summary["positions_rows"] = len(positions)
         summary["combos_rows"] = len(combos)
         summary["totals_rows"] = len(totals)
         summary.update(meta)
-        if manifest_path:
-            summary["outputs"].append(str(manifest_path))
 
+        if args.json:
+            cli_helpers.print_json(summary, quiet)
+        return summary
         if args.json:
             cli_helpers.print_json(summary, quiet)
         return summary

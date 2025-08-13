@@ -302,6 +302,15 @@ The script reads the newest `portfolio_greeks_positions*.csv`,
 next `N` days (defaults to 10 when the flag is provided without a value).
 `--symbol TICKER` restricts report inputs to the given underlying (case-insensitive).
 
+#### New analytics
+
+Daily Report now includes:
+
+- `delta_buckets`: counts by Δ bands (-1,-0.6], (-0.6,-0.3], (-0.3,0], (0,0.3], (0.3,0.6], (0.6,1])
+- `theta_decay_5d`: projected total θ over the next 5 sessions (sum of per-position θ × 5)
+
+Available in JSON under `sections.delta_buckets` and `sections.theta_decay_5d`, and rendered in the HTML/PDF cards.
+
 When `--json` is used, the output includes an `expiry_radar` block:
 
 ```json
