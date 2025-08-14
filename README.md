@@ -314,6 +314,14 @@ python -m portfolio_exporter.scripts.trades_report --since 2025-08-09 --until 20
 python -m portfolio_exporter.scripts.trades_report --executions-csv tests/data/offline_executions_combo_sample.csv --since 2025-08-01 --until 2025-08-31 --debug-combos
 ```
 
+### Trades clustering
+
+Group executions into clusters and compute synthetic P&L:
+
+```bash
+python -m portfolio_exporter.scripts.trades_report --executions-csv tests/data/executions_fixture.csv --json
+```
+
 JSON summary fields: `n_total`, `n_kept`, `u_count`, `underlyings`, `net_credit_debit`, `combos_total`, `combos_by_structure`, and `outputs` (paths when written).
 ```
 
