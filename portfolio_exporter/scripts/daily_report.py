@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -202,20 +203,26 @@ def _build_html(
     expiry_radar: dict[str, Any] | None,
     delta_buckets: dict[str, int] | None = None,
     theta_decay_5d: float | None = None,
+    link_theme: bool = False,
 ) -> str:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    parts = ["<h1>Daily Portfolio Report</h1>"]
-    parts.append(f"<p>Generated: {ts}</p>")
+    head: list[str] = []
+    if link_theme:
+        head.append('<link rel="stylesheet" href="theme.css">')
+    parts = ["<html>", "<head>", *head, "</head>", "<body>"]
+    parts.append("<h1>Daily Portfolio Report</h1>")
+    meta: list[str] = [f"<p>Generated: {ts}</p>"]
     if account:
-        parts.append(f"<p>Account: {account}</p>")
-    parts.append(f"<p>Output dir: {outdir}</p>")
+        meta.append(f"<p>Account: {account}</p>")
+    meta.append(f"<p>Output dir: {outdir}</p>")
+    parts.append('<section class="card">' + "".join(meta) + "</section>")
     if expiry_radar is not None:
-        parts.append(
-            f"<h2>Expiry Radar (next {expiry_radar['window_days']} days)</h2>"
-        )
+        sec_parts = [
+            f"<h2>Expiry Radar (next {expiry_radar['window_days']} days)</h2>",
+        ]
         rows = expiry_radar.get("rows", [])
         if rows:
-            tab_rows = []
+            tab_rows: list[dict[str, Any]] = []
             for r in rows:
                 r = r.copy()
                 if "by_structure" in r:
@@ -223,28 +230,45 @@ def _build_html(
                         f"{k}: {v}" for k, v in r["by_structure"].items()
                     )
                 tab_rows.append(r)
-            parts.append(pd.DataFrame(tab_rows).to_html(index=False))
+            sec_parts.append(pd.DataFrame(tab_rows).to_html(index=False))
         else:
-            parts.append("<p>No expiries within window.</p>")
+            sec_parts.append("<p>No expiries within window.</p>")
+        parts.append('<section class="card">' + "".join(sec_parts) + "</section>")
     if delta_buckets is not None:
-        parts.append("<h2>Delta Buckets</h2>")
         db_df = pd.DataFrame({
             "bucket": list(delta_buckets.keys()),
             "count": list(delta_buckets.values()),
         })
-        parts.append(db_df.to_html(index=False))
+        parts.append(
+            '<section class="card"><h2>Delta Buckets</h2>'
+            + db_df.to_html(index=False)
+            + "</section>"
+        )
     if theta_decay_5d is not None:
-        parts.append("<h2>Theta Decay 5d</h2>")
-        parts.append(f"<p>{theta_decay_5d}</p>")
+        parts.append(
+            '<section class="card"><h2>Theta Decay 5d</h2>'
+            + f"<p>{theta_decay_5d}</p>"
+            + "</section>"
+        )
     if not totals.empty:
-        parts.append("<h2>Totals</h2>")
-        parts.append(totals.to_html(index=False))
+        parts.append(
+            '<section class="card"><h2>Totals</h2>'
+            + totals.to_html(index=False)
+            + "</section>"
+        )
     if not combos.empty:
-        parts.append("<h2>Combos</h2>")
-        parts.append(combos.to_html(index=False))
+        parts.append(
+            '<section class="card"><h2>Combos</h2>'
+            + combos.to_html(index=False)
+            + "</section>"
+        )
     if not positions.empty:
-        parts.append("<h2>Positions</h2>")
-        parts.append(positions.to_html(index=False))
+        parts.append(
+            '<section class="card"><h2>Positions</h2>'
+            + positions.to_html(index=False)
+            + "</section>"
+        )
+    parts.append("</body></html>")
     return "\n".join(parts)
 
 
@@ -415,6 +439,10 @@ def main(argv: list[str] | None = None) -> dict:
 
             # Pre-build HTML for HTML/PDF requests
             html_str = None
+            theme_css = (
+                Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
+            )
+            link_theme = theme_css.exists()
             if formats.get("html") or formats.get("pdf"):
                 html_str = _build_html(
                     outdir,
@@ -425,6 +453,7 @@ def main(argv: list[str] | None = None) -> dict:
                     expiry_radar,
                     delta_buckets,
                     theta_decay_5d,
+                    link_theme=link_theme,
                 )
 
         # File outputs plan and writes
@@ -438,6 +467,11 @@ def main(argv: list[str] | None = None) -> dict:
                 written.append(path_html)
                 if console:
                     console.print(f"HTML report → {path_html}")
+                if link_theme:
+                    try:
+                        shutil.copy(theme_css, outdir / "theme.css")
+                    except Exception:
+                        pass
 
             if formats.get("pdf"):
                 flowables = _build_pdf_flowables(
