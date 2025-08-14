@@ -42,6 +42,7 @@ trades-report = "portfolio_exporter.scripts.trades_report:main"
 portfolio-greeks = "portfolio_exporter.scripts.portfolio_greeks:main"
 doctor = "portfolio_exporter.scripts.doctor:main"
 validate-json = "portfolio_exporter.scripts.validate_json:main"
+combo-db-maint = "portfolio_exporter.scripts.combo_db_maint:main"
 
 [tool.setuptools.packages.find]
 include = ["portfolio_exporter*"]
