@@ -1007,6 +1007,108 @@ def _build_positions_like_df(execs: pd.DataFrame, opens: pd.DataFrame | None = N
     return out
 
 
+def _cluster_executions(execs: pd.DataFrame, window_sec: int = 60) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Cluster executions by ``perm_id`` then by ``(underlying, side, window)``.
+
+    Parameters
+    ----------
+    execs:
+        Raw executions DataFrame.
+    window_sec:
+        Sliding time window in seconds for side-aware clustering when ``perm_id``
+        does not form multi-execution groups.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, pd.DataFrame]
+        ``(clusters, debug_rows)`` where ``clusters`` aggregates per-cluster
+        stats and ``debug_rows`` includes the original executions with a
+        ``cluster_id`` column.
+    """
+    if execs is None or execs.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    df = _standardize_cols(execs)
+    if df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    df = df.copy()
+    # Normalize core fields
+    df["underlying"] = df.get("symbol")
+    side = df.get("Side") if "Side" in df.columns else df.get("side")
+    df["side"] = side.astype(str).str.upper().replace({"BOT": "BUY", "SLD": "SELL"})
+    df["side_sign"] = df["side"].map({"BUY": 1, "SELL": -1}).fillna(0)
+    df["qty"] = pd.to_numeric(df.get("qty", df.get("Qty")), errors="coerce").fillna(0).astype(float)
+    df["price"] = pd.to_numeric(df.get("price"), errors="coerce").fillna(0).astype(float)
+    df["datetime"] = pd.to_datetime(df.get("datetime"), errors="coerce")
+    df["multiplier"] = pd.to_numeric(df.get("multiplier"), errors="coerce")
+    df["multiplier"] = df["multiplier"].fillna(df.get("secType").map({"OPT": 100, "FOP": 50}).fillna(1))
+    df["perm_id"] = pd.to_numeric(df.get("perm_id"), errors="coerce").astype("Int64")
+
+    df = df.sort_values("datetime").reset_index(drop=True)
+    df["cluster_id"] = pd.NA
+
+    cid = 0
+
+    # Cluster by perm_id where there are multiple executions
+    perm_counts = df["perm_id"].value_counts(dropna=True)
+    for pid, count in perm_counts.items():
+        if pd.isna(pid) or int(pid) <= 0 or count < 2:
+            continue
+        cid += 1
+        mask = df["perm_id"] == pid
+        df.loc[mask, "cluster_id"] = cid
+
+    # Remaining rows: cluster by underlying+side within window
+    remaining = df[df["cluster_id"].isna()].copy()
+    for (_u, _s), g in remaining.groupby(["underlying", "side"], dropna=False):
+        g = g.sort_values("datetime")
+        last_dt = None
+        for idx, row in g.iterrows():
+            if last_dt is None or pd.isna(row["datetime"]) or (
+                row["datetime"] - last_dt
+            ).total_seconds() > window_sec:
+                cid += 1
+            df.at[idx, "cluster_id"] = cid
+            last_dt = row["datetime"]
+
+    df["cluster_id"] = pd.to_numeric(df["cluster_id"], errors="coerce").astype(int)
+    df["pnl_leg"] = df["side_sign"] * df["price"] * df["qty"] * df["multiplier"]
+
+    # Aggregate per cluster
+    def _join_perm(vals: pd.Series) -> str:
+        uniq = sorted({str(int(v)) for v in vals.dropna().astype(int) if int(v) > 0})
+        return "/".join(uniq)
+
+    clusters = (
+        df.groupby("cluster_id")
+        .agg(
+            perm_ids=("perm_id", _join_perm),
+            underlying=("underlying", "first"),
+            start=("datetime", "min"),
+            end=("datetime", "max"),
+            pnl=("pnl_leg", "sum"),
+            legs_n=("exec_id", "count"),
+        )
+        .reset_index()
+    )
+
+    structures: dict[int, str] = {}
+    for cid, g in df.groupby("cluster_id"):
+        try:
+            pos = _build_positions_like_df(g, None)
+            detected = combo_core.detect_from_positions(pos)
+            if isinstance(detected, pd.DataFrame) and not detected.empty:
+                structures[cid] = str(detected.iloc[0].get("structure", "synthetic"))
+            else:
+                structures[cid] = "synthetic"
+        except Exception:
+            structures[cid] = "synthetic"
+    clusters["structure"] = clusters["cluster_id"].map(structures).fillna("synthetic")
+
+    return clusters, df
+
+
 def _detect_and_enrich_trades_combos(execs_df: pd.DataFrame, opens_df: pd.DataFrame | None = None) -> pd.DataFrame:
     # Build positions-like df
     pos_like = _build_positions_like_df(execs_df, opens_df)
@@ -1255,6 +1357,8 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
     parser.add_argument("--since")
     parser.add_argument("--until")
     parser.add_argument("--summary-only", action="store_true")
+    parser.add_argument("--cluster-window-sec", type=int, default=60)
+    parser.add_argument("--debug-timings", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--output-dir")
     parser.add_argument("--no-files", action="store_true")
@@ -1319,29 +1423,49 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         except Exception:
             net_credit_debit = 0.0
 
+        with rl.time("cluster"):
+            clusters_df, debug_rows = _cluster_executions(df_exec, int(args.cluster_window_sec))
+        k_total = len(clusters_df)
+        combo_clusters = int((clusters_df.get("structure") != "synthetic").sum())
+
         combos_df = _detect_and_enrich_trades_combos(df_exec, df_open)
         c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
 
         outputs: Dict[str, str] = {}
         written: list[Path] = []
-        if formats.get("csv"):
-            df_all = df_exec.copy()
-            if isinstance(df_open, pd.DataFrame) and not df_open.empty:
-                df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
-            path_report = io_core.save(df_all, "trades_report", "csv", outdir)
-            outputs["trades_report"] = str(path_report)
-            written.append(path_report)
-            path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
-            outputs["trades_combos"] = str(path_combos)
-            written.append(path_combos)
+        with rl.time("write_outputs"):
+            if formats.get("csv"):
+                df_all = df_exec.copy()
+                if isinstance(df_open, pd.DataFrame) and not df_open.empty:
+                    df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
+                path_report = io_core.save(df_all, "trades_report", "csv", outdir)
+                outputs["trades_report"] = str(path_report)
+                written.append(path_report)
+                path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
+                outputs["trades_combos"] = str(path_combos)
+                written.append(path_combos)
+                path_clusters = io_core.save(clusters_df, "trades_clusters", "csv", outdir)
+                outputs["trades_clusters"] = str(path_clusters)
+                written.append(path_clusters)
+                if args.debug_timings or os.getenv("PE_DEBUG") == "1":
+                    dbg_path = io_core.save(debug_rows, "trades_clusters_debug", "csv", outdir)
+                    outputs["trades_clusters_debug"] = str(dbg_path)
+                    written.append(dbg_path)
+                if args.debug_timings and rl.timings:
+                    tpath = io_core.save(pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir)
+                    outputs["timings"] = str(tpath)
+                    written.append(tpath)
 
         rl.add_outputs(written)
         manifest_path = rl.finalize(write=bool(written))
 
+        meta: Dict[str, Any] = {"script": "trades_report"}
+        if args.debug_timings:
+            meta["timings"] = rl.timings
         summary = json_helpers.report_summary(
-            {"executions": n_kept, "combos": c_total},
+            {"executions": n_kept, "clusters": k_total, "combos": combo_clusters},
             outputs=outputs,
-            meta={"script": "trades_report"},
+            meta=meta,
         )
         if manifest_path:
             summary["outputs"].append(str(manifest_path))
