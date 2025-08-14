@@ -15,14 +15,16 @@ import argparse
 import calendar
 import datetime as dt
 import json
+import os
 import pathlib
-from typing import List
+from typing import Any, List
 
 import pandas as pd
-from portfolio_exporter.core import io
+from portfolio_exporter.core import cli as cli_helpers, io, json as json_helpers
 from portfolio_exporter.core.combo import detect_combos
 from portfolio_exporter.core.chain import fetch_chain
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.runlog import RunLog
 from portfolio_exporter.core.ui import run_with_spinner
 
 portfolio_greeks = None  # lazy import to avoid optional deps at module import
@@ -120,6 +122,7 @@ def run(
     tenor: str = "all",
     pretty: bool = True,
     output_dir: str | pathlib.Path | None = None,
+    limit_per_underlying: int | None = None,
 ):
     """Interactive roll manager.
 
@@ -204,6 +207,8 @@ def run(
         new_legs = []
         new_delta = 0.0
         new_theta = 0.0
+        new_gamma = 0.0
+        new_vega = 0.0
         net_mid = 0.0
         for strike, right, qty in zip(strikes, rights, qtys):
             # --- ensure columns exist even if fetch_chain() set them as index ---
@@ -241,11 +246,18 @@ def run(
             )
             new_delta += float(ch.get("delta", 0.0)) * qty
             new_theta += float(ch.get("theta", 0.0)) * qty
+            new_gamma += float(ch.get("gamma", 0.0)) * qty
+            new_vega += float(ch.get("vega", 0.0)) * qty
             net_mid += float(ch.get("mid", 0.0)) * qty
 
         old_delta = float((pos_df.loc[legs, "delta"] * pos_df.loc[legs, "qty"]).sum())
         old_theta = float((pos_df.loc[legs, "theta"] * pos_df.loc[legs, "qty"]).sum())
-        debit_credit = net_mid + slippage * sum(qtys)
+        old_gamma = float((pos_df.loc[legs, "gamma"] * pos_df.loc[legs, "qty"]).sum()) if "gamma" in pos_df.columns else 0.0
+        old_vega = float((pos_df.loc[legs, "vega"] * pos_df.loc[legs, "qty"]).sum()) if "vega" in pos_df.columns else 0.0
+        band = slippage * sum(qtys)
+        debit_credit = net_mid + band
+        price_lo = net_mid - band
+        price_hi = net_mid + band
         cash_impact = debit_credit * mult
 
         rows.append(
@@ -259,12 +271,22 @@ def run(
                 "debit_credit": debit_credit,
                 "delta_change": new_delta - old_delta,
                 "theta_change": new_theta - old_theta,
+                "gamma_change": new_gamma - old_gamma,
+                "vega_change": new_vega - old_vega,
                 "cash_impact": cash_impact,
                 "qty": cmb.qty,
                 "delta_before": old_delta,
                 "delta_after": new_delta,
                 "theta_before": old_theta,
                 "theta_after": new_theta,
+                "gamma_before": old_gamma,
+                "gamma_after": new_gamma,
+                "vega_before": old_vega,
+                "vega_after": new_vega,
+                "mid_price": net_mid,
+                "price_lo": price_lo,
+                "price_hi": price_hi,
+                "warnings": [],
             }
         )
 
@@ -277,6 +299,14 @@ def run(
         return pd.DataFrame() if return_df else None
 
     df = pd.DataFrame(rows).set_index("combo_id")
+    if limit_per_underlying:
+        df = (
+            df.assign(_abs_delta=df["delta_change"].abs())
+            .sort_values("_abs_delta", ascending=False, kind="mergesort")
+            .groupby("underlying", sort=False, group_keys=False)
+            .head(limit_per_underlying)
+            .drop(columns="_abs_delta")
+        )
     if not interactive:
         return df if return_df else None
 
@@ -323,7 +353,7 @@ def run(
     return df if return_df else None
 
 
-def cli(args: argparse.Namespace | None = None) -> dict | None:
+def cli(args: argparse.Namespace | None = None) -> dict:
     """CLI entry point for ``python -m portfolio_exporter.scripts.roll_manager``."""
 
     parser = argparse.ArgumentParser(description="Roll manager")
@@ -334,40 +364,103 @@ def cli(args: argparse.Namespace | None = None) -> dict | None:
     parser.add_argument(
         "--tenor", choices=["weekly", "monthly", "all"], default="all", help="Filter candidates"
     )
+    parser.add_argument("--limit-per-underlying", type=int, help="Cap candidates per symbol")
+    parser.add_argument("--dry-run", action="store_true", help="Preview only; no files")
+    parser.add_argument("--debug-timings", action="store_true")
     parser.add_argument("--no-pretty", action="store_true", help="Disable rich tables")
     parser.add_argument("--json", action="store_true", help="Print JSON summary")
     parser.add_argument("--output-dir", help="Override output directory")
+    parser.add_argument("--no-files", action="store_true", help="Disable all file writes")
     if args is None:
         args = parser.parse_args()
-    # Honor PE_QUIET by disabling Rich pretty output
-    import os as _os
-    pretty = not args.no_pretty and (_os.getenv("PE_QUIET") in (None, "", "0"))
-    if args.json:
-        df = run(
-            days=args.days,
-            include_cal=args.include_cal,
-            tenor=args.tenor,
-            pretty=False,
-            output_dir=args.output_dir,
-            return_df=True,
-        )
-        summary = {
-            "n_candidates": int(len(df)),
-            "n_selected": 0,
-            "underlyings": sorted(df["underlying"].unique()) if not df.empty else [],
-            "by_structure": df["structure"].value_counts().to_dict() if not df.empty else {},
-            "outputs": [],
-        }
-        print(json.dumps(summary))
-        return summary
-    run(
-        days=args.days,
-        include_cal=args.include_cal,
-        tenor=args.tenor,
-        pretty=pretty,
-        output_dir=args.output_dir,
+
+    outdir = cli_helpers.resolve_output_dir(getattr(args, "output_dir", None))
+    defaults = {
+        "preview": bool(
+            getattr(args, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR")
+        ),
+        "ticket": bool(
+            getattr(args, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR")
+        ),
+    }
+    formats = cli_helpers.decide_file_writes(
+        args,
+        json_only_default=True,
+        defaults=defaults,
     )
-    return None
+    quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
+
+    with RunLog(script="roll_manager", args=vars(args), output_dir=outdir) as rl:
+        with rl.time("collect_candidates"):
+            df = run(
+                days=args.days,
+                include_cal=args.include_cal,
+                tenor=args.tenor,
+                pretty=False,
+                output_dir=None,
+                return_df=True,
+                limit_per_underlying=args.limit_per_underlying,
+            )
+
+        meta: dict[str, Any] = {}
+        if args.limit_per_underlying:
+            meta.setdefault("limits", {})["per_underlying"] = args.limit_per_underlying
+        if args.dry_run:
+            meta["dry_run"] = True
+
+        candidates: list[dict[str, Any]] = []
+        for row in df.itertuples():
+            candidates.append(
+                {
+                    "underlying": row.underlying,
+                    "from_expiry": row.old_exp,
+                    "to_expiry": row.new_exp,
+                    "legs": {"from": list(row.legs_old), "to": row.legs_new},
+                    "mid": float(row.mid_price),
+                    "price_band": {
+                        "lo": float(row.price_lo),
+                        "mid": float(row.mid_price),
+                        "hi": float(row.price_hi),
+                    },
+                    "delta": float(row.delta_change),
+                    "gamma": float(row.gamma_change),
+                    "theta": float(row.theta_change),
+                    "vega": float(row.vega_change),
+                    "debit_credit": float(row.debit_credit),
+                    "warnings": list(row.warnings),
+                }
+            )
+
+        outputs = {k: "" for k in formats}
+        written: list[pathlib.Path] = []
+        if not args.dry_run and any(formats.values()):
+            with rl.time("write_outputs"):
+                pos_df = run_with_spinner("Fetching positions…", portfolio_greeks._load_positions)
+                paths = _write_files(df, pos_df, outdir)
+                for k, p in paths.items():
+                    outputs[k] = str(p)
+                written.extend(paths.values())
+            if args.debug_timings:
+                meta["timings"] = rl.timings
+                if written:
+                    tpath = io.save(pd.DataFrame(rl.timings), "timings", "csv", outdir)
+                    outputs["timings"] = str(tpath)
+                    written.append(tpath)
+        elif args.debug_timings:
+            meta["timings"] = rl.timings
+
+        rl.add_outputs(written)
+        manifest_path = rl.finalize(write=bool(written))
+        if manifest_path:
+            outputs.setdefault("manifest", str(manifest_path))
+            written.append(manifest_path)
+
+    sections = {"candidates": int(len(df))}
+    summary = json_helpers.report_summary(sections, outputs=outputs, meta=meta)
+    summary["candidates"] = candidates
+    if args.json:
+        cli_helpers.print_json(summary, quiet)
+    return summary
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry

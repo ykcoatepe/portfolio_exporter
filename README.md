@@ -296,8 +296,19 @@ python trades_report.py --today
 
 ```bash
 python -m portfolio_exporter.scripts.roll_manager --days 28 --tenor monthly --no-pretty
-python -m portfolio_exporter.scripts.roll_manager --json
+python -m portfolio_exporter.scripts.roll_manager --dry-run --json --no-files
+python -m portfolio_exporter.scripts.roll_manager --limit-per-underlying 1 --output-dir rolls
 ```
+
+JSON-only preview:
+
+```bash
+python -m portfolio_exporter.scripts.roll_manager --dry-run --json --no-files
+```
+
+Flags are unified across CLIs: `--json`, `--no-files`, `--output-dir`, `--no-pretty` and `--debug-timings`.
+When writing files, a RunLog manifest is saved; `--debug-timings` adds `timings.csv` and includes
+timings data in the JSON summary.
 
 ### Trades Report
 
