@@ -439,9 +439,12 @@ def main(argv: list[str] | None = None) -> dict:
 
             # Pre-build HTML for HTML/PDF requests
             html_str = None
+            # Locate stylesheet: prefer repo docs; fallback to packaged asset
             theme_css = (
                 Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
             )
+            if not theme_css.exists():
+                theme_css = Path(__file__).resolve().parents[1] / "assets" / "theme.css"
             link_theme = theme_css.exists()
             if formats.get("html") or formats.get("pdf"):
                 html_str = _build_html(

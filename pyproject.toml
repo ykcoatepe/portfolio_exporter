@@ -53,3 +53,6 @@ include-package-data = true
 
 [tool.setuptools.data-files]
 "schemas" = ["schemas/*.json"]
+
+[tool.setuptools.package-data]
+"portfolio_exporter" = ["assets/*.css"]
