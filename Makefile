@@ -5,9 +5,16 @@ PYTEST=$(VENV)/bin/pytest
 .PHONY: setup test lint build ci-home memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
 
 setup:
-	python -m venv $(VENV)
-	$(PIP) install -r requirements.txt
-	$(PIP) install -r requirements-dev.txt
+        python -m venv $(VENV)
+        $(PIP) install -r requirements.txt
+        $(PIP) install -r requirements-dev.txt
+
+dev:
+        @mkdir -p .outputs
+        @echo "OUTPUT_DIR=.outputs" > .env
+        @echo "PE_QUIET=1" >> .env
+        ruff check .
+        pytest -q tests/test_json_contracts.py tests/test_doctor_preflight.py
 
 # ------------------------------------------------------------------
 # Home-lab CI pipeline (single-thread, minimal RAM)

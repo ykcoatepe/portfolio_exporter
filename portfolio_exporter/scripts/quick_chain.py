@@ -485,5 +485,18 @@ def _run_cli_v3() -> int:
         return 0
 
 
+def main(argv: list[str] | None = None) -> int:
+    if argv is not None:
+        import sys
+
+        old = sys.argv
+        sys.argv = [sys.argv[0]] + argv
+        try:
+            return _run_cli_v3()
+        finally:
+            sys.argv = old
+    return _run_cli_v3()
+
+
 if __name__ == "__main__":  # pragma: no cover
-    raise SystemExit(_run_cli_v3())
+    raise SystemExit(main())

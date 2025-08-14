@@ -96,6 +96,18 @@ Environment variables:
 JSON summaries returned by the scripts consistently use `sections` or `rows`
 and include an `outputs` mapping with file paths (empty strings when skipped).
 
+## Console entry points
+
+```bash
+daily-report --json --no-files
+netliq-export --json --no-files --source fixture --fixture-csv tests/data/net_liq_fixture.csv
+quick-chain --chain-csv tests/data/quick_chain_fixture.csv --json
+trades-report --executions-csv tests/data/executions_fixture.csv --json
+portfolio-greeks --positions-csv tests/data/positions_sample.csv --json
+doctor --json --no-files
+daily-report --json --no-files | validate-json
+```
+
 ## Repo Memory (Agent-Shared)
 
 Lightweight, auditable repo “memory” helps Cloud/CLI agents keep context across sessions.

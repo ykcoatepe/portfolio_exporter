@@ -35,6 +35,13 @@ pdf = ["reportlab>=4.0"]
 
 [project.scripts]
 portfolio_playbook = "main:main"
+daily-report = "portfolio_exporter.scripts.daily_report:main"
+netliq-export = "portfolio_exporter.scripts.net_liq_history_export:main"
+quick-chain = "portfolio_exporter.scripts.quick_chain:main"
+trades-report = "portfolio_exporter.scripts.trades_report:main"
+portfolio-greeks = "portfolio_exporter.scripts.portfolio_greeks:main"
+doctor = "portfolio_exporter.scripts.doctor:main"
+validate-json = "portfolio_exporter.scripts.validate_json:main"
 
 [tool.setuptools.packages.find]
 include = ["portfolio_exporter*"]
@@ -42,3 +49,7 @@ exclude = ["legacy*", "tests*", "utils*", "docs*", "ibkr_env*", "iv_history*"]
 
 [tool.setuptools]
 py-modules = ["main"]
+include-package-data = true
+
+[tool.setuptools.data-files]
+"schemas" = ["schemas/*.json"]
