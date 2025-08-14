@@ -16,8 +16,7 @@ import os
 def launch(status, default_fmt):
     console = status.console if status else Console()
     while True:
-        tbl = Table(title="Trades & Reports")
-        for k, lbl in [
+        entries = [
             ("e", "Executions / open orders"),
             ("b", "Build order"),
             ("l", "Roll positions"),
@@ -25,27 +24,39 @@ def launch(status, default_fmt):
             ("n", "Net-Liq (CLI)"),
             ("d", "Daily report (HTML/PDF)"),
             ("r", "Return"),
-        ]:
+        ]
+        tbl = Table(title="Trades & Reports")
+        for k, lbl in entries:
             tbl.add_row(k, lbl)
         console.print(tbl)
-        ch = input("› ").strip().lower()
-        if ch == "r":
-            break
-        dispatch = {
-            "e": lambda: trades_report.run(fmt=default_fmt, show_actions=True),
-            "b": order_builder.run,
-            "l": lambda: roll_manager.run(),
-            "q": lambda: option_chain_snapshot.run(fmt=default_fmt),
-            "n": lambda: net_liq_history_export.main(
-                ["--quiet", "--no-pretty"] if os.getenv("PE_QUIET") else []
-            ),
-            "d": lambda: daily_report.main(
-                ["--no-pretty"] if os.getenv("PE_QUIET") else []
-            ),
-        }.get(ch)
-        if dispatch:
-            if status:
-                status.update(f"Running {lbl} …", "cyan")
-            dispatch()
-            if status:
-                status.update("Ready", "green")
+        raw = input("› ").strip().lower()
+        # Allow multiple entries separated by spaces or commas
+        import re as _re
+        tokens = [t for t in _re.split(r"[\s,]+", raw) if t]
+        for ch in tokens:
+            if ch == "r":
+                return
+            label_map = dict(entries)
+            dispatch = {
+                "e": lambda: trades_report.run(fmt=default_fmt, show_actions=True),
+                "b": order_builder.run,
+                "l": lambda: roll_manager.run(),
+                "q": lambda: option_chain_snapshot.run(fmt=default_fmt),
+                "n": lambda: net_liq_history_export.main(
+                    ["--quiet", "--no-pretty"] if os.getenv("PE_QUIET") else []
+                ),
+                "d": lambda: daily_report.main(
+                    ["--no-pretty"] if os.getenv("PE_QUIET") else []
+                ),
+            }.get(ch)
+            if dispatch:
+                label = label_map.get(ch, ch)
+                if status:
+                    status.update(f"Running {label} …", "cyan")
+                try:
+                    dispatch()
+                except Exception as exc:
+                    console.print(f"[red]Error running {label}:[/] {exc}")
+                finally:
+                    if status:
+                        status.update("Ready", "green")

@@ -1,4 +1,5 @@
 from rich.table import Table
+import re
 from rich.console import Console
 import pandas as pd
 from portfolio_exporter.scripts import (
@@ -60,14 +61,21 @@ def launch(status, default_fmt):
         for key, (label, _) in list(actions.items()) + [("b", ("Back", None))]:
             tbl.add_row(key, label)
         console.print(tbl)
-        ch = input("\u203a ").strip().lower()
-        if ch == "b":
-            break
-        entry = actions.get(ch)
-        if entry:
-            label, func = entry
-            if status:
-                status.update(f"Running {label} …", "cyan")
-            func()
-            if status:
-                status.update("Ready", "green")
+        raw = input("\u203a ").strip().lower()
+        # Allow multiple entries separated by spaces or commas
+        tokens = [t for t in re.split(r"[\s,]+", raw) if t]
+        for ch in tokens:
+            if ch == "b":
+                return
+            entry = actions.get(ch)
+            if entry:
+                label, func = entry
+                if status:
+                    status.update(f"Running {label} …", "cyan")
+                try:
+                    func()
+                except Exception as exc:
+                    console.print(f"[red]Error running {label}:[/] {exc}")
+                finally:
+                    if status:
+                        status.update("Ready", "green")

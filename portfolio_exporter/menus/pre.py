@@ -1,4 +1,5 @@
 from rich.table import Table
+import re
 from rich.console import Console
 from portfolio_exporter.core.ui import StatusBar
 from portfolio_exporter.scripts import (
@@ -92,14 +93,17 @@ def launch(status: StatusBar, default_fmt: str):
         for key, label in menu_items:
             tbl.add_row(key, label)
         console.print(tbl)
-        choice = _input("\u203a ").strip().lower()
-        if choice == "r":
-            break
-        if choice == "f":
-            order = ["csv", "excel", "pdf"]
-            idx = order.index(current_fmt)
-            current_fmt = order[(idx + 1) % len(order)]
-            continue
+        raw = _input("\u203a ").strip().lower()
+        # Allow multiple entries separated by spaces or commas
+        tokens = [t for t in re.split(r"[\s,]+", raw) if t]
+        for choice in tokens:
+            if choice == "r":
+                return
+            if choice == "f":
+                order = ["csv", "excel", "pdf"]
+                idx = order.index(current_fmt)
+                current_fmt = order[(idx + 1) % len(order)]
+                continue
 
         # map choices to actions
         def _quick_chain(fmt: str = "") -> None:
@@ -125,6 +129,10 @@ def launch(status: StatusBar, default_fmt: str):
             label = dict(menu_items).get(choice, choice)
             if status:
                 status.update(f"Running {label} …", "cyan")
-            action(fmt=current_fmt)
-            if status:
-                status.update("Ready", "green")
+            try:
+                action(fmt=current_fmt)
+            except Exception as exc:
+                console.print(f"[red]Error running {label}:[/] {exc}")
+            finally:
+                if status:
+                    status.update("Ready", "green")
