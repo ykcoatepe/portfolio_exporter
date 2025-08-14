@@ -968,6 +968,41 @@ def _build_positions_like_df(execs: pd.DataFrame, opens: pd.DataFrame | None = N
                 legs_df["multiplier"] = pd.to_numeric(legs_df["multiplier"], errors="coerce").fillna(100).astype(int)
                 legs_df["right"] = legs_df["right"].astype(str).str.upper().replace({"CALL": "C", "PUT": "P", "NAN": ""})
                 legs_df.loc[~legs_df["right"].isin(["C", "P"]) , "right"] = ""
+                # Prefer per-leg execution rows when present; skip BAG-expanded
+                # legs that duplicate an existing per-leg (same underlying/expiry/right/strike and side).
+                def _side_from_qty(q):
+                    try:
+                        return "long" if float(q) > 0 else "short"
+                    except Exception:
+                        return "long"
+                # Ensure required columns exist on 'out'
+                if "underlying" not in out.columns and "symbol" in out.columns:
+                    out["underlying"] = out["symbol"]
+                for col in ("expiry", "right", "strike", "qty"):
+                    if col not in out.columns:
+                        out[col] = pd.NA
+                out_keys = set()
+                if not out.empty:
+                    tmp = out.copy()
+                    tmp["strike"] = pd.to_numeric(tmp["strike"], errors="coerce")
+                    tmp_key = tmp.apply(lambda r: (
+                        str(r.get("underlying", "")),
+                        str(r.get("expiry", "")),
+                        str(r.get("right", "")).upper(),
+                        float(r.get("strike")) if pd.notna(r.get("strike")) else float("nan"),
+                        _side_from_qty(r.get("qty"))
+                    ), axis=1)
+                    out_keys = set(tmp_key.tolist())
+
+                def _key_row(r):
+                    return (
+                        str(r.get("underlying", "")),
+                        str(r.get("expiry", "")),
+                        str(r.get("right", "")).upper(),
+                        float(r.get("strike")) if pd.notna(r.get("strike")) else float("nan"),
+                        _side_from_qty(r.get("qty"))
+                    )
+                legs_df = legs_df[~legs_df.apply(_key_row, axis=1).isin(out_keys)].copy()
                 # Prefer leg rows for option-like records and drop BAG placeholders
                 out = pd.concat([out[out.get("secType") != "BAG"], legs_df], ignore_index=True, sort=False)
     except Exception:
@@ -1185,6 +1220,33 @@ def _detect_and_enrich_trades_combos(execs_df: pd.DataFrame, opens_df: pd.DataFr
     except Exception:
         pass
 
+    # De-duplicate combos by normalized leg set per (underlying, expiry, structure, type)
+    try:
+        import ast
+        def _legs_sig(s: str) -> tuple:
+            try:
+                val = ast.literal_eval(s) if isinstance(s, str) else (s or [])
+            except Exception:
+                val = []
+            # Keep only integers (conIds), sort for stable signature
+            ids = []
+            for x in (val or []):
+                try:
+                    if isinstance(x, (int,)) or (isinstance(x, str) and str(x).lstrip("-").isdigit()):
+                        ids.append(int(x))
+                except Exception:
+                    continue
+            return tuple(sorted(ids))
+        key_cols = [c for c in ["underlying", "expiry", "structure", "type"] if c in combos_df.columns]
+        if key_cols and "legs" in combos_df.columns:
+            tmp = combos_df.copy()
+            tmp["__legs_sig"] = tmp["legs"].apply(_legs_sig)
+            tmp["__dedupe_key"] = tmp[key_cols].astype(str).agg("|".join, axis=1) + "#" + tmp["__legs_sig"].astype(str)
+            tmp = tmp.drop_duplicates(subset=["__dedupe_key"], keep="first").drop(columns=["__dedupe_key", "__legs_sig"])  # type: ignore
+            combos_df = tmp
+    except Exception:
+        pass
+
     return combos_df
 
 
@@ -1193,8 +1255,42 @@ def _save_trades_combos(
 ) -> Path:
     """Persist combos DataFrame using existing schema."""
 
+    # Deduplicate defensively by legs signature and key identifiers
+    out = df.copy() if isinstance(df, pd.DataFrame) else pd.DataFrame()
+    try:
+        import ast
+        def _legs_sig(s: object) -> tuple:
+            if isinstance(s, list):
+                seq = s
+            elif isinstance(s, str) and s.strip().startswith("["):
+                try:
+                    seq = ast.literal_eval(s)
+                except Exception:
+                    seq = []
+            else:
+                seq = []
+            ids = []
+            for x in (seq or []):
+                try:
+                    if isinstance(x, (int,)) or (isinstance(x, str) and str(x).lstrip("-").isdigit()):
+                        ids.append(int(x))
+                except Exception:
+                    continue
+            return tuple(sorted(ids))
+        if not out.empty and "legs" in out.columns:
+            key_cols = [c for c in ["underlying","expiry","structure","type"] if c in out.columns]
+            out["__legs_sig"] = out["legs"].apply(_legs_sig)
+            if key_cols:
+                out["__dedupe_key"] = out[key_cols].astype(str).agg("|".join, axis=1) + "#" + out["__legs_sig"].astype(str)
+                out = out.drop_duplicates(subset=["__dedupe_key"], keep="first")
+            # also drop exact duplicates as an extra guard
+            out = out.drop_duplicates()
+    except Exception:
+        # if anything goes wrong, proceed with original frame
+        out = df.copy()
+
     # Drop debug/helper columns from save output
-    out = df.drop(
+    out = out.drop(
         columns=["__db_legs_detail", "__strike_source", "__healed_legs"],
         errors="ignore",
     )
