@@ -58,6 +58,27 @@ class RunLog:
     def finalize(self, *, write: bool) -> Path | None:
         end_ts = datetime.utcnow().isoformat()
         duration_ms = int((perf_counter() - self._start) * 1000)
+
+        def _json_sanitize(obj):
+            """Best-effort conversion to JSON-serializable types.
+
+            - pathlib.Path → str
+            - dict/list/tuple → recurse
+            - fallback to str() for unknown objects
+            """
+            if isinstance(obj, Path):
+                return str(obj)
+            if isinstance(obj, dict):
+                return {k: _json_sanitize(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [
+                    _json_sanitize(v) for v in (list(obj) if isinstance(obj, tuple) else obj)
+                ]
+            try:
+                json.dumps(obj)
+                return obj
+            except Exception:
+                return str(obj)
         outs: list[dict[str, object]] = []
         for p in self.outputs:
             try:
@@ -68,7 +89,7 @@ class RunLog:
             outs.append({"path": str(p), "sha256": sha, "bytes": len(data)})
         manifest = {
             "script": self.script,
-            "argv": self.argv,
+            "argv": _json_sanitize(self.argv),
             "env": self.env,
             "start": self.start_ts,
             "end": end_ts,

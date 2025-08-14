@@ -84,6 +84,7 @@ Most scripts share a small set of flags for consistent ergonomics:
 | `--no-files` | Skip writing any output files. |
 | `--no-pretty` | Disable rich/pretty console rendering. |
 | `--preflight` | Validate inputs only (schema/header checks; no files). |
+| `--debug-timings` | Capture per-stage timings (adds `timings.csv` when files are written). |
 
 Environment variables:
 
@@ -249,6 +250,8 @@ echo "PASS: help shows common flags"
 
 JSON outputs
 - outputs: an array of file paths when files are written; an empty array (`[]`) in JSON-only runs.
+- manifest: when files are written, a `<script>_manifest.json` is also produced and its path is appended to `outputs`.
+- timings: when `--debug-timings` is used, `meta.timings` includes per-stage durations; a `timings.csv` is written alongside other artifacts when files are written.
 - meta.script: if present, matches the script name; not required for smokes.
 - sections/rows: present depending on the script (`sections` for reports, `rows` for time series).
 
@@ -326,6 +329,7 @@ next `N` days (defaults to 10 when the flag is provided without a value).
 `--symbol TICKER` restricts report inputs to the given underlying (case-insensitive).
 
 Note: `--preflight` validates CSV headers (Pandera optional; warns if missing).
+Timings: add `--debug-timings` to capture per-stage durations; writes `timings.csv` when files are written and includes `meta.timings` in JSON.
 
 #### New analytics
 
@@ -369,6 +373,7 @@ Tips
 ### Portfolio Greeks (CLI)
 
 Note: `--preflight` validates CSV headers (Pandera optional; warns if missing).
+Timings: add `--debug-timings` to capture per-stage durations; writes `timings.csv` when files are written and includes `meta.timings` in JSON.
 
 ### Net-Liq chart (CLI)
 

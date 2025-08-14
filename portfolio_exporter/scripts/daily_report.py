@@ -484,6 +484,8 @@ def main(argv: list[str] | None = None) -> dict:
             outputs=outputs,
             meta=meta or None,
         )
+        if manifest_path:
+            summary["outputs"].append(str(manifest_path))
 
         # Back-compat row counts + select meta surfacing
         summary["positions_rows"] = len(positions)

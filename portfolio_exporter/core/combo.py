@@ -592,41 +592,62 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             else:
                 exp_put[exp].append(rec)
 
-        # Greedy pairing by matched qty
+        # Greedy pairing by matched qty and same orientation (both credit or both debit)
         vertical_keep: List[Tuple[str, str, float, float, int, List[int]]] = []
+        def _vert_orient(row_ids: List[int], right_val: str) -> str:
+            if len(row_ids) != 2:
+                return "unknown"
+            i1, i2 = row_ids[0], row_ids[1]
+            k1, k2 = float(u_df.loc[i1, "strike"]), float(u_df.loc[i2, "strike"])
+            s1, s2 = str(u_df.loc[i1, "side"]), str(u_df.loc[i2, "side"])  # long/short
+            # Identify which strike is long vs short
+            long_k = k1 if s1 == "long" else k2
+            short_k = k1 if s1 == "short" else k2
+            if right_val == "C":
+                return "debit" if long_k < short_k else "credit"
+            else:  # P
+                return "debit" if long_k > short_k else "credit"
         for exp in set(list(exp_call.keys()) + list(exp_put.keys())):
             calls = exp_call.get(exp, [])
             puts = exp_put.get(exp, [])
-            ci, pi = 0, 0
+            # Sort by width for stable pairing
             calls.sort(key=lambda t: t[0])
             puts.sort(key=lambda t: t[0])
-            while ci < len(calls) and pi < len(puts):
-                c_w, c_q, c_rows = calls[ci]
-                p_w, p_q, p_rows = puts[pi]
-                m = min(c_q, p_q)
-                if m <= 0:
-                    if c_q <= 0:
+            # Attempt to pair per orientation
+            for orient in ("credit", "debit"):
+                ci, pi = 0, 0
+                while ci < len(calls) and pi < len(puts):
+                    c_w, c_q, c_rows = calls[ci]
+                    p_w, p_q, p_rows = puts[pi]
+                    if _vert_orient(c_rows, "C") != orient:
                         ci += 1
-                    if p_q <= 0:
+                        continue
+                    if _vert_orient(p_rows, "P") != orient:
                         pi += 1
-                    continue
-                width = float(min(c_w, p_w))
-                condor_records.append((exp, width, m, c_rows + p_rows))
-                # Reduce vertical lots and advance when exhausted
-                calls[ci] = (c_w, c_q - m, c_rows)
-                puts[pi] = (p_w, p_q - m, p_rows)
-                if calls[ci][1] <= 0:
-                    ci += 1
-                if puts[pi][1] <= 0:
-                    pi += 1
-            # Any residual verticals remain as vertical structures
-            for c_w, c_q, c_rows in calls[ci:]:
+                        continue
+                    m = min(c_q, p_q)
+                    if m <= 0:
+                        if c_q <= 0:
+                            ci += 1
+                        if p_q <= 0:
+                            pi += 1
+                        continue
+                    width = float(min(c_w, p_w))
+                    condor_records.append((exp, width, m, c_rows + p_rows))
+                    # Reduce vertical lots and advance when exhausted
+                    calls[ci] = (c_w, c_q - m, c_rows)
+                    puts[pi] = (p_w, p_q - m, p_rows)
+                    if calls[ci][1] <= 0:
+                        ci += 1
+                    if puts[pi][1] <= 0:
+                        pi += 1
+            # Any residual verticals remain as vertical structures (check all entries)
+            for c_w, c_q, c_rows in calls:
                 if c_q > 0:
-                    # infer strikes from rows
                     ks = [float(u_df.loc[i, "strike"]) for i in c_rows]
                     k1, k2 = min(ks), max(ks)
                     vertical_keep.append((exp, "C", k1, k2, c_q, c_rows))
-            for p_w, p_q, p_rows in puts[pi:]:
+            for p_w, p_q, p_rows in puts:
                 if p_q > 0:
                     ks = [float(u_df.loc[i, "strike"]) for i in p_rows]
                     k1, k2 = min(ks), max(ks)
@@ -779,6 +800,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     if remaining.get(b, 0) <= 0:
                         continue
                     if u_df.loc[a, "side"] == u_df.loc[b, "side"]:
+                        continue
+                    # Require different expiries for diagonals; equal-expiry pairs are verticals/calendars
+                    if str(u_df.loc[a, "expiry"]) == str(u_df.loc[b, "expiry"]):
                         continue
                     # skip equal-strike pairs (those are calendars handled earlier)
                     if float(u_df.loc[a, "strike"]) == float(u_df.loc[b, "strike"]):
@@ -1107,10 +1131,29 @@ def _match_condor(df: pd.DataFrame, used: set[int]) -> List[Dict]:
         puts = grp[grp["right"] == "P"]
         if len(calls) == 2 and len(puts) == 2:
             if {1, -1} <= set(calls["qty"]) and {1, -1} <= set(puts["qty"]):
-                conids = list(calls.index) + list(puts.index)
-                used.update(conids)
-                width = _calc_width(df.loc[conids])
-                combos.append(_row("Condor", df.loc[conids], "condor", width))
+                # Determine orientation of each vertical
+                def _orient(g: pd.DataFrame, right_val: str) -> str:
+                    # identify long vs short strike
+                    # for calls: debit if long lower < short higher; credit otherwise
+                    # for puts: debit if long higher > short lower; credit otherwise
+                    g2 = g.sort_values("strike")
+                    # map by side
+                    try:
+                        long_k = float(g2[g2["qty"] > 0]["strike"].iloc[0])
+                        short_k = float(g2[g2["qty"] < 0]["strike"].iloc[0])
+                    except Exception:
+                        return "unknown"
+                    if right_val == "C":
+                        return "debit" if long_k < short_k else "credit"
+                    else:
+                        return "debit" if long_k > short_k else "credit"
+                o_calls = _orient(calls, "C")
+                o_puts = _orient(puts, "P")
+                if o_calls != "unknown" and o_puts != "unknown" and o_calls == o_puts:
+                    conids = list(calls.index) + list(puts.index)
+                    used.update(conids)
+                    width = _calc_width(df.loc[conids])
+                    combos.append(_row("Condor", df.loc[conids], "condor", width))
     return combos
 
 

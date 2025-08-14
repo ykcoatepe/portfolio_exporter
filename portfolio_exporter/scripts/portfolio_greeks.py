@@ -353,11 +353,58 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
     """
     Retrieve option/FOP positions and fetch live market data streams for Greeks.
     """
-    positions = [
-        p
-        for p in ib.positions()
-        if p.position != 0 and p.contract.secType in {"OPT", "FOP"}
-    ]
+    raw_positions = [p for p in ib.positions() if p.position != 0]
+
+    # Expand IB "BAG" combo positions into per-leg pseudo-positions so we can
+    # fetch Greeks for each option leg. Some accounts only show combos as BAGs
+    # without separate option legs; previously these were silently skipped.
+    positions: list[Position] = []
+    for p in raw_positions:
+        try:
+            st = getattr(p.contract, "secType", "")
+        except Exception:
+            st = ""
+        if st in {"OPT", "FOP"}:
+            positions.append(p)
+            continue
+        if st == "BAG":
+            try:
+                legs = getattr(p.contract, "comboLegs", None) or []
+                if not legs:
+                    continue
+                # For each leg, qualify by conId and synthesize a Position-like object
+                for leg in legs:
+                    try:
+                        # Qualify the leg contract by conId to obtain full details
+                        c = Contract()
+                        c.conId = int(getattr(leg, "conId"))
+                        cds = ib.reqContractDetails(c)
+                        lc = cds[0].contract if cds else None
+                        if lc is None:
+                            continue
+                        # Compute effective leg quantity (respect leg action/buy/sell and ratio)
+                        ratio = int(getattr(leg, "ratio", 1) or 1)
+                        action = str(getattr(leg, "action", "")).upper()
+                        eff_qty = int(p.position) * ratio
+                        if action == "SELL":
+                            eff_qty *= -1
+
+                        # Build a minimal Position-like object with required attributes
+                        class _PosLike:
+                            def __init__(self, contract, position):
+                                self.contract = contract
+                                self.position = position
+
+                        positions.append(_PosLike(lc, eff_qty))
+                    except Exception:
+                        # Skip legs we cannot qualify
+                        continue
+            except Exception:
+                # Defensive: if anything goes wrong, just skip the BAG
+                continue
+
+    # Keep only option-like instruments after expansion
+    positions = [p for p in positions if getattr(p.contract, "secType", "") in {"OPT", "FOP"}]
     if not positions:
         return []
 
@@ -1242,20 +1289,46 @@ KNOWN_MULTI = {"vertical", "iron condor", "butterfly", "calendar"}
 def _choose_combos_df(
     source: str, positions_df: pd.DataFrame, combo_types: str
 ) -> tuple[pd.DataFrame, str]:
-    """Resolve combo DataFrame from desired *source* and filter to true combos."""
+    """Resolve combo DataFrame from desired *source* and filter to true combos.
+
+    Preference in "auto" mode: live → engine → db.
+    """
 
     resolved = source
     df_raw: pd.DataFrame | None = None
 
-    # --- DB path ---------------------------------------------------------
-    if source in {"auto", "db"}:
+    # --- Live detection first (preferred) --------------------------------
+    if source in {"auto", "live"}:
+        try:
+            live_df = combo_core.detect_from_positions(positions_df)
+            if live_df is not None and not live_df.empty:
+                df_raw = live_df
+                resolved = "live"
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning("Live combo detection failed: %s", e)
+
+    # --- Engine fallback --------------------------------------------------
+    if (df_raw is None or df_raw.empty) and source in {"auto", "engine"}:
+        try:
+            try:
+                engine_df = combo_core.detect_combos(positions_df, mode=combo_types)
+            except TypeError:  # backward compat
+                engine_df = combo_core.detect_combos(positions_df)
+            if engine_df is not None and not engine_df.empty:
+                df_raw = engine_df
+                resolved = "engine"
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning("Engine combo detection failed: %s", e)
+
+    # --- DB as last resort (explicit or auto) ----------------------------
+    if (df_raw is None or df_raw.empty) and source in {"auto", "db"}:
         db_df = _load_db_combos_or_none()
         informative = False
         if db_df is not None:
             if "structure" in db_df.columns:
-                lc = db_df["structure"].str.lower()
+                lc = db_df["structure"].astype(str).str.lower()
             elif "type" in db_df.columns:
-                lc = db_df["type"].str.lower()
+                lc = db_df["type"].astype(str).str.lower()
             else:
                 lc = pd.Series(dtype=str)
             informative = lc.isin(KNOWN_MULTI).any()
@@ -1275,36 +1348,6 @@ def _choose_combos_df(
         elif source == "db":
             df_raw = pd.DataFrame()
             resolved = "db"
-
-    # --- Live / engine detection ----------------------------------------
-    if df_raw is None and source in {"auto", "live", "engine"}:
-        try:
-            if source in {"live", "auto"}:
-                # New greedy live detector; do not re-append singles
-                live_df = combo_core.detect_from_positions(positions_df)
-                df_raw = live_df
-                resolved = source if source != "auto" else "live"
-            else:  # engine
-                # Preserve existing engine behavior via core.detect_combos
-                try:
-                    engine_df = combo_core.detect_combos(
-                        positions_df, mode=combo_types
-                    )
-                except TypeError:
-                    engine_df = combo_core.detect_combos(positions_df)
-                df_raw = engine_df
-                resolved = "engine"
-        except Exception as e:  # pragma: no cover - defensive
-            logger.warning("Combo detection failed: %s", e)
-            df_raw = None
-        if (df_raw is None or df_raw.empty) and source == "auto":
-            # Auto fallback to engine
-            try:
-                engine_df = combo_core.detect_combos(positions_df, mode=combo_types)
-            except TypeError:  # backward compat
-                engine_df = combo_core.detect_combos(positions_df)
-            df_raw = engine_df
-            resolved = "engine"
 
     combos_df = _normalize_combos_columns(df_raw)
     try:
