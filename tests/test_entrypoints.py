@@ -47,6 +47,11 @@ FIXTURES = Path("tests/data")
             False,
         ),
         ("portfolio_exporter.scripts.doctor", ["--json", "--no-files"], True),
+        (
+            "portfolio_exporter.scripts.combo_db_maint",
+            ["--json", "--no-files"],
+            False,
+        ),
     ],
 )
 def test_entrypoint_main_ok(mod_path, argv, needs_env, monkeypatch, capsys, tmp_path):

@@ -108,6 +108,23 @@ doctor --json --no-files
 daily-report --json --no-files | validate-json
 ```
 
+## Combo DB maintenance
+
+`combo-db-maint` audits and repairs the combos database.
+
+```bash
+# check-only (default): analyse DB and report issues
+combo-db-maint --json --no-files
+
+# fix: apply repairs and write before/after snapshots
+combo-db-maint --fix --output-dir .tmp_combo --json
+```
+
+Flags are unified across scripts: `--json`, `--no-files`, `--output-dir`,
+`--no-pretty`, `--debug-timings`. When files are written a RunLog manifest is
+emitted; adding `--debug-timings` also writes `timings.csv` and includes
+per-stage timings in the JSON summary.
+
 ## Repo Memory (Agent-Shared)
 
 Lightweight, auditable repo “memory” helps Cloud/CLI agents keep context across sessions.
