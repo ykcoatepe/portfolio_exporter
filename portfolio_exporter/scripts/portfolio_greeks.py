@@ -48,7 +48,11 @@ except Exception:  # pragma: no cover - optional dependency
 import sqlite3
 import pandas as pd
 
-from utils.bs import bs_greeks
+# Prefer in-package BS greeks; fall back to legacy utils in dev trees
+try:
+    from portfolio_exporter.core.greeks import bs_greeks  # type: ignore
+except Exception:  # pragma: no cover - optional fallback for local dev
+    from utils.bs import bs_greeks  # type: ignore
 try:
     from legacy.option_chain_snapshot import fetch_yf_open_interest
 except Exception:  # pragma: no cover - optional
