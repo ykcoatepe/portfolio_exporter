@@ -1,19 +1,29 @@
 from __future__ import annotations
+
 import argparse
+import json
+import os
 import re
 import sys
+from pathlib import Path
 
+import builtins
 from rich.console import Console
 from rich.table import Table
-import builtins
 
-from portfolio_exporter.core.ui import StatusBar
+from portfolio_exporter.core import cli as core_cli
+from portfolio_exporter.core import json as core_json
+from portfolio_exporter.core.ui import StatusBar, prompt_input
 
 console = Console()
 
 
 def input(prompt: str = "") -> str:
-    return builtins.input(prompt)
+    # Use StatusBar-aware prompt so input is visible and persistent.
+    try:
+        return prompt_input(prompt)
+    except Exception:
+        return builtins.input(prompt)
 
 
 def build_menu() -> None:
@@ -27,10 +37,20 @@ def build_menu() -> None:
     table.add_row("4", "Portfolio Greeks")
     table.add_row("0", "Exit")
     console.print(table)
+    console.print("Hotkeys: s=Sync tickers, 0=Exit")
+    console.print("Multi-select hint: e.g., 2,4")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(add_help=False)
+    epilog = (
+        "Examples:\n"
+        "  python main.py --list-tasks\n"
+        "  python main.py --dry-run --task snapshot-quotes\n"
+        "  python main.py --workflow demo --dry-run\n"
+    )
+    parser = argparse.ArgumentParser(
+        add_help=False, epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "-q", "--quiet", action="store_true", help="suppress banner & status output"
     )
@@ -40,6 +60,16 @@ def parse_args() -> argparse.Namespace:
         default="csv",
         help="default output format",
     )
+    parser.add_argument(
+        "--json", action="store_true", help="emit JSON output for planning commands"
+    )
+    parser.add_argument(
+        "--list-tasks", action="store_true", help="list available tasks and aliases"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="show execution plan without running tasks"
+    )
+    parser.add_argument("--workflow", help="expand a named workflow from memory")
     # Queue support: allow multiple --task flags or a single comma-separated --tasks
     parser.add_argument(
         "--task",
@@ -62,53 +92,111 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_known_args()[0]
 
+def task_registry(fmt: str) -> dict[str, callable]:
+    def snapshot_quotes() -> None:
+        from portfolio_exporter.scripts import live_feed
 
-import os
+        live_feed.run(fmt=fmt, include_indices=False)
+
+    def portfolio_greeks() -> None:
+        from portfolio_exporter.scripts import portfolio_greeks as _portfolio_greeks
+
+        _portfolio_greeks.run(fmt=fmt)
+
+    def option_chain_snapshot() -> None:
+        from portfolio_exporter.scripts import option_chain_snapshot as _ocs
+
+        _ocs.run(fmt=fmt)
+
+    def trades_report() -> None:
+        from portfolio_exporter.scripts import trades_report as _trades
+
+        _trades.run(fmt=fmt)
+
+    def daily_report() -> None:
+        from portfolio_exporter.scripts import daily_report as _daily
+
+        _daily.run(fmt=fmt)
+
+    def netliq_export() -> None:
+        from portfolio_exporter.scripts import net_liq_history_export as _netliq
+
+        _netliq.run(fmt=fmt)
+
+    return {
+        "snapshot-quotes": snapshot_quotes,
+        "quotes": snapshot_quotes,
+        "snapshot": snapshot_quotes,
+        "portfolio-greeks": portfolio_greeks,
+        "greeks": portfolio_greeks,
+        "option-chain-snapshot": option_chain_snapshot,
+        "chain-snapshot": option_chain_snapshot,
+        "trades-report": trades_report,
+        "daily-report": daily_report,
+        "netliq-export": netliq_export,
+    }
+
+
+def load_workflow_queue(name: str) -> list[str]:
+    path = Path(".codex/memory.json")
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        return []
+    submenu = data.get("workflows", {}).get("submenu_queue", {})
+    return submenu.get(name, submenu.get("default", []))
 
 
 def main() -> None:
     args = parse_args()
+    quiet = args.quiet or os.getenv("PE_QUIET") not in (None, "", "0")
     status = None
-    if not args.quiet:
+    if not quiet:
         status = StatusBar("Ready")
         status.update("Ready")
         console.rule("[bold cyan]AI-Managed Playbook")
 
-    # If tasks provided, run in non-interactive queued mode
+    registry = task_registry(args.format)
+
+    if args.list_tasks:
+        names = sorted(registry.keys())
+        if args.json:
+            data = {
+                "schema": {"id": "task_registry", "version": core_json.SCHEMA_VERSION},
+                "tasks": names,
+            }
+            core_cli.print_json(data, quiet)
+        else:
+            txt = "\n".join(names)
+            (print if quiet else console.print)(txt)
+        return
+
     all_tasks: list[str] = []
     if getattr(args, "tasks", None):
         all_tasks.extend([t for t in args.tasks if t])
     if getattr(args, "tasks_csv", None):
         all_tasks.extend([t.strip() for t in str(args.tasks_csv).split(",") if t.strip()])
+    if args.workflow:
+        wf = load_workflow_queue(args.workflow)
+        if wf:
+            all_tasks.extend(wf)
+
+    if args.dry_run:
+        names = [t.strip().lower().replace(" ", "-") for t in all_tasks]
+        if args.json:
+            data = {
+                "schema": {"id": "task_plan", "version": core_json.SCHEMA_VERSION},
+                "plan": names,
+            }
+            core_cli.print_json(data, quiet)
+        else:
+            txt = "\n".join(names)
+            (print if quiet else console.print)(txt)
+        return
 
     if all_tasks:
-        # Map user-friendly names to script callables
-        from portfolio_exporter.scripts import (
-            live_feed,
-            portfolio_greeks as _portfolio_greeks,
-            option_chain_snapshot as _ocs,
-            trades_report as _trades,
-            daily_report as _daily,
-            net_liq_history_export as _netliq,
-        )
-
-        registry: dict[str, callable] = {
-            # aliases for quotes snapshot
-            "snapshot-quotes": lambda: live_feed.run(fmt=args.format, include_indices=False),
-            "quotes": lambda: live_feed.run(fmt=args.format, include_indices=False),
-            "snapshot": lambda: live_feed.run(fmt=args.format, include_indices=False),
-            # portfolio greeks
-            "portfolio-greeks": lambda: _portfolio_greeks.run(fmt=args.format),
-            "greeks": lambda: _portfolio_greeks.run(fmt=args.format),
-            # option chain snapshot (full chain export)
-            "option-chain-snapshot": lambda: _ocs.run(fmt=args.format),
-            "chain-snapshot": lambda: _ocs.run(fmt=args.format),
-            # reports
-            "trades-report": lambda: _trades.run(fmt=args.format),
-            "daily-report": lambda: _daily.run(fmt=args.format),
-            "netliq-export": lambda: _netliq.run(fmt=args.format),
-        }
-
         failures: list[str] = []
         for name in all_tasks:
             key = name.strip().lower().replace(" ", "-")
@@ -132,7 +220,6 @@ def main() -> None:
                 if status:
                     status.update("Ready", "green")
 
-        # Summary and exit queued mode
         if failures:
             console.print(f"[yellow]Completed with {len(failures)} failure(s): {failures}")
         return

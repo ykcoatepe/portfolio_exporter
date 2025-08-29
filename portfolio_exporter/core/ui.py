@@ -17,13 +17,21 @@ console = Console()
 class StatusBar:
     """Singleton Rich.Live status bar shown at the bottom of the TUI."""
 
+    # Track the active instance so prompts can temporarily pause the Live area.
+    current: "StatusBar | None" = None
+
     def __init__(self, text: str = "Ready", style: str = "green"):
         self._text = text
         self._style = style
-        self._live = Live(self._render(), console=console, transient=False)
+        # Use auto_refresh=False so Rich doesn't repaint while the user types
+        # into regular input() prompts. We explicitly update the bar via update().
+        self._live = Live(
+            self._render(), console=console, transient=False, auto_refresh=False
+        )
         self._live.__enter__()  # start live context
         # expose console for menus to print via the same console
         self.console = console
+        StatusBar.current = self
 
     # --- public API ----------------------------------------------------
     def update(self, text: str, style: str = "green") -> None:
@@ -32,11 +40,30 @@ class StatusBar:
 
     def stop(self) -> None:
         self._live.__exit__(None, None, None)
+        StatusBar.current = None
 
     # --- helpers -------------------------------------------------------
     def _render(self):
         panel = Panel(Align.left(self._text), style=self._style, padding=(0, 1))
         return panel
+
+    # --- input helper --------------------------------------------------
+    def prompt(self, prompt: str = "") -> str:
+        # Temporarily suspend the live display so the terminal behaves like
+        # normal input (keystrokes stay visible and don't get repainted).
+        from builtins import input as builtin_input
+
+        with self._live.pause():
+            return builtin_input(prompt)
+
+
+def prompt_input(prompt: str = "") -> str:
+    """Global helper to read input while pausing Live, if active."""
+    if StatusBar.current is not None:
+        return StatusBar.current.prompt(prompt)
+    from builtins import input as builtin_input
+
+    return builtin_input(prompt)
 
 
 def render_chain(df: pd.DataFrame, console: Console, width: int) -> Table:

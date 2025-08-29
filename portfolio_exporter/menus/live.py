@@ -1,6 +1,7 @@
 from rich.table import Table
 import re
 from rich.console import Console
+import builtins as _builtins
 import pandas as pd
 from portfolio_exporter.scripts import (
     live_feed,
@@ -61,7 +62,11 @@ def launch(status, default_fmt):
         for key, (label, _) in list(actions.items()) + [("b", ("Back", None))]:
             tbl.add_row(key, label)
         console.print(tbl)
-        raw = input("\u203a ").strip().lower()
+        try:
+            raw = __import__("main").input("\u203a ")
+        except Exception:
+            raw = _builtins.input("\u203a ")
+        raw = raw.strip().lower()
         # Allow multiple entries separated by spaces or commas
         tokens = [t for t in re.split(r"[\s,]+", raw) if t]
         for ch in tokens:

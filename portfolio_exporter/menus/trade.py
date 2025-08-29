@@ -1,4 +1,5 @@
 from rich.console import Console
+import builtins as _builtins
 from rich.table import Table
 from portfolio_exporter.scripts import (
     trades_report,
@@ -29,7 +30,11 @@ def launch(status, default_fmt):
         for k, lbl in entries:
             tbl.add_row(k, lbl)
         console.print(tbl)
-        raw = input("› ").strip().lower()
+        try:
+            raw = __import__("main").input("› ")
+        except Exception:
+            raw = _builtins.input("› ")
+        raw = raw.strip().lower()
         # Allow multiple entries separated by spaces or commas
         import re as _re
         tokens = [t for t in _re.split(r"[\s,]+", raw) if t]
