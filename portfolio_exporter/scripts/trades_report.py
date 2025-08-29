@@ -142,12 +142,38 @@ def _normalize_expiry(val) -> str | None:
 
 def _find_positions_before(cutoff: datetime | None, outdir: Path | str | None) -> Path | None:
     base = Path(outdir or config_core.settings.output_dir).expanduser()
-    paths = sorted(base.glob("portfolio_greeks_positions*.csv"), key=lambda p: p.stat().st_mtime)
+    def iter_positions_candidates(outdir_path: Path) -> list[tuple[Path, float]]:
+        paths = sorted(outdir_path.glob("portfolio_greeks_positions*.csv"))
+        out: list[tuple[Path, float]] = []
+        for p in paths:
+            # try to parse timestamp from filename: portfolio_greeks_positions_YYYYMMDD_HHMM.csv
+            try:
+                name = p.name
+                m = pd.Series([name]).str.extract(r"(\d{8})[\-_]?(\d{4})").iloc[0]
+                if isinstance(m, pd.Series) and not m.isna().any():
+                    dt = datetime.strptime(str(m[0]) + str(m[1]), "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+                    out.append((p, dt.timestamp()))
+                    continue
+            except Exception:
+                pass
+            # fallback to mtime
+            try:
+                out.append((p, p.stat().st_mtime))
+            except Exception:
+                continue
+        return out
+
+    cands = iter_positions_candidates(base)
+    if not cands:
+        return None
     if not cutoff:
-        return paths[-1] if paths else None
-    ts = cutoff.timestamp()
-    older = [p for p in paths if p.stat().st_mtime < ts]
-    return older[-1] if older else None
+        return max(cands, key=lambda t: t[1])[0]
+    cut = cutoff.timestamp()
+    older = [p for (p, ts) in cands if ts < cut]
+    if not older:
+        return None
+    # pick newest among older
+    return max(older, key=lambda p: p.stat().st_mtime)
 
 
 def _match_leg_in_prior(leg: dict, prior_df: pd.DataFrame, strike_tol: float = 0.01) -> tuple[bool, str, float]:
@@ -943,17 +969,17 @@ def run(
             lambda r: r["Action"] if r.get("Action") == "Open" else _classify(r),
             axis=1,
         )
-    # Previous positions for position_effect inference (quiet auto-refresh if needed)
-    prev_positions_df = _ensure_prev_positions_quiet()
+    # Determine earliest execution and load a prior snapshot strictly older when possible
+    try:
+        earliest_exec_ts = _get_earliest_exec_ts(df_exec)
+    except Exception:
+        earliest_exec_ts = None
+    outdir = Path(config_core.settings.output_dir)
+    prev_positions_df = _ensure_prev_positions_quiet(earliest_exec_ts, outdir)
     try:
         df["position_effect"] = df.apply(
             lambda r: _infer_position_effect(r, prev_positions_df), axis=1
         )
-    except Exception:
-        pass
-    # Always include a position_effect column for quick filtering in exports
-    try:
-        df["position_effect"] = df.apply(_infer_position_effect, axis=1)
     except Exception:
         pass
 
