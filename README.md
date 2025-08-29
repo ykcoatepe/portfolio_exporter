@@ -111,6 +111,23 @@ doctor --json --no-files
 daily-report --json --no-files | validate-json
 ```
 
+## Menus
+
+The interactive menus now include quick previews that avoid writing files:
+
+```
+Trades & Reports › Preview Daily Report (JSON-only)
+Positions: 12
+Combos: 3
+Totals: 1
+Expiry radar: {...}
+
+Trades & Reports › Preview Roll Manager (dry-run)
+Candidates: 4
+TSLA Δ+1.20 +0.50
+AAPL Δ-0.80 -0.30
+```
+
 Typical fixes:
 
 ```bash
