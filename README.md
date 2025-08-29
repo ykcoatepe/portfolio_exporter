@@ -111,6 +111,15 @@ doctor --json --no-files
 daily-report --json --no-files | validate-json
 ```
 
+Typical fixes:
+
+```bash
+export OUTPUT_DIR=~/pe && mkdir -p "$OUTPUT_DIR"
+export CP_REFRESH_TOKEN=<token>
+mkdir -p ~/Jts/export && export TWS_EXPORT_DIR=~/Jts/export
+pip install pandera
+```
+
 ## Combo DB maintenance
 
 `combo-db-maint` audits and repairs the combos database.
