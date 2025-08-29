@@ -51,10 +51,40 @@ class StatusBar:
     def prompt(self, prompt: str = "") -> str:
         # Temporarily suspend the live display so the terminal behaves like
         # normal input (keystrokes stay visible and don't get repainted).
+        # Rich >= 13 has Live.pause(); older versions don't. Provide a
+        # backwards‑compatible fallback by stop/start around the prompt.
         from builtins import input as builtin_input
 
-        with self._live.pause():
+        try:
+            pause = getattr(self._live, "pause", None)
+            if callable(pause):
+                with pause():
+                    return builtin_input(prompt)
+        except Exception:
+            # Fall through to stop/start fallback
+            pass
+
+        # Fallback for older Rich versions without Live.pause()
+        try:
+            if hasattr(self._live, "stop"):
+                self._live.stop()
+        except Exception:
+            pass
+        try:
             return builtin_input(prompt)
+        finally:
+            try:
+                if hasattr(self._live, "start"):
+                    self._live.start()
+                else:
+                    # Re-enter live context if start() is unavailable
+                    self._live.__enter__()
+            except Exception:
+                pass
+            try:
+                self._live.update(self._render())
+            except Exception:
+                pass
 
 
 def prompt_input(prompt: str = "") -> str:

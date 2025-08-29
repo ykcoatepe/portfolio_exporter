@@ -9,12 +9,12 @@ import json
 import pathlib
 from typing import Any, Dict, List, Optional, Tuple
 
-from prompt_toolkit import prompt
+from prompt_toolkit import prompt  # retained for optional environments
 from yfinance import Ticker
 
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.input import parse_order_line
-from portfolio_exporter.core.ui import banner_delta_theta, console
+from portfolio_exporter.core.ui import banner_delta_theta, console, prompt_input
 from rich.table import Table
 try:  # pragma: no cover - ib_insync optional in tests
     from portfolio_exporter.core.ib import quote_option, quote_stock  # type: ignore
@@ -92,9 +92,19 @@ def _normalize_expiry(symbol: str, raw: str | None) -> str:
 
 
 def _ask(question: str, default: Optional[str] = None) -> str | None:
+    """Prompt for a value with Live-aware echo so typing is visible.
+
+    Uses ``prompt_input`` which pauses the global StatusBar (if active)
+    to avoid Rich Live repaint hiding the user's keystrokes. Falls back
+    to a plain input when no StatusBar is running.
+    """
     default_str = f" [{default}]" if default else ""
-    ask_fn = getattr(builtins, "prompt_toolkit.prompt", prompt)
-    resp = ask_fn(f"{question}{default_str}: ")
+    try:
+        resp = prompt_input(f"{question}{default_str}: ")
+    except Exception:
+        # Ultimate fallback – prompt_toolkit or builtin input
+        ask_fn = getattr(builtins, "prompt_toolkit.prompt", prompt)
+        resp = ask_fn(f"{question}{default_str}: ")
     if isinstance(resp, str) and resp.strip().lower() == "q":
         raise RuntimeError("abort")
     return resp or default
@@ -368,7 +378,7 @@ def build_covered_call(
 
 
 def run() -> bool:
-    raw = input("Order (shorthand, Enter to step-through): ").strip()
+    raw = prompt_input("Order (shorthand, Enter to step-through): ").strip()
     parsed = parse_order_line(raw) if raw else None
 
     today = dt.date.today()
@@ -796,7 +806,7 @@ def run() -> bool:
     risk_caps_ok = True
     if caps_warn and confirm_caps:
         console.print(f"[red]⚠  {' & '.join(caps_warn)}[/red]")
-        risk_caps_ok = input("Proceed? (y/N): ").strip().lower() == "y"
+        risk_caps_ok = prompt_input("Proceed? (y/N): ").strip().lower() == "y"
     if not risk_caps_ok:
         console.print("Aborted.")
         return False
