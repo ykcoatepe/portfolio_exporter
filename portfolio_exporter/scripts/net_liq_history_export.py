@@ -212,8 +212,7 @@ def cli(ns: argparse.Namespace) -> dict:
             print(df_print.to_string(index=False))
     return summary
 
-
-def main(argv: list[str] | None = None) -> int:
+def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export Net-Liq history")
     parser.add_argument("--start")
     parser.add_argument("--end")
@@ -224,14 +223,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--fixture-csv", type=Path)
     parser.add_argument("--csv", action="store_true")
-    parser.add_argument("--excel", action="store_true")
     parser.add_argument("--pdf", action="store_true")
-    parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--no-files", action="store_true")
+    cli_helpers.add_common_output_args(parser, include_excel=True)
     parser.add_argument("--quiet", action="store_true")
-    parser.add_argument("--no-pretty", action="store_true")
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("--debug-timings", action="store_true")
+    cli_helpers.add_common_debug_args(parser)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = get_arg_parser()
     args = parser.parse_args(argv)
     summary = cli(args)
     if args.json:

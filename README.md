@@ -75,7 +75,10 @@ See `.env.example` for a starter file; any values there are read by the app.
 
 ## Common CLI flags
 
-Most scripts share a small set of flags for consistent ergonomics:
+Most scripts share a small set of flags for consistent ergonomics. The
+helpers `portfolio_exporter.core.cli.add_common_output_args` and
+`portfolio_exporter.core.cli.add_common_debug_args` register these options so
+every CLI stays in sync; a drift test enforces their presence.
 
 | Flag | Description |
 | ---- | ----------- |

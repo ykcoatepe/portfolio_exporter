@@ -339,30 +339,23 @@ def _build_pdf_flowables(
 # main
 
 
-def main(argv: list[str] | None = None) -> dict:
+def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Render portfolio report from latest CSVs")
-    parser.add_argument("--output-dir", default=None)
     parser.add_argument("--html", action="store_true")
     parser.add_argument("--pdf", action="store_true")
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument(
-        "--excel",
-        action="store_true",
-        help="Additionally write an XLSX workbook (requires openpyxl)",
-    )
-    parser.add_argument(
-        "--no-files",
-        action="store_true",
-        help="Do not write HTML/PDF outputs; emit JSON only if --json is set",
-    )
-    parser.add_argument("--no-pretty", action="store_true")
+    cli_helpers.add_common_output_args(parser, include_excel=True)
     parser.add_argument("--since")
     parser.add_argument("--until")
     parser.add_argument("--combos-source", default="csv")
     parser.add_argument("--expiry-window", type=int, nargs="?", const=10, default=None)
     parser.add_argument("--symbol")
     parser.add_argument("--preflight", action="store_true")
-    parser.add_argument("--debug-timings", action="store_true")
+    cli_helpers.add_common_debug_args(parser)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> dict:
+    parser = get_arg_parser()
     args = parser.parse_args(argv)
 
     formats = cli_helpers.decide_file_writes(

@@ -1444,20 +1444,21 @@ def _enrich_combo_strikes_fallback(combos_df: pd.DataFrame, positions_df: pd.Dat
         pass
     return df
 
-
-def main(argv: list[str] | None = None) -> Dict[str, Any]:
+def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Trades report and combos export")
     parser.add_argument("--executions-csv", dest="exec_csv", default=None)
-    parser.add_argument("--no-pretty", action="store_true")
     parser.add_argument("--debug-combos", action="store_true")
     parser.add_argument("--since")
     parser.add_argument("--until")
     parser.add_argument("--summary-only", action="store_true")
     parser.add_argument("--cluster-window-sec", type=int, default=60)
-    parser.add_argument("--debug-timings", action="store_true")
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("--output-dir")
-    parser.add_argument("--no-files", action="store_true")
+    cli_helpers.add_common_output_args(parser)
+    cli_helpers.add_common_debug_args(parser)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> Dict[str, Any]:
+    parser = get_arg_parser()
     args = parser.parse_args(argv)
 
     if args.summary_only:

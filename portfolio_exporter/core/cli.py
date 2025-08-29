@@ -7,12 +7,57 @@ startup cost.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
 from typing import Any, Dict
 
 from .config import settings
+
+
+def add_common_output_args(
+    parser: argparse.ArgumentParser,
+    *,
+    include_excel: bool = False,
+    defaults: Dict[str, Any] | None = None,
+) -> argparse.ArgumentParser:
+    """Register shared output-related flags on ``parser``.
+
+    Parameters
+    ----------
+    parser:
+        The :class:`argparse.ArgumentParser` to augment.
+    include_excel:
+        When ``True`` also register ``--excel`` (opt-in, default ``False``).
+    defaults:
+        Optional mapping of argument name to default value.
+    """
+
+    defaults = defaults or {}
+    parser.add_argument("--json", action="store_true", default=defaults.get("json", False))
+    parser.add_argument(
+        "--no-pretty", action="store_true", default=defaults.get("no_pretty", False)
+    )
+    parser.add_argument(
+        "--no-files", action="store_true", default=defaults.get("no_files", False)
+    )
+    parser.add_argument("--output-dir", default=defaults.get("output_dir"))
+    if include_excel:
+        parser.add_argument(
+            "--excel",
+            action="store_true",
+            default=defaults.get("excel", False),
+            help="Additionally write an XLSX workbook (requires openpyxl)",
+        )
+    return parser
+
+
+def add_common_debug_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Register shared debug flags on ``parser``."""
+
+    parser.add_argument("--debug-timings", action="store_true")
+    return parser
 
 
 def resolve_output_dir(arg: str | None) -> Path:

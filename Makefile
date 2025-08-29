@@ -3,6 +3,7 @@ PIP=$(VENV)/bin/pip
 PYTEST=$(VENV)/bin/pytest
 
 .PHONY: setup test lint build ci-home memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
+.PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-all
 
 setup:
         python -m venv $(VENV)
@@ -58,3 +59,22 @@ memory-digest:
 
 memory-rotate:
 	$(VENV)/bin/python -m portfolio_exporter.scripts.memory rotate --cutoff 30d
+
+# ------------------------------------------------------------------
+# Sanity helpers
+# ------------------------------------------------------------------
+
+sanity-cli:
+	./scripts/sanity_cli_helpers.sh
+
+sanity-daily:
+	OUTPUT_DIR=tests/data PE_QUIET=1 daily-report --expiry-window 7 --json --no-files | jq -e '.ok==true' >/dev/null
+
+sanity-netliq:
+	PE_QUIET=1 netliq-export --source fixture --fixture-csv tests/data/net_liq_fixture.csv --json --no-files | jq -e '.ok==true' >/dev/null
+
+sanity-trades:
+	PE_QUIET=1 trades-report --executions-csv tests/data/executions_fixture.csv --json --no-files | jq -e '.ok==true' >/dev/null
+
+sanity-all: sanity-cli sanity-daily sanity-netliq sanity-trades
+	@echo "All sanity targets passed."
