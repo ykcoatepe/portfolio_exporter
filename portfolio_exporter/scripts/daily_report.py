@@ -346,6 +346,11 @@ def main(argv: list[str] | None = None) -> dict:
     parser.add_argument("--pdf", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
+        "--excel",
+        action="store_true",
+        help="Additionally write an XLSX workbook (requires openpyxl)",
+    )
+    parser.add_argument(
         "--no-files",
         action="store_true",
         help="Do not write HTML/PDF outputs; emit JSON only if --json is set",
@@ -363,7 +368,7 @@ def main(argv: list[str] | None = None) -> dict:
     formats = cli_helpers.decide_file_writes(
         args,
         json_only_default=True,
-        defaults={"html": True, "pdf": True},
+        defaults={"html": True, "pdf": True, "excel": False},
     )
     outdir = cli_helpers.resolve_output_dir(args.output_dir)
     quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
@@ -379,10 +384,11 @@ def main(argv: list[str] | None = None) -> dict:
             "totals": core_io.latest_file("portfolio_greeks_totals"),
             "combos": core_io.latest_file("portfolio_greeks_combos"),
         }
+        missing_any = False
         for name, path in files.items():
             if not path or not path.exists():
                 warnings.append(f"missing {name} csv")
-                ok = False
+                missing_any = True
                 continue
             try:
                 df = pd.read_csv(path)
@@ -394,11 +400,16 @@ def main(argv: list[str] | None = None) -> dict:
             warnings.extend([f"{path.name}: {m}" for m in msgs])
             if msgs and not any("pandera" in m for m in msgs):
                 ok = False
+        # Provide an actionable hint when inputs are missing
+        if missing_any:
+            warnings.append("run: portfolio-greeks to generate latest CSVs")
         summary = json_helpers.report_summary({}, outputs={}, warnings=warnings, meta={"script": "daily_report"})
         summary["ok"] = ok
         if args.json:
             cli_helpers.print_json(summary, quiet)
-        return summary
+        # When invoked via console entry (argv is None), return an int exit code
+        # to avoid sys.exit(dict) printing a Python repr to stderr.
+        return 0 if argv is None else summary
 
     with RunLog(script="daily_report", args=vars(args), output_dir=outdir) as rl:
         with rl.time("load_data"):
@@ -493,6 +504,46 @@ def main(argv: list[str] | None = None) -> dict:
                 if console:
                     console.print(f"PDF report → {path_pdf}")
 
+            # Optional Excel workbook output
+            if formats.get("excel"):
+                try:
+                    import openpyxl  # noqa: F401  # ensure engine available
+                except Exception:
+                    # Gracefully skip when openpyxl is not installed
+                    if console:
+                        console.print("Skipping XLSX: openpyxl not installed", style="yellow")
+                else:
+                    xlsx_path = outdir / "daily_report.xlsx"
+                    try:
+                        with pd.ExcelWriter(xlsx_path, engine="openpyxl") as xw:
+                            # Write available sections to dedicated sheets
+                            if not totals.empty:
+                                totals.to_excel(xw, index=False, sheet_name="Totals")
+                            if not combos.empty:
+                                combos.to_excel(xw, index=False, sheet_name="Combos")
+                            if not positions.empty:
+                                positions.to_excel(xw, index=False, sheet_name="Positions")
+                            # Add small analytics sheets for quick reference
+                            if expiry_radar and expiry_radar.get("rows"):
+                                pd.DataFrame(expiry_radar["rows"]).to_excel(
+                                    xw, index=False, sheet_name="ExpiryRadar"
+                                )
+                            if delta_buckets is not None:
+                                pd.DataFrame(
+                                    {
+                                        "bucket": list(delta_buckets.keys()),
+                                        "count": list(delta_buckets.values()),
+                                    }
+                                ).to_excel(xw, index=False, sheet_name="DeltaBuckets")
+                    except Exception:
+                        # If writing fails for any reason, don't crash
+                        pass
+                    else:
+                        outputs["excel"] = str(xlsx_path)
+                        written.append(xlsx_path)
+                        if console:
+                            console.print(f"XLSX report → {xlsx_path}")
+
             if args.debug_timings:
                 meta["timings"] = rl.timings
                 if written:
@@ -532,7 +583,7 @@ def main(argv: list[str] | None = None) -> dict:
 
         if args.json:
             cli_helpers.print_json(summary, quiet)
-        return summary
+        return 0 if argv is None else summary
 
 
 if __name__ == "__main__":  # pragma: no cover
