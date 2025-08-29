@@ -9,7 +9,7 @@ PYTEST  := $(VENV_BIN)/pytest
 export PATH := $(VENV_BIN):$(PATH)
 
 .PHONY: setup dev test lint build ci-home memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
-.PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-all
+.PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-all menus-sanity
 
 setup:
 	@test -d $(VENV_DIR) || python3 -m venv $(VENV_DIR)
@@ -92,3 +92,7 @@ sanity-trades: setup
 # Umbrella target
 sanity-all: sanity-cli sanity-daily sanity-netliq sanity-trades
 	@echo "All sanity targets passed."
+
+# Trades & Reports menu – underlying previews sanity
+menus-sanity: setup
+	@./scripts/sanity_trades_menu_underlying.sh

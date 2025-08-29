@@ -116,6 +116,12 @@ daily-report --json --no-files | validate-json
 The interactive menus now include quick previews that avoid writing files:
 
 ```
+Trades & Reports › Preview Trades Clusters (JSON-only)
+Trades & Reports › Preview Roll Manager (dry-run)
+Trades & Reports › Preflight Daily Report
+Trades & Reports › Preflight Roll Manager
+Trades & Reports › Generate Daily Report (explicit format)
+
 Trades & Reports › Preview Daily Report (JSON-only)
 Positions: 12
 Combos: 3

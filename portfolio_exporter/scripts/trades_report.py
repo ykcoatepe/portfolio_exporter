@@ -94,6 +94,75 @@ if IB is None:
 LIQ_MAP = {1: "Added", 2: "Removed", 3: "RoutedOut", 4: "Auction"}
 
 
+# ───────────────────────── positions snapshot helper ─────────────────────────
+def _ensure_prev_positions_quiet() -> pd.DataFrame | None:
+    """Ensure a positions snapshot exists; run portfolio_greeks quietly if needed.
+
+    Returns a DataFrame for previous positions (may be empty) or None on failure.
+    """
+    try:
+        from portfolio_exporter.core.io import latest_file
+
+        prev_path = latest_file("portfolio_greeks_positions")
+        # If a snapshot exists, verify freshness; otherwise fall through to refresh
+        if prev_path and prev_path.exists():
+            try:
+                max_age_sec = int(os.getenv("PE_POSITIONS_MAX_AGE_SEC", "60"))
+            except Exception:
+                max_age_sec = 60
+            try:
+                import time as _time
+
+                age = _time.time() - prev_path.stat().st_mtime
+                if age <= max_age_sec:
+                    try:
+                        return pd.read_csv(prev_path)
+                    except Exception:
+                        pass
+                # Else: too old → refresh below
+            except Exception:
+                # If we can't determine age, still try to read it
+                try:
+                    return pd.read_csv(prev_path)
+                except Exception:
+                    pass
+        # No snapshot → generate quietly just for intent inference
+        try:
+            from portfolio_exporter.scripts import portfolio_greeks as _pg
+
+            # Temporarily enable quiet mode to suppress output
+            _orig_quiet = os.environ.get("PE_QUIET")
+            os.environ["PE_QUIET"] = "1"
+            try:
+                # Avoid printing and avoid generating combos/totals unless defaults write them
+                res = _pg.run(
+                    write_positions=True,
+                    write_totals=False,
+                    combos=False,
+                    return_frames=True,
+                )
+            finally:
+                if _orig_quiet is None:
+                    os.environ.pop("PE_QUIET", None)
+                else:
+                    os.environ["PE_QUIET"] = _orig_quiet
+            if isinstance(res, tuple) and len(res) >= 1:
+                pos_df = res[0]
+                if isinstance(pos_df, pd.DataFrame):
+                    return pos_df
+        except Exception:
+            return None
+        # fallback: try to load again if run() wrote files
+        prev_path = latest_file("portfolio_greeks_positions")
+        if prev_path and prev_path.exists():
+            try:
+                return pd.read_csv(prev_path)
+            except Exception:
+                return None
+        return None
+    except Exception:
+        return None
+
 # ───── Lightweight executions loader & action classifier ─────
 def _load_trades() -> pd.DataFrame | None:
     """Fetch executed trades from IBKR.
@@ -126,8 +195,9 @@ def _load_trades() -> pd.DataFrame | None:
 
 
 def _load_open_orders() -> pd.DataFrame:
-    from ib_insync import IB
-
+    # Use optional top-level IB binding; return empty if unavailable
+    if IB is None:
+        return pd.DataFrame()
     ib = IB()
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=IB_OPEN_CID, timeout=5)
@@ -158,11 +228,19 @@ def _load_open_orders() -> pd.DataFrame:
 
 
 def _classify(row: pd.Series) -> str:
-    sec = row.get("secType", "")
-    side = row.get("Side", "")
-    liq = int(row.get("Liquidation", 0))
-    lastliq = int(row.get("lastLiquidity", 0))
-    ref = (row.get("OrderRef") or "").upper()
+    sec = str(row.get("secType", ""))
+    side = str(row.get("Side", ""))
+    try:
+        liq = int(row.get("Liquidation", 0))
+    except Exception:
+        liq = 0
+    try:
+        lastliq = int(row.get("lastLiquidity", 0))
+    except Exception:
+        lastliq = 0
+    ref = str(row.get("OrderRef", ""))
+    ref = ref if ref is not None else ""
+    ref = ref.upper()
 
     if sec == "BAG":
         return "Combo"
@@ -171,6 +249,71 @@ def _classify(row: pd.Series) -> str:
     if liq > 0 or lastliq in {2, 4}:
         return "Close"
     return "Buy" if side == "BOT" else "Sell"
+
+
+def _infer_position_effect(row: pd.Series, prev_positions: pd.DataFrame | None = None) -> str:
+    """Best-effort position effect: Open, Close, Roll, or Unknown.
+
+    Precedence:
+    - OrderRef contains 'ROLL' -> Roll
+    - Existing Action value 'Open' from open orders -> Open
+    - If previous positions provided, infer by prior quantity sign vs side
+    - Fallback to _classify mapping Close/Roll; else Unknown
+    """
+    def _upper(val: object) -> str:
+        return str(val or "").strip().upper()
+
+    ref = _upper(row.get("OrderRef") or row.get("order_ref"))
+    if "ROLL" in ref:
+        return "Roll"
+    act = _upper(row.get("Action"))
+    if act == "OPEN":
+        return "Open"
+    # Previous positions based inference
+    if prev_positions is not None and not prev_positions.empty:
+        try:
+            sec = str(row.get("secType") or row.get("sec_type") or "")
+            sym = str(row.get("symbol") or row.get("underlying") or "")
+            exp = str(row.get("expiry") or "")
+            right = str(row.get("right") or "").upper()
+            try:
+                strike = float(row.get("strike")) if row.get("strike") is not None else None
+            except Exception:
+                strike = None
+            # filter previous positions for same instrument/leg
+            p = prev_positions
+            m = (p.get("underlying").astype(str) == sym)
+            if sec:
+                m &= (p.get("secType").astype(str) == sec)
+            if exp:
+                m &= (p.get("expiry").astype(str) == exp)
+            if right:
+                m &= (p.get("right").astype(str).str.upper() == right)
+            if strike is not None and "strike" in p.columns:
+                try:
+                    m &= (pd.to_numeric(p.get("strike"), errors="coerce") == float(strike))
+                except Exception:
+                    pass
+            prior_qty = 0.0
+            if hasattr(m, "any") and m.any():
+                try:
+                    prior_qty = float(pd.to_numeric(p.loc[m, "qty"], errors="coerce").sum())
+                except Exception:
+                    prior_qty = 0.0
+            side = _upper(row.get("Side") or row.get("side"))
+            if side == "BUY" or side == "BOT":
+                # buy-to-open if no/long prior; buy-to-close if covering short
+                return "Close" if prior_qty < 0 else "Open"
+            if side == "SELL" or side == "SLD":
+                # sell-to-close if reducing long; sell-to-open if increasing short
+                return "Close" if prior_qty > 0 else "Open"
+        except Exception:
+            pass
+    # Fallback to heuristic classification
+    c = _classify(row)
+    if c in {"Close", "Roll"}:
+        return c
+    return "Unknown"
 
 
 @dataclass
@@ -209,6 +352,8 @@ class Trade:
     account: str | None
     model_code: str | None
     order_ref: str | None
+    # IB execution position effect if available ("O"/"C").
+    open_close: str | None
 
 
 @dataclass
@@ -427,6 +572,7 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
                 account=ex.acctNumber,
                 model_code=ex.modelCode,
                 order_ref=ex.orderRef,
+                open_close=getattr(ex, "openClose", None),
             )
         )
 
@@ -756,6 +902,19 @@ def run(
             lambda r: r["Action"] if r.get("Action") == "Open" else _classify(r),
             axis=1,
         )
+    # Previous positions for position_effect inference (quiet auto-refresh if needed)
+    prev_positions_df = _ensure_prev_positions_quiet()
+    try:
+        df["position_effect"] = df.apply(
+            lambda r: _infer_position_effect(r, prev_positions_df), axis=1
+        )
+    except Exception:
+        pass
+    # Always include a position_effect column for quick filtering in exports
+    try:
+        df["position_effect"] = df.apply(_infer_position_effect, axis=1)
+    except Exception:
+        pass
 
     from portfolio_exporter.core.io import save
 
@@ -767,7 +926,7 @@ def run(
     # Also detect and save combos unless disabled
     if save_combos:
         try:
-            combos_df = _detect_and_enrich_trades_combos(df_exec, open_df)
+            combos_df = _detect_and_enrich_trades_combos(df_exec, open_df, prev_positions_df)
             path_combos = _save_trades_combos(combos_df, fmt="csv")
             print(f"✅ Trades combos exported → {path_combos}")
         except Exception as exc:  # pragma: no cover - defensive
@@ -903,6 +1062,12 @@ def _build_positions_like_df(execs: pd.DataFrame, opens: pd.DataFrame | None = N
             "order_id": df.get("order_id"),
             "perm_id": df.get("perm_id"),
             "datetime": df.get("datetime"),
+            # carry-through fields useful for intent classification
+            "Liquidation": df.get("Liquidation"),
+            "lastLiquidity": df.get("lastLiquidity"),
+            "OrderRef": df.get("OrderRef"),
+            "Action": df.get("Action"),
+            "openClose": df.get("openClose"),
         }
     )
 
@@ -1144,7 +1309,11 @@ def _cluster_executions(execs: pd.DataFrame, window_sec: int = 60) -> tuple[pd.D
     return clusters, df
 
 
-def _detect_and_enrich_trades_combos(execs_df: pd.DataFrame, opens_df: pd.DataFrame | None = None) -> pd.DataFrame:
+def _detect_and_enrich_trades_combos(
+    execs_df: pd.DataFrame,
+    opens_df: pd.DataFrame | None = None,
+    prev_positions_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     # Build positions-like df
     pos_like = _build_positions_like_df(execs_df, opens_df)
     if pos_like is None or pos_like.empty:
@@ -1247,7 +1416,192 @@ def _detect_and_enrich_trades_combos(execs_df: pd.DataFrame, opens_df: pd.DataFr
     except Exception:
         pass
 
+    # Annotate position_effect for combos using leg-level execution intent
+    try:
+        # reconstruct prior positions if our snapshot represents 'after' state
+        prior_df = _reconstruct_prior_positions(prev_positions_df, execs_df)
+        combos_df = _annotate_combos_effect(combos_df, pos_like, prior_df)
+    except Exception:
+        pass
+    
     return combos_df
+
+
+def _reconstruct_prior_positions(current_positions: pd.DataFrame | None, execs_df: pd.DataFrame | None) -> pd.DataFrame | None:
+    """Rebuild a 'before trades' positions view from current positions and executions.
+
+    before = after - delta, where delta is the signed quantity from executions.
+    Returns a normalized positions-like DataFrame (columns at least underlying, expiry, right, strike, qty).
+    """
+    if current_positions is None or not isinstance(current_positions, pd.DataFrame) or current_positions.empty:
+        return current_positions
+    try:
+        # Normalize current positions
+        after = combo_core._normalize_positions_df(current_positions)
+        # Build delta from executions
+        delta_src = _build_positions_like_df(execs_df, None) if isinstance(execs_df, pd.DataFrame) else pd.DataFrame()
+        if delta_src is None:
+            delta_src = pd.DataFrame()
+        try:
+            delta = combo_core._normalize_positions_df(delta_src)
+        except Exception:
+            delta = delta_src.copy()
+        # Aggregate
+        key_cols = ["underlying","expiry","right","strike","secType"]
+        def _agg(df: pd.DataFrame) -> pd.DataFrame:
+            if df is None or df.empty:
+                return pd.DataFrame(columns=key_cols + ["qty"]) 
+            d = df.copy()
+            if "qty" not in d.columns:
+                d["qty"] = 0.0
+            try:
+                d["qty"] = pd.to_numeric(d["qty"], errors="coerce").fillna(0.0)
+            except Exception:
+                d["qty"] = 0.0
+            g = d.groupby(key_cols, dropna=False)["qty"].sum().reset_index()
+            return g
+        A = _agg(after)
+        D = _agg(delta)
+        # Merge and compute prior = after - delta
+        merged = pd.merge(A, D, on=key_cols, how="left", suffixes=("_after","_delta"))
+        merged["qty_delta"] = pd.to_numeric(merged.get("qty_delta"), errors="coerce").fillna(0.0)
+        merged["qty_before"] = pd.to_numeric(merged.get("qty_after"), errors="coerce").fillna(0.0) - merged["qty_delta"]
+        prior = merged[key_cols + ["qty_before"]].rename(columns={"qty_before":"qty"})
+        # keep only non-zero
+        try:
+            prior = prior[prior["qty"].abs() > 0]
+        except Exception:
+            pass
+        return prior
+    except Exception:
+        return current_positions
+
+
+def _annotate_combos_effect(
+    combos_df: pd.DataFrame,
+    pos_like: pd.DataFrame,
+    prev_positions: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Derive position_effect for combos by reconciling legs to prior positions.
+
+    Uses the same normalization and hashing as the combo detector so leg IDs
+    match across frames. Falls back to attribute-based hashing when prior
+    positions carry real conIds.
+    """
+    df = combos_df.copy() if isinstance(combos_df, pd.DataFrame) else pd.DataFrame()
+    if df.empty or "legs" not in df.columns or pos_like is None or pos_like.empty:
+        return df
+
+    import ast, hashlib
+
+    # Normalize current trade legs frame to get (conId -> expiry/right/strike)
+    try:
+        norm_tx = combo_core._normalize_positions_df(pos_like)
+    except Exception:
+        norm_tx = pos_like.copy()
+    for col in ("conId", "strike"):
+        if col in norm_tx.columns:
+            try:
+                norm_tx[col] = pd.to_numeric(norm_tx[col], errors="coerce")
+            except Exception:
+                pass
+    id_to_exp = {}
+    try:
+        for _, r in norm_tx.iterrows():
+            cid = r.get("conId")
+            if pd.notna(cid):
+                id_to_exp[int(cid)] = str(r.get("expiry") or "")
+    except Exception:
+        pass
+
+    # Normalize previous positions; compute a synthetic hash ID matching detector
+    prev_norm = pd.DataFrame()
+    if prev_positions is not None and isinstance(prev_positions, pd.DataFrame) and not prev_positions.empty:
+        try:
+            prev_norm = combo_core._normalize_positions_df(prev_positions)
+        except Exception:
+            prev_norm = prev_positions.copy()
+    if not prev_norm.empty:
+        # Ensure normalized columns exist
+        for c in ("underlying", "expiry", "right", "strike", "qty"):
+            if c not in prev_norm.columns:
+                prev_norm[c] = pd.NA
+        try:
+            prev_norm["strike"] = pd.to_numeric(prev_norm["strike"], errors="coerce")
+        except Exception:
+            pass
+        def _synth_id(row: pd.Series) -> int:
+            key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike')}"
+            v = int.from_bytes(hashlib.sha1(str(key).encode()).digest()[:4], 'big')
+            return -int(v)
+        try:
+            prev_norm["__synth_id"] = prev_norm.apply(_synth_id, axis=1).astype("Int64")
+        except Exception:
+            prev_norm["__synth_id"] = pd.NA
+        try:
+            prev_norm["qty"] = pd.to_numeric(prev_norm["qty"], errors="coerce").fillna(0.0)
+        except Exception:
+            prev_norm["qty"] = 0.0
+        prior_ids = set(int(x) for x in prev_norm.loc[prev_norm["qty"] != 0, "__synth_id"].dropna().tolist())
+        prior_id_to_exp = {}
+        try:
+            for _, r in prev_norm.iterrows():
+                sid = r.get("__synth_id")
+                if pd.notna(sid):
+                    prior_id_to_exp[int(sid)] = str(r.get("expiry") or "")
+        except Exception:
+            pass
+    else:
+        prior_ids = set()
+        prior_id_to_exp = {}
+
+    def _parse_legs(val: object) -> list[int]:
+        if isinstance(val, list):
+            seq = val
+        elif isinstance(val, str) and val.strip().startswith("["):
+            try:
+                seq = ast.literal_eval(val)
+            except Exception:
+                seq = []
+        else:
+            seq = []
+        out: list[int] = []
+        for x in seq or []:
+            try:
+                if isinstance(x, dict):
+                    cid = x.get("conId") or x.get("conid") or x.get("id")
+                    if cid is not None:
+                        out.append(int(cid))
+                elif isinstance(x, (int,)) or (isinstance(x, str) and str(x).lstrip("-").isdigit()):
+                    out.append(int(x))
+            except Exception:
+                continue
+        return out
+
+    effects: list[str] = []
+    for _, row in df.iterrows():
+        cids = _parse_legs(row.get("legs"))
+        open_exp: set[str] = set()
+        close_exp: set[str] = set()
+        for cid in cids:
+            # Determine expiry for this leg from current trade context
+            exp = id_to_exp.get(cid, prior_id_to_exp.get(cid, ""))
+            if cid in prior_ids:
+                close_exp.add(exp)
+            else:
+                open_exp.add(exp)
+        if open_exp and close_exp:
+            # If expiries differ across groups → Roll, else Mixed
+            effects.append("Roll" if open_exp != close_exp else "Mixed")
+        elif open_exp:
+            effects.append("Open")
+        elif close_exp:
+            effects.append("Close")
+        else:
+            effects.append("Unknown")
+
+    df["position_effect"] = effects
+    return df
 
 
 def _save_trades_combos(
@@ -1525,7 +1879,10 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         k_total = len(clusters_df)
         combo_clusters = int((clusters_df.get("structure") != "synthetic").sum())
 
-        combos_df = _detect_and_enrich_trades_combos(df_exec, df_open)
+        # Ensure previous positions snapshot for better intent inference (quiet)
+        prev_positions_df = _ensure_prev_positions_quiet()
+
+        combos_df = _detect_and_enrich_trades_combos(df_exec, df_open, prev_positions_df)
         c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
 
         outputs: Dict[str, str] = {}
@@ -1535,9 +1892,17 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                 df_all = df_exec.copy()
                 if isinstance(df_open, pd.DataFrame) and not df_open.empty:
                     df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
+                # Include position_effect for convenience in exports
+                try:
+                    df_all["position_effect"] = df_all.apply(
+                        lambda r: _infer_position_effect(r, prev_positions_df), axis=1
+                    )
+                except Exception:
+                    pass
                 path_report = io_core.save(df_all, "trades_report", "csv", outdir)
                 outputs["trades_report"] = str(path_report)
                 written.append(path_report)
+                # Ensure combos carry position_effect; detection already annotates
                 path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
                 outputs["trades_combos"] = str(path_combos)
                 written.append(path_combos)
