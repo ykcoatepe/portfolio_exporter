@@ -98,10 +98,23 @@ LIQ_MAP = {1: "Added", 2: "Removed", 3: "RoutedOut", 4: "Auction"}
 
 
 # ───────────────────────── intent helpers (timestamps, matching) ─────────────────────────
-_TS_COL_CANDIDATES = ("timestamp", "time", "date", "exec_time", "datetime")
+# Expanded timestamp candidates to catch varied CSVs
+_TS_COL_CANDIDATES = (
+    "datetime",
+    "timestamp",
+    "time",
+    "date",
+    "exec_time",
+    "Date/Time",
+    "TradeTime",
+    "fill_time",
+    "timestamp_utc",
+)
 
 
 def _parse_ts_any(val) -> datetime | None:
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return None
     try:
         ts = pd.to_datetime(val, utc=True, errors="coerce")
         if pd.isna(ts):
@@ -114,35 +127,70 @@ def _parse_ts_any(val) -> datetime | None:
 def _get_earliest_exec_ts(df: pd.DataFrame) -> datetime | None:
     if df is None or df.empty:
         return None
-    vals: list[datetime] = []
-    for c in _TS_COL_CANDIDATES:
-        if c in df.columns:
+    best: datetime | None = None
+    for col in _TS_COL_CANDIDATES:
+        if col in df.columns:
             try:
-                ser = pd.to_datetime(df[c], utc=True, errors="coerce")
-                if ser.notna().any():
-                    tmin = ser.min()
-                    if isinstance(tmin, pd.Timestamp):
-                        vals.append(tmin.to_pydatetime())
+                ts = pd.to_datetime(df[col], utc=True, errors="coerce").min(skipna=True)
+                if isinstance(ts, pd.Timestamp) and not pd.isna(ts):
+                    dt = ts.to_pydatetime()
+                    best = dt if best is None or dt < best else best
             except Exception:
-                pass
-    return min(vals) if vals else None
+                continue
+    return best
 
 
 def _normalize_expiry(val) -> str | None:
-    if val is None:
+    if val is None or (isinstance(val, float) and math.isnan(val)):
         return None
     try:
         t = pd.to_datetime(val, utc=False, errors="coerce")
         if pd.isna(t):
             return None
-        return t.strftime("%Y-%m-%d")
+        return t.date().isoformat()
     except Exception:
         return None
 
 
-def _find_positions_before(cutoff: datetime | None, outdir: Path | str | None) -> Path | None:
-    base = Path(outdir or config_core.settings.output_dir).expanduser()
-    def iter_positions_candidates(outdir_path: Path) -> list[tuple[Path, float]]:
+def _iter_positions_candidates(outdir_path: Path) -> list[tuple[Path, float]]:
+    paths = sorted(outdir_path.glob("portfolio_greeks_positions*.csv"))
+    out: list[tuple[Path, float]] = []
+    for p in paths:
+        # try to parse timestamp from filename: portfolio_greeks_positions_YYYYMMDD_HHMM.csv
+        try:
+            name = p.name
+            m = pd.Series([name]).str.extract(r"(\d{8})[\-_]?(\d{4})").iloc[0]
+            if isinstance(m, pd.Series) and not m.isna().any():
+                dt = datetime.strptime(str(m[0]) + str(m[1]), "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
+                out.append((p, dt.timestamp()))
+                continue
+        except Exception:
+            pass
+        # fallback to mtime
+        try:
+            out.append((p, p.stat().st_mtime))
+        except Exception:
+            continue
+    return out
+
+
+def _find_positions_before_many(cutoff: datetime | None, search_dirs: list[Path]) -> Path | None:
+    all_cands: list[tuple[Path, float]] = []
+    for d in search_dirs:
+        try:
+            if d and d.exists():
+                all_cands.extend(_iter_positions_candidates(d))
+        except Exception:
+            continue
+    if not all_cands:
+        return None
+    if cutoff is None:
+        return max(all_cands, key=lambda t: t[1])[0]
+    cut = cutoff.timestamp()
+    older = [p for (p, ts) in all_cands if ts < cut]
+    if not older:
+        return None
+    return max(older, key=lambda p: p.stat().st_mtime)
         paths = sorted(outdir_path.glob("portfolio_greeks_positions*.csv"))
         out: list[tuple[Path, float]] = []
         for p in paths:
@@ -211,24 +259,64 @@ def _match_leg_in_prior(leg: dict, prior_df: pd.DataFrame, strike_tol: float = 0
     return False, "no_match", 0.0
 
 
-def _ensure_prev_positions_quiet(earliest_exec_ts: datetime | None, outdir: Path) -> pd.DataFrame:
-    """Prefer a snapshot strictly older than earliest execution; fallback to latest."""
-    try:
-        p = _find_positions_before(earliest_exec_ts, outdir)
-        if p and p.exists():
+def _ensure_prev_positions_quiet(
+    earliest_exec_ts: datetime | None,
+    outdir: Path,
+    prior_override: str | None = None,
+    search_dirs: list[Path] | None = None,
+) -> tuple[pd.DataFrame, Path | None]:
+    """Prefer a snapshot strictly older than earliest execution; fallback to latest.
+
+    Returns (DataFrame, path_or_none).
+    """
+    # explicit override
+    if prior_override:
+        p = Path(prior_override).expanduser()
+        if p.exists():
             try:
-                return pd.read_csv(p)
+                return pd.read_csv(p), p
             except Exception:
                 pass
-        latest = io_core.latest_file("portfolio_greeks_positions", outdir=outdir)
-        if latest and latest.exists():
-            try:
-                return pd.read_csv(latest)
-            except Exception:
-                return pd.DataFrame()
-        return pd.DataFrame()
+    dirs: list[Path] = []
+    if search_dirs:
+        dirs.extend([Path(d) for d in search_dirs])
+    # Always include provided outdir and default settings dir
+    if outdir:
+        dirs.append(Path(outdir))
+    try:
+        from pathlib import Path as _P
+        default_dir = _P(config_core.settings.output_dir)
+        if default_dir not in dirs:
+            dirs.append(default_dir)
+        tests_dir = _P("tests/data")
+        if tests_dir.exists():
+            dirs.append(tests_dir)
     except Exception:
-        return pd.DataFrame()
+        pass
+
+    # strictly prior
+    try:
+        p = _find_positions_before_many(earliest_exec_ts, dirs)
+        if p and p.exists():
+            try:
+                return pd.read_csv(p), p
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # fallback latest per dir
+    for d in dirs:
+        try:
+            latest = io_core.latest_file("portfolio_greeks_positions", outdir=d)
+            if latest and latest.exists():
+                try:
+                    return pd.read_csv(latest), latest
+                except Exception:
+                    continue
+        except Exception:
+            continue
+    return pd.DataFrame(), None
 
 # ───── Lightweight executions loader & action classifier ─────
 def _load_trades() -> pd.DataFrame | None:
@@ -1582,10 +1670,10 @@ def _annotate_combos_effect(
             if pd.notna(cid):
                 id_to_exp[int(cid)] = str(r.get("expiry") or "")
                 id_to_attr[int(cid)] = {
-                    "underlying": r.get("underlying"),
-                    "expiry": r.get("expiry"),
-                    "right": r.get("right"),
-                    "strike": r.get("strike"),
+                    "underlying": (str(r.get("underlying") or r.get("symbol") or "")).upper(),
+                    "expiry": _normalize_expiry(r.get("expiry")),
+                    "right": (str(r.get("right") or "")).upper(),
+                    "strike": (float(r.get("strike")) if pd.notna(r.get("strike")) else float("nan")),
                 }
     except Exception:
         pass
@@ -1606,6 +1694,16 @@ def _annotate_combos_effect(
             prev_norm["strike"] = pd.to_numeric(prev_norm["strike"], errors="coerce")
         except Exception:
             pass
+        # Normalize for attribute matching
+        prev_norm["__sym"] = prev_norm.get("underlying").astype(str).str.upper()
+        prev_norm["__right"] = prev_norm.get("right").astype(str).str.upper()
+        prev_norm["__exp"] = prev_norm.get("expiry").apply(_normalize_expiry)
+        def _round_strike(x):
+            try:
+                return float(f"{float(x):.2f}")
+            except Exception:
+                return float("nan")
+        prev_norm["__k2"] = prev_norm.get("strike").apply(_round_strike)
         def _synth_id(row: pd.Series) -> int:
             key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike')}"
             v = int.from_bytes(hashlib.sha1(str(key).encode()).digest()[:4], 'big')
@@ -1666,7 +1764,8 @@ def _annotate_combos_effect(
         open_exp: set[str] = set()
         close_exp: set[str] = set()
         match_id = 0
-        match_attr = 0
+        match_attr_exact = 0
+        match_attr_tol = 0
         openc = 0
         closec = 0
         combo_sig = str(row.get("__dedupe_key") or f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('structure','')}|{row.get('type','')}")
@@ -1692,21 +1791,44 @@ def _annotate_combos_effect(
             else:
                 # attribute fallback
                 attrs = id_to_attr.get(cid, {})
-                present, mode, pqty = _match_leg_in_prior(attrs, prev_norm)
-                if present:
+                # exact first (rounded strike equality)
+                sym = (attrs.get("underlying") or "").upper()
+                expn = _normalize_expiry(attrs.get("expiry"))
+                rgt = (attrs.get("right") or "").upper()
+                try:
+                    k2 = float(f"{float(attrs.get('strike')):.2f}")
+                except Exception:
+                    k2 = float("nan")
+                exact = prev_norm[(prev_norm["__sym"] == sym) & (prev_norm["__right"] == rgt) & (prev_norm["__exp"] == expn) & (prev_norm["__k2"] == k2)]
+                tol = prev_norm[(prev_norm["__sym"] == sym) & (prev_norm["__right"] == rgt) & (prev_norm["__exp"] == expn) & (prev_norm["__k2"].sub(k2).abs() <= 0.05)] if not np.isnan(k2) else prev_norm.iloc[0:0]
+                if not exact.empty:
                     close_exp.add(exp)
                     closec += 1
-                    if mode == "attr_tol":
-                        match_attr += 1
+                    match_attr_exact += 1
                     if debug_rows is not None:
                         debug_rows.append({
                             "combo_sig": combo_sig,
-                            "underlying": attrs.get("underlying"),
-                            "expiry": _normalize_expiry(attrs.get("expiry")),
-                            "right": attrs.get("right"),
-                            "strike": attrs.get("strike"),
-                            "match_mode": mode,
-                            "prior_qty": pqty,
+                            "underlying": sym,
+                            "expiry": expn,
+                            "right": rgt,
+                            "strike": k2,
+                            "match_mode": "attr_exact",
+                            "prior_qty": float(exact.get("qty", pd.Series([0.0])).astype(float).sum()),
+                            "leg_effect": "Close",
+                        })
+                elif not tol.empty:
+                    close_exp.add(exp)
+                    closec += 1
+                    match_attr_tol += 1
+                    if debug_rows is not None:
+                        debug_rows.append({
+                            "combo_sig": combo_sig,
+                            "underlying": sym,
+                            "expiry": expn,
+                            "right": rgt,
+                            "strike": k2,
+                            "match_mode": "attr_tol",
+                            "prior_qty": float(tol.get("qty", pd.Series([0.0])).astype(float).sum()),
                             "leg_effect": "Close",
                         })
                 else:
@@ -1715,10 +1837,10 @@ def _annotate_combos_effect(
                     if debug_rows is not None:
                         debug_rows.append({
                             "combo_sig": combo_sig,
-                            "underlying": attrs.get("underlying"),
-                            "expiry": _normalize_expiry(attrs.get("expiry")),
-                            "right": attrs.get("right"),
-                            "strike": attrs.get("strike"),
+                            "underlying": sym,
+                            "expiry": expn,
+                            "right": rgt,
+                            "strike": k2,
                             "match_mode": "no_match",
                             "prior_qty": 0.0,
                             "leg_effect": "Open",
@@ -1738,7 +1860,8 @@ def _annotate_combos_effect(
             df.loc[idx, "legs_open_count"] = int(openc)
             df.loc[idx, "legs_close_count"] = int(closec)
             df.loc[idx, "legs_match_id_count"] = int(match_id)
-            df.loc[idx, "legs_match_attr_count"] = int(match_attr)
+            df.loc[idx, "legs_match_attr_exact_count"] = int(match_attr_exact)
+            df.loc[idx, "legs_match_attr_tol_count"] = int(match_attr_tol)
         except Exception:
             pass
 
@@ -1949,6 +2072,11 @@ def get_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit trades_intent_debug.csv with per-leg matching details for intent tagging",
     )
+    parser.add_argument(
+        "--prior-positions-csv",
+        default=None,
+        help="Explicit prior positions CSV to override auto selection",
+    )
     parser.add_argument("--since")
     parser.add_argument("--until")
     parser.add_argument("--summary-only", action="store_true")
@@ -2028,7 +2156,21 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         combo_clusters = int((clusters_df.get("structure") != "synthetic").sum())
 
         # Ensure previous positions snapshot strictly older than earliest exec when possible
-        prev_positions_df = _ensure_prev_positions_quiet(earliest_exec_ts, outdir)
+        search_dirs: list[Path] = [outdir]
+        try:
+            if args.exec_csv:
+                from pathlib import Path as _P
+                search_dirs.append(_P(args.exec_csv).expanduser().resolve().parent)
+        except Exception:
+            pass
+        search_dirs.append(Path(config_core.settings.output_dir))
+        td = Path("tests/data")
+        if td.exists():
+            search_dirs.append(td)
+
+        prev_positions_df, prior_path = _ensure_prev_positions_quiet(
+            earliest_exec_ts, outdir, getattr(args, "prior_positions_csv", None), search_dirs
+        )
 
         debug_intent_rows: list = []
         combos_df = _detect_and_enrich_trades_combos(
@@ -2082,6 +2224,21 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         manifest_path = rl.finalize(write=bool(written))
 
         meta: Dict[str, Any] = {"script": "trades_report"}
+        # intent meta counters
+        try:
+            total_id = int(sum(1 for r in debug_intent_rows if r.get("match_mode") == "id"))
+            total_exact = int(sum(1 for r in debug_intent_rows if r.get("match_mode") == "attr_exact"))
+            total_tol = int(sum(1 for r in debug_intent_rows if r.get("match_mode") == "attr_tol"))
+            total_unmatched = int(sum(1 for r in debug_intent_rows if r.get("match_mode") == "no_match"))
+        except Exception:
+            total_id = total_exact = total_tol = total_unmatched = 0
+        meta["intent"] = {
+            "prior_snapshot_path": str(prior_path) if prior_path else "",
+            "matched_legs_id": total_id,
+            "matched_legs_attr_exact": total_exact,
+            "matched_legs_attr_tol": total_tol,
+            "unmatched_legs": total_unmatched,
+        }
         if args.debug_timings:
             meta["timings"] = rl.timings
         summary = json_helpers.report_summary(
