@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+import glob
+import math
 from zoneinfo import ZoneInfo
 from pathlib import Path
 import os
@@ -32,6 +34,7 @@ import logging
 
 from portfolio_exporter.core import combo as combo_core
 from portfolio_exporter.core import io as io_core
+from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import config as config_core
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
@@ -94,74 +97,112 @@ if IB is None:
 LIQ_MAP = {1: "Added", 2: "Removed", 3: "RoutedOut", 4: "Auction"}
 
 
-# ───────────────────────── positions snapshot helper ─────────────────────────
-def _ensure_prev_positions_quiet() -> pd.DataFrame | None:
-    """Ensure a positions snapshot exists; run portfolio_greeks quietly if needed.
+# ───────────────────────── intent helpers (timestamps, matching) ─────────────────────────
+_TS_COL_CANDIDATES = ("timestamp", "time", "date", "exec_time", "datetime")
 
-    Returns a DataFrame for previous positions (may be empty) or None on failure.
-    """
+
+def _parse_ts_any(val) -> datetime | None:
     try:
-        from portfolio_exporter.core.io import latest_file
-
-        prev_path = latest_file("portfolio_greeks_positions")
-        # If a snapshot exists, verify freshness; otherwise fall through to refresh
-        if prev_path and prev_path.exists():
-            try:
-                max_age_sec = int(os.getenv("PE_POSITIONS_MAX_AGE_SEC", "60"))
-            except Exception:
-                max_age_sec = 60
-            try:
-                import time as _time
-
-                age = _time.time() - prev_path.stat().st_mtime
-                if age <= max_age_sec:
-                    try:
-                        return pd.read_csv(prev_path)
-                    except Exception:
-                        pass
-                # Else: too old → refresh below
-            except Exception:
-                # If we can't determine age, still try to read it
-                try:
-                    return pd.read_csv(prev_path)
-                except Exception:
-                    pass
-        # No snapshot → generate quietly just for intent inference
-        try:
-            from portfolio_exporter.scripts import portfolio_greeks as _pg
-
-            # Temporarily enable quiet mode to suppress output
-            _orig_quiet = os.environ.get("PE_QUIET")
-            os.environ["PE_QUIET"] = "1"
-            try:
-                # Avoid printing and avoid generating combos/totals unless defaults write them
-                res = _pg.run(
-                    write_positions=True,
-                    write_totals=False,
-                    combos=False,
-                    return_frames=True,
-                )
-            finally:
-                if _orig_quiet is None:
-                    os.environ.pop("PE_QUIET", None)
-                else:
-                    os.environ["PE_QUIET"] = _orig_quiet
-            if isinstance(res, tuple) and len(res) >= 1:
-                pos_df = res[0]
-                if isinstance(pos_df, pd.DataFrame):
-                    return pos_df
-        except Exception:
+        ts = pd.to_datetime(val, utc=True, errors="coerce")
+        if pd.isna(ts):
             return None
-        # fallback: try to load again if run() wrote files
-        prev_path = latest_file("portfolio_greeks_positions")
-        if prev_path and prev_path.exists():
-            try:
-                return pd.read_csv(prev_path)
-            except Exception:
-                return None
-        return None
+        return ts.to_pydatetime() if isinstance(ts, pd.Timestamp) else None
     except Exception:
         return None
+
+
+def _get_earliest_exec_ts(df: pd.DataFrame) -> datetime | None:
+    if df is None or df.empty:
+        return None
+    vals: list[datetime] = []
+    for c in _TS_COL_CANDIDATES:
+        if c in df.columns:
+            try:
+                ser = pd.to_datetime(df[c], utc=True, errors="coerce")
+                if ser.notna().any():
+                    tmin = ser.min()
+                    if isinstance(tmin, pd.Timestamp):
+                        vals.append(tmin.to_pydatetime())
+            except Exception:
+                pass
+    return min(vals) if vals else None
+
+
+def _normalize_expiry(val) -> str | None:
+    if val is None:
+        return None
+    try:
+        t = pd.to_datetime(val, utc=False, errors="coerce")
+        if pd.isna(t):
+            return None
+        return t.strftime("%Y-%m-%d")
+    except Exception:
+        return None
+
+
+def _find_positions_before(cutoff: datetime | None, outdir: Path | str | None) -> Path | None:
+    base = Path(outdir or config_core.settings.output_dir).expanduser()
+    paths = sorted(base.glob("portfolio_greeks_positions*.csv"), key=lambda p: p.stat().st_mtime)
+    if not cutoff:
+        return paths[-1] if paths else None
+    ts = cutoff.timestamp()
+    older = [p for p in paths if p.stat().st_mtime < ts]
+    return older[-1] if older else None
+
+
+def _match_leg_in_prior(leg: dict, prior_df: pd.DataFrame, strike_tol: float = 0.01) -> tuple[bool, str, float]:
+    if prior_df is None or prior_df.empty:
+        return False, "no_match", 0.0
+    try:
+        u = str(leg.get("underlying") or "")
+        e = _normalize_expiry(leg.get("expiry")) or ""
+        r = str(leg.get("right") or "").upper()
+        try:
+            k = float(leg.get("strike")) if leg.get("strike") is not None else None
+        except Exception:
+            k = None
+        df = prior_df.copy()
+        for c in ("strike", "qty"):
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+        if "right" in df.columns:
+            df["right"] = df["right"].astype(str).str.upper()
+        if "underlying" in df.columns:
+            df["underlying"] = df["underlying"].astype(str)
+        if "expiry" in df.columns:
+            df["__exp"] = df["expiry"].apply(_normalize_expiry)
+        m = (df.get("underlying") == u) & (df.get("right") == r)
+        if e:
+            m &= (df.get("__exp") == e)
+        if k is not None:
+            m &= (df.get("strike").sub(k).abs() <= strike_tol)
+        cand = df.loc[m]
+        if not cand.empty:
+            q = float(pd.to_numeric(cand.get("qty"), errors="coerce").fillna(0).sum())
+            return (q != 0.0), "attr_tol", q
+    except Exception:
+        return False, "no_match", 0.0
+    return False, "no_match", 0.0
+
+
+def _ensure_prev_positions_quiet(earliest_exec_ts: datetime | None, outdir: Path) -> pd.DataFrame:
+    """Prefer a snapshot strictly older than earliest execution; fallback to latest."""
+    try:
+        p = _find_positions_before(earliest_exec_ts, outdir)
+        if p and p.exists():
+            try:
+                return pd.read_csv(p)
+            except Exception:
+                pass
+        latest = io_core.latest_file("portfolio_greeks_positions", outdir=outdir)
+        if latest and latest.exists():
+            try:
+                return pd.read_csv(latest)
+            except Exception:
+                return pd.DataFrame()
+        return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
 
 # ───── Lightweight executions loader & action classifier ─────
 def _load_trades() -> pd.DataFrame | None:
@@ -1313,6 +1354,7 @@ def _detect_and_enrich_trades_combos(
     execs_df: pd.DataFrame,
     opens_df: pd.DataFrame | None = None,
     prev_positions_df: pd.DataFrame | None = None,
+    debug_rows: list | None = None,
 ) -> pd.DataFrame:
     # Build positions-like df
     pos_like = _build_positions_like_df(execs_df, opens_df)
@@ -1420,7 +1462,7 @@ def _detect_and_enrich_trades_combos(
     try:
         # reconstruct prior positions if our snapshot represents 'after' state
         prior_df = _reconstruct_prior_positions(prev_positions_df, execs_df)
-        combos_df = _annotate_combos_effect(combos_df, pos_like, prior_df)
+        combos_df = _annotate_combos_effect(combos_df, pos_like, prior_df, debug_rows)
     except Exception:
         pass
     
@@ -1481,6 +1523,7 @@ def _annotate_combos_effect(
     combos_df: pd.DataFrame,
     pos_like: pd.DataFrame,
     prev_positions: pd.DataFrame | None = None,
+    debug_rows: list | None = None,
 ) -> pd.DataFrame:
     """Derive position_effect for combos by reconciling legs to prior positions.
 
@@ -1494,7 +1537,7 @@ def _annotate_combos_effect(
 
     import ast, hashlib
 
-    # Normalize current trade legs frame to get (conId -> expiry/right/strike)
+    # Normalize current trade legs frame to get (conId -> attrs)
     try:
         norm_tx = combo_core._normalize_positions_df(pos_like)
     except Exception:
@@ -1506,11 +1549,18 @@ def _annotate_combos_effect(
             except Exception:
                 pass
     id_to_exp = {}
+    id_to_attr: dict[int, dict] = {}
     try:
         for _, r in norm_tx.iterrows():
             cid = r.get("conId")
             if pd.notna(cid):
                 id_to_exp[int(cid)] = str(r.get("expiry") or "")
+                id_to_attr[int(cid)] = {
+                    "underlying": r.get("underlying"),
+                    "expiry": r.get("expiry"),
+                    "right": r.get("right"),
+                    "strike": r.get("strike"),
+                }
     except Exception:
         pass
 
@@ -1543,17 +1593,23 @@ def _annotate_combos_effect(
         except Exception:
             prev_norm["qty"] = 0.0
         prior_ids = set(int(x) for x in prev_norm.loc[prev_norm["qty"] != 0, "__synth_id"].dropna().tolist())
-        prior_id_to_exp = {}
+        prior_id_to_exp: dict[int, str] = {}
+        prior_id_to_qty: dict[int, float] = {}
         try:
             for _, r in prev_norm.iterrows():
                 sid = r.get("__synth_id")
                 if pd.notna(sid):
                     prior_id_to_exp[int(sid)] = str(r.get("expiry") or "")
+                    try:
+                        prior_id_to_qty[int(sid)] = float(r.get("qty") or 0.0)
+                    except Exception:
+                        prior_id_to_qty[int(sid)] = 0.0
         except Exception:
             pass
     else:
         prior_ids = set()
         prior_id_to_exp = {}
+        prior_id_to_qty = {}
 
     def _parse_legs(val: object) -> list[int]:
         if isinstance(val, list):
@@ -1579,17 +1635,68 @@ def _annotate_combos_effect(
         return out
 
     effects: list[str] = []
-    for _, row in df.iterrows():
+    for idx, row in df.iterrows():
         cids = _parse_legs(row.get("legs"))
         open_exp: set[str] = set()
         close_exp: set[str] = set()
+        match_id = 0
+        match_attr = 0
+        openc = 0
+        closec = 0
+        combo_sig = str(row.get("__dedupe_key") or f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('structure','')}|{row.get('type','')}")
         for cid in cids:
             # Determine expiry for this leg from current trade context
             exp = id_to_exp.get(cid, prior_id_to_exp.get(cid, ""))
             if cid in prior_ids:
                 close_exp.add(exp)
+                closec += 1
+                match_id += 1
+                if debug_rows is not None:
+                    attrs = id_to_attr.get(cid, {})
+                    debug_rows.append({
+                        "combo_sig": combo_sig,
+                        "underlying": attrs.get("underlying"),
+                        "expiry": _normalize_expiry(attrs.get("expiry")),
+                        "right": attrs.get("right"),
+                        "strike": attrs.get("strike"),
+                        "match_mode": "id",
+                        "prior_qty": prior_id_to_qty.get(cid, 0.0),
+                        "leg_effect": "Close",
+                    })
             else:
-                open_exp.add(exp)
+                # attribute fallback
+                attrs = id_to_attr.get(cid, {})
+                present, mode, pqty = _match_leg_in_prior(attrs, prev_norm)
+                if present:
+                    close_exp.add(exp)
+                    closec += 1
+                    if mode == "attr_tol":
+                        match_attr += 1
+                    if debug_rows is not None:
+                        debug_rows.append({
+                            "combo_sig": combo_sig,
+                            "underlying": attrs.get("underlying"),
+                            "expiry": _normalize_expiry(attrs.get("expiry")),
+                            "right": attrs.get("right"),
+                            "strike": attrs.get("strike"),
+                            "match_mode": mode,
+                            "prior_qty": pqty,
+                            "leg_effect": "Close",
+                        })
+                else:
+                    open_exp.add(exp)
+                    openc += 1
+                    if debug_rows is not None:
+                        debug_rows.append({
+                            "combo_sig": combo_sig,
+                            "underlying": attrs.get("underlying"),
+                            "expiry": _normalize_expiry(attrs.get("expiry")),
+                            "right": attrs.get("right"),
+                            "strike": attrs.get("strike"),
+                            "match_mode": "no_match",
+                            "prior_qty": 0.0,
+                            "leg_effect": "Open",
+                        })
         if open_exp and close_exp:
             # If expiries differ across groups → Roll, else Mixed
             effects.append("Roll" if open_exp != close_exp else "Mixed")
@@ -1599,6 +1706,15 @@ def _annotate_combos_effect(
             effects.append("Close")
         else:
             effects.append("Unknown")
+
+        # attach counters for visibility
+        try:
+            df.loc[idx, "legs_open_count"] = int(openc)
+            df.loc[idx, "legs_close_count"] = int(closec)
+            df.loc[idx, "legs_match_id_count"] = int(match_id)
+            df.loc[idx, "legs_match_attr_count"] = int(match_attr)
+        except Exception:
+            pass
 
     df["position_effect"] = effects
     return df
@@ -1802,6 +1918,11 @@ def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Trades report and combos export")
     parser.add_argument("--executions-csv", dest="exec_csv", default=None)
     parser.add_argument("--debug-combos", action="store_true")
+    parser.add_argument(
+        "--debug-intent",
+        action="store_true",
+        help="Emit trades_intent_debug.csv with per-leg matching details for intent tagging",
+    )
     parser.add_argument("--since")
     parser.add_argument("--until")
     parser.add_argument("--summary-only", action="store_true")
@@ -1852,6 +1973,7 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         until_dt = _parse_when(args.until)
         df_exec = _filter_by_date(df_exec, since_dt, until_dt, col="datetime")
         n_kept = len(df_exec)
+        earliest_exec_ts = _get_earliest_exec_ts(df_exec)
 
         pos_like = _build_positions_like_df(df_exec, None)
         uvals: list[str] = []
@@ -1879,10 +2001,13 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         k_total = len(clusters_df)
         combo_clusters = int((clusters_df.get("structure") != "synthetic").sum())
 
-        # Ensure previous positions snapshot for better intent inference (quiet)
-        prev_positions_df = _ensure_prev_positions_quiet()
+        # Ensure previous positions snapshot strictly older than earliest exec when possible
+        prev_positions_df = _ensure_prev_positions_quiet(earliest_exec_ts, outdir)
 
-        combos_df = _detect_and_enrich_trades_combos(df_exec, df_open, prev_positions_df)
+        debug_intent_rows: list = []
+        combos_df = _detect_and_enrich_trades_combos(
+            df_exec, df_open, prev_positions_df, debug_intent_rows if getattr(args, "debug_intent", False) else None
+        )
         c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
 
         outputs: Dict[str, str] = {}
@@ -1913,6 +2038,15 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                     dbg_path = io_core.save(debug_rows, "trades_clusters_debug", "csv", outdir)
                     outputs["trades_clusters_debug"] = str(dbg_path)
                     written.append(dbg_path)
+                # Optional intent debug
+                if getattr(args, "debug_intent", False) and debug_intent_rows:
+                    try:
+                        df_dbg = pd.DataFrame(debug_intent_rows)
+                        dbg2 = core_io.save(df_dbg, "trades_intent_debug", "csv", outdir)
+                        outputs["trades_intent_debug"] = str(dbg2)
+                        written.append(dbg2)
+                    except Exception:
+                        pass
                 if args.debug_timings and rl.timings:
                     tpath = io_core.save(pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir)
                     outputs["timings"] = str(tpath)
@@ -1929,6 +2063,10 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
             outputs=outputs,
             meta=meta,
         )
+        if earliest_exec_ts is not None and (prev_positions_df is None or len(prev_positions_df) == 0):
+            summary.setdefault("warnings", []).append(
+                "No prior positions snapshot found before earliest execution; intent may be less accurate."
+            )
         if manifest_path:
             summary["outputs"].append(str(manifest_path))
 

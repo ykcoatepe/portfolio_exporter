@@ -364,6 +364,8 @@ timings data in the JSON summary.
 
 ### Trades Report
 
+Note: Intent tagging prefers a positions snapshot strictly older than the earliest execution in your selected window to decide whether combos are Open, Close, Mixed, or Roll. Use `--debug-intent` to emit `trades_intent_debug.csv` with per‑leg matching details. If no prior snapshot exists, tagging falls back to the latest positions and accuracy may decrease.
+
 Examples with date filters and summaries:
 
 ```bash
