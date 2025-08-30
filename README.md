@@ -364,6 +364,14 @@ timings data in the JSON summary.
 
 ### Trades Report
 
+Intent tagging notes
+- Prefers a positions snapshot strictly older than the earliest execution in the selected window. This improves Open/Close/Roll detection.
+- Override the snapshot with `--prior-positions-csv /path/to/portfolio_greeks_positions.csv` when needed (e.g., multi‑day windows).
+- Use `--debug-intent` to emit `trades_intent_debug.csv` showing per‑leg `match_mode` (id, attr_exact, attr_tol, no_match) and `prior_qty` used for decisions.
+- If no strictly‑prior snapshot is found, the latest snapshot is used and a warning is emitted; accuracy may be lower in that case.
+
+Note: Intent tagging prefers a positions snapshot strictly older than the earliest execution in your selected window to decide whether combos are Open, Close, Mixed, or Roll. Use `--debug-intent` to emit `trades_intent_debug.csv` with per‑leg matching details. If no prior snapshot exists, tagging falls back to the latest positions and accuracy may decrease.
+
 Examples with date filters and summaries:
 
 ```bash

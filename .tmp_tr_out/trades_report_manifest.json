@@ -1,0 +1,45 @@
+{
+  "script": "trades_report",
+  "argv": {
+    "exec_csv": "tests/data/executions_fixture.csv",
+    "debug_combos": false,
+    "since": null,
+    "until": null,
+    "summary_only": false,
+    "cluster_window_sec": 5,
+    "json": false,
+    "no_pretty": false,
+    "no_files": false,
+    "output_dir": ".tmp_tr_out",
+    "debug_timings": false
+  },
+  "env": {
+    "OUTPUT_DIR": null,
+    "PE_OUTPUT_DIR": null,
+    "PE_QUIET": "1",
+    "TWS_EXPORT_DIR": false,
+    "CP_REFRESH_TOKEN": false
+  },
+  "start": "2025-08-29T15:19:43.432315",
+  "end": "2025-08-29T15:19:43.448513",
+  "duration_ms": 16,
+  "outputs": [
+    {
+      "path": ".tmp_tr_out/trades_report.csv",
+      "sha256": "44586241bb69d31fa8f48546fff2f9f659abfd95087c7ef658fe9a1a547b50be",
+      "bytes": 174
+    },
+    {
+      "path": ".tmp_tr_out/trades_combos.csv",
+      "sha256": "d4debc9594f1ea12530d958053df8efaa14579fb4811ceda9f50b8b0f1c9fb35",
+      "bytes": 68
+    },
+    {
+      "path": ".tmp_tr_out/trades_clusters.csv",
+      "sha256": "2399c16e2e4ad8d0a0f45e6a3115dff777c88513bf1d8e23b53c857c6dfeb343",
+      "bytes": 128
+    }
+  ],
+  "warnings": [],
+  "version": null
+}
