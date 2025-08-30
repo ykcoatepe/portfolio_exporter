@@ -1,0 +1,40 @@
+{
+  "script": "trades_dashboard",
+  "argv": {
+    "trades_report": null,
+    "json": true,
+    "no_pretty": false,
+    "no_files": false,
+    "output_dir": ".tmp_trdash",
+    "debug_timings": true
+  },
+  "env": {
+    "OUTPUT_DIR": "tests/data",
+    "PE_OUTPUT_DIR": null,
+    "PE_QUIET": null,
+    "TWS_EXPORT_DIR": false,
+    "CP_REFRESH_TOKEN": false
+  },
+  "start": "2025-08-30T06:29:47.228320",
+  "end": "2025-08-30T06:29:47.230763",
+  "duration_ms": 2,
+  "outputs": [
+    {
+      "path": ".tmp_trdash/trades_dashboard.html",
+      "sha256": "53cc24107fb0d35e803a2ccdcb0310b7cd64b67b6cb40272ec09ed3ed2a445c5",
+      "bytes": 224
+    },
+    {
+      "path": ".tmp_trdash/trades_dashboard.pdf",
+      "sha256": "2f0666559874aca1c8a8f55ecc914d26058aaf34551eb0c69f467bdec90e2166",
+      "bytes": 1468
+    },
+    {
+      "path": ".tmp_trdash/timings.csv",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    }
+  ],
+  "warnings": [],
+  "version": null
+}
