@@ -191,37 +191,6 @@ def _find_positions_before_many(cutoff: datetime | None, search_dirs: list[Path]
     if not older:
         return None
     return max(older, key=lambda p: p.stat().st_mtime)
-        paths = sorted(outdir_path.glob("portfolio_greeks_positions*.csv"))
-        out: list[tuple[Path, float]] = []
-        for p in paths:
-            # try to parse timestamp from filename: portfolio_greeks_positions_YYYYMMDD_HHMM.csv
-            try:
-                name = p.name
-                m = pd.Series([name]).str.extract(r"(\d{8})[\-_]?(\d{4})").iloc[0]
-                if isinstance(m, pd.Series) and not m.isna().any():
-                    dt = datetime.strptime(str(m[0]) + str(m[1]), "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
-                    out.append((p, dt.timestamp()))
-                    continue
-            except Exception:
-                pass
-            # fallback to mtime
-            try:
-                out.append((p, p.stat().st_mtime))
-            except Exception:
-                continue
-        return out
-
-    cands = iter_positions_candidates(base)
-    if not cands:
-        return None
-    if not cutoff:
-        return max(cands, key=lambda t: t[1])[0]
-    cut = cutoff.timestamp()
-    older = [p for (p, ts) in cands if ts < cut]
-    if not older:
-        return None
-    # pick newest among older
-    return max(older, key=lambda p: p.stat().st_mtime)
 
 
 def _match_leg_in_prior(leg: dict, prior_df: pd.DataFrame, strike_tol: float = 0.01) -> tuple[bool, str, float]:
@@ -318,6 +287,48 @@ def _ensure_prev_positions_quiet(
             continue
     return pd.DataFrame(), None
 
+
+def _intent_counts(series: "pd.Series|None") -> dict[str, int]:
+    effects = ["Open", "Close", "Roll", "Mixed", "Unknown"]
+    if series is None:
+        return {e: 0 for e in effects}
+    try:
+        s = series.dropna().astype(str)
+    except Exception:
+        return {e: 0 for e in effects}
+    return {e: int((s == e).sum()) for e in effects}
+
+
+def _attach_intent_flags(df: "pd.DataFrame") -> "pd.DataFrame":
+    if df is None or df.empty:
+        return df
+    col = "position_effect"
+    if col not in df.columns:
+        df[col] = "Unknown"
+    for e, name in [
+        ("Open", "is_open"),
+        ("Close", "is_close"),
+        ("Roll", "is_roll"),
+        ("Mixed", "is_mixed"),
+    ]:
+        try:
+            df[name] = (df[col].astype(str) == e).astype(int)
+        except Exception:
+            df[name] = 0
+    return df
+
+
+def _choose_underlying_effect(g: "pd.DataFrame") -> str:
+    vals = g.get("position_effect", pd.Series([], dtype=str)).astype(str).tolist()
+    if any(v == "Roll" for v in vals):
+        return "Roll"
+    if vals and all(v == "Close" for v in vals):
+        return "Close"
+    if vals and all(v == "Open" for v in vals):
+        return "Open"
+    if any(v == "Mixed" for v in vals):
+        return "Mixed"
+    return "Unknown"
 # ───── Lightweight executions loader & action classifier ─────
 def _load_trades() -> pd.DataFrame | None:
     """Fetch executed trades from IBKR.
@@ -406,69 +417,213 @@ def _classify(row: pd.Series) -> str:
     return "Buy" if side == "BOT" else "Sell"
 
 
-def _infer_position_effect(row: pd.Series, prev_positions: pd.DataFrame | None = None) -> str:
-    """Best-effort position effect: Open, Close, Roll, or Unknown.
-
-    Precedence:
-    - OrderRef contains 'ROLL' -> Roll
-    - Existing Action value 'Open' from open orders -> Open
-    - If previous positions provided, infer by prior quantity sign vs side
-    - Fallback to _classify mapping Close/Roll; else Unknown
+def _prior_qty_for_row(row: pd.Series, prev_positions: pd.DataFrame | None, strike_tol: float = 0.05) -> tuple[float, str]:
     """
-    def _upper(val: object) -> str:
-        return str(val or "").strip().upper()
+    Best-effort prior quantity lookup for a single execution row against prev_positions.
 
-    ref = _upper(row.get("OrderRef") or row.get("order_ref"))
-    if "ROLL" in ref:
-        return "Roll"
-    act = _upper(row.get("Action"))
-    if act == "OPEN":
-        return "Open"
-    # Previous positions based inference
-    if prev_positions is not None and not prev_positions.empty:
+    Returns (prior_qty, match_mode) where match_mode ∈ {'id','attr_exact','attr_tol','no_match'}.
+    """
+    try:
+        if prev_positions is None or not isinstance(prev_positions, pd.DataFrame) or prev_positions.empty:
+            return 0.0, "no_match"
+
+        sym = str(row.get("symbol") or row.get("underlying") or "").upper()
+        exp = None
         try:
-            sec = str(row.get("secType") or row.get("sec_type") or "")
-            sym = str(row.get("symbol") or row.get("underlying") or "")
-            exp = str(row.get("expiry") or "")
-            right = str(row.get("right") or "").upper()
-            try:
-                strike = float(row.get("strike")) if row.get("strike") is not None else None
-            except Exception:
-                strike = None
-            # filter previous positions for same instrument/leg
-            p = prev_positions
-            m = (p.get("underlying").astype(str) == sym)
-            if sec:
-                m &= (p.get("secType").astype(str) == sec)
-            if exp:
-                m &= (p.get("expiry").astype(str) == exp)
-            if right:
-                m &= (p.get("right").astype(str).str.upper() == right)
-            if strike is not None and "strike" in p.columns:
-                try:
-                    m &= (pd.to_numeric(p.get("strike"), errors="coerce") == float(strike))
-                except Exception:
-                    pass
-            prior_qty = 0.0
-            if hasattr(m, "any") and m.any():
-                try:
-                    prior_qty = float(pd.to_numeric(p.loc[m, "qty"], errors="coerce").sum())
-                except Exception:
-                    prior_qty = 0.0
-            side = _upper(row.get("Side") or row.get("side"))
-            if side == "BUY" or side == "BOT":
-                # buy-to-open if no/long prior; buy-to-close if covering short
-                return "Close" if prior_qty < 0 else "Open"
-            if side == "SELL" or side == "SLD":
-                # sell-to-close if reducing long; sell-to-open if increasing short
-                return "Close" if prior_qty > 0 else "Open"
+            exp = pd.to_datetime(row.get("expiry"), errors="coerce").date().isoformat()
         except Exception:
             pass
-    # Fallback to heuristic classification
-    c = _classify(row)
-    if c in {"Close", "Roll"}:
-        return c
-    return "Unknown"
+        rgt = str(row.get("right") or "").upper()
+        try:
+            k = float(row.get("strike")) if row.get("strike") is not None else None
+        except Exception:
+            k = None
+
+        p = prev_positions.copy()
+        for c in ("strike", "qty"):
+            if c in p.columns:
+                p[c] = pd.to_numeric(p[c], errors="coerce")
+        if "right" in p.columns:
+            p["right"] = p["right"].astype(str).str.upper()
+        if "underlying" in p.columns:
+            p["underlying"] = p["underlying"].astype(str).str.upper()
+        if "expiry" in p.columns:
+            p["__exp"] = pd.to_datetime(p["expiry"], errors="coerce").dt.date.astype(str)
+
+        # ID-based first
+        try:
+            cid = row.get("conId") or row.get("conid")
+            if cid is not None and "conId" in p.columns:
+                pc = p[p["conId"] == pd.to_numeric(cid, errors="coerce")]
+                if not pc.empty:
+                    q = float(pd.to_numeric(pc.get("qty"), errors="coerce").fillna(0).sum())
+                    return q, "id"
+        except Exception:
+            pass
+
+        # Attribute exact on rounded strike
+        m = (p.get("underlying") == sym)
+        if exp:
+            m &= (p.get("__exp") == exp)
+        if rgt:
+            m &= (p.get("right") == rgt)
+        if k is not None and "strike" in p.columns:
+            try:
+                k2 = float(f"{float(k):.2f}")
+                m_exact = m & (p["strike"].apply(lambda x: float(f"{float(x):.2f}") if pd.notna(x) else float("nan")) == k2)
+                pc = p[m_exact]
+                if not pc.empty:
+                    q = float(pd.to_numeric(pc.get("qty"), errors="coerce").fillna(0).sum())
+                    return q, "attr_exact"
+            except Exception:
+                pass
+
+        # Attribute tolerance
+        if k is not None and "strike" in p.columns:
+            try:
+                m_tol = m & (p["strike"].sub(float(k)).abs() <= float(strike_tol))
+                pc = p[m_tol]
+                if not pc.empty:
+                    q = float(pd.to_numeric(pc.get("qty"), errors="coerce").fillna(0).sum())
+                    return q, "attr_tol"
+            except Exception:
+                pass
+
+        return 0.0, "no_match"
+    except Exception:
+        return 0.0, "no_match"
+
+
+def _infer_position_effect(row: pd.Series, prev_positions: pd.DataFrame | None = None) -> str:
+    """
+    Best-effort position effect labeling for a single execution row.
+
+    Precedence:
+    1) Explicit hints:
+       - OrderRef contains 'ROLL' => Roll
+       - openClose ('O'/'C'), or Action=='Open' => Open/Close
+    2) Prior snapshot presence + Side:
+       - BUY/BOT reduces short => Close; else Open
+       - SELL/SLD reduces long  => Close; else Open
+    3) Default to Open (visibility over Unknown when prior is absent)
+    """
+    u = lambda x: str(x or "").strip().upper()
+
+    # 1) Strong explicit signals
+    if "ROLL" in u(row.get("OrderRef") or row.get("order_ref")):
+        return "Roll"
+    oc = u(row.get("openClose"))
+    if oc in {"O", "OPEN"}:
+        return "Open"
+    if oc in {"C", "CLOSE"}:
+        return "Close"
+    if u(row.get("Action")) == "OPEN":
+        return "Open"
+
+    # 2) Prior snapshot comparison + side
+    side = u(row.get("Side") or row.get("side"))
+    prior_qty, _mode = _prior_qty_for_row(row, prev_positions, strike_tol=0.05)
+
+    if side in {"BUY", "BOT"}:
+        if prior_qty < 0:
+            return "Close"
+        return "Open"
+    if side in {"SELL", "SLD"}:
+        if prior_qty > 0:
+            return "Close"
+        return "Open"
+
+    # 3) Default
+    return "Open"
+
+
+def _infer_position_effect_safe(prev_df):
+    """Return a per-row safe wrapper so one bad row doesn't break the column."""
+    def _inner(row: pd.Series) -> str:
+        try:
+            val = _infer_position_effect(row, prev_df)
+            return str(val) if val is not None else "Unknown"
+        except Exception:
+            return "Unknown"
+    return _inner
+
+
+def _compute_streaming_effect(df: pd.DataFrame, prev_positions: pd.DataFrame | None) -> pd.Series:
+    """
+    Vectorized per-row intent classification using streaming deltas per instrument.
+
+    For each instrument key K = (underlying, safe_expiry, right, round2(strike)):
+      pre  = prior_qty(K) + cumsum(delta(K)) up to before the row
+      post = pre + delta(row)
+      effect = 'Close' if |post| < |pre| else 'Open'
+
+    Rows without a valid key fall back to the row-wise safe classifier.
+    """
+    if df is None or df.empty:
+        return pd.Series([], dtype=str)
+
+    d = df.copy()
+    d["__orig_idx"] = df.index.values
+
+    # Signed delta from side/qty
+    if "qty" in d.columns:
+        q = d["qty"]
+    elif "Qty" in d.columns:
+        q = d["Qty"]
+    elif "total_qty" in d.columns:
+        q = d["total_qty"]
+    else:
+        q = pd.Series([np.nan] * len(d))
+    side = d.get("Side", d.get("side")).astype(str).str.upper()
+    sign = side.map({"BUY": 1, "BOT": 1, "SELL": -1, "SLD": -1}).fillna(0)
+    d["__delta"] = pd.to_numeric(q, errors="coerce").fillna(0).astype(float) * sign
+
+    # Instrument key
+    sym = d.get("symbol", d.get("underlying"))
+    d["__sym"] = sym.astype(str).str.upper()
+    d["__exp"] = pd.to_datetime(d.get("expiry"), errors="coerce").dt.date.astype(str)
+    d["__right"] = d.get("right").astype(str).str.upper()
+    d["__k2"] = pd.to_numeric(d.get("strike"), errors="coerce").apply(lambda x: float(f"{x:.2f}") if pd.notna(x) else np.nan)
+    d["__ts"] = pd.to_datetime(d.get("datetime"), errors="coerce")
+    d["__key_valid"] = d["__sym"].ne("") & d["__right"].isin(["C", "P"]) & d["__exp"].ne("NaT") & d["__k2"].notna()
+
+    # Prior map
+    prior_map: dict[tuple, float] = {}
+    if isinstance(prev_positions, pd.DataFrame) and not prev_positions.empty:
+        p = prev_positions.copy()
+        p["__sym"] = p.get("underlying").astype(str).str.upper()
+        p["__exp"] = pd.to_datetime(p.get("expiry"), errors="coerce").dt.date.astype(str)
+        p["__right"] = p.get("right").astype(str).str.upper()
+        p["__k2"] = pd.to_numeric(p.get("strike"), errors="coerce").apply(lambda x: float(f"{x:.2f}") if pd.notna(x) else np.nan)
+        p["qty"] = pd.to_numeric(p.get("qty"), errors="coerce").fillna(0.0)
+        prior_map = p.groupby(["__sym", "__exp", "__right", "__k2"], dropna=False)["qty"].sum().to_dict()
+
+    d["__key"] = list(zip(d["__sym"], d["__exp"], d["__right"], d["__k2"]))
+    d = d.sort_values(["__key", "__ts", "__orig_idx"])  # stable order
+
+    effects = pd.Series(index=d["__orig_idx"], dtype=object)
+
+    for key, g in d.groupby("__key", dropna=False, sort=False):
+        valid = g["__key_valid"].astype(bool)
+        if not valid.any():
+            # Fallback for incomplete key
+            for idx in g.index:
+                effects.at[d.loc[idx, "__orig_idx"]] = _infer_position_effect(df.loc[d.loc[idx, "__orig_idx"]], prev_positions)
+            continue
+
+        prior = float(prior_map.get(key, 0.0))
+        csum = g["__delta"].cumsum()
+        pre = prior + csum - g["__delta"]
+        post = pre + g["__delta"]
+        eff = np.where(np.abs(post) < np.abs(pre), "Close", "Open")
+        for idx2, label in zip(g.index, eff):
+            effects.at[d.loc[idx2, "__orig_idx"]] = str(label)
+
+    effects = effects.reindex(df.index)
+    miss = effects[effects.isna()].index
+    if len(miss) > 0:
+        effects.loc[miss] = df.loc[miss].apply(_infer_position_effect_safe(prev_positions), axis=1)
+    return effects.astype(str)
 
 
 @dataclass
@@ -633,7 +788,8 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
         return [], []
 
     # --- Capture executions & commission reports ------------------------------
-    comm_map: dict[str, "CommissionReport"] = {}
+    # Annotate with Any to avoid runtime dependency on ib_insync type names
+    comm_map: dict[str, Any] = {}
 
     # CommissionReport only comes via callback; cache them by execId
     def _comm(*args):
@@ -642,7 +798,7 @@ def fetch_trades_ib(start: date, end: date) -> Tuple[List[Trade], List[OpenOrder
 
     ib.commissionReportEvent += _comm
 
-    all_execs: list["ExecutionDetail"] = []
+    all_execs: list[Any] = []
     day = start
     while day <= end:
         next_day = day + timedelta(days=1)
@@ -1063,13 +1219,9 @@ def run(
     except Exception:
         earliest_exec_ts = None
     outdir = Path(config_core.settings.output_dir)
-    prev_positions_df = _ensure_prev_positions_quiet(earliest_exec_ts, outdir)
-    try:
-        df["position_effect"] = df.apply(
-            lambda r: _infer_position_effect(r, prev_positions_df), axis=1
-        )
-    except Exception:
-        pass
+    prev_positions_df, _prior_path = _ensure_prev_positions_quiet(earliest_exec_ts, outdir)
+    # Prefer vectorized streaming intent; falls back row-wise when needed
+    df["position_effect"] = _compute_streaming_effect(df, prev_positions_df)
 
     from portfolio_exporter.core.io import save
 
@@ -1474,7 +1626,7 @@ def _detect_and_enrich_trades_combos(
     pos_like = _build_positions_like_df(execs_df, opens_df)
     if pos_like is None or pos_like.empty:
         return pd.DataFrame(columns=[
-            "underlying","expiry","structure","structure_label","type","legs","legs_n","width","strikes","call_strikes","put_strikes","call_count","put_count","has_stock_leg","when","order_ids","net_qty","net_credit_debit",
+            "underlying","expiry","structure","structure_label","type","legs","legs_n","width","strikes","call_strikes","put_strikes","call_count","put_count","has_stock_leg","when","order_ids","net_qty","net_credit_debit","position_effect",
         ])
 
     # Group by underlying (simple clustering per Phase 1)
@@ -1579,7 +1731,12 @@ def _detect_and_enrich_trades_combos(
         combos_df = _annotate_combos_effect(combos_df, pos_like, prior_df, debug_rows)
     except Exception:
         pass
-    
+    # Ensure a defensive default column
+    try:
+        if "position_effect" not in combos_df.columns:
+            combos_df["position_effect"] = "Unknown"
+    except Exception:
+        pass
     return combos_df
 
 
@@ -2178,6 +2335,32 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         )
         c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
 
+        # Build intent summaries for JSON/meta (independent of file writes)
+        try:
+            df_all_counts = df_exec.copy()
+            if isinstance(df_open, pd.DataFrame) and not df_open.empty:
+                df_all_counts = pd.concat([df_all_counts, df_open], ignore_index=True, sort=False)
+            df_all_counts["position_effect"] = _compute_streaming_effect(df_all_counts, prev_positions_df)
+        except Exception:
+            df_all_counts = pd.DataFrame(columns=["position_effect"])
+        rows_counts = _intent_counts(df_all_counts.get("position_effect") if isinstance(df_all_counts, pd.DataFrame) else None)
+        combos_counts = _intent_counts(combos_df.get("position_effect") if isinstance(combos_df, pd.DataFrame) and not combos_df.empty else None)
+        if isinstance(combos_df, pd.DataFrame) and not combos_df.empty and "underlying" in combos_df.columns:
+            gb = combos_df.groupby("underlying", dropna=False)
+            intent_by_und = pd.DataFrame({
+                "underlying": [u for u, _ in gb],
+                "position_effect": [_choose_underlying_effect(g) for _, g in gb],
+            })
+        elif isinstance(df_all_counts, pd.DataFrame) and "symbol" in df_all_counts.columns:
+            tmp = df_all_counts.rename(columns={"symbol": "underlying"})
+            gb = tmp.groupby("underlying", dropna=False)
+            intent_by_und = pd.DataFrame({
+                "underlying": [u for u, _ in gb],
+                "position_effect": [_choose_underlying_effect(g) for _, g in gb],
+            })
+        else:
+            intent_by_und = pd.DataFrame(columns=["underlying", "position_effect"])
+
         outputs: Dict[str, str] = {}
         written: list[Path] = []
         with rl.time("write_outputs"):
@@ -2185,23 +2368,36 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                 df_all = df_exec.copy()
                 if isinstance(df_open, pd.DataFrame) and not df_open.empty:
                     df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
-                # Include position_effect for convenience in exports
-                try:
-                    df_all["position_effect"] = df_all.apply(
-                        lambda r: _infer_position_effect(r, prev_positions_df), axis=1
-                    )
-                except Exception:
-                    pass
+                # Prefer vectorized streaming intent
+                df_all["position_effect"] = _compute_streaming_effect(df_all, prev_positions_df)
+                df_all = _attach_intent_flags(df_all)
                 path_report = io_core.save(df_all, "trades_report", "csv", outdir)
                 outputs["trades_report"] = str(path_report)
                 written.append(path_report)
                 # Ensure combos carry position_effect; detection already annotates
+                combos_df = _attach_intent_flags(combos_df)
                 path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
                 outputs["trades_combos"] = str(path_combos)
                 written.append(path_combos)
                 path_clusters = io_core.save(clusters_df, "trades_clusters", "csv", outdir)
                 outputs["trades_clusters"] = str(path_clusters)
                 written.append(path_clusters)
+                # Intent summary CSVs
+                intent_tbl = pd.DataFrame([rows_counts], index=["rows"]).assign(scope="rows")
+                intent_tbl2 = pd.DataFrame([combos_counts], index=["combos"]).assign(scope="combos")
+                intent_summary_df = pd.concat([intent_tbl, intent_tbl2], axis=0, ignore_index=True)
+                cols = ["scope", "Open", "Close", "Roll", "Mixed", "Unknown"]
+                for c in cols:
+                    if c not in intent_summary_df.columns:
+                        intent_summary_df[c] = 0
+                intent_summary_df = intent_summary_df[cols]
+                path_is = core_io.save(intent_summary_df, "trades_intent_summary", "csv", outdir)
+                outputs["trades_intent_summary"] = str(path_is)
+                rl.add_outputs([path_is])
+                if not intent_by_und.empty:
+                    path_iu = core_io.save(intent_by_und, "trades_intent_by_underlying", "csv", outdir)
+                    outputs["trades_intent_by_underlying"] = str(path_iu)
+                    rl.add_outputs([path_iu])
                 if args.debug_timings or os.getenv("PE_DEBUG") == "1":
                     dbg_path = io_core.save(debug_rows, "trades_clusters_debug", "csv", outdir)
                     outputs["trades_clusters_debug"] = str(dbg_path)
@@ -2241,6 +2437,13 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         }
         if args.debug_timings:
             meta["timings"] = rl.timings
+        # enrich meta with intent summaries for programmatic use
+        meta.setdefault("intent", {})
+        meta["intent"]["rows"] = rows_counts
+        meta["intent"]["combos"] = combos_counts
+        meta["intent"]["by_underlying"] = (
+            intent_by_und.to_dict(orient="records") if isinstance(intent_by_und, pd.DataFrame) else []
+        )
         summary = json_helpers.report_summary(
             {"executions": n_kept, "clusters": k_total, "combos": combo_clusters},
             outputs=outputs,
@@ -2252,6 +2455,13 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
             )
         if manifest_path:
             summary["outputs"].append(str(manifest_path))
+
+        # Human-friendly intent glance
+        if not quiet:
+            def _fmt(d):
+                return f"Open {d.get('Open',0)}, Close {d.get('Close',0)}, Roll {d.get('Roll',0)}, Mixed {d.get('Mixed',0)}, Unknown {d.get('Unknown',0)}"
+            print(f"Intent (rows):   {_fmt(rows_counts)}")
+            print(f"Intent (combos): {_fmt(combos_counts)}")
 
         if args.json:
             cli_helpers.print_json(summary, quiet)
