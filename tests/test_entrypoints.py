@@ -35,6 +35,11 @@ FIXTURES = Path("tests/data")
             False,
         ),
         (
+            "portfolio_exporter.scripts.trades_dashboard",
+            ["--json", "--no-files"],
+            False,
+        ),
+        (
             "portfolio_exporter.scripts.portfolio_greeks",
             [
                 "--positions-csv",

@@ -432,6 +432,15 @@ JSON summary fields: `n_total`, `n_kept`, `u_count`, `underlyings`, `net_credit_
 
 Open interest values are sourced from Yahoo Finance rather than the IBKR feed.
 
+### Trades Dashboard
+
+Create a consolidated view from the latest trades report:
+
+```bash
+python -m portfolio_exporter.scripts.trades_dashboard --json --no-files
+trades-dashboard --output-dir ./reports
+```
+
 ### Daily Report
 
 Create a one-page portfolio snapshot from the latest greeks exports:
