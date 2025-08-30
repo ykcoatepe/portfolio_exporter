@@ -9,7 +9,7 @@ PYTEST  := $(VENV_BIN)/pytest
 export PATH := $(VENV_BIN):$(PATH)
 
 .PHONY: setup dev test lint build ci-home memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
-.PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-all menus-sanity
+.PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-all menus-sanity sanity-order-builder
 
 setup:
 	@test -d $(VENV_DIR) || python3 -m venv $(VENV_DIR)
@@ -96,3 +96,7 @@ sanity-all: sanity-cli sanity-daily sanity-netliq sanity-trades
 # Trades & Reports menu – underlying previews sanity
 menus-sanity: setup
 	@./scripts/sanity_trades_menu_underlying.sh
+
+.PHONY: sanity-order-builder
+sanity-order-builder:
+	./scripts/sanity_order_builder_presets.sh

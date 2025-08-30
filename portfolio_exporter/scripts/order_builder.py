@@ -9,11 +9,23 @@ import json
 import pathlib
 from typing import Any, Dict, List, Optional, Tuple
 
-from prompt_toolkit import prompt  # retained for optional environments
-from yfinance import Ticker
+try:
+    from prompt_toolkit import prompt  # retained for optional environments
+except Exception:  # pragma: no cover - optional dependency
+    def prompt(message: str) -> str:  # type: ignore
+        return input(message)
+
+try:
+    from yfinance import Ticker
+except Exception:  # pragma: no cover - optional dependency
+    Ticker = None  # type: ignore
 
 from portfolio_exporter.core.config import settings
-from portfolio_exporter.core.input import parse_order_line
+try:
+    from portfolio_exporter.core.input import parse_order_line
+except Exception:  # pragma: no cover - optional dependency for interactive shorthand
+    def parse_order_line(raw):  # type: ignore
+        return None
 from portfolio_exporter.core.ui import banner_delta_theta, console, prompt_input
 from rich.table import Table
 try:  # pragma: no cover - ib_insync optional in tests
@@ -375,6 +387,177 @@ def build_covered_call(
     ]
     ticket["legs"] = legs
     return ticket
+
+
+# ---- preset helpers ---------------------------------------------------------
+
+def build_preset(
+    preset: str,
+    symbol: str,
+    expiry: str,
+    qty: int,
+    width: float = 5.0,
+    wings: float = 5.0,
+    account: str | None = None,
+) -> Dict[str, Any]:
+    """Return a ticket for simple strategy presets.
+
+    Presets avoid external lookups by using synthetic strikes around 100.
+    """
+    base = 100.0
+    if preset == "bull_put":
+        short, long = base, base - width
+        legs = [
+            {"secType": "OPT", "right": "P", "strike": short, "qty": -qty, "expiry": expiry},
+            {"secType": "OPT", "right": "P", "strike": long, "qty": qty, "expiry": expiry},
+        ]
+        strikes = [long, short]
+        right = "P"
+    elif preset == "bear_call":
+        short, long = base, base + width
+        legs = [
+            {"secType": "OPT", "right": "C", "strike": short, "qty": -qty, "expiry": expiry},
+            {"secType": "OPT", "right": "C", "strike": long, "qty": qty, "expiry": expiry},
+        ]
+        strikes = [short, long]
+        right = "C"
+    elif preset == "bull_call":
+        long_, short = base, base + width
+        legs = [
+            {"secType": "OPT", "right": "C", "strike": long_, "qty": qty, "expiry": expiry},
+            {"secType": "OPT", "right": "C", "strike": short, "qty": -qty, "expiry": expiry},
+        ]
+        strikes = [long_, short]
+        right = "C"
+    elif preset == "bear_put":
+        long_, short = base, base - width
+        legs = [
+            {"secType": "OPT", "right": "P", "strike": long_, "qty": qty, "expiry": expiry},
+            {"secType": "OPT", "right": "P", "strike": short, "qty": -qty, "expiry": expiry},
+        ]
+        strikes = [short, long_]
+        right = "P"
+    elif preset == "iron_condor":
+        put_long = base - 2 * wings
+        put_short = base - wings
+        call_short = base + wings
+        call_long = base + 2 * wings
+        legs = [
+            {"secType": "OPT", "right": "P", "strike": put_short, "qty": -qty, "expiry": expiry},
+            {"secType": "OPT", "right": "P", "strike": put_long, "qty": qty, "expiry": expiry},
+            {"secType": "OPT", "right": "C", "strike": call_short, "qty": -qty, "expiry": expiry},
+            {"secType": "OPT", "right": "C", "strike": call_long, "qty": qty, "expiry": expiry},
+        ]
+        strikes = [put_long, put_short, call_short, call_long]
+        right = ""
+    elif preset == "iron_fly":
+        put_long = base - wings
+        call_long = base + wings
+        center = base
+        legs = [
+            {"secType": "OPT", "right": "P", "strike": center, "qty": -qty, "expiry": expiry},
+            {"secType": "OPT", "right": "P", "strike": put_long, "qty": qty, "expiry": expiry},
+            {"secType": "OPT", "right": "C", "strike": center, "qty": -qty, "expiry": expiry},
+            {"secType": "OPT", "right": "C", "strike": call_long, "qty": qty, "expiry": expiry},
+        ]
+        strikes = [put_long, center, call_long]
+        right = ""
+    elif preset == "calendar":
+        far = expiry
+        near_dt = dt.datetime.fromisoformat(far) - dt.timedelta(days=30)
+        near = near_dt.date().isoformat()
+        strike = base
+        legs = [
+            {"secType": "OPT", "right": "C", "strike": strike, "qty": -qty, "expiry": near},
+            {"secType": "OPT", "right": "C", "strike": strike, "qty": qty, "expiry": far},
+        ]
+        strikes = [strike]
+        right = "C"
+        expiry = far
+    else:  # pragma: no cover - defensive
+        raise ValueError(f"Unknown preset {preset}")
+
+    ticket = _base_ticket(preset, symbol, expiry, qty, strikes, right, account)
+    ticket["legs"] = legs
+    return ticket
+
+
+def compute_risk_summary(ticket: Dict[str, Any]) -> Dict[str, Any] | None:
+    """Compute basic max gain/loss and breakevens for option combos."""
+
+    legs = ticket.get("legs", [])
+    if not legs:
+        return None
+    net_calls = sum(leg.get("qty", 0) for leg in legs if leg.get("right") == "C")
+    if net_calls:
+        return None
+
+    # Price legs for spread price
+    net = 0.0
+    for leg in legs:
+        q = _price_leg(ticket["underlying"], leg.get("expiry"), leg.get("strike"), leg.get("right"))
+        net += leg.get("qty", 0) * q.get("mid", 0)
+
+    strikes = [leg.get("strike") for leg in legs if leg.get("strike") is not None]
+    if len(strikes) < 2:
+        return None
+    width = max(strikes) - min(strikes)
+    if len(legs) == 2:
+        short = next((l for l in legs if l.get("qty", 0) < 0), None)
+        long = next((l for l in legs if l.get("qty", 0) > 0), None)
+        if not short or not long:
+            return None
+        if net < 0:  # credit
+            credit = -net
+            breakeven = (
+                short["strike"] + credit
+                if short.get("right") == "C"
+                else short["strike"] - credit
+            )
+            return {
+                "max_gain": credit,
+                "max_loss": width - credit,
+                "breakevens": [breakeven],
+            }
+        debit = net
+        breakeven = (
+            long["strike"] + debit
+            if long.get("right") == "C"
+            else long["strike"] - debit
+        )
+        return {
+            "max_gain": width - debit,
+            "max_loss": debit,
+            "breakevens": [breakeven],
+        }
+    elif len(legs) == 4:
+        # Treat as iron condor / fly credit structure
+        credit = -net if net < 0 else 0
+        shorts = [l for l in legs if l.get("qty", 0) < 0]
+        short_put = next((l for l in shorts if l.get("right") == "P"), None)
+        short_call = next((l for l in shorts if l.get("right") == "C"), None)
+        put_longs = [l for l in legs if l.get("right") == "P" and l.get("qty", 0) > 0]
+        call_longs = [l for l in legs if l.get("right") == "C" and l.get("qty", 0) > 0]
+        width_put = (
+            short_put["strike"] - put_longs[0]["strike"]
+            if short_put and put_longs
+            else 0
+        )
+        width_call = (
+            call_longs[0]["strike"] - short_call["strike"]
+            if short_call and call_longs
+            else 0
+        )
+        width = max(width_put, width_call)
+        breakevens = []
+        if short_put and short_call:
+            breakevens = [short_put["strike"] - credit, short_call["strike"] + credit]
+        return {
+            "max_gain": credit,
+            "max_loss": width - credit,
+            "breakevens": breakevens,
+        }
+    return None
 
 
 def run() -> bool:
@@ -852,9 +1035,20 @@ def cli(argv: List[str] | None = None) -> int:
     """Non-interactive ticket builder CLI."""
     import argparse
     from portfolio_exporter.core.io import save as io_save
-
     parser = argparse.ArgumentParser(description="Build option strategy tickets")
-    parser.add_argument("--strategy", required=True)
+    parser.add_argument("--strategy")
+    parser.add_argument(
+        "--preset",
+        choices=[
+            "bull_put",
+            "bear_call",
+            "bull_call",
+            "bear_put",
+            "iron_condor",
+            "iron_fly",
+            "calendar",
+        ],
+    )
     parser.add_argument("--symbol", required=True)
     parser.add_argument("--expiry", default="")
     parser.add_argument("--expiry-near", dest="expiry_near", default=None)
@@ -866,84 +1060,120 @@ def cli(argv: List[str] | None = None) -> int:
     parser.add_argument("--call-strike", dest="call_strike", type=float, default=None)
     parser.add_argument("--qty", type=int, default=1)
     parser.add_argument("--account", default=None)
-    parser.add_argument("--json", action="store_true", help="Print ticket JSON to stdout and do not write files")
+    parser.add_argument("--width", type=float, default=5.0)
+    parser.add_argument("--wings", type=float, default=5.0)
+    parser.add_argument("--json", action="store_true", help="Print ticket JSON to stdout")
+    parser.add_argument("--no-files", action="store_true", help="Do not write ticket files")
     args = parser.parse_args(argv)
 
-    strat = args.strategy.lower().replace("-", "_")
     qty = int(args.qty)
     ticket: Dict[str, Any]
 
-    if strat == "vertical":
-        strikes = [float(s) for s in args.strikes.split(",") if s]
-        ticket = build_vertical(
-            args.symbol, args.expiry, args.right.upper(), strikes, qty, args.account
-        )
-    elif strat == "iron_condor":
-        strikes = [float(s) for s in args.strikes.split(",") if s]
-        ticket = build_iron_condor(args.symbol, args.expiry, strikes, qty, args.account)
-    elif strat == "butterfly":
-        strikes = [float(s) for s in args.strikes.split(",") if s]
-        ticket = build_butterfly(
-            args.symbol, args.expiry, args.right.upper(), strikes, qty, args.account
-        )
-    elif strat == "calendar":
-        near = args.expiry_near
-        far = args.expiry_far or args.expiry
-        if args.expiry and "," in args.expiry:
-            near, far = [p.strip() for p in args.expiry.split(",", 1)]
-        if not (near and far):
-            parser.error("calendar requires --expiry-near and --expiry-far or --expiry near,far")
-        if args.strike is None:
-            parser.error("calendar requires --strike")
-        ticket = build_calendar(
+    if args.preset:
+        ticket = build_preset(
+            args.preset,
             args.symbol,
-            far,
-            args.right.upper(),
-            near,
-            far,
-            float(args.strike),
+            args.expiry,
             qty,
-            args.account,
-        )
-    elif strat == "straddle":
-        strike = args.strike if args.strike is not None else None
-        if strike is None and args.strikes:
-            strike = float(args.strikes)
-        if strike is None:
-            parser.error("straddle requires --strike")
-        ticket = build_straddle(args.symbol, args.expiry, float(strike), qty, args.account)
-    elif strat == "strangle":
-        if args.put_strike is not None and args.call_strike is not None:
-            put_k, call_k = args.put_strike, args.call_strike
-        else:
-            ks = [float(s) for s in args.strikes.split(",") if s]
-            if len(ks) != 2:
-                parser.error("strangle requires two strikes")
-            put_k, call_k = ks
-        ticket = build_strangle(
-            args.symbol, args.expiry, float(put_k), float(call_k), qty, args.account
-        )
-    elif strat == "covered_call":
-        call_k = args.call_strike if args.call_strike is not None else None
-        if call_k is None and args.strike is not None:
-            call_k = float(args.strike)
-        if call_k is None and args.strikes:
-            call_k = float(args.strikes)
-        if call_k is None:
-            parser.error("covered_call requires --call-strike")
-        ticket = build_covered_call(
-            args.symbol, args.expiry, float(call_k), qty, args.account
+            width=float(args.width),
+            wings=float(args.wings),
+            account=args.account,
         )
     else:
-        parser.error(f"Unknown strategy {args.strategy}")
+        if not args.strategy:
+            parser.error("--strategy required when --preset is not used")
+        strat = args.strategy.lower().replace("-", "_")
+        if strat == "vertical":
+            strikes = [float(s) for s in args.strikes.split(",") if s]
+            ticket = build_vertical(
+                args.symbol, args.expiry, args.right.upper(), strikes, qty, args.account
+            )
+        elif strat == "iron_condor":
+            strikes = [float(s) for s in args.strikes.split(",") if s]
+            ticket = build_iron_condor(args.symbol, args.expiry, strikes, qty, args.account)
+        elif strat == "butterfly":
+            strikes = [float(s) for s in args.strikes.split(",") if s]
+            ticket = build_butterfly(
+                args.symbol, args.expiry, args.right.upper(), strikes, qty, args.account
+            )
+        elif strat == "calendar":
+            near = args.expiry_near
+            far = args.expiry_far or args.expiry
+            if args.expiry and "," in args.expiry:
+                near, far = [p.strip() for p in args.expiry.split(",", 1)]
+            if not (near and far):
+                parser.error("calendar requires --expiry-near and --expiry-far or --expiry near,far")
+            if args.strike is None:
+                parser.error("calendar requires --strike")
+            ticket = build_calendar(
+                args.symbol,
+                far,
+                args.right.upper(),
+                near,
+                far,
+                float(args.strike),
+                qty,
+                args.account,
+            )
+        elif strat == "straddle":
+            strike = args.strike if args.strike is not None else None
+            if strike is None and args.strikes:
+                strike = float(args.strikes)
+            if strike is None:
+                parser.error("straddle requires --strike")
+            ticket = build_straddle(args.symbol, args.expiry, float(strike), qty, args.account)
+        elif strat == "strangle":
+            if args.put_strike is not None and args.call_strike is not None:
+                put_k, call_k = args.put_strike, args.call_strike
+            else:
+                ks = [float(s) for s in args.strikes.split(",") if s]
+                if len(ks) != 2:
+                    parser.error("strangle requires two strikes")
+                put_k, call_k = ks
+            ticket = build_strangle(
+                args.symbol, args.expiry, float(put_k), float(call_k), qty, args.account
+            )
+        elif strat == "covered_call":
+            call_k = args.call_strike if args.call_strike is not None else None
+            if call_k is None and args.strike is not None:
+                call_k = float(args.strike)
+            if call_k is None and args.strikes:
+                call_k = float(args.strikes)
+            if call_k is None:
+                parser.error("covered_call requires --call-strike")
+            ticket = build_covered_call(
+                args.symbol, args.expiry, float(call_k), qty, args.account
+            )
+        else:
+            parser.error(f"Unknown strategy {args.strategy}")
+
+    result: Dict[str, Any] = {
+        "ok": True,
+        "ticket": ticket,
+        "outputs": [],
+        "warnings": [],
+        "meta": {"schema_id": "order_builder", "schema_version": "1"},
+    }
+    if args.preset:
+        result["preset"] = args.preset
+    else:
+        result["strategy"] = args.strategy
+    risk = compute_risk_summary(ticket)
+    if risk:
+        result["risk_summary"] = risk
 
     if args.json:
-        print(json.dumps(ticket, separators=(",", ":")))
-        return 0
-    ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = f"ticket_{args.symbol}_{ts}"
-    io_save(ticket, name, fmt="json")
+        print(json.dumps(result, separators=(",", ":")))
+    if not args.no_files:
+        ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        name = f"ticket_{args.symbol}_{ts}"
+        io_save(ticket, name, fmt="json")
     return 0
+
+
+def main(argv: List[str] | None = None) -> int:
+    """Console entry wrapper for setuptools scripts."""
+    return cli(argv)
 
 
 if __name__ == "__main__":

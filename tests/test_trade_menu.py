@@ -12,6 +12,15 @@ def test_trade_menu_dispatch(monkeypatch):
     mock_input = lambda _="": next(inp)
     monkeypatch.setattr(builtins, "input", mock_input)
     monkeypatch.setattr(main, "input", mock_input)
-    main.parse_args = lambda: types.SimpleNamespace(quiet=True, format="excel")
+    main.parse_args = lambda: types.SimpleNamespace(
+        quiet=True,
+        format="excel",
+        list_tasks=False,
+        workflow=None,
+        tasks=None,
+        tasks_csv=None,
+        dry_run=False,
+        json=False,
+    )
     main.main()
     assert "excel" in called

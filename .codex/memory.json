@@ -1,0 +1,30 @@
+{
+  "preferences": {
+    "quiet": true
+  },
+  "workflows": {
+    "submenu_queue": {
+      "live": ["quick-chain", "daily-report"],
+      "sanity": ["trades-report", "daily-report"]
+    }
+  },
+  "tasks": [],
+  "questions": [],
+  "decisions": [
+    {
+      "id": 1,
+      "timestamp": "2025-08-30T04:38:24Z",
+      "title": "ORDER_BUILDER_PRESETS_V1",
+      "decision": "Added preset-driven order builder and Stage Order preset wizard; standardized JSON envelope and risk_summary when determinable.",
+      "context": "Offline-only; no market calls. Added sanity script + Makefile target and console entry."
+    }
+  ],
+  "changelog": [
+    {
+      "timestamp": "2025-08-30T04:38:24Z",
+      "event": "Add order builder presets and trade menu preset flow",
+      "details": "--preset support in order_builder; trade menu Stage Order preset path; sanity script scripts/sanity_order_builder_presets.sh; Makefile sanity-order-builder; pyproject console entry 'order-builder'."
+    }
+  ]
+}
+

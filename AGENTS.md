@@ -13,6 +13,8 @@ This guide helps contributors work productively in this repository. Keep changes
 - `make lint`: Run Ruff per `pyproject.toml` rules.
 - `make test` or `pytest -q`: Run the unit tests from repo root.
 - `make build` or `python -m build`: Build wheel/sdist to validate packaging.
+ - `make sanity-order-builder`: Quick JSON-only sanity for order builder presets.
+ - `make menus-sanity`: Import and preview smoke for Trades menu helpers.
 Typical loop: `make setup && make lint && make test`.
 
 ## Coding Style & Naming Conventions

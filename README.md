@@ -111,6 +111,40 @@ doctor --json --no-files
 daily-report --json --no-files | validate-json
 ```
 
+## Order Builder presets
+
+`order_builder` can scaffold common option strategies without manual strike
+entry. Provide a preset, symbol, expiry and quantity, then review the produced
+ticket and risk summary:
+
+```bash
+python -m portfolio_exporter.scripts.order_builder \
+  --preset bull_put --symbol XYZ --expiry 2025-01-17 --qty 1 --width 5 \
+  --json --no-files
+```
+
+The JSON response shape is:
+
+```json
+{
+  "ok": true,
+  "preset": "bull_put",
+  "ticket": {"underlying": "XYZ", ...},
+  "risk_summary": {"max_gain": 0.0, "max_loss": 5.0, "breakevens": [95.0]},
+  "outputs": [],
+  "warnings": [],
+  "meta": {"schema_id": "order_builder", "schema_version": "1"}
+}
+```
+
+Use other presets like `bear_call`, `iron_condor`, `iron_fly` or `calendar`.
+
+Quick reference
+- Presets: `bull_put`, `bear_call`, `bull_call`, `bear_put`, `iron_condor`, `iron_fly`, `calendar`.
+- Inputs: `--symbol`, `--expiry`, `--qty`.
+- Width controls: `--width` (verticals, default 5), `--wings` (iron condor/fly, default 5).
+- Console entry (after install): `order-builder --preset bull_put --symbol AAPL --expiry 2025-12-19 --qty 1 --width 5 --json --no-files`.
+
 ## Menus
 
 The interactive menus now include quick previews that avoid writing files:

@@ -227,8 +227,80 @@ def launch(status, default_fmt):
 
             def _order_builder() -> None:
                 from portfolio_exporter.scripts import order_builder as _ob
+                from portfolio_exporter.core.io import save as io_save
+                import json, io, contextlib
 
-                _ob.run()
+                while True:
+                    tbl = Table(title="Stage Order")
+                    opts = [("p", "Preset"), ("w", "Wizard"), ("r", "Return")]
+                    for k, lbl in opts:
+                        tbl.add_row(k, lbl)
+                    console.print(tbl)
+                    ch = prompt_input("› ").strip().lower()
+                    if ch == "r":
+                        return
+                    if ch == "w":
+                        _ob.run()
+                        continue
+                    if ch != "p":
+                        continue
+                    presets = [
+                        "bull_put",
+                        "bear_call",
+                        "bull_call",
+                        "bear_put",
+                        "iron_condor",
+                        "iron_fly",
+                        "calendar",
+                    ]
+                    tbl = Table(title="Preset")
+                    for i, p in enumerate(presets, 1):
+                        tbl.add_row(str(i), p)
+                    console.print(tbl)
+                    sel = prompt_input("Preset #: ").strip()
+                    try:
+                        preset = presets[int(sel) - 1]
+                    except Exception:
+                        console.print("[red]Invalid preset[/red]")
+                        continue
+                    symbol = prompt_input("Symbol: ").strip().upper()
+                    expiry = prompt_input("Expiry (YYYY-MM-DD): ").strip()
+                    qty = prompt_input("Qty", "1").strip() or "1"
+                    args = [
+                        "--preset",
+                        preset,
+                        "--symbol",
+                        symbol,
+                        "--expiry",
+                        expiry,
+                        "--qty",
+                        qty,
+                        "--json",
+                        "--no-files",
+                    ]
+                    if preset in {"bull_put", "bear_call", "bull_call", "bear_put"}:
+                        width = prompt_input("Width", "5").strip() or "5"
+                        args.extend(["--width", width])
+                    elif preset in {"iron_condor", "iron_fly"}:
+                        wings = prompt_input("Wings", "5").strip() or "5"
+                        args.extend(["--wings", wings])
+                    buf = io.StringIO()
+                    with contextlib.redirect_stdout(buf):
+                        _ob.cli(args)
+                    try:
+                        summary = json.loads(buf.getvalue())
+                    except Exception:
+                        console.print("[red]Builder failed[/red]")
+                        continue
+                    ticket = summary.get("ticket")
+                    risk = summary.get("risk_summary")
+                    console.print(ticket)
+                    if risk:
+                        console.print(risk)
+                    if ticket:
+                        save = prompt_input("Save ticket? (Y/n)", "Y").strip().lower()
+                        if save in {"", "y"}:
+                            io_save(ticket, "order_ticket", fmt="json")
 
             def _roll_positions() -> None:
                 from portfolio_exporter.scripts import roll_manager as _rm
