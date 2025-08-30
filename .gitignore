@@ -6,3 +6,7 @@ portfolio_*.csv
 __pycache__/
 *.pyc
 .venv/
+
+# Ignore Python package metadata
+*.egg-info/
+combos_preview.txt

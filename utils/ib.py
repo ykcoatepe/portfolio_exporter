@@ -1,7 +1,7 @@
-
 """
 ib.py - Centralized IBKR connection and data fetching.
 """
+
 import logging
 from typing import List, Optional, Set, Tuple, Dict, Any
 from datetime import datetime
@@ -14,6 +14,7 @@ from ib_insync import IB, Contract, Option, Stock, Index, Future, Ticker, Positi
 
 try:
     from pandas_datareader import data as web
+
     FRED_AVAILABLE = True
 except ImportError:
     FRED_AVAILABLE = False
@@ -25,7 +26,9 @@ IB_PORT = 7497
 CLIENT_ID = 20
 
 # --- Logging ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 log = logging.getLogger(__name__)
 
 # Silence noisy ib_insync logs
@@ -36,7 +39,9 @@ for logger_name in ("ib_insync.client", "ib_insync.wrapper", "ib_insync.ib"):
 class IBManager:
     """A context manager for handling IBKR connections."""
 
-    def __init__(self, host: str = IB_HOST, port: int = IB_PORT, client_id: int = CLIENT_ID):
+    def __init__(
+        self, host: str = IB_HOST, port: int = IB_PORT, client_id: int = CLIENT_ID
+    ):
         self.ib = IB()
         self.host = host
         self.port = port
@@ -46,8 +51,8 @@ class IBManager:
         try:
             self.ib.connect(self.host, self.port, clientId=self.client_id, timeout=10)
             # Switch to delayed data if live is not available
-            if not self.ib.reqMarketDataType(1): # 1 for live
-                self.ib.reqMarketDataType(3) # 3 for delayed
+            if not self.ib.reqMarketDataType(1):  # 1 for live
+                self.ib.reqMarketDataType(3)  # 3 for delayed
             log.info(f"Connected to IBKR at {self.host}:{self.port}")
         except Exception as e:
             log.error(f"Failed to connect to IBKR: {e}")
@@ -76,22 +81,26 @@ def get_positions(ib: IB) -> pd.DataFrame:
     rows = []
     for p in positions:
         mark_price = price_map.get(p.contract.conId, p.avgCost)
-        rows.append({
-            "symbol": p.contract.symbol,
-            "secType": p.contract.secType,
-            "position": p.position,
-            "avg_cost": p.avgCost,
-            "mark_price": mark_price,
-            "market_value": p.position * mark_price * float(p.contract.multiplier or 1),
-            "unrealized_pnl": (mark_price - p.avgCost) * p.position * float(p.contract.multiplier or 1),
-        })
+        rows.append(
+            {
+                "symbol": p.contract.symbol,
+                "secType": p.contract.secType,
+                "position": p.position,
+                "avg_cost": p.avgCost,
+                "mark_price": mark_price,
+                "market_value": p.position
+                * mark_price
+                * float(p.contract.multiplier or 1),
+                "unrealized_pnl": (mark_price - p.avgCost)
+                * p.position
+                * float(p.contract.multiplier or 1),
+            }
+        )
 
     return pd.DataFrame(rows)
 
 
-def load_ib_positions_ib(
-    ib: IB,
-) -> pd.DataFrame:
+def load_ib_positions_ib(ib: IB) -> pd.DataFrame:
     """
     Pull current portfolio positions directly from Interactive Brokers via
     the TWS / IB-Gateway API (ib_insync wrapper).
@@ -99,15 +108,8 @@ def load_ib_positions_ib(
     Columns returned: symbol · quantity · cost basis · mark price ·
     market_value · unrealized_pnl
     """
-    ib = IB()
-    try:
-        ib.connect(host, port, clientId=client_id)
-        # suppress per-contract error spam from IB
-        ib.errorEvent += lambda *a, **k: None
-    except Exception as e:
-        raise ConnectionError(
-            f"❌ Cannot connect to IB API at {host}:{port}  →  {e}"
-        ) from e
+    if not ib.isConnected():
+        raise ConnectionError("IB object must be connected before calling")
 
     positions = ib.positions()
     if not positions:
@@ -193,6 +195,7 @@ def load_tickers(ib: IB) -> list[str]:
             user_tickers = [line.strip().upper() for line in f if line.strip()]
     mapped = [PROXY_MAP.get(t, t) for t in user_tickers]
     return sorted(set(mapped + EXTRA_TICKERS))
+
 
 def get_option_positions(ib: IB) -> Tuple[List[Option], Set[str]]:
     """Return option contracts in the IBKR account and their underlying symbols."""
@@ -416,17 +419,23 @@ def fetch_live_positions(ib: IB) -> pd.DataFrame:
         combo_legs_data = []
         if con.secType == "BAG" and con.comboLegs:
             for leg in con.comboLegs:
-                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
-                combo_legs_data.append({
-                    "symbol": leg_contract.symbol,
-                    "sec_type": leg_contract.secType,
-                    "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
-                    "strike": getattr(leg_contract, "strike", None),
-                    "right": getattr(leg_contract, "right", None),
-                    "ratio": leg.ratio,
-                    "action": leg.action,
-                    "exchange": leg.exchange,
-                })
+                leg_contract = ib.qualifyContracts(
+                    Contract(conId=leg.conId, exchange=leg.exchange)
+                )[0]
+                combo_legs_data.append(
+                    {
+                        "symbol": leg_contract.symbol,
+                        "sec_type": leg_contract.secType,
+                        "expiry": getattr(
+                            leg_contract, "lastTradeDateOrContractMonth", None
+                        ),
+                        "strike": getattr(leg_contract, "strike", None),
+                        "right": getattr(leg_contract, "right", None),
+                        "ratio": leg.ratio,
+                        "action": leg.action,
+                        "exchange": leg.exchange,
+                    }
+                )
 
         rows.append(
             {
@@ -439,8 +448,13 @@ def fetch_live_positions(ib: IB) -> pd.DataFrame:
                         or (
                             con.secType == "OPT"
                             and combo_counts.get(
-                                (con.symbol, getattr(con, "lastTradeDateOrContractMonth", ""))
-                            , 0) > 1
+                                (
+                                    con.symbol,
+                                    getattr(con, "lastTradeDateOrContractMonth", ""),
+                                ),
+                                0,
+                            )
+                            > 1
                         )
                     )
                     else con.secType
@@ -468,6 +482,7 @@ SYMBOL_MAP = {
     "^IRX": (Index, dict(symbol="IRX", exchange="CBOE")),
     "^FVX": (Index, dict(symbol="FVX", exchange="CBOE")),
 }
+
 
 def _parse_ib_month(dt_str: str) -> datetime:
     """
@@ -525,5 +540,3 @@ def front_future(ib: IB, root: str, exch: str) -> Future:
         if dt > datetime.utcnow():
             return det.contract
     return details[0].contract
-''
-

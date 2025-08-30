@@ -1,0 +1,61 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+extend-exclude = ["legacy", "tests"]
+
+[tool.ruff.lint]
+extend-ignore = ["F401","F841","E402","E401","E731","E701","E741","F821","F811"]
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portfolio_exporter"
+version = "0.25.0"
+description = "Personal trading utilities: combos, greeks, roll wizard, live quotes"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{ name = "Yordam Kocatepe" }]
+
+dependencies = [
+  "pandas>=1.5",
+  "numpy>=1.23",
+  "yfinance>=0.2.37",
+  "rich>=13.3",
+  "pydantic-settings>=2.0",
+  "dateparser>=1.2.0",
+  "pandas-datareader>=0.10",
+]
+
+[project.optional-dependencies]
+ib = ["ib_insync>=0.9.86"]
+pdf = ["reportlab>=4.0"]
+
+[project.scripts]
+portfolio_playbook = "main:main"
+daily-report = "portfolio_exporter.scripts.daily_report:main"
+netliq-export = "portfolio_exporter.scripts.net_liq_history_export:main"
+quick-chain = "portfolio_exporter.scripts.quick_chain:main"
+trades-report = "portfolio_exporter.scripts.trades_report:main"
+trades-dashboard = "portfolio_exporter.scripts.trades_dashboard:main"
+portfolio-greeks = "portfolio_exporter.scripts.portfolio_greeks:main"
+doctor = "portfolio_exporter.scripts.doctor:main"
+validate-json = "portfolio_exporter.scripts.validate_json:main"
+combo-db-maint = "portfolio_exporter.scripts.combo_db_maint:main"
+order-builder = "portfolio_exporter.scripts.order_builder:main"
+
+[tool.setuptools.packages.find]
+include = ["portfolio_exporter*"]
+exclude = ["legacy*", "tests*", "utils*", "docs*", "ibkr_env*", "iv_history*"]
+
+[tool.setuptools]
+py-modules = ["main"]
+include-package-data = true
+
+[tool.setuptools.data-files]
+"schemas" = ["schemas/*.json"]
+
+[tool.setuptools.package-data]
+"portfolio_exporter" = ["assets/*.css"]

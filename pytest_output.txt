@@ -1,0 +1,97 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-8.4.1, pluggy-1.6.0
+rootdir: /Users/yordamkocatepe/PycharmProjects/portfolio_exporter
+configfile: pyproject.toml
+collected 77 items
+
+tests/test_caps_dashboard.py .                                           [  1%]
+tests/test_chain_fetch.py .                                              [  2%]
+tests/test_cli.py .                                                      [  3%]
+tests/test_cli_smoke.py .                                                [  5%]
+tests/test_config.py .                                                   [  6%]
+tests/test_daily_pulse.py ...                                            [ 10%]
+tests/test_historic_prices.py .....                                      [ 16%]
+tests/test_input_parser.py ..                                            [ 19%]
+tests/test_live_feed_indices.py .                                        [ 20%]
+tests/test_live_menu.py .                                                [ 22%]
+tests/test_net_liq_history_export.py ...                                 [ 25%]
+tests/test_net_liq_show.py .                                             [ 27%]
+tests/test_option_chain_snapshot.py ......                               [ 35%]
+tests/test_option_contract_exchange.py .                                 [ 36%]
+tests/test_orchestrate_batch.py .                                        [ 37%]
+tests/test_orchestrate_dataset.py ....                                   [ 42%]
+tests/test_order_builder.py .                                            [ 44%]
+tests/test_output_format.py .                                            [ 45%]
+tests/test_portfolio_greeks.py .....                                     [ 51%]
+tests/test_portfolio_greeks_files.py .                                   [ 53%]
+tests/test_portfolio_greeks_filter.py ...                                [ 57%]
+tests/test_portfolio_greeks_live_stub.py .                               [ 58%]
+tests/test_portfolio_greeks_logic.py .                                   [ 59%]
+tests/test_pre_menu.py .                                                 [ 61%]
+tests/test_quick_chain.py .                                              [ 62%]
+tests/test_quote_fallback.py .                                           [ 63%]
+tests/test_quote_option_fallback.py .                                    [ 64%]
+tests/test_risk_dashboard.py .                                           [ 66%]
+tests/test_status.py .                                                   [ 67%]
+tests/test_tech_scan.py .                                                [ 68%]
+tests/test_tech_scan_fix.py .                                            [ 70%]
+tests/test_tech_signals_ibkr.py .......                                  [ 79%]
+tests/test_trade_menu.py .                                               [ 80%]
+tests/test_trades_report.py ........                                     [ 90%]
+tests/test_trades_report_actions.py .                                    [ 92%]
+tests/test_trades_report_open_orders.py .                                [ 93%]
+tests/test_trades_report_paging.py .                                     [ 94%]
+tests/test_update_tickers.py ...                                         [ 98%]
+tests/test_user_tech_signals.py .                                        [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.13/site-packages/eventkit/util.py:21
+  /Users/yordamkocatepe/PycharmProjects/portfolio_exporter/.venv/lib/python3.13/site-packages/eventkit/util.py:21: DeprecationWarning: There is no current event loop
+    return asyncio.get_event_loop_policy().get_event_loop()
+
+portfolio_exporter/scripts/historic_prices.py:67
+  /Users/yordamkocatepe/PycharmProjects/portfolio_exporter/portfolio_exporter/scripts/historic_prices.py:67: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
+
+portfolio_exporter/scripts/historic_prices.py:68
+  /Users/yordamkocatepe/PycharmProjects/portfolio_exporter/portfolio_exporter/scripts/historic_prices.py:68: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    TIME_TAG = datetime.utcnow().strftime("%H%M")
+
+tests/test_input_parser.py::test_parse_call_spread
+tests/test_input_parser.py::test_parse_call_spread
+tests/test_input_parser.py::test_parse_put_single
+tests/test_order_builder.py::test_order_builder_creates_file
+  /Users/yordamkocatepe/PycharmProjects/portfolio_exporter/.venv/lib/python3.13/site-packages/dateparser/utils/strptime.py:94: DeprecationWarning: Parsing dates involving a day of month without a year specified is ambiguious
+  and fails to parse leap day. The default behavior will change in Python 3.15
+  to either always raise an exception or to use a different default year (TBD).
+  To avoid trouble, add a specific year to the input & format.
+  See https://github.com/python/cpython/issues/70647.
+    obj = datetime(*__strptime(date_string, format)[:-3])
+
+tests/test_option_chain_snapshot.py::ChooseExpiryTests::test_first_friday
+  /Users/yordamkocatepe/PycharmProjects/portfolio_exporter/tests/test_option_chain_snapshot.py:48: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    today = datetime.utcnow().date()
+
+tests/test_option_chain_snapshot.py::ChooseExpiryTests::test_first_friday
+tests/test_option_chain_snapshot.py::ChooseExpiryTests::test_weekly_within_seven_days
+  /Users/yordamkocatepe/PycharmProjects/portfolio_exporter/legacy/option_chain_snapshot.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    today = datetime.utcnow().date()
+
+tests/test_option_chain_snapshot.py::ChooseExpiryTests::test_weekly_within_seven_days
+  /Users/yordamkocatepe/PycharmProjects/portfolio_exporter/tests/test_option_chain_snapshot.py:41: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    today = datetime.utcnow().date()
+
+tests/test_option_chain_snapshot.py::PickExpiryHintTests::test_day_month_hint
+tests/test_option_chain_snapshot.py::PickExpiryHintTests::test_day_month_hint
+tests/test_option_chain_snapshot.py::PickExpiryHintTests::test_day_month_hint
+tests/test_option_chain_snapshot.py::PickExpiryHintTests::test_day_month_hint
+tests/test_option_chain_snapshot.py::PickExpiryHintTests::test_day_month_hint
+  /Users/yordamkocatepe/PycharmProjects/portfolio_exporter/legacy/option_chain_snapshot.py:243: DeprecationWarning: Parsing dates involving a day of month without a year specified is ambiguious
+  and fails to parse leap day. The default behavior will change in Python 3.15
+  to either always raise an exception or to use a different default year (TBD).
+  To avoid trouble, add a specific year to the input & format.
+  See https://github.com/python/cpython/issues/70647.
+    dt = datetime.strptime(h, fmt)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 77 passed, 16 warnings in 46.45s =======================

@@ -2238,13 +2238,6 @@ def get_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--until")
     parser.add_argument("--summary-only", action="store_true")
     parser.add_argument("--cluster-window-sec", type=int, default=60)
-    parser.add_argument("--symbol")
-    parser.add_argument("--structure-in")
-    parser.add_argument("--structure-out")
-    parser.add_argument("--effect-in")
-    parser.add_argument("--min-abs-pnl", type=float)
-    parser.add_argument("--group-by", choices=["underlying", "structure"])
-    parser.add_argument("--top-n", type=int)
     cli_helpers.add_common_output_args(parser)
     cli_helpers.add_common_debug_args(parser)
     return parser
@@ -2291,18 +2284,6 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         until_dt = _parse_when(args.until)
         df_exec = _filter_by_date(df_exec, since_dt, until_dt, col="datetime")
         n_kept = len(df_exec)
-        if (df_exec is None or df_exec.empty) and (df_open is None or df_open.empty):
-            filters_meta = _collect_filters(args)
-            summary = json_helpers.report_summary(
-                {"executions": 0, "clusters": 0, "combos": 0},
-                outputs={},
-                warnings=["No trades data"],
-                meta={"filters": filters_meta},
-            )
-            rl.finalize(write=False)
-            if args.json:
-                cli_helpers.print_json(summary, quiet)
-            return summary
         earliest_exec_ts = _get_earliest_exec_ts(df_exec)
 
         pos_like = _build_positions_like_df(df_exec, None)
@@ -2328,16 +2309,6 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
 
         with rl.time("cluster"):
             clusters_df, debug_rows = _cluster_executions(df_exec, int(args.cluster_window_sec))
-        if not debug_rows.empty:
-            try:
-                df_exec = df_exec.merge(debug_rows[["exec_id", "cluster_id"]], on="exec_id", how="left")
-            except Exception:
-                pass
-        if not clusters_df.empty:
-            try:
-                df_exec = df_exec.merge(clusters_df[["cluster_id", "structure"]], on="cluster_id", how="left")
-            except Exception:
-                pass
         k_total = len(clusters_df)
         combo_clusters = int((clusters_df.get("structure") != "synthetic").sum())
 
@@ -2367,21 +2338,8 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         # Build intent summaries for JSON/meta (independent of file writes)
         try:
             df_all_counts = df_exec.copy()
-            if "expiry" not in df_all_counts.columns:
-                df_all_counts["expiry"] = ""
-            if "right" not in df_all_counts.columns:
-                df_all_counts["right"] = ""
-            if "strike" not in df_all_counts.columns:
-                df_all_counts["strike"] = np.nan
             if isinstance(df_open, pd.DataFrame) and not df_open.empty:
-                df_open2 = df_open.copy()
-                if "expiry" not in df_open2.columns:
-                    df_open2["expiry"] = ""
-                if "right" not in df_open2.columns:
-                    df_open2["right"] = ""
-                if "strike" not in df_open2.columns:
-                    df_open2["strike"] = np.nan
-                df_all_counts = pd.concat([df_all_counts, df_open2], ignore_index=True, sort=False)
+                df_all_counts = pd.concat([df_all_counts, df_open], ignore_index=True, sort=False)
             df_all_counts["position_effect"] = _compute_streaming_effect(df_all_counts, prev_positions_df)
         except Exception:
             df_all_counts = pd.DataFrame(columns=["position_effect"])
@@ -2403,33 +2361,16 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         else:
             intent_by_und = pd.DataFrame(columns=["underlying", "position_effect"])
 
-        df_all = df_exec.copy()
-        if "expiry" not in df_all.columns:
-            df_all["expiry"] = ""
-        if "right" not in df_all.columns:
-            df_all["right"] = ""
-        if "strike" not in df_all.columns:
-            df_all["strike"] = np.nan
-        if isinstance(df_open, pd.DataFrame) and not df_open.empty:
-            df_open2 = df_open.copy()
-            if "expiry" not in df_open2.columns:
-                df_open2["expiry"] = ""
-            if "right" not in df_open2.columns:
-                df_open2["right"] = ""
-            if "strike" not in df_open2.columns:
-                df_open2["strike"] = np.nan
-            df_all = pd.concat([df_all, df_open2], ignore_index=True, sort=False)
-        df_all["position_effect"] = _compute_streaming_effect(df_all, prev_positions_df)
-        df_all = _attach_intent_flags(df_all)
-
-        filters_meta = _collect_filters(args)
-        df_filtered, clusters_filtered = _apply_filters(df_all, clusters_df, args)
-        filters_active = bool(filters_meta)
-
         outputs: Dict[str, str] = {}
         written: list[Path] = []
         with rl.time("write_outputs"):
             if formats.get("csv"):
+                df_all = df_exec.copy()
+                if isinstance(df_open, pd.DataFrame) and not df_open.empty:
+                    df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
+                # Prefer vectorized streaming intent
+                df_all["position_effect"] = _compute_streaming_effect(df_all, prev_positions_df)
+                df_all = _attach_intent_flags(df_all)
                 path_report = io_core.save(df_all, "trades_report", "csv", outdir)
                 outputs["trades_report"] = str(path_report)
                 written.append(path_report)
@@ -2441,14 +2382,6 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                 path_clusters = io_core.save(clusters_df, "trades_clusters", "csv", outdir)
                 outputs["trades_clusters"] = str(path_clusters)
                 written.append(path_clusters)
-                if filters_active:
-                    path_f = io_core.save(df_filtered, "trades_report_filtered", "csv", outdir)
-                    outputs["trades_report_filtered"] = str(path_f)
-                    written.append(path_f)
-                    if not clusters_filtered.empty:
-                        path_cf = io_core.save(clusters_filtered, "trades_clusters_filtered", "csv", outdir)
-                        outputs["trades_clusters_filtered"] = str(path_cf)
-                        written.append(path_cf)
                 # Intent summary CSVs
                 intent_tbl = pd.DataFrame([rows_counts], index=["rows"]).assign(scope="rows")
                 intent_tbl2 = pd.DataFrame([combos_counts], index=["combos"]).assign(scope="combos")
@@ -2511,26 +2444,11 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         meta["intent"]["by_underlying"] = (
             intent_by_und.to_dict(orient="records") if isinstance(intent_by_und, pd.DataFrame) else []
         )
-        meta["filters"] = filters_meta
         summary = json_helpers.report_summary(
             {"executions": n_kept, "clusters": k_total, "combos": combo_clusters},
             outputs=outputs,
             meta=meta,
         )
-        summary["sections"]["filtered"] = {
-            "rows_count": int(len(df_filtered)),
-            "clusters_count": int(len(clusters_filtered)),
-        }
-        if args.group_by and not clusters_filtered.empty:
-            gb = (
-                clusters_filtered.groupby(args.group_by, dropna=False)
-                .agg(count=("cluster_id", "count"), pnl=("pnl", "sum"))
-                .reset_index()
-            )
-            summary["sections"]["grouped"] = [
-                {"key": str(r[args.group_by]), "count": int(r["count"]), "pnl": float(r["pnl"])}
-                for _, r in gb.iterrows()
-            ]
         if earliest_exec_ts is not None and (prev_positions_df is None or len(prev_positions_df) == 0):
             summary.setdefault("warnings", []).append(
                 "No prior positions snapshot found before earliest execution; intent may be less accurate."
@@ -2632,69 +2550,6 @@ def _filter_by_date(
     if until is not None:
         mask &= d[col] <= until
     return d.loc[mask].copy()
-
-
-def _parse_list_arg(val: str | None) -> list[str]:
-    """Return a list of comma-separated values from *val* (case sensitive)."""
-    if val is None:
-        return []
-    return [s for s in (str(val).split(",")) if s]
-
-
-def _apply_filters(
-    rows: pd.DataFrame, clusters: pd.DataFrame, args: argparse.Namespace
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Apply CLI-driven filters to the trades rows and clusters."""
-
-    rows_f = rows.copy() if isinstance(rows, pd.DataFrame) else pd.DataFrame()
-    cl_f = clusters.copy() if isinstance(clusters, pd.DataFrame) else pd.DataFrame()
-
-    symbols = {s.strip().upper() for s in _parse_list_arg(getattr(args, "symbol", None)) if s.strip()}
-    if symbols:
-        rows_f = rows_f[rows_f.get("symbol").astype(str).str.upper().isin(symbols)]
-        cl_f = cl_f[cl_f.get("underlying").astype(str).str.upper().isin(symbols)]
-
-    effects = {s.strip() for s in _parse_list_arg(getattr(args, "effect_in", None)) if s.strip()}
-    if effects:
-        rows_f = rows_f[rows_f.get("position_effect").isin(effects)]
-
-    struct_in = [s.strip().lower() for s in _parse_list_arg(getattr(args, "structure_in", None)) if s.strip()]
-    if struct_in:
-        cl_f = cl_f[cl_f.get("structure").astype(str).str.lower().apply(lambda s: any(v in s for v in struct_in))]
-
-    struct_out = [s.strip().lower() for s in _parse_list_arg(getattr(args, "structure_out", None)) if s.strip()]
-    if struct_out:
-        cl_f = cl_f[~cl_f.get("structure").astype(str).str.lower().apply(lambda s: any(v in s for v in struct_out))]
-
-    min_abs_pnl = getattr(args, "min_abs_pnl", None)
-    if min_abs_pnl not in (None, 0):
-        cl_f = cl_f[cl_f.get("pnl").abs() >= float(min_abs_pnl)]
-
-    if getattr(args, "top_n", None):
-        try:
-            n = int(args.top_n)
-            cl_f = cl_f.reindex(cl_f["pnl"].abs().sort_values(ascending=False).head(n).index)
-        except Exception:
-            pass
-
-    if not cl_f.empty and "cluster_id" in rows_f.columns:
-        rows_f = rows_f[rows_f["cluster_id"].isin(cl_f["cluster_id"])]
-
-    return rows_f, cl_f
-
-
-def _collect_filters(args: argparse.Namespace) -> Dict[str, Any]:
-    """Serialize filter args into a JSON-friendly dict."""
-    data: Dict[str, Any] = {
-        "symbol": _parse_list_arg(getattr(args, "symbol", None)),
-        "structure_in": _parse_list_arg(getattr(args, "structure_in", None)),
-        "structure_out": _parse_list_arg(getattr(args, "structure_out", None)),
-        "effect_in": _parse_list_arg(getattr(args, "effect_in", None)),
-        "min_abs_pnl": getattr(args, "min_abs_pnl", None),
-        "group_by": getattr(args, "group_by", None),
-        "top_n": getattr(args, "top_n", None),
-    }
-    return {k: v for k, v in data.items() if v not in (None, [], "")}
 
 
 if __name__ == "__main__":  # pragma: no cover - exercised by CLI tests

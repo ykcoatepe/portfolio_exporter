@@ -1,0 +1,2 @@
+exec_id,perm_id,order_id,symbol,secType,Side,qty,price,datetime,Liquidation,lastLiquidity,OrderRef,position_effect
+1,1,1,AAPL,STK,BOT,1,10.0,2024-01-01 10:00:00,0,1,,Unknown

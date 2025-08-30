@@ -4,7 +4,7 @@ from datetime import date
 import pandas as pd
 
 
-import trades_report as tr
+import legacy.trades_report as tr
 
 
 class DatePhraseTests(unittest.TestCase):
@@ -183,5 +183,4 @@ class OpenOrderTests(unittest.TestCase):
         self.assertIsNone(self.open_order_single.combo_legs)
 
 
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__":    unittest.main()
