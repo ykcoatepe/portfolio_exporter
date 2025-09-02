@@ -1064,6 +1064,19 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
 
     # -------- options & futures options --------
     bundles = list_positions(ib)
+    # Build avg cost lookup by conId for P&L calculations
+    avg_cost_map: dict[int, float] = {}
+    try:
+        for p in ib.positions():
+            try:
+                cid = int(getattr(p.contract, "conId", 0))
+                if cid:
+                    avg_cost_map[cid] = float(getattr(p, "avgCost", float("nan")))
+            except Exception:
+                continue
+    except Exception:
+        pass
+
     opt_rows: list[dict[str, float | str | int]] = []
     for pos, tk in bundles:
         c = pos.contract
@@ -1078,6 +1091,43 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
             ),
             None,
         )
+        # robust option price (mid ▸ last ▸ close)
+        option_price = None
+        try:
+            option_price = tk.marketPrice()  # call as method
+        except Exception:
+            option_price = None
+        if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
+            option_price = getattr(tk, "last", None)
+        if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
+            option_price = getattr(tk, "close", None)
+        try:
+            conid_val = int(getattr(c, "conId", 0))
+        except Exception:
+            conid_val = 0
+        avg_cost_raw = avg_cost_map.get(conid_val, float("nan"))
+        # Normalize avg cost to per-unit for options/FOP where needed.
+        # Some IB endpoints return avgCost per contract (price * multiplier), others per unit.
+        # Heuristic: if avg_cost is much larger than the current mark price and multiplier>1, treat it as per-contract and divide.
+        per_unit_cost = float("nan")
+        try:
+            ac = float(avg_cost_raw)
+            mp = float(option_price) if option_price is not None else float("nan")
+            if getattr(c, "secType", "") in {"OPT", "FOP"} and mult and float(mult) > 1:
+                if (not math.isnan(mp) and ac > mp * 10) or ac > 50:
+                    per_unit_cost = ac / float(mult)
+                else:
+                    per_unit_cost = ac
+            else:
+                per_unit_cost = ac
+        except Exception:
+            per_unit_cost = float("nan")
+        try:
+            # Unrealized P&L per leg: (mark_per_unit − per_unit_cost) × qty × multiplier
+            pnl_leg = (float(option_price) - per_unit_cost) * float(qty) * float(mult)
+        except Exception:
+            pnl_leg = float("nan")
+
         opt_rows.append(
             {
                 "symbol": c.localSymbol,
@@ -1093,6 +1143,10 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
                 "gamma": getattr(src, "gamma", float("nan")),
                 "vega": getattr(src, "vega", float("nan")),
                 "theta": getattr(src, "theta", float("nan")),
+                "price": option_price if option_price is not None else float("nan"),
+                "avg_cost": avg_cost_raw,
+                "avg_cost_unit": per_unit_cost,
+                "pnl_leg": pnl_leg,
             }
         )
 
@@ -1100,6 +1154,8 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
     stk_rows: list[dict[str, float | str | int]] = []
     for p in ib.positions():
         if p.contract.secType in {"STK", "ETF"} and p.position != 0:
+            # best-effort price snapshot is not fetched here; leave price NaN
+            ac = float(getattr(p, "avgCost", float("nan")))
             stk_rows.append(
                 {
                     "symbol": p.contract.symbol,
@@ -1115,6 +1171,10 @@ def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
                     "gamma": 0.0,
                     "vega": 0.0,
                     "theta": 0.0,
+                    "price": float("nan"),
+                    "avg_cost": ac,
+                    "avg_cost_unit": ac,
+                    "pnl_leg": float("nan"),
                 }
             )
 
@@ -2120,6 +2180,8 @@ def _print_combos(console: Console, combos_df: Optional[pd.DataFrame]) -> None:
         "type",
         "legs_n" if "legs_n" in combos_df.columns else "legs",
         "width",
+        "unrealized_pnl",
+        "unrealized_pnl_pct",
         "strikes",
         "call_strikes",
         "put_strikes",
@@ -2386,6 +2448,111 @@ def run(
             if "legs" in combos_df.columns:
                 combos_df["legs"] = combos_df["legs"].apply(_parse_legs)
                 combos_df["legs_n"] = combos_df["legs"].apply(lambda x: len(x) if isinstance(x, list) else 0).astype("Int64")
+            # Compute unrealized P&L per combo from per-leg P&L (pnl_leg) in positions
+            try:
+                pmap = pos_df.copy()
+                # Normalize conId as integer index for lookup
+                if "conId" in pmap.columns:
+                    try:
+                        pmap["conId"] = pd.to_numeric(pmap["conId"], errors="coerce").astype("Int64")
+                    except Exception:
+                        pass
+                    pmap = pmap.set_index("conId", drop=False)
+                else:
+                    pmap.index = pd.Index([], name="conId")
+                def _sum_pnl(legs):
+                    total = 0.0
+                    if not isinstance(legs, list):
+                        return float("nan")
+                    has_any = False
+                    for cid in legs:
+                        try:
+                            ic = int(cid)
+                        except Exception:
+                            continue
+                        if ic in pmap.index:
+                            try:
+                                val = float(pmap.loc[ic].get("pnl_leg", float("nan")))
+                            except Exception:
+                                val = float("nan")
+                            if not math.isnan(val):
+                                total += val
+                                has_any = True
+                    return total if has_any else float("nan")
+
+                def _sum_basis(legs):
+                    # Sum entry basis using per-unit avg cost × qty × multiplier
+                    total = 0.0
+                    got = False
+                    if not isinstance(legs, list):
+                        return float("nan")
+                    for cid in legs:
+                        try:
+                            ic = int(cid)
+                        except Exception:
+                            continue
+                        if ic in pmap.index:
+                            row = pmap.loc[ic]
+                            try:
+                                ac = row.get("avg_cost_unit", float("nan"))
+                                q = row.get("qty", float("nan"))
+                                m = row.get("multiplier", float("nan"))
+                                v = float(ac) * float(q) * float(m)
+                            except Exception:
+                                v = float("nan")
+                            if not math.isnan(v):
+                                total += v
+                                got = True
+                    return total if got else float("nan")
+
+                combos_df["unrealized_pnl"] = combos_df["legs"].apply(_sum_pnl)
+                combos_df["credit_debit"] = combos_df.get("credit_debit", np.nan)
+                combos_df["credit_debit"] = combos_df.apply(
+                    lambda r: _sum_basis(r.get("legs")) if (pd.isna(r.get("credit_debit")) or r.get("credit_debit") is None) else r.get("credit_debit"),
+                    axis=1,
+                )
+
+                # Percent vs. net debit/credit; fallback to width-based notional if basis is missing
+                def _pct_row(r):
+                    pnl = r.get("unrealized_pnl")
+                    basis = r.get("credit_debit")
+                    try:
+                        if basis is not None and not math.isnan(float(basis)) and abs(float(basis)) > 1e-6:
+                            return float(pnl) / abs(float(basis)) * 100.0
+                    except Exception:
+                        pass
+                    # Fallback: width * multiplier * lots
+                    try:
+                        width = float(r.get("width", float("nan")))
+                        if math.isnan(width) or width <= 0:
+                            return float("nan")
+                        # Estimate lots from legs' absolute qty minimum
+                        legs = r.get("legs")
+                        if not isinstance(legs, list) or not legs:
+                            return float("nan")
+                        qs = []
+                        for cid in legs:
+                            try:
+                                ic = int(cid)
+                            except Exception:
+                                continue
+                            if ic in pmap.index:
+                                try:
+                                    qs.append(abs(float(pmap.loc[ic].get("qty", float("nan")))))
+                                except Exception:
+                                    continue
+                        lots = min(qs) if qs else float("nan")
+                        mult = float(pmap.loc[int(legs[0])].get("multiplier", 100.0)) if isinstance(legs, list) and legs and int(legs[0]) in pmap.index else 100.0
+                        denom = width * mult * lots
+                        if denom and not math.isnan(denom) and denom > 0:
+                            return float(pnl) / denom * 100.0
+                    except Exception:
+                        return float("nan")
+                    return float("nan")
+
+                combos_df["unrealized_pnl_pct"] = combos_df.apply(_pct_row, axis=1)
+            except Exception:
+                pass
         except Exception:
             pass
 
