@@ -2238,7 +2238,7 @@ def get_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--until")
     parser.add_argument("--summary-only", action="store_true")
     parser.add_argument("--cluster-window-sec", type=int, default=60)
-    cli_helpers.add_common_output_args(parser)
+    cli_helpers.add_common_output_args(parser, include_excel=True)
     cli_helpers.add_common_debug_args(parser)
     return parser
 
@@ -2255,7 +2255,7 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
     formats = cli_helpers.decide_file_writes(
         args,
         json_only_default=True,
-        defaults={"csv": bool(args.output_dir)},
+        defaults={"csv": bool(args.output_dir), "excel": False},
     )
     outdir = cli_helpers.resolve_output_dir(args.output_dir)
     quiet, _pretty = cli_helpers.resolve_quiet(args.no_pretty)
@@ -2364,18 +2364,20 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         outputs: Dict[str, str] = {}
         written: list[Path] = []
         with rl.time("write_outputs"):
-            if formats.get("csv"):
+            df_all: pd.DataFrame | None = None
+            if formats.get("csv") or formats.get("excel"):
                 df_all = df_exec.copy()
                 if isinstance(df_open, pd.DataFrame) and not df_open.empty:
                     df_all = pd.concat([df_all, df_open], ignore_index=True, sort=False)
                 # Prefer vectorized streaming intent
                 df_all["position_effect"] = _compute_streaming_effect(df_all, prev_positions_df)
                 df_all = _attach_intent_flags(df_all)
+                combos_df = _attach_intent_flags(combos_df)
+
+            if formats.get("csv") and df_all is not None:
                 path_report = io_core.save(df_all, "trades_report", "csv", outdir)
                 outputs["trades_report"] = str(path_report)
                 written.append(path_report)
-                # Ensure combos carry position_effect; detection already annotates
-                combos_df = _attach_intent_flags(combos_df)
                 path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
                 outputs["trades_combos"] = str(path_combos)
                 written.append(path_combos)
@@ -2416,10 +2418,28 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                     outputs["timings"] = str(tpath)
                     written.append(tpath)
 
+            if formats.get("excel") and df_all is not None:
+                try:
+                    import openpyxl  # type: ignore  # noqa: F401
+                except Exception:
+                    print("⚠️ openpyxl not installed; skipping XLSX export", file=sys.stderr)
+                else:
+                    xlsx_path = outdir / "trades_report.xlsx"
+                    with pd.ExcelWriter(xlsx_path, engine="openpyxl") as writer:
+                        df_all.to_excel(writer, sheet_name="Rows", index=False)
+                        if isinstance(clusters_df, pd.DataFrame) and not clusters_df.empty:
+                            clusters_df.to_excel(writer, sheet_name="Clusters", index=False)
+                        if isinstance(combos_df, pd.DataFrame) and not combos_df.empty:
+                            combos_df.to_excel(writer, sheet_name="Combos", index=False)
+                    outputs["trades_report_xlsx"] = str(xlsx_path)
+                    written.append(xlsx_path)
+
         rl.add_outputs(written)
         manifest_path = rl.finalize(write=bool(written))
 
         meta: Dict[str, Any] = {"script": "trades_report"}
+        if "trades_report_xlsx" in outputs:
+            meta["outputs"] = {"trades_report_xlsx": outputs["trades_report_xlsx"]}
         # intent meta counters
         try:
             total_id = int(sum(1 for r in debug_intent_rows if r.get("match_mode") == "id"))
