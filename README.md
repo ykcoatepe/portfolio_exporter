@@ -168,6 +168,22 @@ TSLA Δ+1.20 +0.50
 AAPL Δ-0.80 -0.30
 ```
 
+### Trades Menu — Quick Actions
+
+Quick shortcuts in the Trades & Reports menu:
+
+- **Open last report** – launch the most recent `daily_report.html` or `trades_dashboard.html`.
+- **Save filtered trades CSV** – pick filters and write a CSV, for example:
+
+  ```
+  Trades & Reports › Save filtered trades CSV… (choose filters)
+  Symbols: AAPL,MSFT
+  Effect: Close
+  Top N: 10
+  ```
+
+- **Copy trades JSON summary** – copy a filtered summary to the clipboard (uses `pyperclip` if installed; otherwise prints the JSON).
+
 Typical fixes:
 
 ```bash

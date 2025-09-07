@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from __future__ import annotations
+
 import builtins as _builtins
 import os
 from contextlib import contextmanager
+from pathlib import Path
+
+import json
 
 from rich.console import Console
 from rich.table import Table
@@ -53,6 +58,110 @@ def _build_synth_chain():
             }
         )
     return pd.DataFrame(rows)
+
+
+def _resolve_last_report(prefer: str | None = "daily") -> Path | None:
+    """Return most recent report Path based on preference."""
+
+    from portfolio_exporter.core.io import latest_file
+
+    order = ["daily", "dashboard"]
+    if prefer in order:
+        order.remove(prefer)
+        order.insert(0, prefer)
+    mapping = {"daily": "daily_report", "dashboard": "trades_dashboard"}
+    for kind in order:
+        base = mapping[kind]
+        for fmt in ("html", "pdf"):
+            path = latest_file(base, fmt)
+            if path:
+                return path
+    return None
+
+
+def open_last_report(prefer: str | None = None, quiet: bool = False) -> str:
+    """Print and optionally open the most recent report."""
+
+    path = _resolve_last_report(prefer)
+    if not path:
+        return "No report found"
+    print(path)
+    if not quiet and os.getenv("PE_QUIET") in (None, "", "0"):
+        try:  # pragma: no cover - best effort
+            import webbrowser
+
+            webbrowser.open(str(path))
+        except Exception:
+            pass
+    return f"Opened {path.name}"
+
+
+def _quick_save_filtered(
+    *,
+    output_dir: str,
+    symbols: str | None = None,
+    effect_in: str | None = None,
+    structure_in: str | None = None,
+    top_n: int | None = None,
+    quiet: bool = False,
+) -> dict:
+    """Run trades_report with filters and return JSON summary."""
+
+    from portfolio_exporter.scripts import trades_report as _tr
+
+    argv = ["--json", "--output-dir", output_dir]
+    if symbols:
+        argv.extend(["--symbol", symbols])
+    if effect_in:
+        argv.extend(["--effect-in", effect_in])
+    if structure_in:
+        argv.extend(["--structure-in", structure_in])
+    if top_n is not None:
+        argv.extend(["--top-n", str(top_n)])
+    summary = _tr.main(argv)
+    if not quiet:
+        for p in summary.get("outputs", []):
+            if p:
+                print(p)
+    return summary
+
+
+def _preview_trades_json(
+    *,
+    symbols: str | None = None,
+    effect_in: str | None = None,
+    structure_in: str | None = None,
+    top_n: int | None = None,
+) -> str:
+    """Return prettified JSON summary from trades_report."""
+
+    from portfolio_exporter.scripts import trades_report as _tr
+
+    argv = ["--json", "--no-files"]
+    if symbols:
+        argv.extend(["--symbol", symbols])
+    if effect_in:
+        argv.extend(["--effect-in", effect_in])
+    if structure_in:
+        argv.extend(["--structure-in", structure_in])
+    if top_n is not None:
+        argv.extend(["--top-n", str(top_n)])
+    data = _tr.main(argv)
+    return json.dumps(data, indent=2, sort_keys=True)
+
+
+def _copy_to_clipboard(text: str) -> bool:
+    """Copy *text* to system clipboard if pyperclip is available."""
+
+    try:
+        import pyperclip  # type: ignore
+    except Exception:  # pragma: no cover - optional dependency
+        return False
+    try:
+        pyperclip.copy(text)
+    except Exception:  # pragma: no cover - best effort
+        return False
+    return True
 
 # Menu for trade-related utilities
 
@@ -200,6 +309,9 @@ def launch(status, default_fmt):
             ("p", "Preview Daily Report (JSON-only)"),
             ("f", "Preflight Daily Report"),
             ("x", "Preflight Roll Manager"),
+            ("o", "Open last report (HTML/PDF)"),
+            ("s", "Save filtered trades CSV… (choose filters)"),
+            ("j", "Copy trades JSON summary (filtered)"),
             ("r", "Return"),
         ]
         tbl = Table(title="Trades & Reports")
@@ -326,6 +438,46 @@ def launch(status, default_fmt):
                     args.append("--no-pretty")
                 _daily.main(args)
 
+            def _open_last() -> None:
+                quiet = os.getenv("PE_QUIET") not in (None, "", "0")
+                msg = open_last_report(quiet=quiet)
+                console.print(msg)
+
+            def _save_filtered() -> None:
+                quiet = os.getenv("PE_QUIET") not in (None, "", "0")
+                from portfolio_exporter.core.config import settings
+
+                symbols = prompt_input("Symbols (comma-separated)", "").strip() or None
+                effect = prompt_input("Effect (Open/Close/Roll)", "").strip() or None
+                top_n = prompt_input("Top N (optional)", "").strip()
+                top = int(top_n) if top_n else None
+                _quick_save_filtered(
+                    output_dir=str(settings.output_dir),
+                    symbols=symbols,
+                    effect_in=effect,
+                    top_n=top,
+                    quiet=quiet,
+                )
+
+            def _copy_trades_json() -> None:
+                quiet = os.getenv("PE_QUIET") not in (None, "", "0")
+                symbols = prompt_input("Symbols (comma-separated)", "").strip() or None
+                effect = prompt_input("Effect (Open/Close/Roll)", "").strip() or None
+                top_n = prompt_input("Top N (optional)", "").strip()
+                top = int(top_n) if top_n else None
+                txt = _preview_trades_json(symbols=symbols, effect_in=effect, top_n=top)
+                if quiet:
+                    import tempfile
+
+                    p = Path(tempfile.gettempdir()) / "trades_summary.json"
+                    p.write_text(txt)
+                    console.print(p)
+                else:
+                    if _copy_to_clipboard(txt):
+                        console.print("Copied summary to clipboard")
+                    else:
+                        console.print(txt)
+
             dispatch = {
                 "e": _trades_report,
                 "b": _order_builder,
@@ -338,6 +490,9 @@ def launch(status, default_fmt):
                 "p": _preview_daily_report,
                 "f": _preflight_daily_report,
                 "x": _preflight_roll_manager,
+                "o": _open_last,
+                "s": _save_filtered,
+                "j": _copy_trades_json,
             }.get(ch)
             if dispatch:
                 label = label_map.get(ch, ch)
