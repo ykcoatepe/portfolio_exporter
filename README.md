@@ -346,6 +346,20 @@ python -m portfolio_exporter.scripts.quick_chain -h              | grep -E -- '-
 echo "PASS: help shows common flags"
 ```
 
+### Sanity — trades_report --excel
+
+Quick confidence for the Excel path of `trades_report`:
+
+```bash
+# Installs openpyxl into the local venv and runs the sanity script
+make sanity-trades-report-excel
+
+# Or run all sanity targets, including the Excel check
+make sanity-all
+```
+
+CI: a minimal workflow is provided at `.github/workflows/sanity-excel.yml` that installs `openpyxl` and runs the same script on PRs.
+
 JSON outputs
 - outputs: an array of file paths when files are written; an empty array (`[]`) in JSON-only runs.
 - manifest: when files are written, a `<script>_manifest.json` is also produced and its path is appended to `outputs`.
@@ -406,7 +420,7 @@ Intent tagging notes
 
 Note: Intent tagging prefers a positions snapshot strictly older than the earliest execution in your selected window to decide whether combos are Open, Close, Mixed, or Roll. Use `--debug-intent` to emit `trades_intent_debug.csv` with per‑leg matching details. If no prior snapshot exists, tagging falls back to the latest positions and accuracy may decrease.
 
-Examples with date filters and summaries:
+### Trades report filters & Excel
 
 ```bash
 # Last week only, summary as text
@@ -417,6 +431,9 @@ python -m portfolio_exporter.scripts.trades_report --since 2025-08-09 --until 20
 
 # Offline CSV + filter + debug combos
 python -m portfolio_exporter.scripts.trades_report --executions-csv tests/data/offline_executions_combo_sample.csv --since 2025-08-01 --until 2025-08-31 --debug-combos
+
+# Write an Excel workbook alongside CSVs
+python -m portfolio_exporter.scripts.trades_report --executions-csv tests/data/executions_fixture.csv --output-dir ./reports --excel
 ```
 
 ### Trades clustering
