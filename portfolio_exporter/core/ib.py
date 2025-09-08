@@ -160,3 +160,19 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> Dict[st
         )
         q.update(greeks)
     return q
+
+
+def net_liq() -> float:
+    """Return current NetLiquidation or NaN if unavailable."""
+    import math as _math
+
+    ib = _ib()
+    if not ib.isConnected():
+        return float("nan")
+    try:
+        for row in ib.accountSummary():
+            if getattr(row, "tag", "") == "NetLiquidation":
+                return float(row.value)
+    except Exception:
+        return float("nan")
+    return float("nan")

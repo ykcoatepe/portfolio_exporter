@@ -119,6 +119,29 @@ memory session-end
 memory rotate --cutoff 45d
 ```
 
+### 17.5.1 Wizard preferences
+
+The order builder wizard persists lightweight defaults under
+`preferences.order_builder_wizard` in `.codex/memory.json`:
+
+```
+{
+  "preferences": {
+    "order_builder_wizard": {
+      "profile": "balanced",
+      "avoid_earnings": true,
+      "min_oi": 200,
+      "min_volume": 50,
+      "max_spread_pct": 0.02,
+      "risk_budget_pct": 2
+    }
+  }
+}
+```
+
+These are updated interactively when you use the wizard’s Auto flow. Writes are
+atomic (`fsync` + `os.replace`) and skipped if `MEMORY_READONLY=1`.
+
 ## 17.6 Acceptance Criteria
 
 - Validation passes; no schema/secret issues.

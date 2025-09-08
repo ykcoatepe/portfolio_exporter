@@ -376,8 +376,158 @@ def launch(status, default_fmt):
                         console.print("[red]Invalid preset[/red]")
                         continue
                     symbol = prompt_input("Symbol: ").strip().upper()
-                    expiry = prompt_input("Expiry (YYYY-MM-DD): ").strip()
-                    qty = prompt_input("Qty", "1").strip() or "1"
+                    expiry = prompt_input("Expiry (YYYY-MM-DD or month like 'nov'): ").strip()
+                    qty = prompt_input("Qty [1]: ").strip() or "1"
+
+                    # Optional: auto-select strikes for supported presets using live data
+                    if preset in {"bull_put", "bear_call", "bull_call", "bear_put", "iron_condor"}:
+                        auto = prompt_input("Auto-select strikes from live data? (Y/n) [Y]: ").strip().lower()
+                        if auto in {"", "y"}:
+                            from portfolio_exporter.core.preset_engine import (
+                                suggest_credit_vertical,
+                                suggest_debit_vertical,
+                                suggest_iron_condor,
+                            )
+                            from portfolio_exporter.scripts.order_builder import _normalize_expiry as _norm_exp
+                            profile = prompt_input("Profile (conservative/balanced/aggressive) [balanced]: ").strip().lower() or "balanced"
+                            avoid_e = prompt_input("Avoid earnings within 7 days? (Y/n) [Y]: ").strip().lower()
+                            avoid_e_bool = (avoid_e in {"", "y"})
+                            # Support DTE entry as number as well as expiry text
+                            dte_or_exp = expiry
+                            if dte_or_exp.isdigit():
+                                import datetime as _dt
+                                d = _dt.date.today() + _dt.timedelta(days=int(dte_or_exp))
+                                expiry = d.isoformat()
+                            expiry = _norm_exp(symbol, expiry)
+                            # Include risk budget pct for suggested qty
+                            rb = prompt_input("Risk budget % of NetLiq for sizing [2]: ").strip() or "2"
+                            try:
+                                rb_pct = float(rb) / 100.0
+                            except Exception:
+                                rb_pct = None
+                            if preset in {"bull_put", "bear_call"}:
+                                cands = suggest_credit_vertical(
+                                    symbol,
+                                    expiry,
+                                    preset,
+                                    profile,
+                                    avoid_earnings=avoid_e_bool,
+                                    earnings_window_days=7,
+                                    risk_budget_pct=rb_pct,
+                                )
+                            elif preset in {"bull_call", "bear_put"}:
+                                cands = suggest_debit_vertical(
+                                    symbol,
+                                    expiry,
+                                    preset,
+                                    profile,
+                                    avoid_earnings=avoid_e_bool,
+                                    earnings_window_days=7,
+                                )
+                            else:
+                                cands = suggest_iron_condor(
+                                    symbol,
+                                    expiry,
+                                    profile,
+                                    avoid_earnings=avoid_e_bool,
+                                    earnings_window_days=7,
+                                    risk_budget_pct=rb_pct,
+                                )
+                            if not cands:
+                                console.print("[yellow]No candidates met liquidity/selection criteria; falling back to manual width.[/yellow]")
+                            else:
+                                resolved_exp = cands[0].get("expiry", expiry)
+                                tbl = Table(title=f"{preset} candidates ({symbol} {resolved_exp})")
+                                tbl.add_column("#", justify="right")
+                                tbl.add_column("Strikes", justify="left")
+                                tbl.add_column("Type", justify="center")
+                                tbl.add_column("Price", justify="right")
+                                tbl.add_column("Width", justify="right")
+                                tbl.add_column("Risk", justify="right")
+                                tbl.add_column("POP", justify="right")
+                                tbl.add_column("Qty*", justify="right")
+                                for i, c in enumerate(cands, 1):
+                                    ks = sorted([leg.get("strike") for leg in c.get("legs", [])])
+                                    typ = "CR" if "credit" in c else ("DR" if "debit" in c else "CR")
+                                    price = c.get("credit", c.get("debit", 0.0))
+                                    risk = c.get("max_loss", c.get("debit", 0.0))
+                                    tbl.add_row(
+                                        str(i),
+                                        ",".join(f"{k:g}" for k in ks),
+                                        typ,
+                                        f"{price:.2f}",
+                                        f"{c.get('width',0):.2f}",
+                                        f"{risk:.2f}",
+                                        f"{c.get('pop_proxy',0):.2f}",
+                                        str(c.get('suggested_qty','')),
+                                    )
+                                console.print(tbl)
+                                sel = prompt_input("Select candidate # (or Enter to skip): ").strip()
+                                if sel.isdigit() and 1 <= int(sel) <= len(cands):
+                                    pick = cands[int(sel) - 1]
+                                    ks = [leg.get("strike") for leg in pick.get("legs", [])]
+                                    expiry = pick.get("expiry", expiry)
+                                    # Suggested qty handling if user asked for auto previously
+                                    eff_qty = qty
+                                    if (qty.strip().lower() in {"", "a", "auto"}) and pick.get("suggested_qty"):
+                                        eff_qty = str(int(pick.get("suggested_qty")))
+                                        use_auto = prompt_input(f"Use suggested qty {eff_qty}? (Y/n) [Y]: ").strip().lower()
+                                        if use_auto == "n":
+                                            eff_qty = prompt_input("Qty: ").strip() or eff_qty
+                                    # Build via strategy based on preset
+                                    if preset in {"bull_put"} and len(ks)>=2:
+                                        args = [
+                                            "--strategy", "vertical",
+                                            "--symbol", symbol,
+                                            "--expiry", expiry,
+                                            "--right", "P",
+                                            "--credit",
+                                            "--strikes", f"{ks[0]},{ks[1]}",
+                                            "--qty", eff_qty,
+                                            "--json", "--no-files",
+                                        ]
+                                    elif preset in {"bull_call"} and len(ks)>=2:
+                                        args = [
+                                            "--strategy", "vertical",
+                                            "--symbol", symbol,
+                                            "--expiry", expiry,
+                                            "--right", "C",
+                                            "--debit",
+                                            "--strikes", f"{ks[0]},{ks[1]}",
+                                            "--qty", eff_qty,
+                                            "--json", "--no-files",
+                                        ]
+                                    elif preset in {"iron_condor"} and len(ks)>=4:
+                                        args = [
+                                            "--strategy", "iron_condor",
+                                            "--symbol", symbol,
+                                            "--expiry", expiry,
+                                            "--strikes", ",".join(str(k) for k in sorted(ks)),
+                                            "--qty", eff_qty,
+                                            "--json", "--no-files",
+                                        ]
+                                    else:
+                                        console.print("[yellow]Automatic ticket build not supported for this selection; please use manual.")
+                                        continue
+                                    buf = io.StringIO()
+                                    with contextlib.redirect_stdout(buf):
+                                        _ob.cli(args)
+                                    try:
+                                        summary = json.loads(buf.getvalue())
+                                    except Exception:
+                                        console.print("[red]Builder failed[/red]")
+                                        continue
+                                    ticket = summary.get("ticket")
+                                    risk = summary.get("risk_summary")
+                                    console.print(ticket)
+                                    if risk:
+                                        console.print(risk)
+                                    if ticket:
+                                        save = prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
+                                        if save in {"", "y"}:
+                                            io_save(ticket, "order_ticket", fmt="json")
+                                    # Continue to next loop
+                                    continue
                     args = [
                         "--preset",
                         preset,
@@ -391,10 +541,10 @@ def launch(status, default_fmt):
                         "--no-files",
                     ]
                     if preset in {"bull_put", "bear_call", "bull_call", "bear_put"}:
-                        width = prompt_input("Width", "5").strip() or "5"
+                        width = prompt_input("Width [5]: ").strip() or "5"
                         args.extend(["--width", width])
                     elif preset in {"iron_condor", "iron_fly"}:
-                        wings = prompt_input("Wings", "5").strip() or "5"
+                        wings = prompt_input("Wings [5]: ").strip() or "5"
                         args.extend(["--wings", wings])
                     buf = io.StringIO()
                     with contextlib.redirect_stdout(buf):
@@ -410,7 +560,7 @@ def launch(status, default_fmt):
                     if risk:
                         console.print(risk)
                     if ticket:
-                        save = prompt_input("Save ticket? (Y/n)", "Y").strip().lower()
+                        save = prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
                         if save in {"", "y"}:
                             io_save(ticket, "order_ticket", fmt="json")
 

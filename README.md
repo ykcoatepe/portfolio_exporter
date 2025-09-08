@@ -111,6 +111,39 @@ doctor --json --no-files
 daily-report --json --no-files | validate-json
 ```
 
+## Task recipes
+
+Copy-paste snippets for common day-to-day tasks.
+
+### Pre-market: quick-chain → daily-report
+
+```bash
+quick-chain --chain-csv tests/data/quick_chain_fixture.csv --json --no-files
+daily-report --json --no-files
+daily-report --output-dir pre && ls pre/daily_report.html pre/daily_report.pdf
+```
+
+### Trades review: trades-report → trades-dashboard
+
+```bash
+trades-report --executions-csv tests/data/executions_fixture.csv --symbol SPY --json --no-files
+trades-dashboard --executions-csv tests/data/executions_fixture.csv --output-dir trades && ls trades/trades_dashboard.html
+```
+
+### Roll preview: roll-manager --dry-run
+
+```bash
+roll-manager --dry-run --json --no-files
+roll-manager --dry-run --output-dir rolls && ls rolls/roll_manager_preview.html rolls/roll_manager_ticket.json
+```
+
+### Maintenance: combo-db-maint
+
+```bash
+combo-db-maint --json --no-files
+combo-db-maint --fix --output-dir combo && ls combo
+```
+
 ## Order Builder presets
 
 `order_builder` can scaffold common option strategies without manual strike
@@ -138,6 +171,32 @@ The JSON response shape is:
 ```
 
 Use other presets like `bear_call`, `iron_condor`, `iron_fly` or `calendar`.
+
+### Auto strike selection (preview)
+
+You can preview live-data candidates for presets using `--auto`. The engine
+selects strikes by target delta with liquidity and earnings filters, and emits
+JSON so you can choose a candidate or feed it to other tools.
+
+```bash
+# Credit vertical example with liquidity and earnings guardrails
+python -m portfolio_exporter.scripts.order_builder \
+  --preset bear_call --symbol AAPL --expiry nov \
+  --auto --profile balanced --earnings-window 7 \
+  --min-oi 200 --min-volume 50 --max-spread-pct 0.02 \
+  --json --no-files
+
+# Debit vertical example by DTE
+python -m portfolio_exporter.scripts.order_builder \
+  --preset bull_call --symbol AAPL --dte 30 \
+  --auto --profile conservative \
+  --json --no-files
+
+# Iron condor preview
+python -m portfolio_exporter.scripts.order_builder \
+  --preset iron_condor --symbol AAPL --expiry nov \
+  --auto --json --no-files
+```
 
 Quick reference
 - Presets: `bull_put`, `bear_call`, `bull_call`, `bear_put`, `iron_condor`, `iron_fly`, `calendar`.
@@ -209,6 +268,13 @@ Flags are unified across scripts: `--json`, `--no-files`, `--output-dir`,
 `--no-pretty`, `--debug-timings`. When files are written a RunLog manifest is
 emitted; adding `--debug-timings` also writes `timings.csv` and includes
 per-stage timings in the JSON summary.
+
+## Troubleshooting & Env
+
+- **command not found** → `pip install -e .` ; `PATH=.venv/bin:$PATH`
+- **missing ruff/pytest** → `make setup` (or `pip install -r requirements-dev.txt`)
+- **reportlab missing** → PDF step skipped
+- **pyperclip missing** → clipboard copy skipped
 
 ## Repo Memory (Agent-Shared)
 
@@ -568,17 +634,17 @@ python -m portfolio_exporter.scripts.net_liq_history_export --start 2025-01-01 -
 ### Build Order (CLI)
 
 The non-interactive order builder creates normalized ticket JSONs for common strategies.
-Each strategy defaults to the house leg directions; flipping the sign of `--qty`
-switches between credit and debit orientations.
+For verticals, you can explicitly set orientation with `--credit` or `--debit`.
+If omitted, legacy defaults apply (calls default to debit, puts default to credit).
 
 ```bash
 # Bull call (debit) vs. bear call (credit)
-python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty 1
-python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty -1
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty 1 --debit
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty 1 --credit
 
 # Bull put (credit) vs. bear put (debit)
-python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty 1
-python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty -1
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty 1 --credit
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty 1 --debit
 
 # Short vs. long iron condor (strike order auto-sorted)
 python -m portfolio_exporter.scripts.order_builder --strategy iron_condor --symbol SPY --expiry 2025-06-20 --strikes 380,390,410,420 --qty -1
@@ -605,6 +671,30 @@ python -m portfolio_exporter.scripts.order_builder --strategy covered_call --sym
 python -m portfolio_exporter.scripts.order_builder --strategy covered_call --symbol SPY --expiry 2025-06-20 --call-strike 410 --qty 1
 ```
 
+### Wizard Auto Mode (preview)
+
+The interactive wizard can suggest strikes from live data for verticals
+(credit/debit) and iron condors, then let you accept or tweak. It remembers
+your liquidity thresholds and risk-budget defaults in `.codex/memory.json`.
+
+CLI preview for the same wizard selection logic:
+
+```bash
+# Preview vertical credit candidates and pick the 2nd to emit a ticket
+python -m portfolio_exporter.scripts.order_builder \
+  --wizard --auto --strategy vertical --right P \
+  --symbol AAPL --expiry nov --profile balanced \
+  --min-oi 200 --min-volume 50 --max-spread-pct 0.02 \
+  --earnings-window 7 --pick 2 \
+  --json --no-files
+
+# Preview iron condor candidates
+python -m portfolio_exporter.scripts.order_builder \
+  --wizard --auto --strategy iron_condor \
+  --symbol AAPL --expiry nov \
+  --json --no-files
+```
+
 ### Expiry hint formats
 
 When prompted for an expiry, you may provide:
@@ -614,6 +704,7 @@ When prompted for an expiry, you may provide:
 * Month name or abbreviation (e.g. ``June`` or ``Jun``)
 * Day and month like ``26 Jun``, ``Jun 26`` or ``26/06``. The script picks the
   nearest available expiry on or after that date.
+* DTE number (e.g., ``30``) to add N days, then snap to the next listed expiry
 
 Leaving the field blank automatically chooses the next weekly expiry within a
 week or the first Friday that is available.
