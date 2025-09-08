@@ -1,0 +1,79 @@
+{
+  "script": "trades_report",
+  "argv": {
+    "exec_csv": "tests/data/executions_fixture.csv",
+    "debug_combos": false,
+    "debug_intent": false,
+    "prior_positions_csv": null,
+    "since": null,
+    "until": null,
+    "summary_only": false,
+    "cluster_window_sec": 60,
+    "symbol": null,
+    "structure_in": "condor",
+    "structure_out": null,
+    "effect_in": null,
+    "min_abs_pnl": null,
+    "group_by": null,
+    "top_n": 5,
+    "json": true,
+    "no_pretty": false,
+    "no_files": false,
+    "output_dir": ".tmp_trfilters",
+    "debug_timings": true
+  },
+  "env": {
+    "OUTPUT_DIR": null,
+    "PE_OUTPUT_DIR": null,
+    "PE_QUIET": null,
+    "TWS_EXPORT_DIR": false,
+    "CP_REFRESH_TOKEN": false
+  },
+  "start": "2025-08-30T08:28:55.522933",
+  "end": "2025-08-30T08:28:55.555343",
+  "duration_ms": 32,
+  "outputs": [
+    {
+      "path": ".tmp_trfilters/trades_intent_summary.csv",
+      "sha256": "699b0fee948174abbbe85bec3a4ad8f34b9f37a5846b8128cc8e4b35d2463f78",
+      "bytes": 68
+    },
+    {
+      "path": ".tmp_trfilters/trades_intent_by_underlying.csv",
+      "sha256": "0b2e2cb2c9db56ec1a5da0231343bc1a3819c31de7aaa539783e017e370a86df",
+      "bytes": 37
+    },
+    {
+      "path": ".tmp_trfilters/trades_report.csv",
+      "sha256": "627532da1a9dc8f77f6e26ff3022eaa88aa2e5fcd27effacc77c12ceec78e106",
+      "bytes": 269
+    },
+    {
+      "path": ".tmp_trfilters/trades_combos.csv",
+      "sha256": "8bcd1cd6fa51045458c0367a0b2ac154cdfa6e6e413ed27988afef4fdc6fc4e5",
+      "bytes": 84
+    },
+    {
+      "path": ".tmp_trfilters/trades_clusters.csv",
+      "sha256": "2399c16e2e4ad8d0a0f45e6a3115dff777c88513bf1d8e23b53c857c6dfeb343",
+      "bytes": 128
+    },
+    {
+      "path": ".tmp_trfilters/trades_report_filtered.csv",
+      "sha256": "627532da1a9dc8f77f6e26ff3022eaa88aa2e5fcd27effacc77c12ceec78e106",
+      "bytes": 269
+    },
+    {
+      "path": ".tmp_trfilters/trades_clusters_debug.csv",
+      "sha256": "8cf4bf9453d023cc0ef3bd8e2928d110302a9ae425b2ffe6f5be662912e088fb",
+      "bytes": 230
+    },
+    {
+      "path": ".tmp_trfilters/timings.csv",
+      "sha256": "55b4f6b7eba64b1c7e4d50215bbb9e1f3168a5ca648b8f551d475da7a2bab251",
+      "bytes": 19
+    }
+  ],
+  "warnings": [],
+  "version": null
+}

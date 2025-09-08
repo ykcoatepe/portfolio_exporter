@@ -511,3 +511,81 @@ def suggest_iron_condor(
                 cand["risk_budget_pct"] = risk_budget_pct
         results.append(cand)
     return results[:3]
+
+
+def suggest_butterfly(
+    symbol: str,
+    expiry: str,
+    right: str,  # 'C' or 'P'
+    profile: str | None = None,
+    rules: LiquidityRules | None = None,
+    *,
+    df_calls: Optional[pd.DataFrame] = None,
+    df_puts: Optional[pd.DataFrame] = None,
+    spot_override: Optional[float] = None,
+    avoid_earnings: bool = True,
+    earnings_window_days: int = 7,
+) -> List[Dict[str, Any]]:
+    """Suggest debit butterflies centred near ATM with widths {2.5, 5, 10}.
+
+    Returns up to 3 profile-based candidates (conservative/balanced/aggressive)
+    using the requested right (C or P).
+    """
+    widths = {
+        "conservative": 10.0,
+        "balanced": 5.0,
+        "aggressive": 2.5,
+    }
+    profs = ["balanced", "conservative", "aggressive"]
+    if profile:
+        p = profile.lower()
+        profs = [p] + [x for x in profs if x != p]
+    rules = rules or LiquidityRules()
+
+    if df_calls is None or df_puts is None or spot_override is None:
+        calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
+    else:
+        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+    expiry = expiry_resolved
+    if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
+        return []
+    dte = _compute_t_days(expiry)
+    calls = _add_delta(calls, spot, dte, "C")
+    puts = _add_delta(puts, spot, dte, "P")
+    calls = _filter_liquidity(calls, rules)
+    puts = _filter_liquidity(puts, rules)
+    df = calls if right == "C" else puts
+    if df.empty:
+        return []
+    # Choose center near ATM (strike nearest spot)
+    strikes = sorted(df["strike"].astype(float).unique().tolist())
+    if not strikes:
+        return []
+    center = _nearest_strike(strikes, float(spot))
+    results: List[Dict[str, Any]] = []
+    for name in profs:
+        w = widths.get(name, 5.0)
+        low = _nearest_strike(strikes, center - w)
+        high = _nearest_strike(strikes, center + w)
+        if low >= center or high <= center:
+            continue
+        mid_low = _mid_from_df(df, low) or 0.0
+        mid_mid = _mid_from_df(df, center) or 0.0
+        mid_high = _mid_from_df(df, high) or 0.0
+        # Debit butterfly: long wings +1, short center -2
+        debit = max(0.0, float(mid_low + mid_high - 2 * mid_mid))
+        results.append({
+            "profile": name,
+            "underlying": symbol,
+            "expiry": expiry,
+            "legs": [
+                {"secType": "OPT", "right": right, "strike": low, "qty": 1, "expiry": expiry},
+                {"secType": "OPT", "right": right, "strike": center, "qty": -2, "expiry": expiry},
+                {"secType": "OPT", "right": right, "strike": high, "qty": 1, "expiry": expiry},
+            ],
+            "debit": debit,
+            "width": float(high - low) / 2.0,
+            "debit_frac": (debit / (high - low)) if (high - low) else 1.0,
+            "rationale": f"ATM center≈{center:g}, wings≈{w:g}",
+        })
+    return results[:3]

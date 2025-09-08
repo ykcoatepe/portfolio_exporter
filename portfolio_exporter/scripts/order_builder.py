@@ -1409,10 +1409,14 @@ def cli(argv: List[str] | None = None) -> int:
                     cands = _pe.suggest_credit_vertical(args.symbol, exp_norm, side, args.profile, rules=rules, avoid_earnings=bool(args.avoid_earnings), earnings_window_days=int(args.earnings_window), risk_budget_pct=rb_val)
                 else:
                     cands = _pe.suggest_debit_vertical(args.symbol, exp_norm, side, args.profile, rules=rules, avoid_earnings=bool(args.avoid_earnings), earnings_window_days=int(args.earnings_window))
+            elif strat == "butterfly":
+                if not args.right:
+                    parser.error("--right required for butterfly wizard preview")
+                cands = _pe.suggest_butterfly(args.symbol, exp_norm, args.right.upper(), args.profile, rules=rules, avoid_earnings=bool(args.avoid_earnings), earnings_window_days=int(args.earnings_window))
             elif strat == "iron_condor":
                 cands = _pe.suggest_iron_condor(args.symbol, exp_norm, args.profile, rules=rules, avoid_earnings=bool(args.avoid_earnings), earnings_window_days=int(args.earnings_window), risk_budget_pct=rb_val)
             else:
-                parser.error("--wizard --auto currently supports vertical and iron_condor")
+                parser.error("--wizard --auto currently supports vertical, butterfly and iron_condor")
         except Exception as exc:
             cands = []
             warn = f"auto selection failed: {exc}"
@@ -1445,6 +1449,9 @@ def cli(argv: List[str] | None = None) -> int:
                 ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
                 credit_flag = True if "credit" in pick else False if "debit" in pick else None
                 ticket = build_vertical(args.symbol, expiry, args.right.upper(), ks[:2], int(args.qty), args.account, credit=credit_flag)
+            elif strat == "butterfly":
+                ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
+                ticket = build_butterfly(args.symbol, expiry, args.right.upper(), ks[:3], int(args.qty), args.account)
             else:  # iron condor
                 ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
                 ticket = build_iron_condor(args.symbol, expiry, ks[:4], int(args.qty), args.account)

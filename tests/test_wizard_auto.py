@@ -44,6 +44,23 @@ def _cand_ic(expiry: str = "2099-01-19") -> List[Dict[str, Any]]:
     ]
 
 
+def _cand_fly(expiry: str = "2099-01-19") -> List[Dict[str, Any]]:
+    return [
+        {
+            "profile": "balanced",
+            "underlying": "TEST",
+            "expiry": expiry,
+            "legs": [
+                {"secType": "OPT", "right": "C", "strike": 95.0, "qty": 1, "expiry": expiry},
+                {"secType": "OPT", "right": "C", "strike": 100.0, "qty": -2, "expiry": expiry},
+                {"secType": "OPT", "right": "C", "strike": 105.0, "qty": 1, "expiry": expiry},
+            ],
+            "debit": 1.25,
+            "width": 5.0,
+        }
+    ]
+
+
 def test_wizard_auto_vertical_candidates(monkeypatch, capsys):
     # Monkeypatch preset_engine.suggest_credit_vertical to avoid network
     import portfolio_exporter.core.preset_engine as pe
@@ -106,3 +123,22 @@ def test_wizard_auto_iron_condor_candidates(monkeypatch, capsys):
     cands = data.get("candidates", [])
     assert cands and len(cands[0].get("legs", [])) == 4
 
+
+def test_wizard_auto_butterfly_candidates(monkeypatch, capsys):
+    import portfolio_exporter.core.preset_engine as pe
+
+    monkeypatch.setattr(pe, "suggest_butterfly", lambda *a, **k: _cand_fly())
+
+    rc = ob.cli([
+        "--wizard", "--auto",
+        "--strategy", "butterfly",
+        "--right", "C",
+        "--symbol", "TEST",
+        "--expiry", "2099-01-19",
+        "--json", "--no-files",
+    ])
+    out = capsys.readouterr().out.strip()
+    data = json.loads(out)
+    assert data["ok"] is True and data.get("wizard") is True
+    cands = data.get("candidates", [])
+    assert cands and len(cands[0].get("legs", [])) == 3
