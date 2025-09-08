@@ -105,6 +105,71 @@ def test_wizard_auto_vertical_pick(monkeypatch, capsys):
     assert len(legs) == 2 and all(l.get("right") == "P" for l in legs)
 
 
+def test_wizard_auto_vertical_debit_candidates(monkeypatch, capsys):
+    import portfolio_exporter.core.preset_engine as pe
+
+    # Stub debit vertical for bull_call
+    cands = [
+        {
+            "profile": "balanced",
+            "underlying": "TEST",
+            "expiry": "2099-01-19",
+            "legs": [
+                {"secType": "OPT", "right": "C", "strike": 100.0, "qty": 1, "expiry": "2099-01-19"},
+                {"secType": "OPT", "right": "C", "strike": 105.0, "qty": -1, "expiry": "2099-01-19"},
+            ],
+            "debit": 1.0,
+        }
+    ]
+    monkeypatch.setattr(pe, "suggest_debit_vertical", lambda *a, **k: cands)
+
+    rc = ob.cli([
+        "--wizard", "--auto",
+        "--strategy", "vertical",
+        "--right", "C",
+        "--symbol", "TEST",
+        "--expiry", "2099-01-19",
+        "--json", "--no-files",
+    ])
+    out = capsys.readouterr().out.strip()
+    data = json.loads(out)
+    assert data["ok"] is True and data.get("wizard") is True
+    assert data.get("candidates")
+
+
+def test_wizard_auto_calendar_candidates(monkeypatch, capsys):
+    import portfolio_exporter.core.preset_engine as pe
+
+    cands = [
+        {
+            "profile": "balanced",
+            "underlying": "TEST",
+            "expiry": "2099-02-18",
+            "near": "2099-01-21",
+            "far": "2099-02-18",
+            "legs": [
+                {"secType": "OPT", "right": "C", "strike": 100.0, "qty": -1, "expiry": "2099-01-21"},
+                {"secType": "OPT", "right": "C", "strike": 100.0, "qty": 1, "expiry": "2099-02-18"},
+            ],
+            "debit": 1.2,
+        }
+    ]
+    monkeypatch.setattr(pe, "suggest_calendar", lambda *a, **k: cands)
+
+    rc = ob.cli([
+        "--wizard", "--auto",
+        "--strategy", "calendar",
+        "--right", "C",
+        "--symbol", "TEST",
+        "--expiry", "2099-02-18",
+        "--json", "--no-files",
+    ])
+    out = capsys.readouterr().out.strip()
+    data = json.loads(out)
+    assert data["ok"] is True and data.get("wizard") is True
+    assert data.get("candidates") and data.get("resolved_expiry") == "2099-02-18"
+
+
 def test_wizard_auto_iron_condor_candidates(monkeypatch, capsys):
     import portfolio_exporter.core.preset_engine as pe
 

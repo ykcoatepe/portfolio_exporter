@@ -497,6 +497,17 @@ def launch(status, default_fmt):
                                             "--qty", eff_qty,
                                             "--json", "--no-files",
                                         ]
+                                    elif preset in {"bear_put"} and len(ks)>=2:
+                                        args = [
+                                            "--strategy", "vertical",
+                                            "--symbol", symbol,
+                                            "--expiry", expiry,
+                                            "--right", "P",
+                                            "--debit",
+                                            "--strikes", f"{ks[0]},{ks[1]}",
+                                            "--qty", eff_qty,
+                                            "--json", "--no-files",
+                                        ]
                                     elif preset in {"iron_condor"} and len(ks)>=4:
                                         args = [
                                             "--strategy", "iron_condor",

@@ -589,3 +589,95 @@ def suggest_butterfly(
             "rationale": f"ATM center≈{center:g}, wings≈{w:g}",
         })
     return results[:3]
+
+
+def suggest_calendar(
+    symbol: str,
+    expiry_far: str,
+    right: str,
+    profile: str | None = None,
+    rules: LiquidityRules | None = None,
+    *,
+    near_dte: int = 30,
+    far_dte: int = 60,
+    df_calls_near: Optional[pd.DataFrame] = None,
+    df_puts_near: Optional[pd.DataFrame] = None,
+    df_calls_far: Optional[pd.DataFrame] = None,
+    df_puts_far: Optional[pd.DataFrame] = None,
+    spot_override: Optional[float] = None,
+    avoid_earnings: bool = True,
+    earnings_window_days: int = 7,
+    avoid_inverted_term: bool = False,
+) -> List[Dict[str, Any]]:
+    """Suggest a simple ATM calendar (short near, long far) with ATM bias.
+
+    - Chooses ATM strike via spot to nearest strike
+    - Near/far expiries default to ~30/60 DTE; snaps to listed expiries
+    - Optionally checks term structure (avoid inverted near IV > far IV)
+    """
+    from datetime import date, timedelta
+
+    rules = rules or LiquidityRules()
+    # Resolve expiries via Yahoo list
+    far_resolved, exps = _nearest_yf_expiry(symbol, expiry_far)
+    # Derive near target by subtracting ~30 days, then snap
+    try:
+        far_dt = pd.to_datetime(far_resolved).date()
+    except Exception:
+        far_dt = date.today() + timedelta(days=far_dte)
+    near_target = (far_dt - timedelta(days=far_dte - near_dte)).isoformat()
+    near_resolved, _ = _nearest_yf_expiry(symbol, near_target)
+
+    # Load chains (or injected DFs)
+    if df_calls_near is None or df_puts_near is None or df_calls_far is None or df_puts_far is None or spot_override is None:
+        calls_far, puts_far, spot, far_resolved = _yf_chain(symbol, far_resolved)
+        calls_near, puts_near, _, near_resolved = _yf_chain(symbol, near_resolved)
+    else:
+        calls_near, puts_near = df_calls_near.copy(), df_puts_near.copy()
+        calls_far, puts_far = df_calls_far.copy(), df_puts_far.copy()
+        spot = float(spot_override)
+    if avoid_earnings and (_earnings_near(symbol, near_resolved, earnings_window_days) or _earnings_near(symbol, far_resolved, earnings_window_days)):
+        return []
+
+    dte_near = _compute_t_days(near_resolved)
+    dte_far = _compute_t_days(far_resolved)
+    calls_near = _add_delta(calls_near, spot, dte_near, "C")
+    puts_near = _add_delta(puts_near, spot, dte_near, "P")
+    calls_far = _add_delta(calls_far, spot, dte_far, "C")
+    puts_far = _add_delta(puts_far, spot, dte_far, "P")
+    calls_near = _filter_liquidity(calls_near, rules)
+    puts_near = _filter_liquidity(puts_near, rules)
+    calls_far = _filter_liquidity(calls_far, rules)
+    puts_far = _filter_liquidity(puts_far, rules)
+
+    df_near = calls_near if right == "C" else puts_near
+    df_far = calls_far if right == "C" else puts_far
+    if df_near.empty or df_far.empty:
+        return []
+    strikes = sorted(set(df_near["strike"].astype(float)).intersection(set(df_far["strike"].astype(float))))
+    if not strikes:
+        return []
+    center = _nearest_strike(strikes, float(spot))
+    mid_short = _mid_from_df(df_near, center) or 0.0
+    mid_long = _mid_from_df(df_far, center) or 0.0
+    debit = max(0.0, float(mid_long) - float(mid_short))
+    # Term structure check (median IVs)
+    near_iv = float(df_near.get("impliedVolatility").median() or 0.0)
+    far_iv = float(df_far.get("impliedVolatility").median() or 0.0)
+    inverted = near_iv > far_iv + 1e-6
+    if avoid_inverted_term and inverted:
+        return []
+    return [{
+        "profile": (profile or "balanced"),
+        "underlying": symbol,
+        "expiry": far_resolved,
+        "legs": [
+            {"secType": "OPT", "right": right, "strike": center, "qty": -1, "expiry": near_resolved},
+            {"secType": "OPT", "right": right, "strike": center, "qty": 1, "expiry": far_resolved},
+        ],
+        "debit": debit,
+        "near": near_resolved,
+        "far": far_resolved,
+        "term_structure": {"near_iv": near_iv, "far_iv": far_iv, "inverted": inverted},
+        "rationale": f"ATM calendar near≈{dte_near}D, far≈{dte_far}D",
+    }]
