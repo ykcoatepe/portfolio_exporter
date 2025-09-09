@@ -372,6 +372,26 @@ def launch(status, default_fmt):
                                 console.print(f"By underlying: {txt}")
                         except Exception:
                             pass
+                    # If Unknown ratio is high or prior snapshot warning present, offer override
+                    try:
+                        unk = int(rows.get('Unknown', 0))
+                        total = sum(int(rows.get(k, 0)) for k in ['Open','Close','Roll','Mixed','Unknown']) or 1
+                        warnings = summary.get('warnings', []) or []
+                        need_prior = (unk / total) > 0.3 or any('prior positions snapshot' in str(w).lower() for w in warnings)
+                    except Exception:
+                        need_prior = False
+                    if need_prior:
+                        path = prompt_input("Prior positions CSV path to improve intent (Enter to skip): ").strip()
+                        if path:
+                            buf2 = io.StringIO()
+                            with _ctx.redirect_stdout(buf2):
+                                _tr.main(["--summary-only", "--json", "--no-files", "--prior-positions-csv", path])
+                            s2 = json.loads(buf2.getvalue().strip() or "{}")
+                            rows2 = ((s2.get("meta", {}) or {}).get("intent", {}) or {}).get("rows", {}) or {}
+                            if rows2:
+                                console.print(
+                                    f"Updated intent with prior: Open={rows2.get('Open',0)} Close={rows2.get('Close',0)} Roll={rows2.get('Roll',0)} Mixed={rows2.get('Mixed',0)} Unknown={rows2.get('Unknown',0)}"
+                                )
                 except Exception:
                     pass
                 # Top combos by realized P&L (from clustered executions)
