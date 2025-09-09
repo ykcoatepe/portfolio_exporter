@@ -363,6 +363,7 @@ def launch(status, default_fmt):
                         "bear_put",
                         "iron_condor",
                         "iron_fly",
+                        "butterfly",
                         "calendar",
                     ]
                     tbl = Table(title="Preset")
@@ -380,13 +381,15 @@ def launch(status, default_fmt):
                     qty = prompt_input("Qty [1]: ").strip() or "1"
 
                     # Optional: auto-select strikes for supported presets using live data
-                    if preset in {"bull_put", "bear_call", "bull_call", "bear_put", "iron_condor"}:
+                    if preset in {"bull_put", "bear_call", "bull_call", "bear_put", "iron_condor", "butterfly", "calendar"}:
                         auto = prompt_input("Auto-select strikes from live data? (Y/n) [Y]: ").strip().lower()
                         if auto in {"", "y"}:
                             from portfolio_exporter.core.preset_engine import (
                                 suggest_credit_vertical,
                                 suggest_debit_vertical,
                                 suggest_iron_condor,
+                                suggest_butterfly,
+                                suggest_calendar,
                             )
                             from portfolio_exporter.scripts.order_builder import _normalize_expiry as _norm_exp
                             profile = prompt_input("Profile (conservative/balanced/aggressive) [balanced]: ").strip().lower() or "balanced"
@@ -405,6 +408,12 @@ def launch(status, default_fmt):
                                 rb_pct = float(rb) / 100.0
                             except Exception:
                                 rb_pct = None
+                            # Additional prompts for right where needed
+                            right = None
+                            if preset in {"butterfly", "calendar"}:
+                                right_in = prompt_input("Right (C/P) [C]: ").strip().upper() or "C"
+                                right = "C" if right_in != "P" else "P"
+
                             if preset in {"bull_put", "bear_call"}:
                                 cands = suggest_credit_vertical(
                                     symbol,
@@ -424,7 +433,7 @@ def launch(status, default_fmt):
                                     avoid_earnings=avoid_e_bool,
                                     earnings_window_days=7,
                                 )
-                            else:
+                            elif preset in {"iron_condor"}:
                                 cands = suggest_iron_condor(
                                     symbol,
                                     expiry,
@@ -432,6 +441,32 @@ def launch(status, default_fmt):
                                     avoid_earnings=avoid_e_bool,
                                     earnings_window_days=7,
                                     risk_budget_pct=rb_pct,
+                                )
+                            elif preset in {"butterfly"}:
+                                # Right is required for butterfly auto
+                                cands = suggest_butterfly(
+                                    symbol,
+                                    expiry,
+                                    right or "C",
+                                    profile,
+                                    avoid_earnings=avoid_e_bool,
+                                    earnings_window_days=7,
+                                )
+                            else:  # calendar
+                                # Ask optional diagonal offset steps (0 = calendar)
+                                so = prompt_input("Diagonal far strike offset steps (0=calendar) [0]: ").strip()
+                                try:
+                                    strike_offset = int(so) if so else 0
+                                except Exception:
+                                    strike_offset = 0
+                                cands = suggest_calendar(
+                                    symbol,
+                                    expiry,
+                                    right or "C",
+                                    profile,
+                                    avoid_earnings=avoid_e_bool,
+                                    earnings_window_days=7,
+                                    strike_offset=strike_offset,
                                 )
                             if not cands:
                                 console.print("[yellow]No candidates met liquidity/selection criteria; falling back to manual width.[/yellow]")
@@ -515,6 +550,32 @@ def launch(status, default_fmt):
                                             "--expiry", expiry,
                                             "--strikes", ",".join(str(k) for k in sorted(ks)),
                                             "--qty", eff_qty,
+                                            "--json", "--no-files",
+                                        ]
+                                    
+                                    elif preset in {"butterfly"} and len(ks)>=3:
+                                        # Build butterfly with selected right
+                                        args = [
+                                            "--strategy", "butterfly",
+                                            "--symbol", symbol,
+                                            "--expiry", expiry,
+                                            "--right", (right or "C"),
+                                            "--strikes", ",".join(str(k) for k in sorted(ks)[:3]),
+                                            "--qty", eff_qty,
+                                            "--json", "--no-files",
+                                        ]
+                                    elif preset in {"calendar"} and len(ks)>=1:
+                                        # Prefer wizard pick to support diagonal if strikes differ
+                                        near = pick.get("near") or pick.get("legs", [{}])[0].get("expiry")
+                                        far = pick.get("far") or pick.get("expiry", expiry)
+                                        # Use wizard auto pick path to emit consistent ticket JSON
+                                        args = [
+                                            "--wizard", "--auto",
+                                            "--strategy", "calendar",
+                                            "--right", (right or "C"),
+                                            "--symbol", symbol,
+                                            "--expiry", expiry,
+                                            "--pick", str(int(sel)),
                                             "--json", "--no-files",
                                         ]
                                     else:

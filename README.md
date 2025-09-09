@@ -702,6 +702,15 @@ python -m portfolio_exporter.scripts.order_builder \
   --earnings-window 7 --json --no-files
 ```
 
+### Stage Order (menu)
+
+From the Trades & Reports menu, choose Build order → Preset to stage tickets.
+
+- Auto candidates: vertical (credit/debit), iron condor, butterfly, and calendar.
+- Butterfly/calendar prompt for Right (C/P). Calendar also supports a diagonal offset.
+- Flow: select a preset → Symbol → Expiry (date/month/DTE) → Auto = Y → review candidates table → pick a number → ticket JSON prints with a risk summary and optional save.
+- Iron fly currently uses presets/manual (no auto suggestions yet).
+
 ### Expiry hint formats
 
 When prompted for an expiry, you may provide:
