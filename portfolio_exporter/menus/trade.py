@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from portfolio_exporter.core.ui import prompt_input
+import datetime as _dt
 
 
 @contextmanager
@@ -206,6 +207,8 @@ def launch(status, default_fmt):
         else:
             for w in summary.get("warnings", []):
                 console.print(f"[yellow]{w}")
+            if not summary.get("warnings"):
+                console.print("Preflight OK: files can be generated.")
         finally:
             if orig_quiet is None:
                 os.environ.pop("PE_QUIET", None)
@@ -259,9 +262,15 @@ def launch(status, default_fmt):
             console.print(f"Candidates: {len(candidates)}")
             top = sorted(candidates, key=lambda c: abs(c.get("delta", 0)), reverse=True)[:3]
             for c in top:
-                console.print(
-                    f"{c.get('underlying')} Δ{c.get('delta', 0):+0.2f} {c.get('debit_credit', 0):+0.2f}"
-                )
+                exp = c.get("expiry") or c.get("exp")
+                dte_txt = ""
+                try:
+                    if exp:
+                        dte = ( _dt.date.fromisoformat(str(exp)) - _dt.date.today() ).days
+                        dte_txt = f" {exp} ({dte}D)"
+                except Exception:
+                    dte_txt = ""
+                console.print(f"{c.get('underlying')} Δ{c.get('delta', 0):+0.2f} {c.get('debit_credit', 0):+0.2f}{dte_txt}")
             for w in summary.get("warnings", []):
                 console.print(f"[yellow]{w}")
         finally:
@@ -276,7 +285,7 @@ def launch(status, default_fmt):
         from portfolio_exporter.core.io import latest_file
 
         if not latest_file("portfolio_greeks_positions"):
-            console.print("[yellow]Missing positions; run: portfolio-greeks")
+            console.print("[yellow]Missing positions; run: portfolio-greeks (hint: PE_POSITIONS_MAX_AGE_SEC controls freshness)")
             if orig_quiet is None:
                 os.environ.pop("PE_QUIET", None)
             else:
@@ -773,6 +782,12 @@ def launch(status, default_fmt):
                 if os.getenv("PE_QUIET"):
                     args.append("--no-pretty")
                 _daily.main(args)
+                # Offer to open the last report immediately
+                quiet = os.getenv("PE_QUIET") not in (None, "", "0")
+                ch = prompt_input("Open last report now? (Y/n) [Y]: ").strip().lower()
+                if ch in {"", "y"}:
+                    msg = open_last_report(quiet=quiet)
+                    console.print(msg)
 
             def _open_last() -> None:
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
@@ -782,26 +797,95 @@ def launch(status, default_fmt):
             def _save_filtered() -> None:
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
                 from portfolio_exporter.core.config import settings
+                # Prefill from Pre-Market cache and memory
+                try:
+                    from portfolio_exporter.menus import pre as _pre_menu
+                    _last_sym = _pre_menu.last_symbol.get()
+                except Exception:
+                    _last_sym = ""
+                # Load memory preferences
+                _mem = {}
+                try:
+                    from pathlib import Path as _Path
+                    _p = _Path(".codex/memory.json")
+                    if _p.exists():
+                        _mem = json.loads(_p.read_text()).get("preferences", {}).get("trades_filters", {})
+                except Exception:
+                    _mem = {}
+                defv_sym = _mem.get("symbols", _last_sym)
+                defv_eff = _mem.get("effect") or ""
+                defv_str = _mem.get("structure") or ""
+                defv_top = str(_mem.get("top_n", "")) if _mem.get("top_n") is not None else ""
 
-                symbols = prompt_input("Symbols (comma-separated)", "").strip() or None
-                effect = prompt_input("Effect (Open/Close/Roll)", "").strip() or None
-                top_n = prompt_input("Top N (optional)", "").strip()
-                top = int(top_n) if top_n else None
-                _quick_save_filtered(
+                symbols = (prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym) or None
+                effect = (prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff) or None
+                structure = (prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip() or defv_str) or None
+                top_n = prompt_input(f"Top N (optional) [{defv_top}]: ").strip() or defv_top
+                top = int(top_n) if str(top_n).strip().isdigit() else None
+                summary = _quick_save_filtered(
                     output_dir=str(settings.output_dir),
                     symbols=symbols,
                     effect_in=effect,
+                    structure_in=structure,
                     top_n=top,
                     quiet=quiet,
                 )
+                # Clipboard: copy last output path if available
+                try:
+                    outs = [str(p) for p in summary.get("outputs", []) if p]
+                    if outs:
+                        last = outs[-1]
+                        if not quiet and _copy_to_clipboard(last):
+                            console.print("Copied path to clipboard")
+                except Exception:
+                    pass
+                # Persist prefs back to memory (best effort, atomic replace)
+                try:
+                    from pathlib import Path as _Path
+                    _pf = _Path(".codex/memory.json")
+                    data = {}
+                    if _pf.exists():
+                        data = json.loads(_pf.read_text())
+                    prefs = data.setdefault("preferences", {})
+                    prefs["trades_filters"] = {
+                        "symbols": symbols or "",
+                        "effect": effect or "",
+                        "structure": structure or "",
+                        "top_n": top if top is not None else "",
+                    }
+                    tmp = _pf.with_suffix(".json.tmp")
+                    tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
+                    os.replace(tmp, _pf)
+                except Exception:
+                    pass
 
             def _copy_trades_json() -> None:
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
-                symbols = prompt_input("Symbols (comma-separated)", "").strip() or None
-                effect = prompt_input("Effect (Open/Close/Roll)", "").strip() or None
-                top_n = prompt_input("Top N (optional)", "").strip()
-                top = int(top_n) if top_n else None
-                txt = _preview_trades_json(symbols=symbols, effect_in=effect, top_n=top)
+                # Prefill from memory and Pre menu
+                try:
+                    from portfolio_exporter.menus import pre as _pre_menu
+                    _last_sym = _pre_menu.last_symbol.get()
+                except Exception:
+                    _last_sym = ""
+                _mem = {}
+                try:
+                    from pathlib import Path as _Path
+                    _p = _Path(".codex/memory.json")
+                    if _p.exists():
+                        _mem = json.loads(_p.read_text()).get("preferences", {}).get("trades_filters", {})
+                except Exception:
+                    _mem = {}
+                defv_sym = _mem.get("symbols", _last_sym)
+                defv_eff = _mem.get("effect") or ""
+                defv_str = _mem.get("structure") or ""
+                defv_top = str(_mem.get("top_n", "")) if _mem.get("top_n") is not None else ""
+
+                symbols = (prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym) or None
+                effect = (prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff) or None
+                structure = (prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip() or defv_str) or None
+                top_n = prompt_input(f"Top N (optional) [{defv_top}]: ").strip() or defv_top
+                top = int(top_n) if str(top_n).strip().isdigit() else None
+                txt = _preview_trades_json(symbols=symbols, effect_in=effect, structure_in=structure, top_n=top)
                 if quiet:
                     import tempfile
 
@@ -813,6 +897,25 @@ def launch(status, default_fmt):
                         console.print("Copied summary to clipboard")
                     else:
                         console.print(txt)
+                # Persist selections
+                try:
+                    from pathlib import Path as _Path
+                    _pf = _Path(".codex/memory.json")
+                    data = {}
+                    if _pf.exists():
+                        data = json.loads(_pf.read_text())
+                    prefs = data.setdefault("preferences", {})
+                    prefs["trades_filters"] = {
+                        "symbols": symbols or "",
+                        "effect": effect or "",
+                        "structure": structure or "",
+                        "top_n": top if top is not None else "",
+                    }
+                    tmp = _pf.with_suffix(".json.tmp")
+                    tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
+                    os.replace(tmp, _pf)
+                except Exception:
+                    pass
 
             dispatch = {
                 "e": _trades_report,
