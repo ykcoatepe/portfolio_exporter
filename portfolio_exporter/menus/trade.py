@@ -1048,43 +1048,6 @@ def launch(status, default_fmt):
                 except Exception:
                     pass
 
-            dispatch = {
-                "e": _trades_report,
-                "b": _order_builder,
-                "l": _roll_positions,
-                "v": _preview_roll_manager,
-                "c": _preview_trades_clusters,
-                "q": _quick_chain,
-                "n": _net_liq,
-                "d": _generate_daily_report,
-                "p": _preview_daily_report,
-                "f": _preflight_daily_report,
-                "x": _preflight_roll_manager,
-                "o": _open_last,
-                "k": _open_last_ticket,
-                "s": _save_filtered,
-                "j": _copy_trades_json,
-                "m": _preview_combos_mtm,
-                "t": None,
-            }.get(ch)
-            if dispatch:
-                label = label_map.get(ch, ch)
-                if status:
-                    status.update(f"Running {label} …", "cyan")
-                try:
-                    dispatch()
-                except Exception as exc:
-                    console.print(f"[red]Error running {label}:[/] {exc}")
-                finally:
-                    if status:
-                        status.update("Ready", "green")
-            elif ch == "t":
-                order = ["csv", "excel", "pdf"]
-                try:
-                    idx = order.index(current_fmt)
-                except ValueError:
-                    idx = 0
-                current_fmt = order[(idx + 1) % len(order)]
             def _preview_combos_mtm() -> None:
                 """Compute MTM P&L for detected combos using mid quotes; JSON-only."""
                 from portfolio_exporter.scripts import trades_report as _tr
@@ -1187,4 +1150,41 @@ def launch(status, default_fmt):
                         console.print("Copied MTM combos JSON to clipboard")
                     else:
                         console.print(txt)
-                return
+
+            dispatch = {
+                "e": _trades_report,
+                "b": _order_builder,
+                "l": _roll_positions,
+                "v": _preview_roll_manager,
+                "c": _preview_trades_clusters,
+                "q": _quick_chain,
+                "n": _net_liq,
+                "d": _generate_daily_report,
+                "p": _preview_daily_report,
+                "f": _preflight_daily_report,
+                "x": _preflight_roll_manager,
+                "o": _open_last,
+                "k": _open_last_ticket,
+                "s": _save_filtered,
+                "j": _copy_trades_json,
+                "m": _preview_combos_mtm,
+                "t": None,
+            }.get(ch)
+            if dispatch:
+                label = label_map.get(ch, ch)
+                if status:
+                    status.update(f"Running {label} …", "cyan")
+                try:
+                    dispatch()
+                except Exception as exc:
+                    console.print(f"[red]Error running {label}:[/] {exc}")
+                finally:
+                    if status:
+                        status.update("Ready", "green")
+            elif ch == "t":
+                order = ["csv", "excel", "pdf"]
+                try:
+                    idx = order.index(current_fmt)
+                except ValueError:
+                    idx = 0
+                current_fmt = order[(idx + 1) % len(order)]
