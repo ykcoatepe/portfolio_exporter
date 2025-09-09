@@ -323,6 +323,7 @@ def launch(status, default_fmt):
             ("k", "Open last order ticket (JSON)"),
             ("s", "Save filtered trades CSV… (choose filters)"),
             ("j", "Copy trades JSON summary (filtered)"),
+            ("m", "Preview Combos MTM P&L (JSON-only)"),
             ("t", f"Toggle output format (current: {current_fmt})"),
             ("r", "Return"),
         ]
@@ -352,8 +353,20 @@ def launch(status, default_fmt):
                 try:
                     buf = io.StringIO()
                     import contextlib as _ctx
+                    # Use default prior positions from memory if present
+                    args = ["--summary-only", "--json", "--no-files"]
+                    try:
+                        from pathlib import Path as _Path
+                        _pf = _Path(".codex/memory.json")
+                        if _pf.exists():
+                            _data = json.loads(_pf.read_text())
+                            prior = (_data.get("preferences", {}) or {}).get("trades_prior_positions", "")
+                            if prior and _Path(prior).expanduser().exists():
+                                args.extend(["--prior-positions-csv", str(_Path(prior).expanduser())])
+                    except Exception:
+                        pass
                     with _ctx.redirect_stdout(buf):
-                        _tr.main(["--summary-only", "--json", "--no-files"])
+                        _tr.main(args)
                     summary = json.loads(buf.getvalue().strip() or "{}")
                     intent = (summary.get("meta", {}) or {}).get("intent", {})
                     rows = intent.get("rows", {}) or {}
@@ -392,6 +405,20 @@ def launch(status, default_fmt):
                                 console.print(
                                     f"Updated intent with prior: Open={rows2.get('Open',0)} Close={rows2.get('Close',0)} Roll={rows2.get('Roll',0)} Mixed={rows2.get('Mixed',0)} Unknown={rows2.get('Unknown',0)}"
                                 )
+                            # Persist for future runs
+                            try:
+                                from pathlib import Path as _Path
+                                _pf = _Path(".codex/memory.json")
+                                data = {}
+                                if _pf.exists():
+                                    data = json.loads(_pf.read_text())
+                                prefs = data.setdefault("preferences", {})
+                                prefs["trades_prior_positions"] = str(_Path(path).expanduser())
+                                tmp = _pf.with_suffix(".json.tmp")
+                                tmp.write_text(json.dumps(data, indent=2, sort_keys=True))
+                                os.replace(tmp, _pf)
+                            except Exception:
+                                pass
                 except Exception:
                     pass
                 # Top combos by realized P&L (from clustered executions)
@@ -1037,6 +1064,7 @@ def launch(status, default_fmt):
                 "k": _open_last_ticket,
                 "s": _save_filtered,
                 "j": _copy_trades_json,
+                "m": _preview_combos_mtm,
                 "t": None,
             }.get(ch)
             if dispatch:
@@ -1057,4 +1085,106 @@ def launch(status, default_fmt):
                 except ValueError:
                     idx = 0
                 current_fmt = order[(idx + 1) % len(order)]
+            def _preview_combos_mtm() -> None:
+                """Compute MTM P&L for detected combos using mid quotes; JSON-only."""
+                from portfolio_exporter.scripts import trades_report as _tr
+                from portfolio_exporter.core.ib import quote_option, quote_stock
+                try:
+                    execs = _tr._load_trades()
+                except Exception as exc:
+                    console.print(f"[red]Failed to load executions:[/] {exc}")
+                    return
+                try:
+                    opens = _tr._load_open_orders()
+                except Exception:
+                    opens = None
+                try:
+                    combos = _tr._detect_and_enrich_trades_combos(execs, opens, prev_positions_df=None)
+                    pos_like = _tr._build_positions_like_df(execs, opens)
+                except Exception as exc:
+                    console.print(f"[red]Failed to detect combos:[/] {exc}")
+                    return
+                if combos is None or len(combos) == 0:
+                    console.print("[yellow]No combos detected for the selected range.")
+                    return
+                # Build conId -> attrs map
+                import pandas as _pd
+                id_map = {}
+                try:
+                    p = pos_like.copy()
+                    for c in ("conId","strike","qty","multiplier"):
+                        if c in p.columns:
+                            p[c] = _pd.to_numeric(p[c], errors="coerce")
+                    if "right" in p.columns:
+                        p["right"] = p["right"].astype(str).str.upper()
+                    if "underlying" in p.columns:
+                        p["underlying"] = p["underlying"].astype(str).str.upper()
+                    if "expiry" in p.columns:
+                        p["expiry"] = _pd.to_datetime(p["expiry"], errors="coerce").dt.date.astype(str)
+                    for _, r in p.iterrows():
+                        cid = r.get("conId")
+                        if _pd.isna(cid):
+                            continue
+                        id_map[int(cid)] = {
+                            "underlying": r.get("underlying"),
+                            "expiry": r.get("expiry"),
+                            "right": r.get("right"),
+                            "strike": float(r.get("strike")) if _pd.notna(r.get("strike")) else None,
+                            "qty": float(r.get("qty", 0.0) or 0.0),
+                            "mult": int(r.get("multiplier", 100) or 100),
+                        }
+                except Exception:
+                    pass
+                import ast
+                rows: list[dict] = []
+                for _, row in combos.iterrows():
+                    legs_val = row.get("legs")
+                    try:
+                        leg_ids = ast.literal_eval(legs_val) if isinstance(legs_val, str) else (legs_val or [])
+                    except Exception:
+                        leg_ids = []
+                    net_cd = float(row.get("net_credit_debit", 0.0) or 0.0)
+                    cur_val = 0.0
+                    quoted = 0
+                    for cid in (leg_ids or []):
+                        attrs = id_map.get(int(cid))
+                        if not attrs:
+                            continue
+                        sym = attrs.get("underlying")
+                        qty = float(attrs.get("qty", 0.0) or 0.0)
+                        mult = int(attrs.get("mult", 100) or 100)
+                        mid = None
+                        try:
+                            if attrs.get("right") in {"C","P"} and attrs.get("expiry") and attrs.get("strike") is not None:
+                                q = quote_option(sym, attrs.get("expiry"), float(attrs.get("strike")), attrs.get("right"))
+                                mid = float(q.get("mid")) if q and q.get("mid") is not None else None
+                            else:
+                                q = quote_stock(sym)
+                                mid = float(q.get("mid")) if q and q.get("mid") is not None else None
+                        except Exception:
+                            mid = None
+                        if mid is None:
+                            continue
+                        cur_val += mid * qty * mult
+                        quoted += 1
+                    mtm = net_cd - cur_val
+                    rows.append({
+                        "underlying": row.get("underlying"),
+                        "structure": row.get("structure"),
+                        "legs_n": int(row.get("legs_n", 0) or 0),
+                        "net_credit_debit": net_cd,
+                        "current_value": cur_val,
+                        "mtm_pnl": mtm,
+                        "quoted_legs": quoted,
+                        "when": str(row.get("when")),
+                    })
+                out = {"ok": True, "combos_mtm": rows, "meta": {"schema_id": "combos_mtm_preview", "schema_version": "1"}}
+                txt = json.dumps(out, separators=(",", ":"))
+                if os.getenv("PE_QUIET") not in (None, "", "0"):
+                    console.print(txt)
+                else:
+                    if _copy_to_clipboard(txt):
+                        console.print("Copied MTM combos JSON to clipboard")
+                    else:
+                        console.print(txt)
                 continue
