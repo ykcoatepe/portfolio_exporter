@@ -1921,9 +1921,15 @@ def _annotate_combos_effect(
         except Exception:
             pass
     else:
+        # No prior snapshot available; treat as empty so attribute fallback classifies legs as Open
         prior_ids = set()
         prior_id_to_exp = {}
         prior_id_to_qty = {}
+        try:
+            import pandas as _pd
+            prev_norm = _pd.DataFrame(columns=["__sym","__right","__exp","__k2","qty"])  # empty placeholder
+        except Exception:
+            prev_norm = None  # type: ignore
 
     def _parse_legs(val: object) -> list[int]:
         if isinstance(val, list):
