@@ -169,6 +169,7 @@ def _copy_to_clipboard(text: str) -> bool:
 
 def launch(status, default_fmt):
     console = status.console if status else Console()
+    current_fmt = default_fmt
 
     def _preview_daily_report() -> None:
         orig_quiet = os.getenv("PE_QUIET")
@@ -319,8 +320,10 @@ def launch(status, default_fmt):
             ("f", "Preflight Daily Report"),
             ("x", "Preflight Roll Manager"),
             ("o", "Open last report (HTML/PDF)"),
+            ("k", "Open last order ticket (JSON)"),
             ("s", "Save filtered trades CSV… (choose filters)"),
             ("j", "Copy trades JSON summary (filtered)"),
+            ("t", f"Toggle output format (current: {current_fmt})"),
             ("r", "Return"),
         ]
         tbl = Table(title="Trades & Reports")
@@ -344,7 +347,7 @@ def launch(status, default_fmt):
             def _trades_report() -> None:
                 from portfolio_exporter.scripts import trades_report as _tr
 
-                _tr.run(fmt=default_fmt, show_actions=True)
+                _tr.run(fmt=current_fmt, show_actions=True)
 
             def _order_builder() -> None:
                 from portfolio_exporter.scripts import order_builder as _ob
@@ -721,6 +724,13 @@ def launch(status, default_fmt):
                                         save = prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
                                         if save in {"", "y"}:
                                             io_save(ticket, "order_ticket", fmt="json")
+                                            # Copy JSON to clipboard in interactive mode
+                                            if os.getenv("PE_QUIET") in (None, "", "0"):
+                                                try:
+                                                    if _copy_to_clipboard(json.dumps(ticket, separators=(",", ":"))):
+                                                        console.print("Copied ticket JSON to clipboard")
+                                                except Exception:
+                                                    pass
                                     # Continue to next loop
                                     continue
                     args = [
@@ -767,7 +777,7 @@ def launch(status, default_fmt):
             def _quick_chain() -> None:
                 from portfolio_exporter.scripts import option_chain_snapshot as _ocs
 
-                _ocs.run(fmt=default_fmt)
+                _ocs.run(fmt=current_fmt)
 
             def _net_liq() -> None:
                 from portfolio_exporter.scripts import net_liq_history_export as _netliq
@@ -777,7 +787,7 @@ def launch(status, default_fmt):
             def _generate_daily_report() -> None:
                 from portfolio_exporter.scripts import daily_report as _daily
 
-                fmt_flag = {"pdf": "--pdf", "excel": "--excel"}.get(default_fmt, "--html")
+                fmt_flag = {"pdf": "--pdf", "excel": "--excel"}.get(current_fmt, "--html")
                 args = [fmt_flag]
                 if os.getenv("PE_QUIET"):
                     args.append("--no-pretty")
@@ -793,6 +803,22 @@ def launch(status, default_fmt):
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
                 msg = open_last_report(quiet=quiet)
                 console.print(msg)
+
+            def _open_last_ticket() -> None:
+                from portfolio_exporter.core.io import latest_file
+                quiet = os.getenv("PE_QUIET") not in (None, "", "0")
+                path = latest_file("order_ticket", "json")
+                if not path:
+                    console.print("[yellow]No order ticket found")
+                    return
+                try:
+                    txt = Path(path).read_text()
+                except Exception:
+                    txt = ""
+                print(path)
+                if not quiet and txt:
+                    if _copy_to_clipboard(txt):
+                        console.print("Copied ticket JSON to clipboard")
 
             def _save_filtered() -> None:
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
@@ -930,8 +956,10 @@ def launch(status, default_fmt):
                 "f": _preflight_daily_report,
                 "x": _preflight_roll_manager,
                 "o": _open_last,
+                "k": _open_last_ticket,
                 "s": _save_filtered,
                 "j": _copy_trades_json,
+                "t": None,
             }.get(ch)
             if dispatch:
                 label = label_map.get(ch, ch)
@@ -944,3 +972,11 @@ def launch(status, default_fmt):
                 finally:
                     if status:
                         status.update("Ready", "green")
+            elif ch == "t":
+                order = ["csv", "excel", "pdf"]
+                try:
+                    idx = order.index(current_fmt)
+                except ValueError:
+                    idx = 0
+                current_fmt = order[(idx + 1) % len(order)]
+                continue
