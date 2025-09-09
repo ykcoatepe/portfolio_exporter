@@ -346,8 +346,34 @@ def launch(status, default_fmt):
 
             def _trades_report() -> None:
                 from portfolio_exporter.scripts import trades_report as _tr
-
-                _tr.run(fmt=current_fmt, show_actions=True)
+                # Generate report in selected format
+                df = _tr.run(fmt=current_fmt, show_actions=True, return_df=True)
+                # Quick intent summary (Open/Close/Roll/Mixed) using JSON-only pass
+                try:
+                    buf = io.StringIO()
+                    import contextlib as _ctx
+                    with _ctx.redirect_stdout(buf):
+                        _tr.main(["--summary-only", "--json", "--no-files"])
+                    summary = json.loads(buf.getvalue().strip() or "{}")
+                    intent = (summary.get("meta", {}) or {}).get("intent", {})
+                    rows = intent.get("rows", {}) or {}
+                    by_und = intent.get("by_underlying", []) or []
+                    # Print high-level counts
+                    if rows:
+                        console.print(
+                            f"Intent: Open={rows.get('Open',0)} Close={rows.get('Close',0)} Roll={rows.get('Roll',0)} Mixed={rows.get('Mixed',0)} Unknown={rows.get('Unknown',0)}"
+                        )
+                    # Print top few underlyings by activity with their dominant effect
+                    if by_und:
+                        try:
+                            top = by_und[:5]
+                            txt = ", ".join(f"{r.get('underlying')}: {r.get('position_effect')}" for r in top if r.get('underlying'))
+                            if txt:
+                                console.print(f"By underlying: {txt}")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
             def _order_builder() -> None:
                 from portfolio_exporter.scripts import order_builder as _ob
