@@ -374,6 +374,38 @@ def launch(status, default_fmt):
                             pass
                 except Exception:
                     pass
+                # Top combos by realized P&L (from clustered executions)
+                try:
+                    import pandas as _pd  # local import to avoid heavy deps at import time
+                    if isinstance(df, _pd.DataFrame) and not df.empty:
+                        execs = df[df.get("exec_id").notna()] if "exec_id" in df.columns else df
+                        clusters, _dbg = _tr._cluster_executions(execs)
+                        if isinstance(clusters, _pd.DataFrame) and not clusters.empty and "pnl" in clusters.columns:
+                            top = clusters.copy()
+                            # Sort by absolute P&L
+                            try:
+                                top = top.reindex(top["pnl"].abs().sort_values(ascending=False).index)
+                            except Exception:
+                                top = top.sort_values("pnl", ascending=False)
+                            top = top.head(5)
+                            tbl = Table(title="Top Combos by Realized P&L")
+                            tbl.add_column("Underlying")
+                            tbl.add_column("Structure")
+                            tbl.add_column("Legs", justify="right")
+                            tbl.add_column("P&L", justify="right")
+                            tbl.add_column("Start")
+                            tbl.add_column("End")
+                            for _, r in top.iterrows():
+                                und = str(r.get("underlying", ""))
+                                struct = str(r.get("structure", ""))
+                                legs_n = str(int(r.get("legs_n", 0))) if _pd.notna(r.get("legs_n")) else ""
+                                pnl = float(r.get("pnl", 0.0)) if _pd.notna(r.get("pnl")) else 0.0
+                                start = str(r.get("start", ""))
+                                end = str(r.get("end", ""))
+                                tbl.add_row(und, struct, legs_n, f"{pnl:+.2f}", start, end)
+                            console.print(tbl)
+                except Exception:
+                    pass
 
             def _order_builder() -> None:
                 from portfolio_exporter.scripts import order_builder as _ob

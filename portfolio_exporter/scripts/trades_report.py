@@ -1621,6 +1621,7 @@ def _detect_and_enrich_trades_combos(
     opens_df: pd.DataFrame | None = None,
     prev_positions_df: pd.DataFrame | None = None,
     debug_rows: list | None = None,
+    clusters_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     # Build positions-like df
     pos_like = _build_positions_like_df(execs_df, opens_df)
@@ -1666,6 +1667,38 @@ def _detect_and_enrich_trades_combos(
         combos_df = pd.DataFrame()
     else:
         combos_df = pd.concat(combos_rows, ignore_index=True, sort=False)
+
+    # Attach realized P&L per combo by intersecting order/perm IDs with clusters
+    try:
+        if isinstance(combos_df, pd.DataFrame) and not combos_df.empty and isinstance(clusters_df, pd.DataFrame) and not clusters_df.empty:
+            # Build map: cluster index -> set of perm_ids and pnl
+            def _to_perm_set(val: object) -> set[int]:
+                s = set()
+                for tok in str(val).replace("/", ",").split(","):
+                    tok = tok.strip()
+                    if not tok:
+                        continue
+                    try:
+                        s.add(int(tok))
+                    except Exception:
+                        pass
+                return s
+
+            cl_perm = clusters_df.get("perm_ids") if "perm_ids" in clusters_df.columns else None
+            if cl_perm is not None:
+                cl_map = [(_to_perm_set(v), float(p) if pd.notna(p) else 0.0) for v, p in zip(clusters_df["perm_ids"], clusters_df.get("pnl", 0.0))]
+                pnls: list[float] = []
+                for _, row in combos_df.iterrows():
+                    ids = _to_perm_set(row.get("order_ids", ""))
+                    total = 0.0
+                    if ids:
+                        for perm_set, pnl in cl_map:
+                            if perm_set and ids.intersection(perm_set):
+                                total += float(pnl)
+                    pnls.append(total)
+                combos_df["pnl"] = pnls
+    except Exception:
+        pass
 
     # Enrichment – prefer positions mapping
     if _enrich_combo_strikes_greeks is not None:
@@ -2331,7 +2364,7 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
 
         debug_intent_rows: list = []
         combos_df = _detect_and_enrich_trades_combos(
-            df_exec, df_open, prev_positions_df, debug_intent_rows if getattr(args, "debug_intent", False) else None
+            df_exec, df_open, prev_positions_df, debug_intent_rows if getattr(args, "debug_intent", False) else None, clusters_df
         )
         c_total = len(combos_df) if isinstance(combos_df, pd.DataFrame) else 0
 
