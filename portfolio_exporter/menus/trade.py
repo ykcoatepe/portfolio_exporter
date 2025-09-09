@@ -726,12 +726,12 @@ def launch(status, default_fmt):
                         "--json",
                         "--no-files",
                     ]
-                            if preset in {"bull_put", "bear_call", "bull_call", "bear_put"}:
-                                width = prompt_input("Width [5]: ").strip() or "5"
-                                args.extend(["--width", width])
-                            elif preset in {"iron_condor", "iron_fly"}:
-                                wings = prompt_input("Wings [5]: ").strip() or "5"
-                                args.extend(["--wings", wings])
+                    if preset in {"bull_put", "bear_call", "bull_call", "bear_put"}:
+                        width = prompt_input("Width [5]: ").strip() or "5"
+                        args.extend(["--width", width])
+                    elif preset in {"iron_condor", "iron_fly"}:
+                        wings = prompt_input("Wings [5]: ").strip() or "5"
+                        args.extend(["--wings", wings])
                     buf = io.StringIO()
                     with contextlib.redirect_stdout(buf):
                         _ob.cli(args)
