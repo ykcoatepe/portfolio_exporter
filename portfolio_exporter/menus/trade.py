@@ -1187,4 +1187,4 @@ def launch(status, default_fmt):
                         console.print("Copied MTM combos JSON to clipboard")
                     else:
                         console.print(txt)
-                continue
+                return
