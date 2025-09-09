@@ -564,9 +564,45 @@ def launch(status, default_fmt):
                                     typ = "CR" if "credit" in c else ("DR" if "debit" in c else "CR")
                                     price = c.get("credit", c.get("debit", 0.0))
                                     risk = c.get("max_loss", c.get("debit", 0.0))
+                                    # Annotate calendar near/far and diagonal offset succinctly
+                                    strikes_txt = ",".join(f"{k:g}" for k in ks)
+                                    if preset == "calendar":
+                                        try:
+                                            sn = c.get("strike_near", ks[0] if ks else "")
+                                            sf = c.get("strike_far", ks[-1] if ks else "")
+                                            strikes_txt = f"{sn:g}/{sf:g}"
+                                        except Exception:
+                                            pass
+                                        # near/far DTE hint
+                                        nf_hint = ""
+                                        try:
+                                            import datetime as _dt
+                                            n = c.get("near") or (c.get("legs", [{}])[0].get("expiry"))
+                                            f = c.get("far") or c.get("expiry")
+                                            if n and f:
+                                                dn = max(0, ( _dt.date.fromisoformat(str(n)) - _dt.date.today()).days )
+                                                df = max(0, ( _dt.date.fromisoformat(str(f)) - _dt.date.today()).days )
+                                                nf_hint = f"n/f {dn}/{df}"
+                                        except Exception:
+                                            nf_hint = ""
+                                        # diagonal offset hint using the offset we asked for
+                                        diag_hint = ""
+                                        try:
+                                            if 'strike_offset' in locals():
+                                                off = int(strike_offset)
+                                            else:
+                                                off = 0
+                                            if off:
+                                                sgn = "+" if (right or "C") == "C" else "-"
+                                                diag_hint = f"Δ{sgn}{abs(off)}"
+                                        except Exception:
+                                            diag_hint = ""
+                                        extras = ", ".join([t for t in (nf_hint, diag_hint) if t])
+                                        if extras:
+                                            strikes_txt = f"{strikes_txt} ({extras})"
                                     tbl.add_row(
                                         str(i),
-                                        ",".join(f"{k:g}" for k in ks),
+                                        strikes_txt,
                                         typ,
                                         f"{price:.2f}",
                                         f"{c.get('width',0):.2f}",
