@@ -376,8 +376,29 @@ def launch(status, default_fmt):
                     except Exception:
                         console.print("[red]Invalid preset[/red]")
                         continue
-                    symbol = prompt_input("Symbol: ").strip().upper()
-                    expiry = prompt_input("Expiry (YYYY-MM-DD or month like 'nov'): ").strip()
+                    # Prefill symbol/expiry defaults from Pre-Market menu cache
+                    try:
+                        from portfolio_exporter.menus import pre as _pre_menu
+                        _last_sym = _pre_menu.last_symbol.get()
+                        _last_exp = _pre_menu.last_expiry.get()
+                    except Exception:
+                        _last_sym, _last_exp = "", ""
+                    sym_prompt = f"Symbol [{_last_sym}]: " if _last_sym else "Symbol: "
+                    exp_prompt = (
+                        f"Expiry (YYYY-MM-DD or month like 'nov') [{_last_exp}]: "
+                        if _last_exp
+                        else "Expiry (YYYY-MM-DD or month like 'nov'): "
+                    )
+                    symbol = (prompt_input(sym_prompt).strip().upper() or _last_sym).upper()
+                    expiry = prompt_input(exp_prompt).strip() or _last_exp
+                    # Update last symbol/expiry cache
+                    try:
+                        if symbol:
+                            _pre_menu.last_symbol.value = symbol
+                        if expiry:
+                            _pre_menu.last_expiry.value = expiry
+                    except Exception:
+                        pass
                     qty = prompt_input("Qty [1]: ").strip() or "1"
 
                     # Optional: auto-select strikes for supported presets using live data
@@ -390,11 +411,59 @@ def launch(status, default_fmt):
                                 suggest_iron_condor,
                                 suggest_butterfly,
                                 suggest_calendar,
+                                LiquidityRules,
                             )
                             from portfolio_exporter.scripts.order_builder import _normalize_expiry as _norm_exp
-                            profile = prompt_input("Profile (conservative/balanced/aggressive) [balanced]: ").strip().lower() or "balanced"
-                            avoid_e = prompt_input("Avoid earnings within 7 days? (Y/n) [Y]: ").strip().lower()
+                            # Load wizard defaults from repo memory if present
+                            _prefs_mem = {}
+                            try:
+                                import json as _json
+                                from pathlib import Path as _Path
+                                p = _Path(".codex/memory.json")
+                                if p.exists():
+                                    _data = _json.loads(p.read_text())
+                                    _prefs_mem = (
+                                        _data.get("preferences", {}).get("order_builder_wizard", {})
+                                        or {}
+                                    )
+                            except Exception:
+                                _prefs_mem = {}
+
+                            profile_def = str(_prefs_mem.get("profile", "balanced")).lower()
+                            profile = (
+                                prompt_input(
+                                    f"Profile (conservative/balanced/aggressive) [{profile_def}]: "
+                                )
+                                .strip()
+                                .lower()
+                                or profile_def
+                            )
+                            avoid_def = "Y" if bool(_prefs_mem.get("avoid_earnings", True)) else "N"
+                            avoid_e = (
+                                prompt_input(
+                                    f"Avoid earnings within 7 days? (Y/n) [{avoid_def}]: "
+                                )
+                                .strip()
+                                .lower()
+                            )
                             avoid_e_bool = (avoid_e in {"", "y"})
+                            # Liquidity thresholds (prefilled)
+                            min_oi_def = str(_prefs_mem.get("min_oi", 200))
+                            min_volume_def = str(_prefs_mem.get("min_volume", 50))
+                            max_spread_def = str(_prefs_mem.get("max_spread_pct", 0.02))
+                            min_oi_in = prompt_input(f"Min OI [{min_oi_def}]: ").strip() or min_oi_def
+                            min_vol_in = prompt_input(f"Min Volume [{min_volume_def}]: ").strip() or min_volume_def
+                            max_spread_in = prompt_input(
+                                f"Max spread fraction of mid [{max_spread_def}]: "
+                            ).strip() or max_spread_def
+                            try:
+                                rules = LiquidityRules(
+                                    min_oi=int(min_oi_in),
+                                    min_volume=int(min_vol_in),
+                                    max_spread_pct=float(max_spread_in),
+                                )
+                            except Exception:
+                                rules = LiquidityRules()
                             # Support DTE entry as number as well as expiry text
                             dte_or_exp = expiry
                             if dte_or_exp.isdigit():
@@ -403,7 +472,11 @@ def launch(status, default_fmt):
                                 expiry = d.isoformat()
                             expiry = _norm_exp(symbol, expiry)
                             # Include risk budget pct for suggested qty
-                            rb = prompt_input("Risk budget % of NetLiq for sizing [2]: ").strip() or "2"
+                            rb_def_val = _prefs_mem.get("risk_budget_pct", 2)
+                            rb_def = str(rb_def_val)
+                            rb = prompt_input(
+                                f"Risk budget % of NetLiq for sizing [{rb_def}]: "
+                            ).strip() or rb_def
                             try:
                                 rb_pct = float(rb) / 100.0
                             except Exception:
@@ -423,6 +496,7 @@ def launch(status, default_fmt):
                                     avoid_earnings=avoid_e_bool,
                                     earnings_window_days=7,
                                     risk_budget_pct=rb_pct,
+                                    rules=rules,
                                 )
                             elif preset in {"bull_call", "bear_put"}:
                                 cands = suggest_debit_vertical(
@@ -432,6 +506,7 @@ def launch(status, default_fmt):
                                     profile,
                                     avoid_earnings=avoid_e_bool,
                                     earnings_window_days=7,
+                                    rules=rules,
                                 )
                             elif preset in {"iron_condor"}:
                                 cands = suggest_iron_condor(
@@ -441,6 +516,7 @@ def launch(status, default_fmt):
                                     avoid_earnings=avoid_e_bool,
                                     earnings_window_days=7,
                                     risk_budget_pct=rb_pct,
+                                    rules=rules,
                                 )
                             elif preset in {"butterfly"}:
                                 # Right is required for butterfly auto
@@ -451,6 +527,7 @@ def launch(status, default_fmt):
                                     profile,
                                     avoid_earnings=avoid_e_bool,
                                     earnings_window_days=7,
+                                    rules=rules,
                                 )
                             else:  # calendar
                                 # Ask optional diagonal offset steps (0 = calendar)
@@ -466,6 +543,7 @@ def launch(status, default_fmt):
                                     profile,
                                     avoid_earnings=avoid_e_bool,
                                     earnings_window_days=7,
+                                    rules=rules,
                                     strike_offset=strike_offset,
                                 )
                             if not cands:
@@ -612,12 +690,12 @@ def launch(status, default_fmt):
                         "--json",
                         "--no-files",
                     ]
-                    if preset in {"bull_put", "bear_call", "bull_call", "bear_put"}:
-                        width = prompt_input("Width [5]: ").strip() or "5"
-                        args.extend(["--width", width])
-                    elif preset in {"iron_condor", "iron_fly"}:
-                        wings = prompt_input("Wings [5]: ").strip() or "5"
-                        args.extend(["--wings", wings])
+                            if preset in {"bull_put", "bear_call", "bull_call", "bear_put"}:
+                                width = prompt_input("Width [5]: ").strip() or "5"
+                                args.extend(["--width", width])
+                            elif preset in {"iron_condor", "iron_fly"}:
+                                wings = prompt_input("Wings [5]: ").strip() or "5"
+                                args.extend(["--wings", wings])
                     buf = io.StringIO()
                     with contextlib.redirect_stdout(buf):
                         _ob.cli(args)
