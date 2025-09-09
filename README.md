@@ -693,6 +693,13 @@ python -m portfolio_exporter.scripts.order_builder \
   --wizard --auto --strategy iron_condor \
   --symbol AAPL --expiry nov \
   --json --no-files
+
+# Preview calendar / diagonal candidates (ATM near/far with optional offset)
+python -m portfolio_exporter.scripts.order_builder \
+  --wizard --auto --strategy calendar --right C \
+  --symbol AAPL --expiry nov --strike-offset 1 \
+  --min-oi 200 --min-volume 50 --max-spread-pct 0.02 \
+  --earnings-window 7 --json --no-files
 ```
 
 ### Expiry hint formats

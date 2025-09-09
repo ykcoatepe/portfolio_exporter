@@ -608,6 +608,7 @@ def suggest_calendar(
     avoid_earnings: bool = True,
     earnings_window_days: int = 7,
     avoid_inverted_term: bool = False,
+    strike_offset: int = 0,
 ) -> List[Dict[str, Any]]:
     """Suggest a simple ATM calendar (short near, long far) with ATM bias.
 
@@ -658,8 +659,21 @@ def suggest_calendar(
     if not strikes:
         return []
     center = _nearest_strike(strikes, float(spot))
+    # Apply diagonal offset: calls move up, puts move down
+    try:
+        idx = strikes.index(center)
+    except ValueError:
+        idx = min(range(len(strikes)), key=lambda i: abs(strikes[i] - center))
+    if strike_offset and isinstance(strike_offset, int):
+        if right == "C":
+            idx_far = min(len(strikes) - 1, idx + max(0, strike_offset))
+        else:
+            idx_far = max(0, idx - max(0, strike_offset))
+    else:
+        idx_far = idx
+    far_strike = strikes[idx_far]
     mid_short = _mid_from_df(df_near, center) or 0.0
-    mid_long = _mid_from_df(df_far, center) or 0.0
+    mid_long = _mid_from_df(df_far, far_strike) or 0.0
     debit = max(0.0, float(mid_long) - float(mid_short))
     # Term structure check (median IVs)
     near_iv = float(df_near.get("impliedVolatility").median() or 0.0)
@@ -673,11 +687,13 @@ def suggest_calendar(
         "expiry": far_resolved,
         "legs": [
             {"secType": "OPT", "right": right, "strike": center, "qty": -1, "expiry": near_resolved},
-            {"secType": "OPT", "right": right, "strike": center, "qty": 1, "expiry": far_resolved},
+            {"secType": "OPT", "right": right, "strike": far_strike, "qty": 1, "expiry": far_resolved},
         ],
         "debit": debit,
         "near": near_resolved,
         "far": far_resolved,
+        "strike_near": center,
+        "strike_far": far_strike,
         "term_structure": {"near_iv": near_iv, "far_iv": far_iv, "inverted": inverted},
         "rationale": f"ATM calendar near≈{dte_near}D, far≈{dte_far}D",
     }]

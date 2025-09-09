@@ -481,6 +481,28 @@ def build_calendar(
     return ticket
 
 
+def build_diagonal(
+    symbol: str,
+    expiry: str,
+    right: str,
+    exp_near: str,
+    exp_far: str,
+    strike_near: float,
+    strike_far: float,
+    qty: int,
+    account: str | None = None,
+):
+    near, far = sorted([exp_near, exp_far])
+    expiry = far  # ticket expiry = far
+    ticket = _base_ticket("diagonal", symbol, expiry, qty, [strike_near, strike_far], right, account)
+    legs = [
+        {"secType": "OPT", "right": right, "strike": strike_near, "qty": -qty, "expiry": near},
+        {"secType": "OPT", "right": right, "strike": strike_far, "qty": qty, "expiry": far},
+    ]
+    ticket["legs"] = legs
+    return ticket
+
+
 def build_straddle(
     symbol: str,
     expiry: str,
@@ -800,7 +822,7 @@ def run() -> bool:
             is_credit_choice = kind.startswith("c")
         # Optional Auto suggestions for supported strategies (Phase A)
         auto_used = False
-        if _pe is not None and strat in {"vert", "ic", "iron_condor"}:
+        if _pe is not None and strat in {"vert", "ic", "iron_condor", "cal", "calendar", "fly", "butterfly"}:
             auto = (_ask("Auto suggestions from live data? (Y/n)", "Y") or "Y").strip().lower()
             if auto in {"", "y"}:
                 # Load/prompt persisted preferences
@@ -835,6 +857,9 @@ def run() -> bool:
                 # Build candidates
                 cands = []
                 resolved_exp = expiry
+                auto_near = None
+                auto_far = None
+                auto_far_strike = None
                 try:
                     if strat == "vert":
                         # Map to preset-like side
@@ -863,16 +888,49 @@ def run() -> bool:
                                 avoid_earnings=avoid_e,
                                 earnings_window_days=7,
                             )
-                    else:  # iron condor
-                        cands = _pe.suggest_iron_condor(
+                    elif strat in {"fly", "butterfly"}:
+                        # Ensure right is known
+                        if not right:
+                            right = ((_ask("Right (C/P)", "C") or "C").upper())
+                        cands = _pe.suggest_butterfly(
                             underlying,
                             expiry,
+                            right,
                             profile,
                             rules=_pe.LiquidityRules(min_oi=min_oi, min_volume=min_volume, max_spread_pct=max_spread_pct),
                             avoid_earnings=avoid_e,
                             earnings_window_days=7,
-                            risk_budget_pct=rb_pct,
                         )
+                    else:  # iron condor
+                        if strat in {"ic", "iron_condor"}:
+                            cands = _pe.suggest_iron_condor(
+                                underlying,
+                                expiry,
+                                profile,
+                                rules=_pe.LiquidityRules(min_oi=min_oi, min_volume=min_volume, max_spread_pct=max_spread_pct),
+                                avoid_earnings=avoid_e,
+                                earnings_window_days=7,
+                                risk_budget_pct=rb_pct,
+                            )
+                        else:  # calendar/diagonal
+                            if not right:
+                                right = ((_ask("Right (C/P)", "C") or "C").upper())
+                            so_def = str(_prefs.get("strike_offset", 0))
+                            try:
+                                strike_offset = int((_ask("Diagonal far strike offset steps (0=calendar)", so_def) or so_def))
+                            except Exception:
+                                strike_offset = int(so_def)
+                            _save_wizard_prefs({"strike_offset": strike_offset})
+                            cands = _pe.suggest_calendar(
+                                underlying,
+                                expiry,
+                                right,
+                                profile,
+                                rules=_pe.LiquidityRules(min_oi=min_oi, min_volume=min_volume, max_spread_pct=max_spread_pct),
+                                avoid_earnings=avoid_e,
+                                earnings_window_days=7,
+                                strike_offset=strike_offset,
+                            )
                     if cands:
                         resolved_exp = cands[0].get("expiry", expiry)
                 except Exception:
@@ -924,6 +982,24 @@ def run() -> bool:
                                 if use_auto in {"", "y"}:
                                     qty = int(pick.get("suggested_qty"))
                             auto_used = True
+                        elif strat in {"fly", "butterfly"} and len(ks) >= 3:
+                            strikes = ks[:3]
+                            if pick.get("suggested_qty"):
+                                use_auto = (_ask(f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)", "Y") or "Y").strip().lower()
+                                if use_auto in {"", "y"}:
+                                    qty = int(pick.get("suggested_qty"))
+                            auto_used = True
+                        elif strat in {"cal", "calendar"} and len(ks) >= 1:
+                            # Store near/far defaults for calendar and optional far strike for diagonal
+                            auto_near = pick.get("near") or None
+                            auto_far = pick.get("far") or expiry
+                            auto_far_strike = pick.get("strike_far", ks[0])
+                            strikes = [pick.get("strike_near", ks[0])]
+                            if pick.get("suggested_qty"):
+                                use_auto = (_ask(f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)", "Y") or "Y").strip().lower()
+                                if use_auto in {"", "y"}:
+                                    qty = int(pick.get("suggested_qty"))
+                            auto_used = True
         # Strategy-specific strikes collection
         if not locals().get("strikes", []):
             strikes = []
@@ -945,8 +1021,9 @@ def run() -> bool:
                 raise ValueError("Butterfly requires three strikes")
             strikes = ks
         elif strat in {"cal", "calendar"}:
-            # strike gathered later as single float
-            strikes = []
+            # strike gathered later as single float unless Auto provided
+            if not auto_used:
+                strikes = []
         elif strat in {"strad", "straddle"}:
             raw = _ask("Strike", strikes_default or "") or ""
             strikes = [float(raw)] if raw else []
@@ -1096,15 +1173,18 @@ def run() -> bool:
             for leg in t["legs"]
         ]
     elif strat in {"cal", "calendar"}:
-        r = (_ask("Right (C/P)", "C") or "C").upper()
-        near_in = _ask("Near expiry (YYYY-MM-DD)", expiry) or expiry
-        far_in = _ask("Far expiry (YYYY-MM-DD)", expiry) or expiry
+        r = (_ask("Right (C/P)", "C") or "C").upper() if not right else right
+        near_in = _ask("Near expiry (YYYY-MM-DD)", auto_near or expiry) or (auto_near or expiry)
+        far_in = _ask("Far expiry (YYYY-MM-DD)", auto_far or expiry) or (auto_far or expiry)
         near = _normalize_expiry(underlying, near_in)
         far = _normalize_expiry(underlying, far_in)
         if not strikes:
             raise ValueError("Calendar requires a strike")
         strike = float(strikes[0])
-        t = build_calendar(underlying, far, r, near, far, strike, qty, None)
+        if auto_far_strike is not None and float(auto_far_strike) != float(strike):
+            t = build_diagonal(underlying, far, r, near, far, strike, float(auto_far_strike), qty, None)
+        else:
+            t = build_calendar(underlying, far, r, near, far, strike, qty, None)
         legs = [
             {
                 "symbol": underlying,
@@ -1372,6 +1452,7 @@ def cli(argv: List[str] | None = None) -> int:
         default=0.02,
         help="Maximum bid-ask spread as a fraction of mid (e.g., 0.02 = 2%)",
     )
+    parser.add_argument("--strike-offset", dest="strike_offset", type=int, default=0, help="For calendar/diagonal: far leg strike offset in steps (calls up, puts down)")
     args = parser.parse_args(argv)
 
     qty = int(args.qty)
@@ -1426,6 +1507,7 @@ def cli(argv: List[str] | None = None) -> int:
                     rules=rules,
                     avoid_earnings=bool(args.avoid_earnings),
                     earnings_window_days=int(args.earnings_window),
+                    strike_offset=int(args.strike_offset),
                 )
             else:
                 parser.error("--wizard --auto currently supports vertical, butterfly, calendar and iron_condor")
@@ -1468,7 +1550,13 @@ def cli(argv: List[str] | None = None) -> int:
                 ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
                 near = pick.get("near") or pick.get("legs")[0].get("expiry")
                 far = pick.get("far") or pick.get("expiry")
-                ticket = build_calendar(args.symbol, far, args.right.upper(), near, far, ks[0], int(args.qty), args.account)
+                # Identify far vs near strikes
+                strike_near = pick.get("strike_near", ks[0])
+                strike_far = pick.get("strike_far", ks[0])
+                if float(strike_near) != float(strike_far):
+                    ticket = build_diagonal(args.symbol, far, args.right.upper(), near, far, float(strike_near), float(strike_far), int(args.qty), args.account)
+                else:
+                    ticket = build_calendar(args.symbol, far, args.right.upper(), near, far, float(strike_near), int(args.qty), args.account)
             else:  # iron condor
                 ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
                 ticket = build_iron_condor(args.symbol, expiry, ks[:4], int(args.qty), args.account)
