@@ -243,6 +243,30 @@ Quick shortcuts in the Trades & Reports menu:
 
 - **Copy trades JSON summary** – copy a filtered summary to the clipboard (uses `pyperclip` if installed; otherwise prints the JSON).
 
+- **Executions → intent + P&L** – after “Executions / open orders”, the menu prints:
+  - Intent totals: Open/Close/Roll/Mixed/Unknown and dominant effect by underlying.
+  - Top Combos by realized P&L (clustered fills in the selected window).
+  - If Unknown is high or a prior-snapshot warning appears, the menu prompts for a prior positions CSV and persists it for next runs.
+
+- **Combos MTM P&L (JSON-only)** – press `m` to compute mark‑to‑market P&L per detected combo using mid quotes per leg. The JSON is copied to clipboard in interactive mode.
+
+- **Format toggle** – press `t` to cycle the default output format (`csv → excel → pdf`) used by actions in this menu.
+
+- **Open last ticket** – press `k` to print the last saved `order_ticket*.json` path and copy its JSON to the clipboard.
+
+Preference for prior positions snapshot:
+
+The menu auto-uses a default prior positions CSV when present under `.codex/memory.json`:
+
+```json
+{
+  "preferences": {
+    "trades_prior_positions": "/absolute/path/to/portfolio_greeks_positions_YYYYMMDD.csv"
+  }
+}
+```
+You can set this interactively when prompted after Executions, or edit the file directly.
+
 Typical fixes:
 
 ```bash
