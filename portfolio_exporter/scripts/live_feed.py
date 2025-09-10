@@ -756,7 +756,7 @@ def _current_output_paths() -> tuple[str, str]:
     return base_q, base_pos
 
 
-def run(fmt: str = "csv", include_indices: bool = True) -> None:
+def run(fmt: str = "csv", include_indices: bool = True, return_df: bool = False):
     """Programmatic entrypoint used by the Live-Market menu.
 
     - Avoids interactive prompts
@@ -778,7 +778,7 @@ def run(fmt: str = "csv", include_indices: bool = True) -> None:
     tickers = sorted(set(tickers + list(opt_under) + extras))
     if not tickers:
         logging.warning("No tickers to snapshot.")
-        return
+        return pd.DataFrame() if return_df else None
 
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
 
@@ -816,6 +816,8 @@ def run(fmt: str = "csv", include_indices: bool = True) -> None:
     df["unrealized_pnl"] = df["ticker"].map(pnl_map)
     df["unrealized_pnl_pct"] = df["ticker"].map(pct_map)
 
+    if return_df:
+        return df
     # reorder columns for clarity
     quote_cols = [
         "timestamp",

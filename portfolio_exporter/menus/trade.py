@@ -13,6 +13,8 @@ from rich.console import Console
 from rich.table import Table
 
 from portfolio_exporter.core import ui as core_ui
+# Back-compat: allow tests to monkeypatch prompt_input on this module
+prompt_input = core_ui.prompt_input
 import datetime as _dt
 
 

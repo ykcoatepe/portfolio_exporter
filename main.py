@@ -151,6 +151,18 @@ def load_workflow_queue(name: str) -> list[str]:
 
 def main() -> None:
     args = parse_args()
+    # Ensure defaults for tests that override parse_args with partial namespaces
+    for name, default in (
+        ("list_tasks", False),
+        ("workflow", None),
+        ("tasks", None),
+        ("tasks_csv", None),
+        ("dry_run", False),
+        ("json", False),
+        ("stop_on_fail", False),
+    ):
+        if not hasattr(args, name):
+            setattr(args, name, default)
     quiet = args.quiet or os.getenv("PE_QUIET") not in (None, "", "0")
     status = None
     if not quiet:

@@ -1596,19 +1596,22 @@ def _cluster_executions(execs: pd.DataFrame, window_sec: int = 60) -> tuple[pd.D
         uniq = sorted({str(int(v)) for v in vals.dropna().astype(int) if int(v) > 0})
         return "/".join(uniq)
 
+    g = df.groupby("cluster_id")
     clusters = (
-        df.groupby("cluster_id")
-        .agg(
+        g.agg(
             perm_ids=("perm_id", _join_perm),
             underlying=("underlying", "first"),
             start=("datetime", "min"),
             end=("datetime", "max"),
             pnl=("pnl_leg", "sum"),
             commission=("commission", "sum") if "commission" in df.columns else ("pnl_leg", "sum"),
-            legs_n=("exec_id", "count"),
         )
         .reset_index()
     )
+    try:
+        clusters["legs_n"] = g.size().values
+    except Exception:
+        clusters["legs_n"] = 0
     try:
         if "commission" in clusters.columns:
             clusters["pnl_net"] = pd.to_numeric(clusters.get("pnl"), errors="coerce").fillna(0.0) - pd.to_numeric(clusters.get("commission"), errors="coerce").fillna(0.0)

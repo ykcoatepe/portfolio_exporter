@@ -25,7 +25,7 @@ from portfolio_exporter.core.combo import detect_combos
 from portfolio_exporter.core.chain import fetch_chain
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core.ui import run_with_spinner
+from portfolio_exporter.core import ui as core_ui
 
 portfolio_greeks = None  # lazy import to avoid optional deps at module import
 
@@ -156,7 +156,7 @@ def run(
 
         portfolio_greeks = _pg
 
-    pos_df = run_with_spinner("Fetching positions…", portfolio_greeks._load_positions)
+    pos_df = core_ui.run_with_spinner("Fetching positions…", portfolio_greeks._load_positions)
     if pos_df.empty:
         if return_df:
             return pd.DataFrame()

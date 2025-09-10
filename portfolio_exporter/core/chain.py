@@ -414,3 +414,9 @@ def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
         print(f"✅ backfill_combos: updated {updated} / {len(combos)} combos (meta fields).")
     finally:
         conn.close()
+"""Test hooks: allow monkeypatching quote_option/quote_stock on this module.
+These placeholders are overwritten in tests; normal callers should import
+from portfolio_exporter.core.ib instead.
+"""
+quote_option = None  # type: ignore
+quote_stock = None  # type: ignore
