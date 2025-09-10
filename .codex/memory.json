@@ -9,6 +9,11 @@
       "event": "Trades menu enhancements: intent summary, P&L, MTM preview",
       "details": "Executions: intent totals & by-underlying; Top combos by realized P&L; combos CSV/Excel include pnl; MTM preview (key 'm') using mid quotes; format toggle (key 't'); open last ticket (key 'k'); filters prefill/persist; daily-report open prompt; roll preview DTE; persisted preferences.trades_prior_positions.",
       "timestamp": "2025-09-09T09:15:00Z"
+    },
+    {
+      "event": "Tests run (dev_yordam)",
+      "details": "Initiated pytest run and triaged failures; applied patches for UI import stability, IB guards, live_feed return_df, trades_report clustering and menu prompts. Ongoing fixes for CLI scripts (tech_signals_ibkr, wizards) queued.",
+      "timestamp": "2025-09-10T00:00:00Z"
     }
   ],
   "decisions": [
@@ -25,6 +30,13 @@
       "decision": "Expose intent summary and realized P&L in menu; add MTM preview; persist prior positions path; extend Stage Order auto-build for butterfly and calendar.",
       "context": "Keep offline-friendly; JSON-only previews; clipboard in interactive mode; prefer strictly prior positions snapshot when available.",
       "timestamp": "2025-09-09T09:15:00Z"
+    },
+    {
+      "id": 3,
+      "title": "TEST_HARDENING_V1",
+      "decision": "Align imports to module-level for monkeypatching, add test hooks (_snapshot_quotes, prompt_input alias, run_with_spinner alias), guard IB connectivity checks, and make clustering robust to missing columns.",
+      "context": "Goal: reduce import-time coupling and stabilize CLI/menu tests without impacting runtime behavior.",
+      "timestamp": "2025-09-10T00:00:00Z"
     }
   ],
   "preferences": {
