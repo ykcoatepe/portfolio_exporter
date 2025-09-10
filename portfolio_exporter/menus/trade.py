@@ -1158,6 +1158,7 @@ def launch(status, default_fmt):
                 """Compute MTM P&L for detected combos using mid quotes; JSON-only."""
                 from portfolio_exporter.scripts import trades_report as _tr
                 from portfolio_exporter.core.ib import quote_option, quote_stock
+                import time as _time
                 try:
                     execs = _tr._load_trades()
                 except Exception as exc:
@@ -1206,6 +1207,33 @@ def launch(status, default_fmt):
                     pass
                 import ast
                 rows: list[dict] = []
+                # Lightweight in-memory quote cache with TTL and overall budget
+                _qcache: dict[tuple, tuple[float, float]] = {}
+                _TTL_SEC = 30.0
+                _BUDGET_SEC = 8.0
+                _t0 = _time.time()
+
+                def _get_mid(sym: str, exp: str | None, strike: float | None, right: str | None) -> float | None:
+                    now = _time.time()
+                    if now - _t0 > _BUDGET_SEC:
+                        return None
+                    key = (sym, exp or "", float(strike) if strike is not None else float("nan"), (right or "").upper())
+                    hit = _qcache.get(key)
+                    if hit and (now - hit[0] <= _TTL_SEC):
+                        return hit[1]
+                    mid = None
+                    try:
+                        if right in {"C", "P"} and exp and strike is not None:
+                            q = quote_option(sym, exp, float(strike), right)
+                            mid = float(q.get("mid")) if q and q.get("mid") is not None else None
+                        else:
+                            q = quote_stock(sym)
+                            mid = float(q.get("mid")) if q and q.get("mid") is not None else None
+                    except Exception:
+                        mid = None
+                    # cache even None with timestamp to avoid hammering
+                    _qcache[key] = (now, mid if mid is not None else float("nan"))
+                    return mid
                 for _, row in combos.iterrows():
                     legs_val = row.get("legs")
                     try:
@@ -1215,6 +1243,7 @@ def launch(status, default_fmt):
                     net_cd = float(row.get("net_credit_debit", 0.0) or 0.0)
                     cur_val = 0.0
                     quoted = 0
+                    total_legs = len(leg_ids or [])
                     for cid in (leg_ids or []):
                         attrs = id_map.get(int(cid))
                         if not attrs:
@@ -1222,16 +1251,7 @@ def launch(status, default_fmt):
                         sym = attrs.get("underlying")
                         qty = float(attrs.get("qty", 0.0) or 0.0)
                         mult = int(attrs.get("mult", 100) or 100)
-                        mid = None
-                        try:
-                            if attrs.get("right") in {"C","P"} and attrs.get("expiry") and attrs.get("strike") is not None:
-                                q = quote_option(sym, attrs.get("expiry"), float(attrs.get("strike")), attrs.get("right"))
-                                mid = float(q.get("mid")) if q and q.get("mid") is not None else None
-                            else:
-                                q = quote_stock(sym)
-                                mid = float(q.get("mid")) if q and q.get("mid") is not None else None
-                        except Exception:
-                            mid = None
+                        mid = _get_mid(sym, attrs.get("expiry"), attrs.get("strike"), attrs.get("right"))
                         if mid is None:
                             continue
                         cur_val += mid * qty * mult
@@ -1245,6 +1265,8 @@ def launch(status, default_fmt):
                         "current_value": cur_val,
                         "mtm_pnl": mtm,
                         "quoted_legs": quoted,
+                        "total_legs": total_legs,
+                        "quoted_ratio": (f"{quoted}/{total_legs}" if total_legs else "0/0"),
                         "when": str(row.get("when")),
                     })
                 out = {"ok": True, "combos_mtm": rows, "meta": {"schema_id": "combos_mtm_preview", "schema_version": "1"}}
