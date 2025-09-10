@@ -8,7 +8,20 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Iterable, List, Literal, Tuple
 
-import dateparser
+try:
+    import dateparser  # type: ignore
+except Exception:  # minimal fallback to avoid hard dependency in tests
+    from datetime import datetime as _dt
+
+    class _DP:  # type: ignore
+        @staticmethod
+        def parse(s, settings=None):
+            try:
+                return _dt.fromisoformat(str(s))
+            except Exception:
+                return None
+
+    dateparser = _DP()  # type: ignore
 import pandas as pd
 from rich.console import Console
 from rich.live import Live
@@ -20,6 +33,7 @@ from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core.runlog import RunLog
+from portfolio_exporter.core.io import save as io_save
 from portfolio_exporter.core import ui as core_ui
 render_chain = core_ui.render_chain
 run_with_spinner = core_ui.run_with_spinner

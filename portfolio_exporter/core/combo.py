@@ -8,7 +8,7 @@ import pathlib
 import sqlite3
 from typing import Dict, List, Tuple, Optional
 
-from .io import migrate_combo_schema
+from .io import migrate_combo_schema, _ensure_writable_dir
 from .config import settings
 
 import pandas as pd
@@ -36,21 +36,13 @@ def _default_db_path() -> pathlib.Path:
         local_p.parent.mkdir(parents=True, exist_ok=True)
         return local_p
 
-    # Preferred location alongside other app outputs
+    # Preferred location alongside other app outputs with writable fallback
     try:
-        outdir = pathlib.Path(getattr(settings, "output_dir", ".")).expanduser()
+        base = pathlib.Path(getattr(settings, "output_dir", "."))
     except Exception:
-        outdir = pathlib.Path.cwd()
-    home_p = outdir / "combos.db"
-    try:
-        # Only ensure the directory exists here; avoid touching the DB file at import time.
-        home_p.parent.mkdir(parents=True, exist_ok=True)
-        return home_p
-    except Exception:
-        # Fall back to a repo-local path to avoid sandbox restrictions
-        local_p = pathlib.Path.cwd() / "tmp_test_run" / "combos.db"
-        local_p.parent.mkdir(parents=True, exist_ok=True)
-        return local_p
+        base = pathlib.Path.cwd()
+    outdir = _ensure_writable_dir(base)
+    return outdir / "combos.db"
 
 
 DB_PATH = _default_db_path()
@@ -80,7 +72,12 @@ CREATE TABLE IF NOT EXISTS legs (
 
 
 def _db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn = sqlite3.connect(DB_PATH)
+    except Exception:
+        # Last-resort fallback to local tmp if prior path became unwritable
+        fallback = (_ensure_writable_dir(pathlib.Path.cwd() / "tmp_test_run") / "combos.db")
+        conn = sqlite3.connect(fallback)
     conn.executescript(_DDL)
     migrate_combo_schema(conn)
     return conn

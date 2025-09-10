@@ -59,8 +59,8 @@ except Exception:  # pragma: no cover - optional
     def fetch_yf_open_interest(*args, **kwargs):  # type: ignore
         return {}
 try:
-from portfolio_exporter.core import ui as core_ui
-run_with_spinner = core_ui.run_with_spinner
+    from portfolio_exporter.core import ui as core_ui
+    run_with_spinner = core_ui.run_with_spinner
 except Exception:  # pragma: no cover - fallback
     def run_with_spinner(msg, func, *args, **kwargs):
         return func(*args, **kwargs)

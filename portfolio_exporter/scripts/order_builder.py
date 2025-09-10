@@ -1398,7 +1398,26 @@ def run() -> bool:
 def cli(argv: List[str] | None = None) -> int:
     """Non-interactive ticket builder CLI."""
     import argparse
-    from portfolio_exporter.core.io import save as io_save
+    try:
+        from portfolio_exporter.core.io import save as io_save  # type: ignore
+    except Exception:
+        def io_save(obj, name, fmt="json", outdir=None):  # type: ignore
+            from pathlib import Path as _P
+            import json as _json
+            p = _P(outdir or ".") / f"{name}.{fmt if fmt != 'excel' else 'xlsx'}"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            if fmt == "json":
+                p.write_text(_json.dumps(obj, indent=2))
+            elif fmt == "csv":
+                try:
+                    import pandas as _pd
+                    assert isinstance(obj, _pd.DataFrame)
+                    obj.to_csv(p, index=False)
+                except Exception:
+                    p.write_text("")
+            else:
+                p.write_text("")
+            return p
     parser = argparse.ArgumentParser(description="Build option strategy tickets")
     parser.add_argument("--strategy")
     parser.add_argument(

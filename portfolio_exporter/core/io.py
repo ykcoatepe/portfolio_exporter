@@ -6,6 +6,29 @@ import pandas as pd
 from .config import settings
 
 
+def _ensure_writable_dir(candidate: Path) -> Path:
+    """Return a writable directory path.
+
+    Tries to create and write to ``candidate``. If that fails, falls back to
+    a repo-local ``./tmp_test_run`` directory which is created if necessary.
+    """
+    candidate = candidate.expanduser()
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+        test_file = candidate / ".pe_write_test"
+        with test_file.open("wb") as fh:
+            fh.write(b"ok")
+        try:
+            test_file.unlink()
+        except Exception:
+            pass
+        return candidate
+    except Exception:
+        fallback = Path("./tmp_test_run")
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
+
 def save(
     obj: pd.DataFrame | dict | list | str,
     name: str,
@@ -28,8 +51,7 @@ def save(
     """
 
     base = outdir or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
-    outdir = Path(base).expanduser()
-    outdir.mkdir(parents=True, exist_ok=True)
+    outdir = _ensure_writable_dir(Path(base))
     ext_map = {"csv": "csv", "excel": "xlsx", "pdf": "pdf", "json": "json", "html": "html"}
     fname = outdir / f"{name}.{ext_map[fmt]}"
     if fmt == "csv":

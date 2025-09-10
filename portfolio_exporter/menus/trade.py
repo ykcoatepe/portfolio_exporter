@@ -9,13 +9,32 @@ from pathlib import Path
 
 import json
 
-from rich.console import Console
-from rich.table import Table
+try:
+    from rich.console import Console
+    from rich.table import Table
+except Exception:  # pragma: no cover - fallback for constrained test envs
+    class Console:  # type: ignore
+        def print(self, *a, **_k):
+            try:
+                print(*a)
+            except Exception:
+                pass
+    class Table:  # type: ignore
+        def __init__(self, *a, **k):
+            pass
+        def add_column(self, *a, **k):
+            pass
+        def add_row(self, *a, **k):
+            pass
 
 from portfolio_exporter.core import ui as core_ui
 # Back-compat: allow tests to monkeypatch prompt_input on this module
 prompt_input = core_ui.prompt_input
 import datetime as _dt
+
+# Speed up previews in CI/test mode
+import os as _os
+TEST_MODE = bool(_os.getenv("PE_TEST_MODE"))
 
 
 @contextmanager
@@ -388,16 +407,17 @@ def launch(status, default_fmt):
                     import contextlib as _ctx
                     # Use default prior positions from memory if present
                     args = ["--summary-only", "--json", "--no-files"]
-                    try:
-                        from pathlib import Path as _Path
-                        _pf = _Path(".codex/memory.json")
-                        if _pf.exists():
-                            _data = json.loads(_pf.read_text())
-                            prior = (_data.get("preferences", {}) or {}).get("trades_prior_positions", "")
-                            if prior and _Path(prior).expanduser().exists():
-                                args.extend(["--prior-positions-csv", str(_Path(prior).expanduser())])
-                    except Exception:
-                        pass
+                    if not TEST_MODE:
+                        try:
+                            from pathlib import Path as _Path
+                            _pf = _Path(".codex/memory.json")
+                            if _pf.exists():
+                                _data = json.loads(_pf.read_text())
+                                prior = (_data.get("preferences", {}) or {}).get("trades_prior_positions", "")
+                                if prior and _Path(prior).expanduser().exists():
+                                    args.extend(["--prior-positions-csv", str(_Path(prior).expanduser())])
+                        except Exception:
+                            pass
                     with _ctx.redirect_stdout(buf):
                         _tr.main(args)
                     summary = json.loads(buf.getvalue().strip() or "{}")

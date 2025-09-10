@@ -21,6 +21,7 @@ import csv
 import argparse
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from pathlib import Path
 
 import pandas as pd
 from typing import List, Dict, Any
@@ -246,11 +247,28 @@ now_tr = datetime.now(TR_TZ)
 DATE_TAG = now_tr.strftime("%Y%m%d")
 TIME_TAG = now_tr.strftime("%H%M")
 
-# Save snapshots to iCloud Drive ▸ Downloads
-OUTPUT_DIR = os.path.expanduser(settings.output_dir)
+def _resolve_output_dir() -> str:
+    """Resolve a writable output directory with env overrides and fallback.
 
-OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"live_quotes_{DATE_TAG}_{TIME_TAG}.csv")
-OUTPUT_POS_CSV = os.path.join(OUTPUT_DIR, f"live_positions_{DATE_TAG}_{TIME_TAG}.csv")
+    Order: ``OUTPUT_DIR`` → ``PE_OUTPUT_DIR`` → ``settings.output_dir``.
+    Uses the core IO helper to ensure the directory is writable, otherwise
+    falls back to a repo-local ``./tmp_test_run``.
+    """
+    base = os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
+    try:
+        from portfolio_exporter.core.io import _ensure_writable_dir  # reuse helper
+
+        return str(_ensure_writable_dir(Path(base)))
+    except Exception:
+        # Last-resort fallback
+        p = Path(base).expanduser()
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return str(p)
+        except Exception:
+            p = Path("./tmp_test_run")
+            p.mkdir(parents=True, exist_ok=True)
+            return str(p)
 
 from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
 IB_CID = _cid("live_feed", default=2)  # separate clientId
@@ -747,13 +765,9 @@ def _current_output_paths() -> tuple[str, str]:
     now = datetime.now(TR_TZ)
     date_tag = now.strftime("%Y%m%d")
     time_tag = now.strftime("%H%M")
-    # Ensure output directory exists at write-time (avoid import-time side effects)
-    try:
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-    except Exception:
-        pass
-    base_q = os.path.join(OUTPUT_DIR, f"live_quotes_{date_tag}_{time_tag}")
-    base_pos = os.path.join(OUTPUT_DIR, f"live_positions_{date_tag}_{time_tag}")
+    out_dir = _resolve_output_dir()
+    base_q = os.path.join(out_dir, f"live_quotes_{date_tag}_{time_tag}")
+    base_pos = os.path.join(out_dir, f"live_positions_{date_tag}_{time_tag}")
     return base_q, base_pos
 
 

@@ -27,6 +27,8 @@ def _ensure_db(path: Path) -> Path:
         """
         CREATE TABLE combos (
             combo_id TEXT PRIMARY KEY,
+            ts_created TEXT,
+            ts_closed TEXT,
             structure TEXT,
             underlying TEXT,
             expiry TEXT,
@@ -36,7 +38,7 @@ def _ensure_db(path: Path) -> Path:
             parent_combo_id TEXT,
             closed_date TEXT
         );
-        CREATE TABLE combo_legs (
+        CREATE TABLE IF NOT EXISTS legs (
             combo_id TEXT,
             conid INTEGER,
             strike REAL,
@@ -49,11 +51,11 @@ def _ensure_db(path: Path) -> Path:
         "INSERT INTO combos (combo_id, structure, underlying, expiry, type, width, credit_debit) VALUES (?,?,?,?,?,?,?)",
         [
             ("1", "vertical", "AAPL", "2024-01-19", None, None, None),
-            ("2", None, "MSFT", "2024-02-16", "vertical", 10.0, 1.0),
+            ("2", "vertical", "MSFT", "2024-02-16", "vertical", 10.0, 1.0),
         ],
     )
     conn.executemany(
-        "INSERT INTO combo_legs (combo_id, conid, strike, right) VALUES (?,?,?,?)",
+        "INSERT INTO legs (combo_id, conid, strike, right) VALUES (?,?,?,?)",
         [("1", 1, 150, "C"), ("1", 2, 155, "P")],
     )
     migrate_combo_schema(conn)

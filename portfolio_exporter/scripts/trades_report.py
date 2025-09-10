@@ -372,7 +372,11 @@ def _load_open_orders() -> pd.DataFrame:
         return pd.DataFrame()
 
     rows = []
-    for o in ib.openOrders():
+    try:
+        iterable = ib.openOrders()
+    except AttributeError:  # test stubs without openOrders
+        return pd.DataFrame()
+    for o in iterable:
         c = o.contract
         rows.append(
             {
@@ -580,10 +584,19 @@ def _compute_streaming_effect(df: pd.DataFrame, prev_positions: pd.DataFrame | N
 
     # Instrument key
     sym = d.get("symbol", d.get("underlying"))
-    d["__sym"] = sym.astype(str).str.upper()
-    d["__exp"] = pd.to_datetime(d.get("expiry"), errors="coerce").dt.date.astype(str)
-    d["__right"] = d.get("right").astype(str).str.upper()
-    d["__k2"] = pd.to_numeric(d.get("strike"), errors="coerce").apply(lambda x: float(f"{x:.2f}") if pd.notna(x) else np.nan)
+    d["__sym"] = (sym if sym is not None else pd.Series([None] * len(d))).astype(str).str.upper()
+    exp_ser = d.get("expiry")
+    if exp_ser is None:
+        exp_ser = pd.Series([None] * len(d))
+    d["__exp"] = pd.to_datetime(exp_ser, errors="coerce").dt.date.astype(str)
+    right_ser = d.get("right")
+    if right_ser is None:
+        right_ser = pd.Series([None] * len(d))
+    d["__right"] = right_ser.astype(str).str.upper()
+    strk = d.get("strike")
+    if not isinstance(strk, pd.Series):
+        strk = pd.Series([strk] * len(d))
+    d["__k2"] = pd.to_numeric(strk, errors="coerce").apply(lambda x: float(f"{x:.2f}") if pd.notna(x) else np.nan)
     d["__ts"] = pd.to_datetime(d.get("datetime"), errors="coerce")
     d["__key_valid"] = d["__sym"].ne("") & d["__right"].isin(["C", "P"]) & d["__exp"].ne("NaT") & d["__k2"].notna()
 

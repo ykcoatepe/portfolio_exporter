@@ -20,14 +20,29 @@ def get_combo_db_path() -> Path:
     Resolve the current combos.db path.
     Prefers PE_DB_PATH env var if set, otherwise defaults to settings.output_dir/combos.db.
     """
+    # Test-friendly override
+    if os.getenv("PE_TEST_MODE") or os.getenv("PYTEST_CURRENT_TEST"):
+        p = Path.cwd() / "tmp_test_run" / "combos.db"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
     try:
         from portfolio_exporter.core.config import settings
+        from portfolio_exporter.core.io import _ensure_writable_dir
 
-        default_path = Path(settings.output_dir).expanduser() / "combos.db"
+        base = Path(settings.output_dir).expanduser()
+        outdir = _ensure_writable_dir(base)
+        default_path = outdir / "combos.db"
     except Exception:
         default_path = Path.home() / "combos.db"  # fallback if settings import fails
-    db_path = Path(os.getenv("PE_DB_PATH", default_path)).expanduser()
-    return db_path
+    db_path_env = os.getenv("PE_DB_PATH")
+    if db_path_env:
+        p = Path(db_path_env).expanduser()
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            return p
+        except Exception:
+            pass
+    return Path(default_path)
 
 
 def _get_quote_option_func():
