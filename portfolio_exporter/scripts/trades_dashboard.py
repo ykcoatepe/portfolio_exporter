@@ -140,18 +140,27 @@ def _build_pdf(summary: Dict[str, Any], path: Path) -> None:
 # CLI
 
 
-def main(argv: list[str] | None = None):
+def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Trades Dashboard")
     parser.add_argument("--trades-report", help="Path to trades_report CSV/JSON", default=None)
-    cli_helpers.add_common_output_args(parser)
-    cli_helpers.add_common_debug_args(parser)
+    # Explicit flags required by tests
+    parser.add_argument("--json", action="store_true", help="Print JSON summary to stdout")
+    parser.add_argument("--no-files", action="store_true", help="Do not write any files")
+    parser.add_argument("--output-dir", help="Directory to write outputs")
+    parser.add_argument("--no-pretty", action="store_true", help="Disable pretty printing")
+    parser.add_argument("--debug-timings", action="store_true", help="Emit timing breakdown")
+    return parser
+
+
+def main(argv: list[str] | None = None):
+    parser = get_arg_parser()
     args = parser.parse_args(argv)
 
     quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
-    outdir = Path(args.output_dir) if args.output_dir else None
-    formats = cli_helpers.decide_file_writes(
-        args, json_only_default=True, defaults={"html": True, "pdf": True}
-    )
+    outdir = Path(args.output_dir).expanduser() if args.output_dir else None
+    # Respect --no-files strictly regardless of defaults
+    write_files = bool(outdir) and not args.no_files
+    formats = {"html": write_files, "pdf": write_files}
 
     df = _load_latest_trades_report(args.trades_report)
     _ = _load_quick_chain()  # currently unused but loaded for future use
@@ -192,7 +201,7 @@ def main(argv: list[str] | None = None):
                 written.append(path_pdf)
         if args.debug_timings:
             meta["timings"] = rl.timings
-            if written:
+            if written and write_files:
                 tpath = core_io.save(pd.DataFrame(rl.timings), "timings", "csv", outdir)
                 outputs["timings"] = str(tpath)
                 written.append(tpath)

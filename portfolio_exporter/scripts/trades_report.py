@@ -33,7 +33,6 @@ import numpy as np
 import logging
 
 from portfolio_exporter.core import combo as combo_core
-from portfolio_exporter.core import io as io_core
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import config as config_core
 from portfolio_exporter.core import cli as cli_helpers
@@ -1236,11 +1235,9 @@ def run(
     # Prefer vectorized streaming intent; falls back row-wise when needed
     df["position_effect"] = _compute_streaming_effect(df, prev_positions_df)
 
-    from portfolio_exporter.core.io import save
-
     # Timestamped filename for easier tracking and to avoid overwrites
     date_tag = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
-    path = save(df, f"trades_report_{date_tag}", fmt, settings.output_dir)
+    path = core_io.save(df, f"trades_report_{date_tag}", fmt, settings.output_dir)
     print(f"✅ Trades report exported → {path}")
 
     # Also detect and save combos unless disabled
@@ -2160,7 +2157,7 @@ def _save_trades_combos(
         errors="ignore",
     )
     target = outdir or config_core.settings.output_dir
-    return io_core.save(out, "trades_combos", fmt, target)
+    return core_io.save(out, "trades_combos", fmt, target)
 
 
 def _enrich_combo_strikes_fallback(combos_df: pd.DataFrame, positions_df: pd.DataFrame | None) -> pd.DataFrame:
@@ -2303,7 +2300,7 @@ def _enrich_combo_strikes_fallback(combos_df: pd.DataFrame, positions_df: pd.Dat
     # Optional debug
     try:
         if os.getenv("PE_DEBUG_COMBOS") == "1":
-            io_core.save(df.copy(), "combos_enriched_debug", "csv", config_core.settings.output_dir)
+            core_io.save(df.copy(), "combos_enriched_debug", "csv", config_core.settings.output_dir)
             df = df.drop(columns=["__strike_source"], errors="ignore")
     except Exception:
         pass
@@ -2464,13 +2461,13 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                 combos_df = _attach_intent_flags(combos_df)
 
             if formats.get("csv") and df_all is not None:
-                path_report = io_core.save(df_all, "trades_report", "csv", outdir)
+                path_report = core_io.save(df_all, "trades_report", "csv", outdir)
                 outputs["trades_report"] = str(path_report)
                 written.append(path_report)
                 path_combos = _save_trades_combos(combos_df, fmt="csv", outdir=outdir)
                 outputs["trades_combos"] = str(path_combos)
                 written.append(path_combos)
-                path_clusters = io_core.save(clusters_df, "trades_clusters", "csv", outdir)
+                path_clusters = core_io.save(clusters_df, "trades_clusters", "csv", outdir)
                 outputs["trades_clusters"] = str(path_clusters)
                 written.append(path_clusters)
                 # Intent summary CSVs
@@ -2490,7 +2487,7 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                     outputs["trades_intent_by_underlying"] = str(path_iu)
                     rl.add_outputs([path_iu])
                 if args.debug_timings or os.getenv("PE_DEBUG") == "1":
-                    dbg_path = io_core.save(debug_rows, "trades_clusters_debug", "csv", outdir)
+                    dbg_path = core_io.save(debug_rows, "trades_clusters_debug", "csv", outdir)
                     outputs["trades_clusters_debug"] = str(dbg_path)
                     written.append(dbg_path)
                 # Optional intent debug
@@ -2503,7 +2500,7 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                     except Exception:
                         pass
                 if args.debug_timings and rl.timings:
-                    tpath = io_core.save(pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir)
+                    tpath = core_io.save(pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir)
                     outputs["timings"] = str(tpath)
                     written.append(tpath)
 
