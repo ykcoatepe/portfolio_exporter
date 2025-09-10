@@ -896,7 +896,15 @@ def launch(status, default_fmt):
                 args = [fmt_flag]
                 if os.getenv("PE_QUIET"):
                     args.append("--no-pretty")
-                _daily.main(args)
+                summary = _daily.main(args)
+                # Print where files were written (paths list in summary.outputs)
+                try:
+                    outs = summary.get("outputs", []) if isinstance(summary, dict) else []
+                    if outs:
+                        # Show last written artifact path for convenience
+                        console.print(outs[-1])
+                except Exception:
+                    pass
                 # Offer to open the last report immediately
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
                 ch = prompt_input("Open last report now? (Y/n) [Y]: ").strip().lower()
