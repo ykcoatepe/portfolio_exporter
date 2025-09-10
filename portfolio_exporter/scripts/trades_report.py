@@ -1697,8 +1697,22 @@ def _detect_and_enrich_trades_combos(
                 return s
 
             cl_perm = clusters_df.get("perm_ids") if "perm_ids" in clusters_df.columns else None
+            cl_map = []
             if cl_perm is not None:
-            cl_map = [(_to_perm_set(v), float(p) if pd.notna(p) else 0.0, float(n) if pd.notna(n) else 0.0) for v, p, n in zip(clusters_df["perm_ids"], clusters_df.get("pnl", 0.0), clusters_df.get("pnl_net", 0.0) if "pnl_net" in clusters_df.columns else clusters_df.get("pnl", 0.0))]
+                cl_map = [
+                    (
+                        _to_perm_set(v),
+                        float(p) if pd.notna(p) else 0.0,
+                        float(n) if pd.notna(n) else 0.0,
+                    )
+                    for v, p, n in zip(
+                        clusters_df["perm_ids"],
+                        clusters_df.get("pnl", 0.0),
+                        clusters_df.get("pnl_net", 0.0)
+                        if "pnl_net" in clusters_df.columns
+                        else clusters_df.get("pnl", 0.0),
+                    )
+                ]
             pnls: list[float] = []
             pnls_net: list[float] = []
             for _, row in combos_df.iterrows():
