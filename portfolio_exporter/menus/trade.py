@@ -1175,7 +1175,9 @@ def launch(status, default_fmt):
                 from portfolio_exporter.core.ib import quote_option, quote_stock
                 import time as _time
                 try:
-                    execs = _tr._load_trades()
+                    execs = session.get("execs_df")
+                    if execs is None or not hasattr(execs, "empty"):
+                        execs = _tr._load_trades()
                 except Exception as exc:
                     console.print(f"[red]Failed to load executions:[/] {exc}")
                     return
@@ -1184,8 +1186,12 @@ def launch(status, default_fmt):
                 except Exception:
                     opens = None
                 try:
-                    combos = _tr._detect_and_enrich_trades_combos(execs, opens, prev_positions_df=None)
-                    pos_like = _tr._build_positions_like_df(execs, opens)
+                    combos = session.get("combos_df")
+                    pos_like = session.get("pos_like_df")
+                    if combos is None:
+                        combos = _tr._detect_and_enrich_trades_combos(execs, opens, prev_positions_df=None)
+                    if pos_like is None:
+                        pos_like = _tr._build_positions_like_df(execs, opens)
                 except Exception as exc:
                     console.print(f"[red]Failed to detect combos:[/] {exc}")
                     return
