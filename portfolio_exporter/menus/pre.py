@@ -98,6 +98,9 @@ def launch(status: StatusBar, default_fmt: str):
             tbl.add_row(key, label)
         console.print(tbl)
         raw = _input("\u203a ").strip().lower()
+        # Allow test harness to exit with '0' like the main menu
+        if raw == "0":
+            return
         # Allow multiple entries separated by spaces or commas
         tokens = [t for t in re.split(r"[\s,]+", raw) if t]
         for choice in tokens:
