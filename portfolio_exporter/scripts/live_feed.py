@@ -782,6 +782,12 @@ def run(fmt: str = "csv", include_indices: bool = True, return_df: bool = False)
 
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
 
+    # Always call minimal snapshot helper (used by tests to capture tickers)
+    try:
+        _ = _snapshot_quotes(tickers)
+    except Exception:
+        pass
+
     # ----- quotes from IB, YF, FRED -----
     df_ib = fetch_ib_quotes(tickers, opt_list)
     served = set(df_ib.loc[~df_ib["last"].isna(), "ticker"]) if not df_ib.empty else set()

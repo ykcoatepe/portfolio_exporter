@@ -26,6 +26,8 @@ from portfolio_exporter.core.chain import fetch_chain
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.runlog import RunLog
 from portfolio_exporter.core import ui as core_ui
+# Back-compat: expose run_with_spinner alias for tests to monkeypatch
+run_with_spinner = core_ui.run_with_spinner
 
 portfolio_greeks = None  # lazy import to avoid optional deps at module import
 

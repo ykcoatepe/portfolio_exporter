@@ -60,7 +60,7 @@ def quote_stock(symbol: str) -> Dict[str, Any]:
     Attempts IBKR first and falls back to yfinance.
     """
     ib = _ib()
-    if ib is not None and ib.isConnected():
+    if ib is not None and hasattr(ib, "isConnected") and ib.isConnected():
         try:
             from ib_insync import Stock  # type: ignore
         except Exception:
@@ -102,7 +102,7 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> Dict[st
         ``vega``, ``theta`` and ``iv``.
     """
     ib = _ib()
-    if ib is not None and ib.isConnected():
+    if ib is not None and hasattr(ib, "isConnected") and ib.isConnected():
         try:
             from ib_insync import Option  # type: ignore
         except Exception:
