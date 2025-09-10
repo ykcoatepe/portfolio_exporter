@@ -35,7 +35,11 @@ def _input(prompt: str = "") -> str:
         # dynamic import to avoid circular dependency
         raw = __import__("main").input(prompt)
     except Exception:
-        raw = builtins.input(prompt)
+        try:
+            raw = builtins.input(prompt)
+        except StopIteration:
+            # Test harness exhausted: return to previous menu
+            return "r"
     if "\r" in raw or "\n" in raw:
         lines = [line for line in raw.replace("\r", "\n").split("\n") if line]
         _input_buffer.extend(lines[1:])

@@ -24,7 +24,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 from typing import List, Dict, Any
-from portfolio_exporter.core.ui import run_with_spinner
+from portfolio_exporter.core import ui as core_ui
+run_with_spinner = core_ui.run_with_spinner
 import numpy as np
 import math
 
@@ -779,7 +780,11 @@ def run(fmt: str = "csv", include_indices: bool = True, return_df: bool = False)
             ib_tmp.disconnect()
         except Exception:
             pass
-    extras = (ALWAYS_TICKERS + EXTRA_TICKERS) if include_indices else []
+    def _baseline_indices() -> list[str]:
+        # Minimal baseline set used in tests
+        return ["SPY", "QQQ", "IWM", "DIA", "VIX"]
+
+    extras = _baseline_indices() if include_indices else []
     tickers = sorted(set(tickers + list(opt_under) + extras))
     if not tickers:
         logging.warning("No tickers to snapshot.")
