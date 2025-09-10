@@ -245,10 +245,11 @@ Quick shortcuts in the Trades & Reports menu:
 
 - **Executions → intent + P&L** – after “Executions / open orders”, the menu prints:
   - Intent totals: Open/Close/Roll/Mixed/Unknown and dominant effect by underlying.
-  - Top Combos by realized P&L (clustered fills in the selected window).
+  - Top Combos by realized P&L (clustered fills in the selected window) with an Effect column.
   - If Unknown is high or a prior-snapshot warning appears, the menu prompts for a prior positions CSV and persists it for next runs.
 
 - **Combos MTM P&L (JSON-only)** – press `m` to compute mark‑to‑market P&L per detected combo using mid quotes per leg. The JSON is copied to clipboard in interactive mode.
+  - Includes `quoted_ratio` (e.g., `3/4`) and caches quotes for 30s with a small per-run time budget.
 
 - **Format toggle** – press `t` to cycle the default output format (`csv → excel → pdf`) used by actions in this menu.
 
@@ -266,6 +267,10 @@ The menu auto-uses a default prior positions CSV when present under `.codex/memo
 }
 ```
 You can set this interactively when prompted after Executions, or edit the file directly.
+
+Notes
+- Executions intent mapping auto-picks a strictly prior snapshot by earliest fill time and uses the saved path as an override when present.
+- Combos CSV/Excel now include both `pnl` (gross) and `pnl_net` (commission-aware) when data is available.
 
 Typical fixes:
 

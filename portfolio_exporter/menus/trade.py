@@ -169,6 +169,8 @@ def _copy_to_clipboard(text: str) -> bool:
 
 def launch(status, default_fmt):
     console = status.console if status else Console()
+    # Simple per-session cache for heavy data
+    session: dict = {}
     current_fmt = default_fmt
 
     def _preview_daily_report() -> None:
@@ -374,6 +376,10 @@ def launch(status, default_fmt):
                 from portfolio_exporter.scripts import trades_report as _tr
                 # Generate report in selected format
                 df = _tr.run(fmt=current_fmt, show_actions=True, return_df=True)
+                try:
+                    session["execs_df"] = df
+                except Exception:
+                    pass
                 # Quick intent summary (Open/Close/Roll/Mixed) using JSON-only pass
                 try:
                     buf = io.StringIO()
@@ -486,6 +492,11 @@ def launch(status, default_fmt):
                             except Exception:
                                 prior_df = None
                             combos_df = _tr._detect_and_enrich_trades_combos(execs, None, prev_positions_df=prior_df)
+                            try:
+                                session["combos_df"] = combos_df
+                                session["prior_df"] = prior_df
+                            except Exception:
+                                pass
                             if isinstance(combos_df, _pd.DataFrame) and not combos_df.empty:
                                 def _to_set(s: object) -> set[int]:
                                     vals = set()
@@ -506,6 +517,10 @@ def launch(status, default_fmt):
                         except Exception:
                             effect_map = []
                         if isinstance(clusters, _pd.DataFrame) and not clusters.empty and "pnl" in clusters.columns:
+                            try:
+                                session["clusters_df"] = clusters
+                            except Exception:
+                                pass
                             top = clusters.copy()
                             # Sort by absolute P&L
                             try:

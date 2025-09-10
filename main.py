@@ -222,6 +222,7 @@ def main() -> None:
 
         if failures:
             console.print(f"[yellow]Completed with {len(failures)} failure(s): {failures}")
+            
         return
 
     if os.getenv("PE_TEST_MODE"):

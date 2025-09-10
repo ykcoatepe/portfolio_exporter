@@ -21,6 +21,7 @@ class RunLog:
         self._start = 0.0
         self.outputs: List[Path] = []
         self.timings: list[dict[str, int]] = []
+        self.meta: dict = {}
         self.env = {
             "OUTPUT_DIR": os.getenv("OUTPUT_DIR"),
             "PE_OUTPUT_DIR": os.getenv("PE_OUTPUT_DIR"),
@@ -97,6 +98,7 @@ class RunLog:
             "outputs": outs,
             "warnings": [],
             "version": None,
+            "meta": _json_sanitize(self.meta) if self.meta else {},
         }
         if write and self.output_dir:
             self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -105,3 +107,10 @@ class RunLog:
                 json.dump(manifest, fh, indent=2)
             return mpath
         return None
+
+    def add_meta(self, data: dict) -> None:
+        """Merge additional metadata to be written in the manifest."""
+        try:
+            self.meta.update(data or {})
+        except Exception:
+            pass

@@ -1550,6 +1550,12 @@ def _cluster_executions(execs: pd.DataFrame, window_sec: int = 60) -> tuple[pd.D
     df["datetime"] = pd.to_datetime(df.get("datetime"), errors="coerce")
     df["multiplier"] = pd.to_numeric(df.get("multiplier"), errors="coerce")
     df["multiplier"] = df["multiplier"].fillna(df.get("secType").map({"OPT": 100, "FOP": 50}).fillna(1))
+    # Optional commission column for net P&L computation
+    if "commission" in df.columns:
+        try:
+            df["commission"] = pd.to_numeric(df.get("commission"), errors="coerce").fillna(0.0)
+        except Exception:
+            df["commission"] = 0.0
     df["perm_id"] = pd.to_numeric(df.get("perm_id"), errors="coerce").astype("Int64")
 
     df = df.sort_values("datetime").reset_index(drop=True)
@@ -1595,10 +1601,16 @@ def _cluster_executions(execs: pd.DataFrame, window_sec: int = 60) -> tuple[pd.D
             start=("datetime", "min"),
             end=("datetime", "max"),
             pnl=("pnl_leg", "sum"),
+            commission=("commission", "sum") if "commission" in df.columns else ("pnl_leg", "sum"),
             legs_n=("exec_id", "count"),
         )
         .reset_index()
     )
+    try:
+        if "commission" in clusters.columns:
+            clusters["pnl_net"] = pd.to_numeric(clusters.get("pnl"), errors="coerce").fillna(0.0) - pd.to_numeric(clusters.get("commission"), errors="coerce").fillna(0.0)
+    except Exception:
+        pass
 
     structures: dict[int, str] = {}
     for cid, g in df.groupby("cluster_id"):
@@ -1686,17 +1698,22 @@ def _detect_and_enrich_trades_combos(
 
             cl_perm = clusters_df.get("perm_ids") if "perm_ids" in clusters_df.columns else None
             if cl_perm is not None:
-                cl_map = [(_to_perm_set(v), float(p) if pd.notna(p) else 0.0) for v, p in zip(clusters_df["perm_ids"], clusters_df.get("pnl", 0.0))]
-                pnls: list[float] = []
-                for _, row in combos_df.iterrows():
-                    ids = _to_perm_set(row.get("order_ids", ""))
-                    total = 0.0
-                    if ids:
-                        for perm_set, pnl in cl_map:
-                            if perm_set and ids.intersection(perm_set):
-                                total += float(pnl)
-                    pnls.append(total)
-                combos_df["pnl"] = pnls
+            cl_map = [(_to_perm_set(v), float(p) if pd.notna(p) else 0.0, float(n) if pd.notna(n) else 0.0) for v, p, n in zip(clusters_df["perm_ids"], clusters_df.get("pnl", 0.0), clusters_df.get("pnl_net", 0.0) if "pnl_net" in clusters_df.columns else clusters_df.get("pnl", 0.0))]
+            pnls: list[float] = []
+            pnls_net: list[float] = []
+            for _, row in combos_df.iterrows():
+                ids = _to_perm_set(row.get("order_ids", ""))
+                total = 0.0
+                total_net = 0.0
+                if ids:
+                    for perm_set, pnl, pnl_n in cl_map:
+                        if perm_set and ids.intersection(perm_set):
+                            total += float(pnl)
+                            total_net += float(pnl_n)
+                pnls.append(total)
+                pnls_net.append(total_net)
+            combos_df["pnl"] = pnls
+            combos_df["pnl_net"] = pnls_net
     except Exception:
         pass
 
@@ -2474,6 +2491,33 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                     written.append(xlsx_path)
 
         rl.add_outputs(written)
+        # Attach meta: intent counts and top combos by realized P&L
+        try:
+            top_list = []
+            if isinstance(clusters_df, pd.DataFrame) and not clusters_df.empty:
+                tmp = clusters_df.copy()
+                try:
+                    tmp = tmp.reindex(tmp["pnl"].abs().sort_values(ascending=False).index)
+                except Exception:
+                    tmp = tmp.sort_values("pnl", ascending=False)
+                for _, r in tmp.head(5).iterrows():
+                    top_list.append({
+                        "underlying": str(r.get("underlying")),
+                        "structure": str(r.get("structure")),
+                        "legs_n": int(r.get("legs_n", 0) or 0),
+                        "pnl": float(r.get("pnl", 0.0) or 0.0),
+                        "start": str(r.get("start")),
+                        "end": str(r.get("end")),
+                    })
+        except Exception:
+            top_list = []
+        try:
+            rl.add_meta({
+                "intent": {"rows": rows_counts, "combos": combos_counts, "by_underlying": intent_by_und.to_dict(orient="records") if isinstance(intent_by_und, pd.DataFrame) else []},
+                "top_combos_pnl": top_list,
+            })
+        except Exception:
+            pass
         manifest_path = rl.finalize(write=bool(written))
 
         meta: Dict[str, Any] = {"script": "trades_report"}
