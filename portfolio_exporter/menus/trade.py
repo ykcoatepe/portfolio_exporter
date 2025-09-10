@@ -455,7 +455,37 @@ def launch(status, default_fmt):
                         # Build mapping: combo perm_ids → position_effect
                         effect_map: list[tuple[set[int], str]] = []
                         try:
-                            combos_df = _tr._detect_and_enrich_trades_combos(execs, None, prev_positions_df=None)
+                            # Resolve a strictly prior positions snapshot to improve intent
+                            earliest = None
+                            try:
+                                earliest = _tr._get_earliest_exec_ts(execs)
+                            except Exception:
+                                earliest = None
+                            prior_override = None
+                            try:
+                                from pathlib import Path as _Path
+                                _pf = _Path(".codex/memory.json")
+                                if _pf.exists():
+                                    _data = json.loads(_pf.read_text())
+                                    prior_override = (_data.get("preferences", {}) or {}).get("trades_prior_positions", "") or None
+                            except Exception:
+                                prior_override = None
+                            prior_df = None
+                            try:
+                                from portfolio_exporter.core.config import settings as _settings
+                                search_dirs = []
+                                try:
+                                    from pathlib import Path as _P
+                                    search_dirs = [_P(str(_settings.output_dir))]
+                                    td = _P("tests/data")
+                                    if td.exists():
+                                        search_dirs.append(td)
+                                except Exception:
+                                    search_dirs = []
+                                prior_df, _prior_path = _tr._ensure_prev_positions_quiet(earliest, _settings.output_dir, prior_override, search_dirs)
+                            except Exception:
+                                prior_df = None
+                            combos_df = _tr._detect_and_enrich_trades_combos(execs, None, prev_positions_df=prior_df)
                             if isinstance(combos_df, _pd.DataFrame) and not combos_df.empty:
                                 def _to_set(s: object) -> set[int]:
                                     vals = set()
