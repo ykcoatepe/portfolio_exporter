@@ -425,7 +425,7 @@ def launch(status, default_fmt):
                     except Exception:
                         need_prior = False
                     if need_prior:
-                        path = prompt_input("Prior positions CSV path to improve intent (Enter to skip): ").strip()
+                        path = core_ui.prompt_input("Prior positions CSV path to improve intent (Enter to skip): ").strip()
                         if path:
                             buf2 = io.StringIO()
                             with _ctx.redirect_stdout(buf2):
@@ -964,7 +964,7 @@ def launch(status, default_fmt):
                         "--no-files",
                     ]
                     if preset in {"bull_put", "bear_call", "bull_call", "bear_put"}:
-                    width = core_ui.prompt_input("Width [5]: ").strip() or "5"
+                        width = core_ui.prompt_input("Width [5]: ").strip() or "5"
                         args.extend(["--width", width])
                     elif preset in {"iron_condor", "iron_fly"}:
                         wings = core_ui.prompt_input("Wings [5]: ").strip() or "5"
