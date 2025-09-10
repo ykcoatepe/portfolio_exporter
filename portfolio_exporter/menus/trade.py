@@ -199,6 +199,9 @@ def launch(status, default_fmt):
     def _preflight_daily_report() -> None:
         orig_quiet = os.getenv("PE_QUIET")
         os.environ["PE_QUIET"] = "1"
+        # Silence pandera import deprecation noise during preflight
+        orig_pandera = os.getenv("DISABLE_PANDERA_IMPORT_WARNING")
+        os.environ["DISABLE_PANDERA_IMPORT_WARNING"] = "TRUE"
         try:
             from portfolio_exporter.scripts import daily_report as _daily
 
@@ -215,6 +218,10 @@ def launch(status, default_fmt):
                 os.environ.pop("PE_QUIET", None)
             else:
                 os.environ["PE_QUIET"] = orig_quiet
+            if orig_pandera is None:
+                os.environ.pop("DISABLE_PANDERA_IMPORT_WARNING", None)
+            else:
+                os.environ["DISABLE_PANDERA_IMPORT_WARNING"] = orig_pandera
 
     def _preview_trades_clusters() -> None:
         orig_quiet = os.getenv("PE_QUIET")
