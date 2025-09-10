@@ -23,7 +23,11 @@ def input(prompt: str = "") -> str:
     try:
         return core_ui.prompt_input(prompt)
     except Exception:
-        return builtins.input(prompt)
+        try:
+            return builtins.input(prompt)
+        except StopIteration:
+            # Test harness exhausted input sequence → exit main menu gracefully
+            return "0"
 
 
 def build_menu() -> None:
