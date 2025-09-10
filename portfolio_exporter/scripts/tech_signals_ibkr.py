@@ -19,7 +19,7 @@ from math import log, sqrt, erf
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from portfolio_exporter.core.config import settings
-from portfolio_exporter.core.io import save
+from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core.ui import run_with_spinner
 
 TR_TZ = ZoneInfo("Europe/Istanbul")
@@ -634,6 +634,6 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
             ib.disconnect()
         return df_out
 
-    save(df_out, "tech_signals", fmt)
+    core_io.save(df_out, "tech_signals", fmt)
     if USE_IB:
         ib.disconnect()

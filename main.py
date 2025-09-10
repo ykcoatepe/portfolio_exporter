@@ -120,8 +120,7 @@ def task_registry(fmt: str) -> dict[str, callable]:
 
     def netliq_export() -> None:
         from portfolio_exporter.scripts import net_liq_history_export as _netliq
-
-        _netliq.run(fmt=fmt)
+        _netliq.run(fmt=fmt, plot=True)
 
     return {
         "snapshot-quotes": snapshot_quotes,

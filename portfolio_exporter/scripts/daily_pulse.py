@@ -18,7 +18,8 @@ import contextlib
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core import io
 from utils.progress import iter_progress
-from portfolio_exporter.core.ui import run_with_spinner
+from portfolio_exporter.core import ui as core_ui
+run_with_spinner = core_ui.run_with_spinner
 from reportlab.lib.pagesizes import letter, landscape  # PDF output (landscape added)
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
 from reportlab.lib import colors

@@ -756,6 +756,11 @@ def _current_output_paths() -> tuple[str, str]:
     return base_q, base_pos
 
 
+def _load_portfolio_tickers() -> list[str]:
+    """Test hook: wrapper around load_tickers for monkeypatching."""
+    return load_tickers()
+
+
 def run(fmt: str = "csv", include_indices: bool = True, return_df: bool = False):
     """Programmatic entrypoint used by the Live-Market menu.
 
@@ -764,7 +769,7 @@ def run(fmt: str = "csv", include_indices: bool = True, return_df: bool = False)
     - Optionally excludes macro/index extras if include_indices=False
     """
     # ----- resolve tickers -----
-    tickers = load_tickers()
+    tickers = _load_portfolio_tickers()
     opt_list, opt_under = ([], set())
     if IB_AVAILABLE:
         ib_tmp = IB()

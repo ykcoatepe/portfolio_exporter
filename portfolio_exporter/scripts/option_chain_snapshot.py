@@ -28,7 +28,8 @@ import os
 import time
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core import io
-from portfolio_exporter.core.ui import run_with_spinner
+from portfolio_exporter.core import ui as core_ui
+run_with_spinner = core_ui.run_with_spinner
 from datetime import datetime, timezone, date
 from typing import List, Sequence
 import zipfile

@@ -18,9 +18,11 @@ from portfolio_exporter.core import chain as core_chain
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.config import settings
-from portfolio_exporter.core.io import save as io_save
+from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core.ui import render_chain, run_with_spinner
+from portfolio_exporter.core import ui as core_ui
+render_chain = core_ui.render_chain
+run_with_spinner = core_ui.run_with_spinner
 
 
 def _calc_strikes(symbol: str, width: int) -> List[float]:

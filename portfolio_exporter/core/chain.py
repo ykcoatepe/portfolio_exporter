@@ -30,6 +30,20 @@ def get_combo_db_path() -> Path:
     return db_path
 
 
+def _get_quote_option_func():
+    fn = globals().get("quote_option")
+    if callable(fn):
+        return fn
+    try:
+        from .ib import quote_option as _qo  # type: ignore
+        return _qo
+    except Exception:
+        # Fallback stub
+        def _stub(*_a, **_k):
+            return {"mid": float("nan"), "bid": float("nan"), "ask": float("nan"), "delta": float("nan"), "gamma": float("nan"), "vega": float("nan"), "theta": float("nan"), "iv": float("nan")}
+        return _stub
+
+
 def fetch_chain(symbol: str, expiry: str, strikes: List[float] | None = None) -> pd.DataFrame:
     """Return an option chain snapshot.
 
@@ -42,9 +56,10 @@ def fetch_chain(symbol: str, expiry: str, strikes: List[float] | None = None) ->
         spot = quote_stock(symbol)["mid"]
         strikes = [round((spot // 5 + i) * 5, 0) for i in range(-5, 6)]
     rows = []
+    qo = _get_quote_option_func()
     for strike, right in itertools.product(strikes, ["C", "P"]):
         try:
-            q = quote_option(symbol, expiry, strike, right)
+            q = qo(symbol, expiry, strike, right)
             q.update({"strike": strike, "right": right})
             rows.append(q)
         except ValueError:
