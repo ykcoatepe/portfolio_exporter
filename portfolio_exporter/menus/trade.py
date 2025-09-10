@@ -452,6 +452,29 @@ def launch(status, default_fmt):
                     if isinstance(df, _pd.DataFrame) and not df.empty:
                         execs = df[df.get("exec_id").notna()] if "exec_id" in df.columns else df
                         clusters, _dbg = _tr._cluster_executions(execs)
+                        # Build mapping: combo perm_ids → position_effect
+                        effect_map: list[tuple[set[int], str]] = []
+                        try:
+                            combos_df = _tr._detect_and_enrich_trades_combos(execs, None, prev_positions_df=None)
+                            if isinstance(combos_df, _pd.DataFrame) and not combos_df.empty:
+                                def _to_set(s: object) -> set[int]:
+                                    vals = set()
+                                    for tok in str(s or "").replace("/", ",").split(","):
+                                        tok = tok.strip()
+                                        if not tok:
+                                            continue
+                                        try:
+                                            vals.add(int(tok))
+                                        except Exception:
+                                            pass
+                                    return vals
+                                for _, r in combos_df.iterrows():
+                                    ids = _to_set(r.get("order_ids", ""))
+                                    eff = str(r.get("position_effect", "Unknown"))
+                                    if ids:
+                                        effect_map.append((ids, eff))
+                        except Exception:
+                            effect_map = []
                         if isinstance(clusters, _pd.DataFrame) and not clusters.empty and "pnl" in clusters.columns:
                             top = clusters.copy()
                             # Sort by absolute P&L
@@ -464,6 +487,7 @@ def launch(status, default_fmt):
                             tbl.add_column("Underlying")
                             tbl.add_column("Structure")
                             tbl.add_column("Legs", justify="right")
+                            tbl.add_column("Effect")
                             tbl.add_column("P&L", justify="right")
                             tbl.add_column("Start")
                             tbl.add_column("End")
@@ -474,7 +498,26 @@ def launch(status, default_fmt):
                                 pnl = float(r.get("pnl", 0.0)) if _pd.notna(r.get("pnl")) else 0.0
                                 start = str(r.get("start", ""))
                                 end = str(r.get("end", ""))
-                                tbl.add_row(und, struct, legs_n, f"{pnl:+.2f}", start, end)
+                                # Derive effect by intersecting cluster perm_ids with combo order_ids
+                                effect = ""
+                                try:
+                                    perm_set = set()
+                                    for tok in str(r.get("perm_ids", "")).replace("/", ",").split(","):
+                                        tok = tok.strip()
+                                        if tok:
+                                            perm_set.add(int(tok))
+                                    # Priority: Roll > Close > Open > Mixed > Unknown
+                                    priority = {"Roll": 4, "Close": 3, "Open": 2, "Mixed": 1, "Unknown": 0}
+                                    best = ("", -1)
+                                    for ids, eff in effect_map:
+                                        if ids and perm_set.intersection(ids):
+                                            pr = priority.get(eff, 0)
+                                            if pr > best[1]:
+                                                best = (eff, pr)
+                                    effect = best[0] or ""
+                                except Exception:
+                                    effect = ""
+                                tbl.add_row(und, struct, legs_n, effect, f"{pnl:+.2f}", start, end)
                             console.print(tbl)
                 except Exception:
                     pass
