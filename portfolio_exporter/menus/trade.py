@@ -204,8 +204,26 @@ def launch(status, default_fmt):
         os.environ["DISABLE_PANDERA_IMPORT_WARNING"] = "TRUE"
         try:
             from portfolio_exporter.scripts import daily_report as _daily
+            from portfolio_exporter.core.config import settings as _settings
 
             summary = _daily.main(["--preflight", "--json", "--no-files"])
+            # If inputs are missing, auto-run Portfolio Greeks then re-run preflight
+            warns = [str(w).lower() for w in summary.get("warnings", [])]
+            needs_refresh = any(
+                ("missing positions" in w) or ("missing totals" in w) or ("missing combos" in w)
+                for w in warns
+            )
+            if needs_refresh:
+                console.print("[yellow]Inputs missing; auto-generating Portfolio Greeks …")
+                try:
+                    from portfolio_exporter.scripts import portfolio_greeks as _pg
+                    # Write fresh CSVs to configured OUTPUT_DIR
+                    _pg.main(["--output-dir", str(_settings.output_dir), "--json"])  # quiet via PE_QUIET
+                except Exception as exc:
+                    console.print(f"[red]Auto-generation failed:[/] {exc}")
+                else:
+                    # Re-run preflight
+                    summary = _daily.main(["--preflight", "--json", "--no-files"]) 
         except Exception as exc:  # pragma: no cover - defensive
             console.print(f"[red]Preflight failed:[/] {exc}")
         else:
