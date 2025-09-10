@@ -1549,7 +1549,10 @@ def _cluster_executions(execs: pd.DataFrame, window_sec: int = 60) -> tuple[pd.D
     df["price"] = pd.to_numeric(df.get("price"), errors="coerce").fillna(0).astype(float)
     df["datetime"] = pd.to_datetime(df.get("datetime"), errors="coerce")
     df["multiplier"] = pd.to_numeric(df.get("multiplier"), errors="coerce")
-    df["multiplier"] = df["multiplier"].fillna(df.get("secType").map({"OPT": 100, "FOP": 50}).fillna(1))
+    # safe secType mapping when column is missing
+    sec = df.get("secType")
+    sec_map = sec.map({"OPT": 100, "FOP": 50}) if sec is not None else pd.Series([None] * len(df))
+    df["multiplier"] = df["multiplier"].fillna(sec_map).fillna(1)
     # Optional commission column for net P&L computation
     if "commission" in df.columns:
         try:

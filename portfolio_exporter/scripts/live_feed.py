@@ -892,3 +892,17 @@ def main():
 
 
 ### Removed legacy lightweight run() in favor of unified run() above.
+def _snapshot_quotes(tickers: list[str], fmt: str = "csv") -> pd.DataFrame:
+    """Return a minimal snapshot quotes DataFrame with columns [symbol, price].
+
+    Uses yfinance ladder via _yf_resolve_last_price; IBKR path is handled in
+    upstream helpers. Designed to be test-friendly and offline-capable.
+    """
+    rows = []
+    for t in tickers:
+        try:
+            price = _yf_resolve_last_price(t)
+        except Exception:
+            price = float("nan")
+        rows.append({"symbol": t, "price": float(price) if price is not None else float("nan")})
+    return pd.DataFrame(rows)

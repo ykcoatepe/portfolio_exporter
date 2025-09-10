@@ -12,7 +12,7 @@ import json
 from rich.console import Console
 from rich.table import Table
 
-from portfolio_exporter.core.ui import prompt_input
+from portfolio_exporter.core import ui as core_ui
 import datetime as _dt
 
 
@@ -360,7 +360,7 @@ def launch(status, default_fmt):
         console.print(tbl)
         console.print("Multi-select hint: e.g., v p")
         try:
-            raw = prompt_input("› ")
+            raw = core_ui.prompt_input("› ")
         except Exception:
             raw = _builtins.input("› ")
         raw = raw.strip().lower()
@@ -578,7 +578,7 @@ def launch(status, default_fmt):
                     for k, lbl in opts:
                         tbl.add_row(k, lbl)
                     console.print(tbl)
-                    ch = prompt_input("› ").strip().lower()
+                    ch = core_ui.prompt_input("› ").strip().lower()
                     if ch == "r":
                         return
                     if ch == "w":
@@ -600,7 +600,7 @@ def launch(status, default_fmt):
                     for i, p in enumerate(presets, 1):
                         tbl.add_row(str(i), p)
                     console.print(tbl)
-                    sel = prompt_input("Preset #: ").strip()
+                    sel = core_ui.prompt_input("Preset #: ").strip()
                     try:
                         preset = presets[int(sel) - 1]
                     except Exception:
@@ -619,8 +619,8 @@ def launch(status, default_fmt):
                         if _last_exp
                         else "Expiry (YYYY-MM-DD or month like 'nov'): "
                     )
-                    symbol = (prompt_input(sym_prompt).strip().upper() or _last_sym).upper()
-                    expiry = prompt_input(exp_prompt).strip() or _last_exp
+                    symbol = (core_ui.prompt_input(sym_prompt).strip().upper() or _last_sym).upper()
+                    expiry = core_ui.prompt_input(exp_prompt).strip() or _last_exp
                     # Update last symbol/expiry cache
                     try:
                         if symbol:
@@ -629,11 +629,11 @@ def launch(status, default_fmt):
                             _pre_menu.last_expiry.value = expiry
                     except Exception:
                         pass
-                    qty = prompt_input("Qty [1]: ").strip() or "1"
+                    qty = core_ui.prompt_input("Qty [1]: ").strip() or "1"
 
                     # Optional: auto-select strikes for supported presets using live data
                     if preset in {"bull_put", "bear_call", "bull_call", "bear_put", "iron_condor", "butterfly", "calendar"}:
-                        auto = prompt_input("Auto-select strikes from live data? (Y/n) [Y]: ").strip().lower()
+                        auto = core_ui.prompt_input("Auto-select strikes from live data? (Y/n) [Y]: ").strip().lower()
                         if auto in {"", "y"}:
                             from portfolio_exporter.core.preset_engine import (
                                 suggest_credit_vertical,
@@ -661,7 +661,7 @@ def launch(status, default_fmt):
 
                             profile_def = str(_prefs_mem.get("profile", "balanced")).lower()
                             profile = (
-                                prompt_input(
+                                core_ui.prompt_input(
                                     f"Profile (conservative/balanced/aggressive) [{profile_def}]: "
                                 )
                                 .strip()
@@ -670,7 +670,7 @@ def launch(status, default_fmt):
                             )
                             avoid_def = "Y" if bool(_prefs_mem.get("avoid_earnings", True)) else "N"
                             avoid_e = (
-                                prompt_input(
+                                core_ui.prompt_input(
                                     f"Avoid earnings within 7 days? (Y/n) [{avoid_def}]: "
                                 )
                                 .strip()
@@ -681,9 +681,9 @@ def launch(status, default_fmt):
                             min_oi_def = str(_prefs_mem.get("min_oi", 200))
                             min_volume_def = str(_prefs_mem.get("min_volume", 50))
                             max_spread_def = str(_prefs_mem.get("max_spread_pct", 0.02))
-                            min_oi_in = prompt_input(f"Min OI [{min_oi_def}]: ").strip() or min_oi_def
-                            min_vol_in = prompt_input(f"Min Volume [{min_volume_def}]: ").strip() or min_volume_def
-                            max_spread_in = prompt_input(
+                            min_oi_in = core_ui.prompt_input(f"Min OI [{min_oi_def}]: ").strip() or min_oi_def
+                            min_vol_in = core_ui.prompt_input(f"Min Volume [{min_volume_def}]: ").strip() or min_volume_def
+                            max_spread_in = core_ui.prompt_input(
                                 f"Max spread fraction of mid [{max_spread_def}]: "
                             ).strip() or max_spread_def
                             try:
@@ -704,7 +704,7 @@ def launch(status, default_fmt):
                             # Include risk budget pct for suggested qty
                             rb_def_val = _prefs_mem.get("risk_budget_pct", 2)
                             rb_def = str(rb_def_val)
-                            rb = prompt_input(
+                            rb = core_ui.prompt_input(
                                 f"Risk budget % of NetLiq for sizing [{rb_def}]: "
                             ).strip() or rb_def
                             try:
@@ -714,7 +714,7 @@ def launch(status, default_fmt):
                             # Additional prompts for right where needed
                             right = None
                             if preset in {"butterfly", "calendar"}:
-                                right_in = prompt_input("Right (C/P) [C]: ").strip().upper() or "C"
+                                right_in = core_ui.prompt_input("Right (C/P) [C]: ").strip().upper() or "C"
                                 right = "C" if right_in != "P" else "P"
 
                             if preset in {"bull_put", "bear_call"}:
@@ -761,7 +761,7 @@ def launch(status, default_fmt):
                                 )
                             else:  # calendar
                                 # Ask optional diagonal offset steps (0 = calendar)
-                                so = prompt_input("Diagonal far strike offset steps (0=calendar) [0]: ").strip()
+                                so = core_ui.prompt_input("Diagonal far strike offset steps (0=calendar) [0]: ").strip()
                                 try:
                                     strike_offset = int(so) if so else 0
                                 except Exception:
@@ -841,7 +841,7 @@ def launch(status, default_fmt):
                                         str(c.get('suggested_qty','')),
                                     )
                                 console.print(tbl)
-                                sel = prompt_input("Select candidate # (or Enter to skip): ").strip()
+                                sel = core_ui.prompt_input("Select candidate # (or Enter to skip): ").strip()
                                 if sel.isdigit() and 1 <= int(sel) <= len(cands):
                                     pick = cands[int(sel) - 1]
                                     ks = [leg.get("strike") for leg in pick.get("legs", [])]
@@ -850,9 +850,9 @@ def launch(status, default_fmt):
                                     eff_qty = qty
                                     if (qty.strip().lower() in {"", "a", "auto"}) and pick.get("suggested_qty"):
                                         eff_qty = str(int(pick.get("suggested_qty")))
-                                        use_auto = prompt_input(f"Use suggested qty {eff_qty}? (Y/n) [Y]: ").strip().lower()
+                                        use_auto = core_ui.prompt_input(f"Use suggested qty {eff_qty}? (Y/n) [Y]: ").strip().lower()
                                         if use_auto == "n":
-                                            eff_qty = prompt_input("Qty: ").strip() or eff_qty
+                                            eff_qty = core_ui.prompt_input("Qty: ").strip() or eff_qty
                                     # Build via strategy based on preset
                                     if preset in {"bull_put"} and len(ks)>=2:
                                         args = [
@@ -939,7 +939,7 @@ def launch(status, default_fmt):
                                     if risk:
                                         console.print(risk)
                                     if ticket:
-                                        save = prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
+                                        save = core_ui.prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
                                         if save in {"", "y"}:
                                             io_save(ticket, "order_ticket", fmt="json")
                                             # Copy JSON to clipboard in interactive mode
@@ -964,10 +964,10 @@ def launch(status, default_fmt):
                         "--no-files",
                     ]
                     if preset in {"bull_put", "bear_call", "bull_call", "bear_put"}:
-                        width = prompt_input("Width [5]: ").strip() or "5"
+                    width = core_ui.prompt_input("Width [5]: ").strip() or "5"
                         args.extend(["--width", width])
                     elif preset in {"iron_condor", "iron_fly"}:
-                        wings = prompt_input("Wings [5]: ").strip() or "5"
+                        wings = core_ui.prompt_input("Wings [5]: ").strip() or "5"
                         args.extend(["--wings", wings])
                     buf = io.StringIO()
                     with contextlib.redirect_stdout(buf):
@@ -983,7 +983,7 @@ def launch(status, default_fmt):
                     if risk:
                         console.print(risk)
                     if ticket:
-                        save = prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
+                        save = core_ui.prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
                         if save in {"", "y"}:
                             io_save(ticket, "order_ticket", fmt="json")
 
@@ -1020,7 +1020,7 @@ def launch(status, default_fmt):
                     pass
                 # Offer to open the last report immediately
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
-                ch = prompt_input("Open last report now? (Y/n) [Y]: ").strip().lower()
+                ch = core_ui.prompt_input("Open last report now? (Y/n) [Y]: ").strip().lower()
                 if ch in {"", "y"}:
                     msg = open_last_report(quiet=quiet)
                     console.print(msg)
@@ -1069,10 +1069,10 @@ def launch(status, default_fmt):
                 defv_str = _mem.get("structure") or ""
                 defv_top = str(_mem.get("top_n", "")) if _mem.get("top_n") is not None else ""
 
-                symbols = (prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym) or None
-                effect = (prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff) or None
-                structure = (prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip() or defv_str) or None
-                top_n = prompt_input(f"Top N (optional) [{defv_top}]: ").strip() or defv_top
+                symbols = (core_ui.prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym) or None
+                effect = (core_ui.prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff) or None
+                structure = (core_ui.prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip() or defv_str) or None
+                top_n = core_ui.prompt_input(f"Top N (optional) [{defv_top}]: ").strip() or defv_top
                 top = int(top_n) if str(top_n).strip().isdigit() else None
                 summary = _quick_save_filtered(
                     output_dir=str(settings.output_dir),
@@ -1132,10 +1132,10 @@ def launch(status, default_fmt):
                 defv_str = _mem.get("structure") or ""
                 defv_top = str(_mem.get("top_n", "")) if _mem.get("top_n") is not None else ""
 
-                symbols = (prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym) or None
-                effect = (prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff) or None
-                structure = (prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip() or defv_str) or None
-                top_n = prompt_input(f"Top N (optional) [{defv_top}]: ").strip() or defv_top
+                symbols = (core_ui.prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym) or None
+                effect = (core_ui.prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff) or None
+                structure = (core_ui.prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip() or defv_str) or None
+                top_n = core_ui.prompt_input(f"Top N (optional) [{defv_top}]: ").strip() or defv_top
                 top = int(top_n) if str(top_n).strip().isdigit() else None
                 txt = _preview_trades_json(symbols=symbols, effect_in=effect, structure_in=structure, top_n=top)
                 if quiet:

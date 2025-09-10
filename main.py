@@ -13,7 +13,7 @@ from rich.table import Table
 
 from portfolio_exporter.core import cli as core_cli
 from portfolio_exporter.core import json as core_json
-from portfolio_exporter.core.ui import StatusBar, prompt_input
+from portfolio_exporter.core import ui as core_ui
 
 console = Console()
 
@@ -21,7 +21,7 @@ console = Console()
 def input(prompt: str = "") -> str:
     # Use StatusBar-aware prompt so input is visible and persistent.
     try:
-        return prompt_input(prompt)
+        return core_ui.prompt_input(prompt)
     except Exception:
         return builtins.input(prompt)
 
@@ -154,7 +154,7 @@ def main() -> None:
     quiet = args.quiet or os.getenv("PE_QUIET") not in (None, "", "0")
     status = None
     if not quiet:
-        status = StatusBar("Ready")
+        status = core_ui.StatusBar("Ready")
         status.update("Ready")
         console.rule("[bold cyan]AI-Managed Playbook")
 
