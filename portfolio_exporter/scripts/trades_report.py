@@ -1207,7 +1207,7 @@ def run(
     show_actions: bool = False,
     include_open: bool = True,
     return_df: bool = False,
-    save_combos: bool = True,
+    save_combos: bool = False,
 ) -> pd.DataFrame | None:
     """Generate trades report and export in desired format.
 
@@ -2333,6 +2333,11 @@ def get_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--until")
     parser.add_argument("--summary-only", action="store_true")
     parser.add_argument("--cluster-window-sec", type=int, default=60)
+    # Optional filter flags (accepted for compatibility with menu quick actions)
+    parser.add_argument("--symbol", dest="filter_symbol", default=None)
+    parser.add_argument("--effect-in", dest="filter_effect", default=None)
+    parser.add_argument("--structure-in", dest="filter_structure", default=None)
+    parser.add_argument("--top-n", dest="filter_top_n", type=int, default=None)
     cli_helpers.add_common_output_args(parser, include_excel=True)
     cli_helpers.add_common_debug_args(parser)
     return parser
@@ -2513,6 +2518,54 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
                     outputs["timings"] = str(tpath)
                     written.append(tpath)
 
+            # Optional filtered outputs and JSON sections
+            sections_filtered: Dict[str, Any] = {}
+            filt_rows = None
+            filt_clusters = None
+            base_rows = df_all if df_all is not None else df_exec
+            if base_rows is not None and (args.filter_symbol or args.filter_effect):
+                d = base_rows.copy()
+                if args.filter_symbol:
+                    sym = str(args.filter_symbol).strip().upper()
+                    cols = [c for c in ("symbol", "underlying") if c in d.columns]
+                    if cols:
+                        m = pd.Series([False] * len(d), index=d.index)
+                        for c in cols:
+                            m = m | d[c].astype(str).str.upper().eq(sym)
+                        d = d.loc[m]
+                if args.filter_effect and "position_effect" in d.columns:
+                    d = d.loc[d["position_effect"].astype(str).str.upper() == str(args.filter_effect).upper()]
+                filt_rows = d
+                sections_filtered["rows_count"] = int(len(d))
+            if isinstance(clusters_df, pd.DataFrame) and not clusters_df.empty and (
+                args.filter_structure or args.filter_top_n is not None
+            ):
+                c = clusters_df.copy()
+                if args.filter_structure and "structure" in c.columns:
+                    c = c.loc[c["structure"].astype(str).str.contains(str(args.filter_structure), case=False, na=False)]
+                if args.filter_top_n is not None:
+                    try:
+                        c = c.reindex(c["pnl"].abs().sort_values(ascending=False).index).head(int(args.filter_top_n))
+                    except Exception:
+                        c = c.head(int(args.filter_top_n))
+                filt_clusters = c
+                sections_filtered["clusters_count"] = int(len(c))
+            if sections_filtered or (args.filter_structure or args.filter_top_n is not None):
+                # emit files if writing
+                if formats.get("csv") and outdir is not None:
+                    if isinstance(filt_rows, pd.DataFrame):
+                        pfr = core_io.save(filt_rows, "trades_report_filtered", "csv", outdir)
+                        outputs["trades_report_filtered"] = str(pfr)
+                        written.append(pfr)
+                    elif base_rows is not None:
+                        pfr = core_io.save(base_rows, "trades_report_filtered", "csv", outdir)
+                        outputs["trades_report_filtered"] = str(pfr)
+                        written.append(pfr)
+                    if isinstance(filt_clusters, pd.DataFrame) and not filt_clusters.empty:
+                        pfc = core_io.save(filt_clusters, "trades_clusters_filtered", "csv", outdir)
+                        outputs["trades_clusters_filtered"] = str(pfc)
+                        written.append(pfc)
+
             if formats.get("excel") and df_all is not None:
                 try:
                     import openpyxl  # type: ignore  # noqa: F401
@@ -2591,6 +2644,12 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
             outputs=outputs,
             meta=meta,
         )
+        # Attach filtered section if we computed it
+        try:
+            if 'sections_filtered' in locals() and sections_filtered:
+                summary.setdefault("sections", {})["filtered"] = sections_filtered
+        except Exception:
+            pass
         if earliest_exec_ts is not None and (prev_positions_df is None or len(prev_positions_df) == 0):
             summary.setdefault("warnings", []).append(
                 "No prior positions snapshot found before earliest execution; intent may be less accurate."

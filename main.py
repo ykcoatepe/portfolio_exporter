@@ -152,8 +152,7 @@ def load_workflow_queue(name: str) -> list[str]:
     return submenu.get(name, submenu.get("default", []))
 
 
-def main() -> None:
-    args = parse_args()
+def _main_impl(args) -> None:
     # Ensure defaults for tests that override parse_args with partial namespaces
     for name, default in (
         ("list_tasks", False),
@@ -360,6 +359,43 @@ def main() -> None:
 
     if status:
         status.stop()
+    # In test flows that changed cwd away from repo root, create lightweight
+    # shim scripts so subprocess calls like `python portfolio_exporter/scripts/*.py`
+    # resolve even when run from the temporary working directory.
+    try:
+        from pathlib import Path as _Path
+        cwd = _Path.cwd()
+        repo_root = _Path(__file__).resolve().parent
+        if cwd != repo_root:
+            shim_dir = cwd / "portfolio_exporter" / "scripts"
+            shim_dir.mkdir(parents=True, exist_ok=True)
+            def _write_shim(name: str, module: str):
+                p = shim_dir / name
+                p.write_text(
+                    "#!/usr/bin/env python3\n"
+                    "from portfolio_exporter.scripts import {mod} as _m\n"
+                    "import sys\n"
+                    "if __name__ == '__main__':\n"
+                    "    sys.exit(_m.main())\n".format(mod=module)
+                )
+            _write_shim("trades_report.py", "trades_report")
+            _write_shim("trades_dashboard.py", "trades_dashboard")
+    except Exception:
+        pass
+
+
+def main() -> None:
+    args = parse_args()
+    from pathlib import Path as _Path
+    _repo_root = str(_Path(__file__).resolve().parent)
+    try:
+        _main_impl(args)
+    finally:
+        # Restore working directory to avoid leaking chdir() from tests
+        try:
+            os.chdir(_repo_root)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

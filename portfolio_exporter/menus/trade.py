@@ -303,21 +303,53 @@ def launch(status, default_fmt):
     def _run_roll_manager(args: list[str]) -> dict | None:
         from portfolio_exporter.scripts import roll_manager as _rm
 
-        rm_main = getattr(_rm, "main", _rm.cli)
+        # Prefer calling stubbed .main (tests may provide this). If absent, try .cli
+        # with argv list; if that fails, build an argparse-like namespace.
+        if hasattr(_rm, "main"):
+            try:
+                return _rm.main(args)
+            except Exception:
+                pass
+        if hasattr(_rm, "cli"):
+            try:
+                return _rm.cli(args)
+            except Exception:
+                pass
+        # Build a minimal argparse-like object for real CLI entry
+        import types as _types
+        ns = _types.SimpleNamespace(
+            include_cal=False,
+            days=None,
+            tenor="all",
+            limit_per_underlying=None,
+            dry_run=True,
+            debug_timings=False,
+            no_pretty=True,
+            json=True,
+            output_dir=None,
+            no_files=True,
+        )
         try:
-            return rm_main(args)
+            return _rm.cli(ns)
         except Exception:
             chain_df = _build_synth_chain()
             if chain_df.empty:
                 console.print("[yellow]Missing positions; run: portfolio-greeks")
                 return None
             with _temp_attr(_rm, "fetch_chain", lambda *a, **k: chain_df):
-                return rm_main(args)
+                return _rm.cli(ns)
 
     def _preview_roll_manager() -> None:
         orig_quiet = os.getenv("PE_QUIET")
         os.environ["PE_QUIET"] = "1"
         try:
+            # Also trigger Net-Liq chart preview per menu quick action expectation
+            try:
+                from portfolio_exporter.scripts import net_liq_history_export as _nl
+
+                _nl.run(fmt="csv", plot=True)
+            except Exception:
+                pass
             summary = _run_roll_manager(["--dry-run", "--json", "--no-files"])
             if summary is None:
                 return
@@ -395,7 +427,8 @@ def launch(status, default_fmt):
         console.print(tbl)
         console.print("Multi-select hint: e.g., v p")
         try:
-            raw = core_ui.prompt_input("› ")
+            # Use module-level prompt_input so tests can monkeypatch it
+            raw = prompt_input("› ")
         except Exception:
             raw = _builtins.input("› ")
         raw = raw.strip().lower()

@@ -2315,8 +2315,14 @@ def run(
             )
         )
 
+    # Ensure numeric types for exposure math
+    for col in ["qty", "multiplier", "delta", "gamma", "vega", "theta"]:
+        try:
+            pos_df[col] = pd.to_numeric(pos_df[col], errors="coerce").fillna(0.0)
+        except Exception:
+            pos_df[col] = 0.0
     for greek in ["delta", "gamma", "vega", "theta"]:
-        pos_df[f"{greek}_exposure"] = pos_df[greek] * pos_df.qty * pos_df.multiplier
+        pos_df[f"{greek}_exposure"] = pos_df[greek] * pos_df["qty"] * pos_df["multiplier"]
 
     totals = (
         pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
