@@ -240,7 +240,10 @@ def launch(status, default_fmt):
         orig_pandera = os.getenv("DISABLE_PANDERA_IMPORT_WARNING")
         os.environ["DISABLE_PANDERA_IMPORT_WARNING"] = "TRUE"
         try:
-            from portfolio_exporter.scripts import daily_report as _daily
+            import sys as _sys
+            _daily = _sys.modules.get("portfolio_exporter.scripts.daily_report")
+            if _daily is None:
+                from portfolio_exporter.scripts import daily_report as _daily
             from portfolio_exporter.core.config import settings as _settings
 
             summary = _daily.main(["--preflight", "--json", "--no-files"])
@@ -301,6 +304,13 @@ def launch(status, default_fmt):
                 os.environ["PE_QUIET"] = orig_quiet
 
     def _run_roll_manager(args: list[str]) -> dict | None:
+        import sys as _sys
+        _stub = _sys.modules.get("portfolio_exporter.scripts.roll_manager")
+        if _stub is not None and not hasattr(_stub, "__file__") and hasattr(_stub, "main"):
+            try:
+                return _stub.main(args)
+            except Exception:
+                pass
         from portfolio_exporter.scripts import roll_manager as _rm
 
         # Prefer calling stubbed .main (tests may provide this). If absent, try .cli
