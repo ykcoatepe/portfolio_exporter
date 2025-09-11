@@ -2324,12 +2324,49 @@ def run(
     for greek in ["delta", "gamma", "vega", "theta"]:
         pos_df[f"{greek}_exposure"] = pos_df[greek] * pos_df["qty"] * pos_df["multiplier"]
 
-    totals = (
-        pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
-        .sum()
-        .to_frame()
-        .T
-    )
+    # Deterministic totals computation with a robust fallback to precomputed exposures
+    try:
+        totals = pd.DataFrame(
+            {
+                "delta_exposure": float((pos_df["delta"] * pos_df["qty"] * pos_df["multiplier"]).sum()),
+                "gamma_exposure": float((pos_df["gamma"] * pos_df["qty"] * pos_df["multiplier"]).sum()),
+                "vega_exposure": float((pos_df["vega"] * pos_df["qty"] * pos_df["multiplier"]).sum()),
+                "theta_exposure": float((pos_df["theta"] * pos_df["qty"] * pos_df["multiplier"]).sum()),
+            },
+            index=[0],
+        )
+    except Exception:
+        totals = (
+            pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
+            .sum()
+            .to_frame()
+            .T
+        )
+    # If initial totals are all zeros but per-row exposures contain signal, fall back
+    try:
+        if (
+            float(totals.iloc[0].get("delta_exposure", 0.0)) == 0.0
+            and float(
+                pos_df[[
+                    "delta_exposure",
+                    "gamma_exposure",
+                    "vega_exposure",
+                    "theta_exposure",
+                ]]
+                .abs()
+                .sum()
+                .sum()
+            )
+            > 0.0
+        ):
+            totals = (
+                pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
+                .sum()
+                .to_frame()
+                .T
+            )
+    except Exception:
+        pass
 
     combos_df = pd.DataFrame()
     resolved_source = "none"

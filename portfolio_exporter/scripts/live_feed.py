@@ -794,7 +794,12 @@ def _load_portfolio_tickers() -> list[str]:
     return load_tickers()
 
 
-def run(fmt: str = "csv", include_indices: bool = True, return_df: bool = False):
+def run(
+    fmt: str = "csv",
+    include_indices: bool = True,
+    return_df: bool = False,
+    include_positions: bool = False,
+):
     """Programmatic entrypoint used by the Live-Market menu.
 
     - Avoids interactive prompts
@@ -804,7 +809,8 @@ def run(fmt: str = "csv", include_indices: bool = True, return_df: bool = False)
     # ----- resolve tickers -----
     tickers = _load_portfolio_tickers()
     opt_list, opt_under = ([], set())
-    if IB_AVAILABLE:
+    # Only include underlyings from live positions when explicitly requested.
+    if include_positions and IB_AVAILABLE:
         ib_tmp = IB()
         try:
             ib_tmp.connect(IB_HOST, IB_PORT, clientId=99, timeout=3)
@@ -817,7 +823,7 @@ def run(fmt: str = "csv", include_indices: bool = True, return_df: bool = False)
         return ["SPY", "QQQ", "IWM", "DIA", "VIX"]
 
     extras = _baseline_indices() if include_indices else []
-    tickers = sorted(set(tickers + list(opt_under) + extras))
+    tickers = sorted(set(tickers + (list(opt_under) if include_positions else []) + extras))
     if not tickers:
         logging.warning("No tickers to snapshot.")
         return pd.DataFrame() if return_df else None
