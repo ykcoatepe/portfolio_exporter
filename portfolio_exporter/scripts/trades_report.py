@@ -15,6 +15,15 @@ import argparse
 import json
 import sys
 
+# Support running as a script via file path by ensuring repo root is importable
+if __package__ in (None, ""):
+    try:  # pragma: no cover - environment guard
+        import pathlib as _pathlib
+
+        sys.path.append(str(_pathlib.Path(__file__).resolve().parents[2]))
+    except Exception:
+        pass
+
 from portfolio_exporter.core.config import settings
 try:  # optional IBKR config
     from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
@@ -276,7 +285,7 @@ def _ensure_prev_positions_quiet(
     # fallback latest per dir
     for d in dirs:
         try:
-            latest = io_core.latest_file("portfolio_greeks_positions", outdir=d)
+            latest = core_io.latest_file("portfolio_greeks_positions", outdir=d)
             if latest and latest.exists():
                 try:
                     return pd.read_csv(latest), latest

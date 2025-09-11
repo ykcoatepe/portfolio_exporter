@@ -10,6 +10,16 @@ from typing import Any, Dict
 
 import pandas as pd
 
+# Support running as a script via file path by ensuring repo root is importable
+import sys as _sys
+if __package__ in (None, ""):
+    try:  # pragma: no cover - environment guard
+        import pathlib as _pathlib
+
+        _sys.path.append(str(_pathlib.Path(__file__).resolve().parents[2]))
+    except Exception:
+        pass
+
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import json as json_helpers

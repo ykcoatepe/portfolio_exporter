@@ -125,7 +125,13 @@ def _yf_resolve_last_price(
         # Step 2: intraday 1m
         if price is None or pd.isna(price):
             try:
-                intr = yf.download(yf_symbol, period="1d", interval="1m", progress=False)
+                intr = yf.download(
+                    yf_symbol,
+                    period="1d",
+                    interval="1m",
+                    progress=False,
+                    auto_adjust=False,
+                )
                 if intr is not None and not intr.empty:
                     price = float(intr["Close"].dropna().iloc[-1])
             except Exception:
@@ -133,7 +139,13 @@ def _yf_resolve_last_price(
         # Step 3: intraday 5m
         if price is None or pd.isna(price):
             try:
-                intr5 = yf.download(yf_symbol, period="1d", interval="5m", progress=False)
+                intr5 = yf.download(
+                    yf_symbol,
+                    period="1d",
+                    interval="5m",
+                    progress=False,
+                    auto_adjust=False,
+                )
                 if intr5 is not None and not intr5.empty:
                     price = float(intr5["Close"].dropna().iloc[-1])
             except Exception:
@@ -141,7 +153,13 @@ def _yf_resolve_last_price(
         # Step 4: 2d daily
         if price is None or pd.isna(price):
             try:
-                daily = yf.download(yf_symbol, period="2d", interval="1d", progress=False)
+                daily = yf.download(
+                    yf_symbol,
+                    period="2d",
+                    interval="1d",
+                    progress=False,
+                    auto_adjust=False,
+                )
                 if daily is not None and not daily.empty:
                     price = float(daily["Close"].dropna().iloc[-1])
             except Exception:

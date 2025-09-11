@@ -89,6 +89,9 @@ def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
 def create_zip(files: List[str], dest: str | Path) -> tuple[int, list[str]]:
     """Create a zip archive containing the given files, skipping missing.
 
+    - De-duplicates input paths while preserving order to avoid duplicate
+      entries in the ZIP when multiple scripts touched the same file.
+
     Returns
     -------
     (added_count, missing_list)
@@ -97,10 +100,20 @@ def create_zip(files: List[str], dest: str | Path) -> tuple[int, list[str]]:
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     added = 0
     missing: list[str] = []
+    # Deduplicate by absolute path while preserving order
+    seen_paths: set[str] = set()
+    unique_files: list[Path] = []
+    for p in files:
+        path = Path(p).resolve()
+        sp = str(path)
+        if sp in seen_paths:
+            continue
+        seen_paths.add(sp)
+        unique_files.append(path)
     with zipfile.ZipFile(dest_path, "w") as zf:
-        for p in files:
-            path = Path(p)
+        for path in unique_files:
             if path.exists():
+                # Use basename; duplicates are avoided by unique_files above
                 zf.write(path, arcname=path.name)
                 added += 1
             else:

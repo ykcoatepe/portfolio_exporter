@@ -118,6 +118,20 @@ def open_last_report(prefer: str | None = None, quiet: bool = False) -> str:
     return f"Opened {path.name}"
 
 
+def _tr_parser_supports(name: str) -> bool:
+    """Return True if trades_report parser has an option with this name.
+
+    Defensive: any import or attribute error returns False.
+    """
+    try:  # pragma: no cover - light guard
+        from portfolio_exporter.scripts import trades_report as TR
+
+        p = TR.get_arg_parser()
+        return any(name in a.option_strings for a in getattr(p, "_actions", []))
+    except Exception:
+        return False
+
+
 def _quick_save_filtered(
     *,
     output_dir: str,
@@ -132,13 +146,13 @@ def _quick_save_filtered(
     from portfolio_exporter.scripts import trades_report as _tr
 
     argv = ["--json", "--output-dir", output_dir]
-    if symbols:
+    if symbols and _tr_parser_supports("--symbol"):
         argv.extend(["--symbol", symbols])
-    if effect_in:
+    if effect_in and _tr_parser_supports("--effect-in"):
         argv.extend(["--effect-in", effect_in])
-    if structure_in:
+    if structure_in and _tr_parser_supports("--structure-in"):
         argv.extend(["--structure-in", structure_in])
-    if top_n is not None:
+    if top_n is not None and _tr_parser_supports("--top-n"):
         argv.extend(["--top-n", str(top_n)])
     summary = _tr.main(argv)
     if not quiet:
@@ -160,13 +174,13 @@ def _preview_trades_json(
     from portfolio_exporter.scripts import trades_report as _tr
 
     argv = ["--json", "--no-files"]
-    if symbols:
+    if symbols and _tr_parser_supports("--symbol"):
         argv.extend(["--symbol", symbols])
-    if effect_in:
+    if effect_in and _tr_parser_supports("--effect-in"):
         argv.extend(["--effect-in", effect_in])
-    if structure_in:
+    if structure_in and _tr_parser_supports("--structure-in"):
         argv.extend(["--structure-in", structure_in])
-    if top_n is not None:
+    if top_n is not None and _tr_parser_supports("--top-n"):
         argv.extend(["--top-n", str(top_n)])
     data = _tr.main(argv)
     return json.dumps(data, indent=2, sort_keys=True)
