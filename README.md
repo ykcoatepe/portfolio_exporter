@@ -529,6 +529,16 @@ Intent tagging notes
 - Use `--debug-intent` to emit `trades_intent_debug.csv` showing per‑leg `match_mode` (id, attr_exact, attr_tol, no_match) and `prior_qty` used for decisions.
 - If no strictly‑prior snapshot is found, the latest snapshot is used and a warning is emitted; accuracy may be lower in that case.
 
+Additional details (intent mechanics)
+- Streaming classification computes signed deltas per instrument. For options, the key is `(underlying, expiry, right, strike_2dp)`; for stocks (`STK`) the key is just `symbol` so within‑window reductions are tagged `Close`.
+- The IBKR execution field `openClose` (`O`/`C`) overrides the computed intent for that row. The menu/report also maps snake_case `open_close` if present.
+- Side detection accepts both `Side` and `side` and normalizes `BOT/SLD → BUY/SELL` to avoid NaN‑driven mislabels.
+- When a prior snapshot is truly unavailable, a non‑zero `realized_pnl` implies the row is `Close`.
+- For best accuracy across days, either pass `--prior-positions-csv …` or set `.codex/memory.json` `preferences.trades_prior_positions` to a positions CSV path.
+
+Action column
+- `Action` is derived from side/liquidation/roll heuristics and now normalizes `BUY/SELL` vs `BOT/SLD`. `OrderRef` containing `ROLL` shows `Roll`, and executions that hit liquidity removal or liquidation are shown as `Close`.
+
 Note: Intent tagging prefers a positions snapshot strictly older than the earliest execution in your selected window to decide whether combos are Open, Close, Mixed, or Roll. Use `--debug-intent` to emit `trades_intent_debug.csv` with per‑leg matching details. If no prior snapshot exists, tagging falls back to the latest positions and accuracy may decrease.
 
 ### Trades report filters & Excel
