@@ -407,7 +407,19 @@ def _load_open_orders() -> pd.DataFrame:
 
 def _classify(row: pd.Series) -> str:
     sec = str(row.get("secType", ""))
-    side = str(row.get("Side", ""))
+    # Accept both IB executions ("side") and open orders ("Side")
+    raw_side = row.get("Side", None)
+    if raw_side is None or (isinstance(raw_side, float) and pd.isna(raw_side)) or raw_side == "":
+        raw_side = row.get("side", "")
+    side = str(raw_side).upper().strip()
+    # Normalize legacy codes
+    if side in {"BOT", "BUY"}:
+        side_norm = "BUY"
+    elif side in {"SLD", "SELL"}:
+        side_norm = "SELL"
+    else:
+        side_norm = side  # may be empty/unknown
+
     try:
         liq = int(row.get("Liquidation", 0))
     except Exception:
@@ -416,9 +428,7 @@ def _classify(row: pd.Series) -> str:
         lastliq = int(row.get("lastLiquidity", 0))
     except Exception:
         lastliq = 0
-    ref = str(row.get("OrderRef", ""))
-    ref = ref if ref is not None else ""
-    ref = ref.upper()
+    ref = str(row.get("OrderRef", "") or "").upper()
 
     if sec == "BAG":
         return "Combo"
@@ -426,7 +436,12 @@ def _classify(row: pd.Series) -> str:
         return "Roll"
     if liq > 0 or lastliq in {2, 4}:
         return "Close"
-    return "Buy" if side == "BOT" else "Sell"
+    if side_norm == "BUY":
+        return "Buy"
+    if side_norm == "SELL":
+        return "Sell"
+    # Conservative fallback
+    return ""
 
 
 def _prior_qty_for_row(row: pd.Series, prev_positions: pd.DataFrame | None, strike_tol: float = 0.05) -> tuple[float, str]:
@@ -524,16 +539,32 @@ def _infer_position_effect(row: pd.Series, prev_positions: pd.DataFrame | None =
     # 1) Strong explicit signals
     if "ROLL" in u(row.get("OrderRef") or row.get("order_ref")):
         return "Roll"
-    oc = u(row.get("openClose"))
+    # Accept both camelCase from IBKR and snake_case from our dataclass
+    oc = u(row.get("openClose") or row.get("open_close"))
     if oc in {"O", "OPEN"}:
         return "Open"
     if oc in {"C", "CLOSE"}:
         return "Close"
     if u(row.get("Action")) == "OPEN":
         return "Open"
+    # Realized P&L present usually implies a closing trade
+    try:
+        rpnl = float(pd.to_numeric(row.get("realized_pnl"), errors="coerce"))
+        if not math.isnan(rpnl) and rpnl != 0.0:
+            return "Close"
+    except Exception:
+        pass
 
     # 2) Prior snapshot comparison + side
-    side = u(row.get("Side") or row.get("side"))
+    # Choose Side with a safe fallback to side, handling NaN/empty
+    side_raw = row.get("Side")
+    try:
+        is_nan = pd.isna(side_raw)
+    except Exception:
+        is_nan = False
+    if is_nan or side_raw in ("", None):
+        side_raw = row.get("side")
+    side = u(side_raw)
     prior_qty, _mode = _prior_qty_for_row(row, prev_positions, strike_tol=0.05)
 
     if side in {"BUY", "BOT"}:
@@ -586,7 +617,15 @@ def _compute_streaming_effect(df: pd.DataFrame, prev_positions: pd.DataFrame | N
         q = d["total_qty"]
     else:
         q = pd.Series([np.nan] * len(d))
-    side = d.get("Side", d.get("side")).astype(str).str.upper()
+    # Prefer Side, but fill missing values from side to avoid NaNs for executions
+    side_series = d.get("Side")
+    if side_series is None:
+        side_series = d.get("side")
+    else:
+        alt = d.get("side")
+        if alt is not None:
+            side_series = side_series.where(side_series.notna(), alt)
+    side = side_series.astype(str).str.upper()
     sign = side.map({"BUY": 1, "BOT": 1, "SELL": -1, "SLD": -1}).fillna(0)
     d["__delta"] = pd.to_numeric(q, errors="coerce").fillna(0).astype(float) * sign
 
@@ -606,7 +645,16 @@ def _compute_streaming_effect(df: pd.DataFrame, prev_positions: pd.DataFrame | N
         strk = pd.Series([strk] * len(d))
     d["__k2"] = pd.to_numeric(strk, errors="coerce").apply(lambda x: float(f"{x:.2f}") if pd.notna(x) else np.nan)
     d["__ts"] = pd.to_datetime(d.get("datetime"), errors="coerce")
-    d["__key_valid"] = d["__sym"].ne("") & d["__right"].isin(["C", "P"]) & d["__exp"].ne("NaT") & d["__k2"].notna()
+    # Broaden validity for stocks: key by symbol only so within-window reductions mark Close
+    sec = d.get("secType", d.get("sec_type"))
+    sec = (sec if sec is not None else pd.Series([None] * len(d))).astype(str).str.upper()
+    is_stock = sec.eq("STK")
+    # For stocks, normalise to deterministic key parts
+    d.loc[is_stock, "__exp"] = ""
+    d.loc[is_stock, "__right"] = ""
+    d.loc[is_stock, "__k2"] = 0.0
+    base_valid = d["__sym"].ne("") & d["__right"].isin(["C", "P"]) & d["__exp"].ne("NaT") & d["__k2"].notna()
+    d["__key_valid"] = base_valid | (is_stock & d["__sym"].ne(""))
 
     # Prior map
     prior_map: dict[tuple, float] = {}
@@ -639,6 +687,22 @@ def _compute_streaming_effect(df: pd.DataFrame, prev_positions: pd.DataFrame | N
         eff = np.where(np.abs(post) < np.abs(pre), "Close", "Open")
         for idx2, label in zip(g.index, eff):
             effects.at[d.loc[idx2, "__orig_idx"]] = str(label)
+
+    # Explicit override by openClose/open_close when present
+    try:
+        oc_ser = d.get("openClose")
+        oc2 = d.get("open_close")
+        if oc_ser is None:
+            oc_ser = oc2
+        elif oc2 is not None:
+            oc_ser = oc_ser.where(oc_ser.notna() & oc_ser.astype(str).ne(""), oc2)
+        if oc_ser is not None:
+            ocn = oc_ser.astype(str).str.upper().str.strip()
+            oc_map = ocn.map({"O": "Open", "OPEN": "Open", "C": "Close", "CLOSE": "Close"})
+            for idx3, val in oc_map.dropna().items():
+                effects.at[d.loc[idx3, "__orig_idx"]] = str(val)
+    except Exception:
+        pass
 
     effects = effects.reindex(df.index)
     miss = effects[effects.isna()].index
@@ -1207,7 +1271,7 @@ def run(
     show_actions: bool = False,
     include_open: bool = True,
     return_df: bool = False,
-    save_combos: bool = False,
+    save_combos: bool = True,
 ) -> pd.DataFrame | None:
     """Generate trades report and export in desired format.
 
@@ -1240,7 +1304,22 @@ def run(
     except Exception:
         earliest_exec_ts = None
     outdir = Path(config_core.settings.output_dir)
-    prev_positions_df, _prior_path = _ensure_prev_positions_quiet(earliest_exec_ts, outdir)
+    # Prefer prior snapshot path from memory prefs when available
+    prior_override: str | None = None
+    try:
+        from pathlib import Path as _P
+        import json as _json
+        mp = _P(".codex/memory.json")
+        if mp.exists():
+            data = _json.loads(mp.read_text()) or {}
+            prior_override = (data.get("preferences", {}) or {}).get("trades_prior_positions")
+            if prior_override:
+                pp = _P(str(prior_override)).expanduser()
+                if not pp.exists():
+                    prior_override = None
+    except Exception:
+        prior_override = None
+    prev_positions_df, _prior_path = _ensure_prev_positions_quiet(earliest_exec_ts, outdir, prior_override)
     # Prefer vectorized streaming intent; falls back row-wise when needed
     df["position_effect"] = _compute_streaming_effect(df, prev_positions_df)
 
