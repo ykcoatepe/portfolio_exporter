@@ -136,6 +136,22 @@ Writes are atomic and skipped when MEMORY_READONLY=1.
 	•	digest text stays concise (< 800 tokens); --json remains well‑formed and stable.
 	•	No JSON corruption under concurrent writes (lock + atomic write).
 
+4.7 Trades intent preference
+
+To improve Open/Close/Roll detection in trades_report across days, set a prior positions CSV in repo memory. The script auto‑uses this path when present and still allows CLI override.
+
+Example (.codex/memory.json):
+
+{
+  "preferences": {
+    "trades_prior_positions": "/absolute/path/to/portfolio_greeks_positions_YYYYMMDD_HHMM.csv"
+  }
+}
+
+Notes:
+- CLI override: --prior-positions-csv takes precedence when provided.
+- Without a prior snapshot, intent still works using streaming deltas (stocks keyed by symbol) and openClose overrides, but accuracy improves with a strictly prior snapshot.
+
 ⸻
 
 5) Security & Configuration
