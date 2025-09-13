@@ -95,7 +95,14 @@ def get_intraday_bars(symbol: str, cfg: Dict[str, Any], minutes: int = 60, prepo
 
         # Fetch up to last `minutes` 1m bars. Using period='90m' to be safe.
         period = "90m" if minutes <= 90 else "1d"
-        df = yf.download(tickers=symbol, period=period, interval="1m", prepost=prepost, progress=False)
+        df = yf.download(
+            tickers=symbol,
+            period=period,
+            interval="1m",
+            prepost=prepost,
+            progress=False,
+            auto_adjust=False,  # explicit to avoid FutureWarning and keep raw OHLC
+        )
         if df is None or len(df) == 0:
             return []
         # Normalize columns to lower-case keys and output list of dicts

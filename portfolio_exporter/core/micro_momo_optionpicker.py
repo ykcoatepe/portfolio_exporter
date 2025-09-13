@@ -41,6 +41,25 @@ def _get(r: Any, name: str, default: Any = None) -> Any:
     return getattr(r, name, default) if not isinstance(r, dict) else r.get(name, default)
 
 
+def _mid(r: Any) -> float:
+    m = _get(r, "mid", None)
+    try:
+        if isinstance(m, (int, float)) and float(m) > 0:
+            return float(m)
+    except Exception:
+        pass
+    bid = float(_get(r, "bid", 0.0))
+    ask = float(_get(r, "ask", 0.0))
+    last = float(_get(r, "last", 0.0))
+    if bid > 0 and ask > 0:
+        return (bid + ask) / 2
+    if ask > 0:
+        return ask
+    if bid > 0:
+        return bid
+    return last
+
+
 def pick_bull_put_credit(
     spot: float,
     chain: List[Any],
@@ -194,7 +213,7 @@ def pick_structure(
         # find short strike at least min_width above
         short_strike = None
         for strike in sorted(calls):
-            if strike >= long_call.strike + min_width:
+            if strike >= float(_get(long_call, "strike", 0.0)) + min_width:
                 short_strike = strike
                 break
         short_call = _call_at_strike(short_strike, calls) if short_strike else None
@@ -202,7 +221,7 @@ def pick_structure(
             dc = Structure(
                 template="Template",
                 expiry=expiry,
-                long_strike=long_call.strike,
+                long_strike=float(_get(long_call, "strike", 0.0)),
                 short_strike=None,
                 debit_or_credit=None,
                 width=None,
@@ -215,21 +234,24 @@ def pick_structure(
                 return pick_bull_put_credit(scan.price, chain, expiry, cfg)
             return dc
 
-        leg_spreads = [spread_pct(long_call.bid, long_call.ask), spread_pct(short_call.bid, short_call.ask)]
+        leg_spreads = [
+            spread_pct(float(_get(long_call, "bid", 0.0)), float(_get(long_call, "ask", 0.0))),
+            spread_pct(float(_get(short_call, "bid", 0.0)), float(_get(short_call, "ask", 0.0))),
+        ]
         # If any leg has no reliable spread, treat as failing spread check
         per_leg_spread = None
         if all(v is not None for v in leg_spreads):
             per_leg_spread = max([v for v in leg_spreads if v is not None])  # type: ignore[arg-type]
-        oi_ok = long_call.oi >= min_oi and short_call.oi >= min_oi
+        oi_ok = int(_get(long_call, "oi", 0)) >= min_oi and int(_get(short_call, "oi", 0)) >= min_oi
         spread_ok = per_leg_spread is not None and per_leg_spread <= max_spread
-        limit_price = max(0.01, long_call.mid - short_call.mid)
+        limit_price = max(0.01, _mid(long_call) - _mid(short_call))
         dc_struct = Structure(
             template="DebitCall",
             expiry=expiry,
-            long_strike=long_call.strike,
-            short_strike=short_call.strike,
+            long_strike=float(_get(long_call, "strike", 0.0)),
+            short_strike=float(_get(short_call, "strike", 0.0)),
             debit_or_credit="debit",
-            width=abs(short_call.strike - long_call.strike),
+            width=abs(float(_get(short_call, "strike", 0.0)) - float(_get(long_call, "strike", 0.0))),
             per_leg_oi_ok=bool(oi_ok),
             per_leg_spread_pct=per_leg_spread,
             needs_chain=not (oi_ok and spread_ok),
@@ -257,7 +279,7 @@ def pick_structure(
         )
     long_protect = None
     for strike in sorted(calls):
-        if strike >= short_call.strike + min_width:
+        if strike >= float(_get(short_call, "strike", 0.0)) + min_width:
             long_protect = calls[strike]
             break
     if not long_protect:
@@ -265,7 +287,7 @@ def pick_structure(
             template="Template",
             expiry=expiry,
             long_strike=None,
-            short_strike=short_call.strike,
+            short_strike=float(_get(short_call, "strike", 0.0)),
             debit_or_credit=None,
             width=None,
             per_leg_oi_ok=False,
@@ -274,20 +296,23 @@ def pick_structure(
             limit_price=None,
         )
 
-    leg_spreads2 = [spread_pct(short_call.bid, short_call.ask), spread_pct(long_protect.bid, long_protect.ask)]
+    leg_spreads2 = [
+        spread_pct(float(_get(short_call, "bid", 0.0)), float(_get(short_call, "ask", 0.0))),
+        spread_pct(float(_get(long_protect, "bid", 0.0)), float(_get(long_protect, "ask", 0.0))),
+    ]
     per_leg_spread2 = None
     if all(v is not None for v in leg_spreads2):
         per_leg_spread2 = max([v for v in leg_spreads2 if v is not None])  # type: ignore[arg-type]
-    oi_ok2 = short_call.oi >= min_oi and long_protect.oi >= min_oi
+    oi_ok2 = int(_get(short_call, "oi", 0)) >= min_oi and int(_get(long_protect, "oi", 0)) >= min_oi
     spread_ok2 = per_leg_spread2 is not None and per_leg_spread2 <= max_spread
-    limit_price2 = max(0.01, short_call.mid - long_protect.mid)
+    limit_price2 = max(0.01, _mid(short_call) - _mid(long_protect))
     return Structure(
         template="BearCallCredit",
         expiry=expiry,
-        long_strike=long_protect.strike,
-        short_strike=short_call.strike,
+        long_strike=float(_get(long_protect, "strike", 0.0)),
+        short_strike=float(_get(short_call, "strike", 0.0)),
         debit_or_credit="credit",
-        width=abs(long_protect.strike - short_call.strike),
+        width=abs(float(_get(long_protect, "strike", 0.0)) - float(_get(short_call, "strike", 0.0))),
         per_leg_oi_ok=bool(oi_ok2),
         per_leg_spread_pct=per_leg_spread2,
         needs_chain=not (oi_ok2 and spread_ok2),
