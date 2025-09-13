@@ -433,6 +433,85 @@ make momo-dashboard
 
 Includes Scored, Orders, Journal, EOD Summary, and Trigger Log when present.
 
+## Micro-MOMO — Operator Runbook (v1.4+)
+
+Morning (13:25 TRT)
+1) Drop your shortlist CSV (e.g., `data/meme_scan_YYYYMMDD.csv`).
+2) Run analyzer (auto‑enrich IB → Yahoo) and emit a journal template:
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input data/meme_scan_YYYYMMDD.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --data-mode enrich --providers ib,yahoo \
+  --journal-template
+```
+
+Outputs: `out/micro_momo_scored.csv`, `out/micro_momo_orders.csv`, `out/micro_momo_journal.csv`.
+
+During session
+3) Start sentinel (optional Slack thread):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --interval 10 \
+  --webhook https://hooks.slack.com/services/XXX/YYY/ZZZ \
+  --thread <thread_ts>   # optional
+```
+
+Logs firings to `out/micro_momo_triggers_log.csv` and updates journal status.
+
+End of day
+4) Score outcomes (offline OK):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_eod \
+  --journal out/micro_momo_journal.csv \
+  --out_dir out --offline
+```
+
+Writes `out/micro_momo_eod_summary.csv` and annotates the journal.
+
+Review
+5) Build & open dashboard:
+
+```bash
+make momo-dashboard-open
+# or via UI: Pre-Market → Micro-MOMO Dashboard
+```
+
+App task equivalents
+- Analyzer: `python main.py --task micro-momo`
+- Sentinel: `python main.py --task micro-momo-sentinel`
+- EOD: `python main.py --task micro-momo-eod`
+- Dashboard: `python main.py --task micro-momo-dashboard`
+
+Make helpers
+- `make momo-journal` (fixture CSV → journal template)
+- `make momo-sentinel-offline` (idle loop for CI)
+- `make momo-eod-offline` (journal update in offline mode)
+- `make momo-dashboard`, `make momo-dashboard-open`
+
+### Logbook habits for parallel Codex tracks
+
+- Append a log after each task merge:
+
+```bash
+make logbook-add TASK="Micro-MOMO v1.4 EOD + Guard" BRANCH="dev_yordam2" OWNER="codex" \
+  COMMIT="$(git rev-parse --short HEAD)" SCOPE="EOD scorer + guard" \
+  FILES="portfolio_exporter/scripts/micro_momo_eod.py" STATUS="merged" NEXT="Dashboard" NOTES="—"
+```
+
+- Quick tail:
+
+```bash
+python tools/logbook.py list
+```
+
 
 
 ### Live enrichment (v1.1)
