@@ -11,6 +11,8 @@ from portfolio_exporter.scripts import (
     orchestrate_dataset,
     tech_scan,
 )
+from portfolio_exporter.scripts import micro_momo_dashboard as _dash
+import os, webbrowser
 from portfolio_exporter.scripts import micro_momo_analyzer
 
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
@@ -89,6 +91,7 @@ def launch(status: StatusBar, default_fmt: str):
             ("o", "Option chain snapshot"),
             ("n", "Net-Liq history"),
             ("m", "Micro-MOMO Analyzer"),
+            ("d", "Micro-MOMO Dashboard"),
             ("x", "External technical scan"),
             ("y", "Pre-flight check (env & CSVs)"),
             ("z", "Run overnight batch"),
@@ -128,6 +131,7 @@ def launch(status: StatusBar, default_fmt: str):
             "o": option_chain_snapshot.run,
             "n": net_liq_history_export.run,
             "m": lambda fmt=default_fmt: _run_micro_momo(console),
+            "d": lambda fmt=default_fmt: launch_micro_momo_dashboard(status, fmt),
             "x": lambda fmt=default_fmt: _external_scan(fmt),
             "y": lambda fmt=default_fmt: orchestrate_dataset.preflight_check(
                 no_pretty=bool(os.getenv("PE_QUIET"))
@@ -164,3 +168,35 @@ def _run_micro_momo(console: Console) -> None:
         console.print(f"[green]Micro-MOMO complete → {out_dir}[/]")
     except Exception as exc:  # pragma: no cover - menu path
         console.print(f"[red]Micro-MOMO error:[/] {exc}")
+
+
+def launch_micro_momo_dashboard(status: StatusBar, fmt: str) -> None:  # noqa: ARG001
+    try:
+        from portfolio_exporter.core import ui as core_ui
+
+        default_out = os.getenv("MOMO_OUT") or "out"
+        out_dir = core_ui.prompt_input(
+            f"Dashboard output dir [{default_out}]: "
+        ).strip() or default_out
+        if status:
+            status.update("Generating Micro-MOMO Dashboard", "cyan")
+        _dash.main(["--out_dir", out_dir])
+        path = os.path.join(out_dir, "micro_momo_dashboard.html")
+        if os.path.exists(path):
+            try:
+                webbrowser.open(f"file://{os.path.abspath(path)}", new=2)
+            except Exception:
+                pass
+            from rich.console import Console as _C
+
+            _C().print(f"[green]Dashboard ready:[/] {path}")
+        else:
+            from rich.console import Console as _C
+
+            _C().print(f"[yellow]Dashboard not found at:[/] {path}")
+        if status:
+            status.update("Ready", "green")
+    except Exception as exc:  # pragma: no cover - UI path
+        from rich.console import Console as _C
+
+        _C().print(f"[red]Micro-MOMO Dashboard failed:[/] {exc}")

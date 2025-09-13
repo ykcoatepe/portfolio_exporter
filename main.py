@@ -211,6 +211,18 @@ def task_registry(fmt: str) -> dict[str, callable]:
             argv += ["--offline"]
         _eod.main(argv)
 
+    def micro_momo_dashboard() -> None:
+        from portfolio_exporter.scripts import micro_momo_dashboard as _dash
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        _dash.main(["--out_dir", out_dir])
+        try:
+            import webbrowser as _wb, os as _os
+            path = _os.path.join(out_dir, "micro_momo_dashboard.html")
+            if _os.path.exists(path):
+                _wb.open(f"file://{_os.path.abspath(path)}", new=2)
+        except Exception:
+            pass
+
     return {
         "snapshot-quotes": snapshot_quotes,
         "quotes": snapshot_quotes,
@@ -228,6 +240,8 @@ def task_registry(fmt: str) -> dict[str, callable]:
         "momo-sentinel": micro_momo_sentinel,
         "micro-momo-eod": micro_momo_eod,
         "momo-eod": micro_momo_eod,
+        "micro-momo-dashboard": micro_momo_dashboard,
+        "momo-dashboard": micro_momo_dashboard,
     }
 
 

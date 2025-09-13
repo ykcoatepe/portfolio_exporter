@@ -4,7 +4,12 @@ from typing import Any, Dict, List, Optional
 
 
 def emit_alerts(
-    alerts: List[Dict[str, Any]], webhook_url: Optional[str], dry_run: bool, offline: bool
+    alerts: List[Dict[str, Any]],
+    webhook_url: Optional[str],
+    dry_run: bool,
+    offline: bool,
+    per_item: bool = False,
+    extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """POST alerts to webhook_url unless dry_run or offline; return {"sent":N,"failed":[...]}.
 
@@ -18,17 +23,32 @@ def emit_alerts(
         import json
         import urllib.request
 
-        req = urllib.request.Request(
-            webhook_url,
-            data=json.dumps(alerts).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:  # nosec - caller controls URL
-            if 200 <= resp.status < 300:
-                result["sent"] = len(alerts)
-            else:
-                result["failed"] = ["http_status_" + str(resp.status)]
+        if per_item or extra:
+            for a in alerts:
+                payload = dict(a)
+                if extra:
+                    payload.update(extra)
+                req = urllib.request.Request(
+                    webhook_url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:  # nosec - caller controls URL
+                    if 200 <= resp.status < 300:
+                        result["sent"] += 1
+                    else:
+                        result["failed"].append("http_status_" + str(resp.status))
+        else:
+            req = urllib.request.Request(
+                webhook_url,
+                data=json.dumps(alerts).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec - caller controls URL
+                if 200 <= resp.status < 300:
+                    result["sent"] = len(alerts)
+                else:
+                    result["failed"] = ["http_status_" + str(resp.status)]
     except Exception as exc:  # pragma: no cover - exercised via monkeypatch
         result["failed"] = [str(exc)]
     return result
-

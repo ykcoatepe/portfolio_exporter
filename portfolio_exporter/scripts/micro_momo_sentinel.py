@@ -55,6 +55,7 @@ def main(argv: List[str] | None = None) -> int:
     ap.add_argument("--interval", type=int, default=10)
     ap.add_argument("--webhook")
     ap.add_argument("--offline", action="store_true")
+    ap.add_argument("--thread", help="Slack thread_ts for threaded alerts")
     args = ap.parse_args(argv)
 
     scored = _load_scored(args.scored_csv)
@@ -114,7 +115,17 @@ def main(argv: List[str] | None = None) -> int:
         if logs:
             _append_log(os.path.join(args.out_dir, "micro_momo_triggers_log.csv"), logs)
             if args.webhook and not args.offline:
-                emit_alerts(alerts, args.webhook, dry_run=False, offline=False)
+                if args.thread:
+                    emit_alerts(
+                        alerts,
+                        args.webhook,
+                        dry_run=False,
+                        offline=False,
+                        per_item=True,
+                        extra={"thread_ts": args.thread},
+                    )
+                else:
+                    emit_alerts(alerts, args.webhook, dry_run=False, offline=False)
             j = os.path.join(args.out_dir, "micro_momo_journal.csv")
             if os.path.exists(j):
                 update_journal(j, updates)
@@ -124,4 +135,3 @@ def main(argv: List[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
-

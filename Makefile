@@ -163,3 +163,8 @@ logbook-add:
 .PHONY: momo-dashboard
 momo-dashboard:
 	python -m portfolio_exporter.scripts.micro_momo_dashboard --out_dir out
+
+.PHONY: momo-dashboard-open
+momo-dashboard-open:
+	python -m portfolio_exporter.scripts.micro_momo_dashboard --out_dir out; \
+	python -c "import webbrowser,os; p=os.path.abspath('out/micro_momo_dashboard.html'); print(p); webbrowser.open('file://'+p, new=2)"

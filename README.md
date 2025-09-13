@@ -375,6 +375,8 @@ python -m portfolio_exporter.scripts.micro_momo_sentinel \
 
 Notes: The sentinel is deliberately lightweight — it polls price/volume (IB provider when not offline), checks the simplified trigger rule (long: ORB break → pullback to VWAP → reclaim, short: lower-high → VWAP rejection) with RVOL ≥ confirm, then appends to `out/micro_momo_triggers_log.csv`, updates journal status to Triggered when present, and can send a webhook alert when `--webhook` is provided.
 
+Slack thread: pass `--thread <thread_ts>` to post alerts into an existing Slack thread (for incoming webhooks that honor `thread_ts`). When a thread is provided, the sentinel posts one alert per message.
+
 ### EOD outcome scorer (v1.4)
 
 Compute end‑of‑day outcomes from the journal and update statuses/`result_R`.
