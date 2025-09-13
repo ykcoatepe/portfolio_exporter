@@ -90,9 +90,22 @@ def _write_csv(path: str, rows: List[Dict[str, Any]], header: List[str]) -> None
             w.writerow({k: r.get(k, "") for k in header})
 
 
-def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_dir: str, emit_json: bool, no_files: bool,
-        data_mode: str, providers: List[str], offline: bool, halts_source: Optional[str],
-        webhook: Optional[str] = None, alerts_json_only: bool = False, ib_basket_out: Optional[str] = None) -> List[Dict[str, Any]]:
+def run(
+    cfg_path: Optional[str],
+    input_csv: str,
+    chains_dir: Optional[str],
+    out_dir: str,
+    emit_json: bool,
+    no_files: bool,
+    data_mode: str,
+    providers: List[str],
+    offline: bool,
+    halts_source: Optional[str],
+    webhook: Optional[str] = None,
+    alerts_json_only: bool = False,
+    ib_basket_out: Optional[str] = None,
+    journal_template: bool = False,
+) -> List[Dict[str, Any]]:
     cfg = _read_cfg(cfg_path)
     # Merge runtime data config
     cfg.setdefault("data", {})
@@ -274,6 +287,13 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
             notes_path = os.path.splitext(ib_basket_out)[0] + "_ib_notes.txt"
             export_ib_notes(orders, notes_path)
 
+    # Journal template (independent from no_files)
+    if journal_template:
+        from ..core.journal import write_journal_template
+
+        os.makedirs(out_dir, exist_ok=True)
+        write_journal_template(results, os.path.join(out_dir, "micro_momo_journal.csv"))
+
     return results
 
 
@@ -294,6 +314,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--webhook", help="Webhook URL for alerts (e.g., Slack)")
     p.add_argument("--alerts-json-only", action="store_true", help="Build alerts JSON but do not POST")
     p.add_argument("--ib-basket-out", help="Path to write IB Basket CSV; notes saved alongside with _ib_notes.txt suffix")
+    # v1.3 journal
+    p.add_argument("--journal-template", action="store_true", help="Write a journal template CSV (Pending rows)")
     return p
 
 
@@ -313,6 +335,7 @@ def main(argv: List[str] | None = None) -> int:
         webhook=args.webhook,
         alerts_json_only=bool(args.alerts_json_only),
         ib_basket_out=args.ib_basket_out,
+        journal_template=bool(args.journal_template),
     )
     return 0
 

@@ -1,0 +1,3 @@
+run_id,symbol,tier,direction,structure,contracts,expiry,long_leg,short_leg,limit,tp,sl,entry_trigger,status,status_ts,result_R,notes
+20250913_174145,ABC,C,long?,Template,2,,,,,1.5,0.5,Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ 1.5); levels: vwap=NA,Pending,,,
+20250913_174145,XYZ,C,long?,Template,2,,,,,1.5,0.5,Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ 1.5); levels: vwap=NA,Pending,,,

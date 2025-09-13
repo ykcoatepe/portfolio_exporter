@@ -357,6 +357,25 @@ python -m portfolio_exporter.scripts.micro_momo_analyzer \
 ```
 
 
+### Journal & Sentinel (v1.3)
+
+- Journal template: the analyzer can emit a ready-to-fill journal CSV with `--journal-template`.
+  - Writes `out/micro_momo_journal.csv` with status=Pending rows for each scored candidate.
+
+- Sentinel (trigger watcher): monitors scored rows and logs when the trigger condition fires.
+
+```
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --interval 10 \
+  --offline
+```
+
+Notes: The sentinel is deliberately lightweight — it polls price/volume (IB provider when not offline), checks the simplified trigger rule (long: ORB break → pullback to VWAP → reclaim, short: lower-high → VWAP rejection) with RVOL ≥ confirm, then appends to `out/micro_momo_triggers_log.csv`, updates journal status to Triggered when present, and can send a webhook alert when `--webhook` is provided.
+
+
 ### Live enrichment (v1.1)
 
 Micro‑MOMO can enrich shortlist rows with live data (IBKR primary, Yahoo fallback).
