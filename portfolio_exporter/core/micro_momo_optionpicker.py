@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from datetime import date, datetime
 
 from .micro_momo_types import ChainRow, ScanRow, Structure
 from .micro_momo_utils import spread_pct
@@ -21,6 +22,79 @@ def _pick_expiry(chain: List[Any]) -> Optional[str]:
     # v1: single-file chain often has one expiry; just pick the first by sort
     expiries = sorted({_get(r, "expiry") for r in chain if _get(r, "expiry")})
     return expiries[0] if expiries else None
+
+
+def _dte(expiry_yyyymmdd: str, today: date) -> int:
+    try:
+        dt = datetime.strptime(expiry_yyyymmdd, "%Y%m%d").date()
+        return max(0, (dt - today).days)
+    except Exception:
+        return 0
+
+
+def _is_friday(expiry_yyyymmdd: str) -> bool:
+    try:
+        return datetime.strptime(expiry_yyyymmdd, "%Y%m%d").date().weekday() == 4
+    except Exception:
+        return False
+
+
+def _near_money_oi(chain: List[Any], spot: float, expiry: str, pct: float = 3.0) -> int:
+    lo = spot * (1.0 - pct / 100.0)
+    hi = spot * (1.0 + pct / 100.0)
+    tot = 0
+    for r in chain:
+        if _get(r, "expiry") != expiry:
+            continue
+        strike = float(_get(r, "strike", 0.0))
+        if lo <= strike <= hi:
+            tot += int(_get(r, "oi", 0))
+    return tot
+
+
+def _pick_expiry_by_dte(
+    chain: List[Any],
+    spot: float,
+    dte_min: int,
+    dte_max: int,
+    today: Optional[date] = None,
+) -> Optional[str]:
+    if not chain:
+        return None
+    today = today or date.today()
+    expiries = sorted({_get(r, "expiry") for r in chain if _get(r, "expiry")} )
+    if not expiries:
+        return None
+
+    # Build candidates with DTE
+    ex_d = [(e, _dte(e, today)) for e in expiries]
+    in_win = [(e, d) for e, d in ex_d if dte_min <= d <= dte_max]
+    if in_win:
+        # Prefer higher near-money OI
+        in_win.sort(key=lambda t: (_near_money_oi(chain, spot, t[0]), -t[1]))
+        # highest OI last if we use ascending; switch to descending explicitly
+        best = sorted(in_win, key=lambda t: _near_money_oi(chain, spot, t[0]), reverse=True)[0][0]
+        return best
+
+    # Prefer nearest weekly strictly above max within 7 days
+    above = [(e, d) for e, d in ex_d if d > dte_max and (d - dte_max) <= 7]
+    if above:
+        # Prefer Friday expiries, then smallest DTE above max, then OI
+        def key_fn(t: Tuple[str, int]):
+            e, d = t
+            return (
+                0 if _is_friday(e) else 1,
+                d - dte_max,
+                -_near_money_oi(chain, spot, e),
+            )
+
+        best = sorted(above, key=key_fn)[0][0]
+        return best
+
+    # Else nearest overall by absolute distance to mid-point of window
+    target = (dte_min + dte_max) / 2.0
+    best_any = min(ex_d, key=lambda t: abs(t[1] - target))[0]
+    return best_any
 
 
 def _nearest_otm_call(price: float, calls: Dict[float, ChainRow]) -> Optional[ChainRow]:
@@ -169,7 +243,10 @@ def pick_structure(
     cfg: Dict[str, object],
     tier: Optional[str] = None,
 ) -> Structure:
-    expiry = _pick_expiry(chain)
+    # Choose expiry using DTE smart selection
+    d_min = int(cfg.get("options", {}).get("dte_min", 3))  # type: ignore[union-attr]
+    d_max = int(cfg.get("options", {}).get("dte_max", 10))  # type: ignore[union-attr]
+    expiry = _pick_expiry_by_dte(chain, scan.price, d_min, d_max)
     calls = _calls_by_strike([r for r in chain if hasattr(r, "right") or (isinstance(r, dict) and r.get("right"))])
 
     min_width = float(cfg.get("options", {}).get("min_width", 5.0))  # type: ignore[union-attr]
