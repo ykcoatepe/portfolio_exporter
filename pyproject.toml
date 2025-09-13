@@ -45,6 +45,7 @@ doctor = "portfolio_exporter.scripts.doctor:main"
 validate-json = "portfolio_exporter.scripts.validate_json:main"
 combo-db-maint = "portfolio_exporter.scripts.combo_db_maint:main"
 order-builder = "portfolio_exporter.scripts.order_builder:main"
+micro-momo = "portfolio_exporter.scripts.micro_momo_analyzer:main"
 
 [tool.setuptools.packages.find]
 include = ["portfolio_exporter*"]

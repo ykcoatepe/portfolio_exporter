@@ -298,6 +298,30 @@ Flags are unified across scripts: `--json`, `--no-files`, `--output-dir`,
 emitted; adding `--debug-timings` also writes `timings.csv` and includes
 per-stage timings in the JSON summary.
 
+## Micro-MOMO Analyzer (CSV-only v1)
+
+Micro-MOMO is a lightweight shortlist analyzer that operates entirely offline for v1.
+
+- Inputs: a scan CSV and optional per-symbol option chain CSVs named `{SYMBOL}_{YYYYMMDD}.csv`.
+- Flow: filters → scoring → tier & direction → structure pick (DebitCall for long, BearCallCredit for short) → sizing → TP/SL → entry trigger.
+
+Examples:
+
+```bash
+micro-momo --input tests/data/meme_scan_sample.csv \
+  --cfg tests/data/micro_momo_config.json \
+  --chains_dir tests/data --out_dir out
+
+# JSON-only, no files
+micro-momo --input tests/data/meme_scan_sample.csv --cfg tests/data/micro_momo_config.json --chains_dir tests/data --out_dir out --json --no-files
+```
+
+Outputs when files are enabled:
+- `out/micro_momo_scored.csv`
+- `out/micro_momo_orders.csv`
+
+If a chain file is missing for a symbol, a `Template` structure is emitted with `needs_chain=1` so you can add data or switch to live providers in a later version.
+
 ## Troubleshooting & Env
 
 - **command not found** → `pip install -e .` ; `PATH=.venv/bin:$PATH`
