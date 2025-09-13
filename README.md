@@ -540,6 +540,16 @@ Micro‑MOMO can enrich shortlist rows with live data (IBKR primary, Yahoo fallb
   - `--offline`: disable network fetches and halts; useful in CI.
   - `--halts-source nasdaq`: enable halts count (cached; disabled when `--offline`).
 
+Enrichment & caching (Yahoo)
+- 1m bars: populates `rvol_1m`, `rvol_5m`, `vwap`, `orb_high/low`, and derives `above_vwap_now`/`pattern_signal`.
+- Option chains: sets `optionable=Yes`, fills `oi_near_money` and `spread_pct_near_money` from the nearest expiry.
+- Local cache: responses stored under `out/.cache/yahoo_*.json` (configurable via `cfg.data.cache.{enabled,dir,ttl_sec}`) and reused even when `--offline` is set.
+- Symbols mode: when `--symbols` is provided, the analyzer synthesizes rows and uses provider data + cache; chain CSVs are optional.
+
+Environment shortcuts
+- `MOMO_SYMBOLS`: pass comma‑separated symbols via task/menu.
+- `MOMO_DATA_MODE`, `MOMO_PROVIDERS`, `MOMO_OFFLINE`: forwarded to the analyzer from both the menu and `main.py --task micro-momo`.
+
 Provenance columns are appended to outputs when present: `src_last`, `src_prev_close`, `src_gap`, `src_rvol`, `src_vwap`, `src_orb`, `src_chain`, `src_float`, `src_adv`, `src_short_interest`, `src_borrow`, `src_borrow_rate`, `src_halts`. Any enrichment issues are summarized in `data_errors` (semicolon‑joined).
 
 Examples:
