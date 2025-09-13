@@ -2332,6 +2332,34 @@ def run(
         except Exception:
             pos_df[f"{greek}_exposure"] = 0.0
 
+    # Fallback: if all exposures are exactly zero but inputs suggest non-zero, recompute defensively
+    try:
+        exp_cols = [f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]
+        if pos_df[exp_cols].abs().sum(numeric_only=True).sum() == 0.0:
+            base_delta = pd.to_numeric(pos_df.get("delta", 0.0), errors="coerce").fillna(0.0)
+            base_qty = pd.to_numeric(pos_df.get("qty", 0.0), errors="coerce").fillna(0.0)
+            base_mult = pd.to_numeric(pos_df.get("multiplier", 0.0), errors="coerce").fillna(0.0)
+            # Only apply fallback if any base inputs are non-zero
+            if (base_delta.abs().sum() > 0) and (base_qty.abs().sum() > 0):
+                pos_df["delta_exposure"] = (base_delta * base_qty * base_mult).astype(float)
+                pos_df["gamma_exposure"] = (
+                    pd.to_numeric(pos_df.get("gamma", 0.0), errors="coerce").fillna(0.0)
+                    * base_qty
+                    * base_mult
+                ).astype(float)
+                pos_df["vega_exposure"] = (
+                    pd.to_numeric(pos_df.get("vega", 0.0), errors="coerce").fillna(0.0)
+                    * base_qty
+                    * base_mult
+                ).astype(float)
+                pos_df["theta_exposure"] = (
+                    pd.to_numeric(pos_df.get("theta", 0.0), errors="coerce").fillna(0.0)
+                    * base_qty
+                    * base_mult
+                ).astype(float)
+    except Exception:
+        pass
+
     # Totals computed directly from precomputed exposures for robustness
     try:
         totals = (
