@@ -322,6 +322,29 @@ Outputs when files are enabled:
 
 If a chain file is missing for a symbol, a `Template` structure is emitted with `needs_chain=1` so you can add data or switch to live providers in a later version.
 
+### Live enrichment (v1.1)
+
+Micro‑MOMO can enrich shortlist rows with live data (IBKR primary, Yahoo fallback).
+
+- Flags:
+  - `--data-mode {csv-only,enrich,fetch}`: enrich fills missing fields only; fetch rebuilds all fields from providers.
+  - `--providers ib,yahoo`: comma‑separated priority (default `ib,yahoo`).
+  - `--offline`: disable network fetches and halts; useful in CI.
+  - `--halts-source nasdaq`: enable halts count (cached; disabled when `--offline`).
+
+Provenance columns are appended to outputs when present: `src_last`, `src_prev_close`, `src_gap`, `src_rvol`, `src_vwap`, `src_orb`, `src_chain`, `src_float`, `src_adv`, `src_short_interest`, `src_borrow`, `src_borrow_rate`, `src_halts`. Any enrichment issues are summarized in `data_errors` (semicolon‑joined).
+
+Examples:
+
+```
+micro-momo --input meme_scan.csv --cfg micro_momo_config.json \
+  --out_dir out --data-mode enrich --providers ib,yahoo
+
+# Offline CI run
+micro-momo --input tests/data/meme_scan_sample.csv --cfg tests/data/micro_momo_config.json \
+  --offline --no-files --json
+```
+
 ## Troubleshooting & Env
 
 - **command not found** → `pip install -e .` ; `PATH=.venv/bin:$PATH`

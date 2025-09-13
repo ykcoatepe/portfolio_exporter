@@ -32,6 +32,11 @@
   "entry": {
     "pct_above": 0.01,
     "pct_below": 0.01
+  },
+  "data": {
+    "mode": "csv-only",
+    "providers": ["ib", "yahoo"],
+    "offline": true,
+    "cache": {"enabled": true, "dir": "out/.cache", "ttl_sec": 60}
   }
 }
-

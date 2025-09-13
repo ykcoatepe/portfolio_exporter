@@ -51,6 +51,13 @@ DEFAULT_CFG: Dict[str, Any] = {
         "news_buzz": 0.6,
     },
     "rvol_confirm_entry": 1.5,
+    "data": {
+        "mode": "enrich",
+        "providers": ["ib", "yahoo"],
+        "offline": False,
+        "halts_source": "nasdaq",
+        "cache": {"enabled": True, "dir": "out/.cache", "ttl_sec": 60},
+    },
 }
 
 
@@ -80,8 +87,18 @@ def _write_csv(path: str, rows: List[Dict[str, Any]], header: List[str]) -> None
             w.writerow({k: r.get(k, "") for k in header})
 
 
-def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_dir: str, emit_json: bool, no_files: bool) -> List[Dict[str, Any]]:
+def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_dir: str, emit_json: bool, no_files: bool,
+        data_mode: str, providers: List[str], offline: bool, halts_source: Optional[str]) -> List[Dict[str, Any]]:
     cfg = _read_cfg(cfg_path)
+    # Merge runtime data config
+    cfg.setdefault("data", {})
+    cfg["data"].update({
+        "mode": data_mode or cfg["data"].get("mode", "enrich"),
+        "providers": providers or cfg["data"].get("providers", ["ib", "yahoo"]),
+        "offline": bool(offline),
+        "halts_source": halts_source or cfg["data"].get("halts_source", "nasdaq"),
+        "cache": cfg["data"].get("cache", {"enabled": True, "dir": os.path.join(out_dir, ".cache"), "ttl_sec": 60}),
+    })
     scans = load_scan_csv(input_csv)
     enrich_inplace(scans, cfg)  # v1 no-op
 
@@ -123,6 +140,15 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
             if k in base:
                 continue
             base[k] = v
+        # Flatten provenance and data_errors if enrichment populated them
+        prov = getattr(scan, "_provenance", None)
+        if isinstance(prov, dict):
+            for k, v in prov.items():
+                if k not in base:
+                    base[k] = v
+        errs = getattr(scan, "_data_errors", None)
+        if isinstance(errs, list) and errs:
+            base["data_errors"] = ";".join(str(e) for e in errs)
         results.append(base)
 
     if emit_json:
@@ -185,6 +211,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out_dir", default="out", help="Output directory for CSVs")
     p.add_argument("--json", action="store_true", help="Emit results JSON to stdout")
     p.add_argument("--no-files", action="store_true", help="Skip writing CSV files")
+    # v1.1 data flags
+    p.add_argument("--data-mode", choices=["csv-only", "enrich", "fetch"], default="enrich")
+    p.add_argument("--providers", default="ib,yahoo", help="Comma-separated providers in priority order")
+    p.add_argument("--offline", action="store_true", help="Disable all live fetches and halts")
+    p.add_argument("--halts-source", default="nasdaq", help="Halts source (nasdaq); ignored when --offline")
     return p
 
 
@@ -197,6 +228,10 @@ def main(argv: List[str] | None = None) -> int:
         out_dir=args.out_dir,
         emit_json=args.json,
         no_files=args.no_files,
+        data_mode=args.data_mode,
+        providers=[s for s in (args.providers or "").split(",") if s],
+        offline=bool(args.offline),
+        halts_source=(None if args.offline else args.halts_source),
     )
     return 0
 
