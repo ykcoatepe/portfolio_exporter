@@ -134,6 +134,7 @@ def task_registry(fmt: str) -> dict[str, callable]:
             auto_config,
             auto_chains_dir,
         )
+        from tools.logbook import logbook_on_success
 
         pe_test = os.getenv("PE_TEST_MODE")
         cfg = os.getenv("MOMO_CFG") or auto_config(
@@ -176,7 +177,16 @@ def task_registry(fmt: str) -> dict[str, callable]:
             argv += ["--chains_dir", chd]
         if pe_test:
             argv += ["--json", "--no-files"]
-        _mm.main(argv)
+        try:
+            _mm.main(argv)
+        except Exception:
+            raise
+        else:
+            logbook_on_success(
+                "micro-momo analyzer",
+                scope="analyze+score+journal",
+                files=["portfolio_exporter/scripts/micro_momo_analyzer.py"],
+            )
 
     def micro_momo_sentinel() -> None:
         from portfolio_exporter.scripts import micro_momo_sentinel as _sent
@@ -200,7 +210,17 @@ def task_registry(fmt: str) -> dict[str, callable]:
             argv += ["--offline"]
         if os.getenv("MOMO_WEBHOOK"):
             argv += ["--webhook", os.getenv("MOMO_WEBHOOK")]
-        _sent.main(argv)
+        from tools.logbook import logbook_on_success as _lb
+        try:
+            _sent.main(argv)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "micro-momo sentinel",
+                scope="trigger watcher",
+                files=["portfolio_exporter/scripts/micro_momo_sentinel.py"],
+            )
 
     def micro_momo_eod() -> None:
         from portfolio_exporter.scripts import micro_momo_eod as _eod
@@ -209,12 +229,32 @@ def task_registry(fmt: str) -> dict[str, callable]:
         argv = ["--journal", j, "--out_dir", out_dir]
         if os.getenv("MOMO_OFFLINE") in ("1", "true", "yes"):
             argv += ["--offline"]
-        _eod.main(argv)
+        from tools.logbook import logbook_on_success as _lb
+        try:
+            _eod.main(argv)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "micro-momo eod scorer",
+                scope="journal outcomes",
+                files=["portfolio_exporter/scripts/micro_momo_eod.py"],
+            )
 
     def micro_momo_dashboard() -> None:
         from portfolio_exporter.scripts import micro_momo_dashboard as _dash
         out_dir = os.getenv("MOMO_OUT") or "out"
-        _dash.main(["--out_dir", out_dir])
+        from tools.logbook import logbook_on_success as _lb
+        try:
+            _dash.main(["--out_dir", out_dir])
+        except Exception:
+            raise
+        else:
+            _lb(
+                "micro-momo dashboard",
+                scope="html report",
+                files=["portfolio_exporter/scripts/micro_momo_dashboard.py"],
+            )
         try:
             import webbrowser as _wb, os as _os
             path = _os.path.join(out_dir, "micro_momo_dashboard.html")

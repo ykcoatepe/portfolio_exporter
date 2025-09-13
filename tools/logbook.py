@@ -75,6 +75,51 @@ def cmd_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def logbook_on_success(
+    task: str,
+    scope: str = "",
+    files: list[str] | None = None,
+    status: str = "merged",
+    notes: str = "",
+) -> None:
+    """
+    Append to LOGBOOK.md and .codex/memory.json when LOGBOOK_AUTO=1.
+    No-op if LOGBOOK_AUTO is unset/false.
+    """
+    import subprocess  # local to keep imports light at module import time
+
+    if str(os.getenv("LOGBOOK_AUTO", "")).lower() not in ("1", "true", "yes"):
+        return
+    try:
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
+        ).strip()
+    except Exception:
+        branch = ""
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], text=True
+        ).strip()
+    except Exception:
+        commit = ""
+    files_str = ",".join(files or [])
+    # Reuse the "add" code path directly
+    cmd_add(
+        argparse.Namespace(
+            task=task,
+            branch=branch,
+            owner=os.getenv("LOGBOOK_OWNER", "codex"),
+            commit=commit,
+            scope=scope,
+            files=files_str,
+            interfaces="",
+            status=status,
+            next="",
+            notes=notes,
+        )
+    )
+
+
 def cmd_list(_args: argparse.Namespace) -> int:
     mem = _load_mem()
     for w in mem.get("worklog", [])[-10:]:
@@ -109,4 +154,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
-

@@ -14,6 +14,7 @@ from portfolio_exporter.scripts import (
 from portfolio_exporter.scripts import micro_momo_dashboard as _dash
 import os, webbrowser
 from portfolio_exporter.scripts import micro_momo_analyzer
+from portfolio_exporter.core.fs_utils import find_latest_file, auto_chains_dir
 
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
 import builtins
@@ -152,11 +153,14 @@ def _run_micro_momo(console: Console) -> None:
     try:
         pe_test = os.getenv("PE_TEST_MODE")
         # Auto-config
-        cfg = os.getenv("MOMO_CFG") or (
-            "micro_momo_config.json"
-            if os.path.exists("micro_momo_config.json")
-            else ("tests/data/micro_momo_config.json" if pe_test else "micro_momo_config.json")
-        )
+        cfg_env = os.getenv("MOMO_CFG")
+        cfg_candidates = [
+            cfg_env,
+            "micro_momo_config.json",
+            "configs/micro_momo_config.json",
+            ("tests/data/micro_momo_config.json" if pe_test else None),
+        ]
+        cfg = next((p for p in cfg_candidates if p and os.path.exists(p)), None)
         # Auto-input discovery
         if os.getenv("MOMO_INPUT"):
             inp = os.getenv("MOMO_INPUT")
@@ -175,13 +179,23 @@ def _run_micro_momo(console: Console) -> None:
                 auto = "tests/data/meme_scan_sample.csv"
             inp = auto or "meme_scan.csv"
         out_dir = os.getenv("MOMO_OUT") or "out"
-        argv = ["--input", inp, "--cfg", cfg, "--out_dir", out_dir]
+        argv = ["--input", inp, "--out_dir", out_dir]
+        if cfg:
+            argv += ["--cfg", cfg]
         # Auto chains dir (optional)
         chd = os.getenv("MOMO_CHAINS_DIR") or auto_chains_dir(
             ["./option_chains", "./chains", "./data/chains", "tests/data" if pe_test else None]
         )
         if chd:
             argv += ["--chains_dir", chd]
+        # Optional symbols override (comma-separated). Blank → keep file-based defaults.
+        try:
+            # Use menu-aware input to keep keystrokes visible in this UI
+            sym_in = _input("Symbols (comma, optional): ").strip()
+        except Exception:
+            sym_in = ""
+        if sym_in:
+            argv += ["--symbols", sym_in]
         if pe_test:
             argv += ["--json", "--no-files"]
         micro_momo_analyzer.main(argv)

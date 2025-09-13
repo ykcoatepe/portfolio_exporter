@@ -221,21 +221,44 @@ def main(argv: Optional[List[str]] = None) -> int:
         from portfolio_exporter.scripts import micro_momo_analyzer as _mm
         import datetime as _dt
         import pathlib
+        # Import lazily to keep CLI startup fast
+        from tools.logbook import logbook_on_success
 
-        cfg = (
-            "tests/data/micro_momo_config.json"
-            if os.getenv("PE_TEST_MODE")
-            else "micro_momo_config.json"
-        )
+        pe_test = os.getenv("PE_TEST_MODE")
+        cfg_env = os.getenv("MOMO_CFG")
+        cfg_candidates = [
+            cfg_env,
+            "micro_momo_config.json",
+            "configs/micro_momo_config.json",
+            ("tests/data/micro_momo_config.json" if pe_test else None),
+        ]
+        cfg = next((p for p in cfg_candidates if p and os.path.exists(p)), None)
         inp = os.getenv("MOMO_INPUT") or "tests/data/meme_scan_sample.csv"
         out_dir = os.getenv("MOMO_OUT") or "out"
-        argv2: list[str] = ["--input", inp, "--cfg", cfg, "--out_dir", out_dir]
+        argv2: list[str] = ["--input", inp, "--out_dir", out_dir]
+        if cfg:
+            argv2 += ["--cfg", cfg]
         chd = os.getenv("MOMO_CHAINS_DIR")
         if chd:
             argv2 += ["--chains_dir", chd]
-        if os.getenv("PE_TEST_MODE"):
+        # Optional symbols override via environment; analyzer gives precedence to --symbols
+        sym = os.getenv("MOMO_SYMBOLS")
+        if sym:
+            argv2 += ["--symbols", sym]
+        if pe_test:
             argv2 += ["--json", "--no-files"]
-        _mm.main(argv2)
+        try:
+            _mm.main(argv2)
+        except Exception:
+            # Surface failure to caller without logging success
+            raise
+        else:
+            # On success, optionally log to logbook/worklog
+            logbook_on_success(
+                "micro-momo analyzer",
+                scope="analyze+score+journal",
+                files=["portfolio_exporter/scripts/micro_momo_analyzer.py"],
+            )
 
     CUSTOM_TASKS: Dict[str, Callable[[], None]] = {
         "micro-momo": micro_momo,
@@ -318,6 +341,31 @@ def main(argv: Optional[List[str]] = None) -> int:
         if rc != 0:
             print(f"Task failed: {t.name} (exit {rc})")
             return rc
+        # Successful completion → optionally append to logbook for selected tasks
+        try:
+            from tools.logbook import logbook_on_success as _lb
+
+            if t.name == "micro_momo_sentinel":
+                _lb(
+                    "micro-momo sentinel",
+                    scope="trigger watcher",
+                    files=["portfolio_exporter/scripts/micro_momo_sentinel.py"],
+                )
+            elif t.name == "micro_momo_eod":
+                _lb(
+                    "micro-momo eod scorer",
+                    scope="journal outcomes",
+                    files=["portfolio_exporter/scripts/micro_momo_eod.py"],
+                )
+            elif t.name == "micro_momo_dashboard":
+                _lb(
+                    "micro-momo dashboard",
+                    scope="html report",
+                    files=["portfolio_exporter/scripts/micro_momo_dashboard.py"],
+                )
+        except Exception:
+            # Logging is best-effort; never fail the task on logbook issues
+            pass
     return 0
 
 

@@ -106,7 +106,7 @@ def _write_csv(path: str, rows: List[Dict[str, Any]], header: List[str]) -> None
 
 def run(
     cfg_path: Optional[str],
-    input_csv: str,
+    input_csv: Optional[str],
     chains_dir: Optional[str],
     out_dir: str,
     emit_json: bool,
@@ -119,6 +119,7 @@ def run(
     alerts_json_only: bool = False,
     ib_basket_out: Optional[str] = None,
     journal_template: bool = False,
+    prebuilt_scans: Optional[List[ScanRow]] = None,
 ) -> List[Dict[str, Any]]:
     cfg = _read_cfg(cfg_path)
     # Merge runtime data config
@@ -130,7 +131,15 @@ def run(
         "halts_source": halts_source or cfg["data"].get("halts_source", "nasdaq"),
         "cache": cfg["data"].get("cache", {"enabled": True, "dir": os.path.join(out_dir, ".cache"), "ttl_sec": 60}),
     })
-    scans = load_scan_csv(input_csv)
+    # Build scans list either from symbols (synthesized) or from CSV
+    scans: List[ScanRow]
+    if prebuilt_scans is not None:
+        scans = list(prebuilt_scans)
+    elif isinstance(input_csv, str) and input_csv:
+        scans = load_scan_csv(input_csv)
+    else:
+        # Neither input CSV nor prebuilt scans provided → empty set
+        scans = []
     enrich_inplace(scans, cfg)  # v1 no-op
 
     results: List[Dict[str, Any]] = []
@@ -315,10 +324,14 @@ def run(
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="micro-momo", description="Micro-MOMO Analyzer (CSV-only v1)")
-    p.add_argument("--input", required=True, help="Path to shortlist scan CSV")
+    p.add_argument("--input", required=False, help="Path to shortlist scan CSV")
     p.add_argument("--cfg", help="Path to config JSON")
     p.add_argument("--chains_dir", help="Directory with SYMBOL_YYYYMMDD.csv chain files")
     p.add_argument("--out_dir", default="out", help="Output directory for CSVs")
+    p.add_argument(
+        "--symbols",
+        help="Comma-separated symbols (alternative to --input). When both are provided, --symbols wins.",
+    )
     p.add_argument("--json", action="store_true", help="Emit results JSON to stdout")
     p.add_argument("--no-files", action="store_true", help="Skip writing CSV files")
     # v1.1 data flags
@@ -337,6 +350,65 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # Build scans from --symbols when provided; otherwise, keep CSV behavior.
+    # Note: when both --input and --symbols are present, --symbols takes precedence.
+    scans: List[ScanRow] = []
+    if getattr(args, "symbols", None):
+        syms = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
+        # Synthesize minimal ScanRow entries; enrichment/fetch can fill fields later.
+        scans = [
+            ScanRow(
+                symbol=s,
+                price=0.0,
+                volume=0,
+                rel_strength=0.0,
+                short_interest=0.0,
+                turnover=0.0,
+                iv_rank=0.0,
+                atr_pct=0.0,
+                trend=0.0,
+            )
+            for s in syms
+        ]
+
+    # Fast path: if symbols were provided, run directly using synthesized scans without CSV.
+    if scans:
+        # We reuse the run() pipeline but bypass CSV loading by passing input_csv=None
+        # and injecting our synthesized scans via a minimal shim.
+        # Inject: temporarily monkeypatch load_scan_csv to return our scans.
+        _orig = load_scan_csv
+
+        def _fake_load_scan_csv(_path: str) -> List[ScanRow]:  # pragma: no cover (tiny shim)
+            return list(scans)
+
+        try:
+            globals()["load_scan_csv"] = _fake_load_scan_csv  # type: ignore[assignment]
+            run(
+                cfg_path=args.cfg,
+                input_csv=None,
+                chains_dir=args.chains_dir,
+                out_dir=args.out_dir,
+                emit_json=args.json,
+                no_files=args.no_files,
+                data_mode=args.data_mode,
+                providers=[s for s in (args.providers or "").split(",") if s],
+                offline=bool(args.offline),
+                halts_source=(None if args.offline else args.halts_source),
+                webhook=args.webhook,
+                alerts_json_only=bool(args.alerts_json_only),
+                ib_basket_out=args.ib_basket_out,
+                journal_template=bool(args.journal_template),
+                prebuilt_scans=scans,
+            )
+        finally:
+            globals()["load_scan_csv"] = _orig  # restore
+        return 0
+
+    # Fallback: CSV path is required when no symbols are provided
+    if not args.input:
+        print("error: --input is required when --symbols is not provided", flush=True)
+        return 2
+
     run(
         cfg_path=args.cfg,
         input_csv=args.input,

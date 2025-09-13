@@ -316,6 +316,18 @@ micro-momo --input tests/data/meme_scan_sample.csv \
 micro-momo --input tests/data/meme_scan_sample.csv --cfg tests/data/micro_momo_config.json --chains_dir tests/data --out_dir out --json --no-files
 ```
 
+Symbols mode (no CSV):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --symbols AAPL,TSLA,MSFT \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --data-mode enrich --providers ib,yahoo
+```
+
+In the app (Pre-Market → Micro‑MOMO Analyzer), you can optionally type a comma‑separated symbol list; leave blank to use the latest `meme_scan_*.csv`.
+
 Outputs when files are enabled:
 - `out/micro_momo_scored.csv`
 - `out/micro_momo_orders.csv`
@@ -421,6 +433,10 @@ List recent entries:
 ```bash
 python tools/logbook.py list
 ```
+
+Opt-in auto-logbook
+- Set `LOGBOOK_AUTO=1` to auto-append after app tasks succeed (micro‑momo, sentinel, EOD, dashboard).
+- Use Make “+log” variants to bundle run+log in one command (e.g., `make momo-dashboard-open-log`).
 
 ### Micro-MOMO Dashboard (HTML)
 

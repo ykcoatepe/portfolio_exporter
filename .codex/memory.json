@@ -98,8 +98,29 @@
   "tasks": [],
   "workflows": {
     "submenu_queue": {
-      "live": ["quick-chain", "daily-report"],
-      "sanity": ["trades-report", "daily-report"]
+      "live": [
+        "quick-chain",
+        "daily-report"
+      ],
+      "sanity": [
+        "trades-report",
+        "daily-report"
+      ]
     }
-  }
+  },
+  "worklog": [
+    {
+      "date": "2025-09-13T19:28:46+03:00",
+      "task": "micro-momo analyzer",
+      "branch": "dev_yordam2",
+      "owner": "codex",
+      "commit": "c233116",
+      "files": [
+        "portfolio_exporter/scripts/micro_momo_analyzer.py"
+      ],
+      "interfaces": {},
+      "status": "merged",
+      "notes": ""
+    }
+  ]
 }
