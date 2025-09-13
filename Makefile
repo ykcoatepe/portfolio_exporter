@@ -114,7 +114,12 @@ sanity-order-builder:
 
 .PHONY: sanity-micro-momo
 sanity-micro-momo:
-	micro-momo --input tests/data/meme_scan_sample.csv --cfg tests/data/micro_momo_config.json --chains_dir tests/data --out_dir out --json --no-files
+	python -m portfolio_exporter.scripts.micro_momo_analyzer \
+	  --input tests/data/meme_scan_sample.csv \
+	  --cfg tests/data/micro_momo_config.json \
+	  --chains_dir tests/data \
+	  --out_dir out \
+	  --json --no-files
 
 .PHONY: sanity-trades-report-excel
 sanity-trades-report-excel: setup
