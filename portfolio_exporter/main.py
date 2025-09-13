@@ -241,8 +241,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         chd = os.getenv("MOMO_CHAINS_DIR")
         if chd:
             argv2 += ["--chains_dir", chd]
-        # Optional symbols override via environment; analyzer gives precedence to --symbols
+        # symbols: env first, then memory fallback (optional), else none
         sym = os.getenv("MOMO_SYMBOLS")
+        if not sym:
+            try:
+                from portfolio_exporter.core.memory import get_pref
+
+                sym = get_pref("micro_momo.symbols") or ""
+            except Exception:
+                sym = ""
         if sym:
             argv2 += ["--symbols", sym]
         # Optional data mode/providers/offline passthrough via environment
