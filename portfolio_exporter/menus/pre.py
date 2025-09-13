@@ -172,12 +172,8 @@ def _run_micro_momo(console: Console) -> None:
 
 def launch_micro_momo_dashboard(status: StatusBar, fmt: str) -> None:  # noqa: ARG001
     try:
-        from portfolio_exporter.core import ui as core_ui
-
-        default_out = os.getenv("MOMO_OUT") or "out"
-        out_dir = core_ui.prompt_input(
-            f"Dashboard output dir [{default_out}]: "
-        ).strip() or default_out
+        # Use default output directory without prompting (consistent with other outputs)
+        out_dir = os.getenv("MOMO_OUT") or "out"
         if status:
             status.update("Generating Micro-MOMO Dashboard", "cyan")
         _dash.main(["--out_dir", out_dir])
