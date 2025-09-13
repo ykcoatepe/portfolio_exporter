@@ -126,6 +126,58 @@ def task_registry(fmt: str) -> dict[str, callable]:
         from portfolio_exporter.scripts import net_liq_history_export as _netliq
         _netliq.run(fmt=fmt, plot=True)
 
+    def micro_momo() -> None:
+        # CSV-only defaults unless env provides paths; JSON-only in PE_TEST_MODE
+        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
+        from portfolio_exporter.core.fs_utils import (
+            find_latest_file,
+            auto_config,
+            auto_chains_dir,
+        )
+
+        pe_test = os.getenv("PE_TEST_MODE")
+        cfg = os.getenv("MOMO_CFG") or auto_config(
+            [
+                "micro_momo_config.json",
+                "config/micro_momo_config.json",
+                "tests/data/micro_momo_config.json" if pe_test else None,
+            ]
+        ) or ("tests/data/micro_momo_config.json" if pe_test else "micro_momo_config.json")
+
+        if os.getenv("MOMO_INPUT"):
+            inp = os.getenv("MOMO_INPUT")
+        else:
+            search_dirs = [
+                os.getenv("MOMO_INPUT_DIR"),
+                ".",
+                "./data",
+                "./scans",
+                "./inputs",
+                "tests/data" if pe_test else None,
+            ]
+            patterns = tuple((os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(","))
+            auto = find_latest_file([d for d in search_dirs if d], patterns)
+            if pe_test and not auto:
+                auto = "tests/data/meme_scan_sample.csv"
+            inp = auto or "meme_scan.csv"
+
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        argv = ["--input", inp, "--cfg", cfg, "--out_dir", out_dir]
+
+        chd = os.getenv("MOMO_CHAINS_DIR") or auto_chains_dir(
+            [
+                "./option_chains",
+                "./chains",
+                "./data/chains",
+                "tests/data" if pe_test else None,
+            ]
+        )
+        if chd:
+            argv += ["--chains_dir", chd]
+        if pe_test:
+            argv += ["--json", "--no-files"]
+        _mm.main(argv)
+
     return {
         "snapshot-quotes": snapshot_quotes,
         "quotes": snapshot_quotes,
@@ -137,6 +189,8 @@ def task_registry(fmt: str) -> dict[str, callable]:
         "trades-report": trades_report,
         "daily-report": daily_report,
         "netliq-export": netliq_export,
+        "micro-momo": micro_momo,
+        "momo": micro_momo,
     }
 
 

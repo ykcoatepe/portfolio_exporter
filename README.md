@@ -326,6 +326,8 @@ Run via task or menu
 - Task runner: `python main.py --task micro-momo`
 - Pre-Market menu: choose “Micro-MOMO Analyzer” and provide paths.
 
+Auto-discovery: If `MOMO_INPUT` is not set, the task looks for the newest `meme_scan_YYYYMMDD.csv` in `MOMO_INPUT_DIR` (if set) or in `./, ./data, ./scans, ./inputs`. Override the glob with `MOMO_INPUT_GLOB` (comma-separated).
+
 ### Alerts & IB Basket (v1.2)
 
 - Alerts: build a compact alerts list for each scored row and write `out/micro_momo_alerts.json`.
