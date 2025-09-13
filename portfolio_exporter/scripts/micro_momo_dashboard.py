@@ -16,6 +16,7 @@ CSS = (
     ".badge.A{background:#1b8e5a}.badge.B{background:#9b870c}.badge.C{background:#8b0000}"
     "kbd{background:#f4f4f4;border:1px solid #ddd;border-bottom-color:#ccc;border-radius:3px;padding:0.1em 0.4em}"
     ".small{color:#666;font-size:12px}"
+    ".summary{margin:10px 0 18px 0}"
 )
 
 
@@ -24,6 +25,44 @@ def _read_csv(path: Path) -> List[Dict[str, Any]]:
         return []
     with path.open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
+
+def _summary(scored_rows: List[Dict[str, Any]]) -> str:
+    """Build a compact summary header.
+
+    - Totals by tier (A/B/C)
+    - Provenance counts for VWAP source (artifact/yahoo/csv)
+    - Guards: sum of concurrency_guard
+    """
+    n = len(scored_rows)
+    a = sum(1 for r in scored_rows if (r.get("tier") or "").upper() == "A")
+    b = sum(1 for r in scored_rows if (r.get("tier") or "").upper() == "B")
+    # Treat anything not A/B as C for a quick snapshot
+    c = max(0, n - a - b)
+
+    srcs = [str(r.get("src_vwap", "")).lower() for r in scored_rows]
+    src_art = sum(1 for s in srcs if s == "artifact")
+    src_yf = sum(1 for s in srcs if s == "yahoo")
+    src_csv = sum(1 for s in srcs if s == "csv")
+
+    guards = 0
+    for r in scored_rows:
+        try:
+            guards += int(float(r.get("concurrency_guard", 0) or 0))
+        except Exception:
+            continue
+
+    return (
+        "<div class='summary'>"
+        f"<div>"
+        f"<span class='badge A'>A: {a}</span> "
+        f"<span class='badge B'>B: {b}</span> "
+        f"<span class='badge C'>C: {c}</span> "
+        f"<span class='badge' style='background:#555'>Guards: {guards}</span>"
+        f"</div>"
+        f"<div class='small'>VWAP src → artifact:{src_art} · yahoo:{src_yf} · csv:{src_csv}</div>"
+        "</div>"
+    )
 
 
 def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
@@ -87,6 +126,7 @@ def main(argv: List[str] | None = None) -> int:
         "<div class='small'>Sections: "
         "<a href='#scored'>Scored</a> · <a href='#orders'>Orders</a> · <a href='#journal'>Journal</a> · "
         "<a href='#eod-summary'>EOD Summary</a> · <a href='#trigger-log'>Trigger Log</a></div>",
+        _summary(scored),
         _section("Scored", scored, "scored"),
         _section("Orders", orders, "orders"),
         _section("Journal", journal, "journal"),
@@ -99,4 +139,3 @@ def main(argv: List[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
-
