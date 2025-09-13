@@ -30,19 +30,15 @@ last_expiry.get = lambda le=last_expiry: le.value
 
 
 def _input(prompt: str = "") -> str:
-    """Fetch one command from potentially multi-line input buffer."""
+    """Simple input that keeps keystrokes visible in menu flows."""
     global _input_buffer
     if _input_buffer:
         return _input_buffer.pop(0)
     try:
-        # dynamic import to avoid circular dependency
-        raw = __import__("main").input(prompt)
-    except Exception:
-        try:
-            raw = builtins.input(prompt)
-        except StopIteration:
-            # Test harness exhausted: return to previous menu
-            return "r"
+        raw = builtins.input(prompt)
+    except StopIteration:
+        # Test harness exhausted: return to previous menu
+        return "r"
     if "\r" in raw or "\n" in raw:
         lines = [line for line in raw.replace("\r", "\n").split("\n") if line]
         _input_buffer.extend(lines[1:])
@@ -154,16 +150,40 @@ def launch(status: StatusBar, default_fmt: str):
 
 def _run_micro_momo(console: Console) -> None:
     try:
-        default_inp = os.getenv("MOMO_INPUT", "tests/data/meme_scan_sample.csv")
-        default_cfg = "micro_momo_config.json" if os.path.exists("micro_momo_config.json") else "tests/data/micro_momo_config.json"
-        default_out = os.getenv("MOMO_OUT", "out")
-        inp = _input(f"Input CSV [{default_inp}]: ").strip() or default_inp
-        cfg = _input(f"Config JSON [{default_cfg}]: ").strip() or default_cfg
-        out_dir = _input(f"Output dir [{default_out}]: ").strip() or default_out
-        chd = _input("Chains dir (optional): ").strip()
+        pe_test = os.getenv("PE_TEST_MODE")
+        # Auto-config
+        cfg = os.getenv("MOMO_CFG") or (
+            "micro_momo_config.json"
+            if os.path.exists("micro_momo_config.json")
+            else ("tests/data/micro_momo_config.json" if pe_test else "micro_momo_config.json")
+        )
+        # Auto-input discovery
+        if os.getenv("MOMO_INPUT"):
+            inp = os.getenv("MOMO_INPUT")
+        else:
+            search_dirs = [
+                os.getenv("MOMO_INPUT_DIR"),
+                ".",
+                "./data",
+                "./scans",
+                "./inputs",
+                "tests/data" if pe_test else None,
+            ]
+            patterns = tuple((os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(","))
+            auto = find_latest_file([d for d in search_dirs if d], patterns)
+            if pe_test and not auto:
+                auto = "tests/data/meme_scan_sample.csv"
+            inp = auto or "meme_scan.csv"
+        out_dir = os.getenv("MOMO_OUT") or "out"
         argv = ["--input", inp, "--cfg", cfg, "--out_dir", out_dir]
+        # Auto chains dir (optional)
+        chd = os.getenv("MOMO_CHAINS_DIR") or auto_chains_dir(
+            ["./option_chains", "./chains", "./data/chains", "tests/data" if pe_test else None]
+        )
         if chd:
             argv += ["--chains_dir", chd]
+        if pe_test:
+            argv += ["--json", "--no-files"]
         micro_momo_analyzer.main(argv)
         console.print(f"[green]Micro-MOMO complete → {out_dir}[/]")
     except Exception as exc:  # pragma: no cover - menu path
