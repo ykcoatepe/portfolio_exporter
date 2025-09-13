@@ -155,3 +155,11 @@ momo-eod-offline:
 	  --journal out/micro_momo_journal.csv \
 	  --out_dir out \
 	  --offline
+
+.PHONY: logbook-add
+logbook-add:
+	python tools/logbook.py add --task "$$TASK" --branch "$$BRANCH" --owner "$$OWNER" --commit "$$COMMIT" --scope "$$SCOPE" --files "$$FILES" --interfaces "$$INTERFACES" --status "$$STATUS" --next "$$NEXT" --notes "$$NOTES"
+
+.PHONY: momo-dashboard
+momo-dashboard:
+	python -m portfolio_exporter.scripts.micro_momo_dashboard --out_dir out

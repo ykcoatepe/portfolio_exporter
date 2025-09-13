@@ -397,6 +397,40 @@ python -m portfolio_exporter.scripts.micro_momo_eod \
 Environment overrides:
 - `MOMO_SCORED`, `MOMO_CFG`, `MOMO_OUT`, `MOMO_INTERVAL`, `MOMO_WEBHOOK`, `MOMO_OFFLINE`, `MOMO_JOURNAL`
 
+### Logbook
+
+Append a quick entry to LOGBOOK.md and .codex/memory.json worklog:
+
+```bash
+make logbook-add \
+  TASK="Micro-MOMO v1.4 EOD + Guard" \
+  BRANCH="dev_yordam2" \
+  OWNER="codex" \
+  COMMIT="$(git rev-parse --short HEAD)" \
+  SCOPE="EOD scorer + guard" \
+  FILES="portfolio_exporter/scripts/micro_momo_eod.py" \
+  STATUS="merged" \
+  NEXT="Dashboard" \
+  NOTES="dtype warning benign"
+```
+
+List recent entries:
+
+```bash
+python tools/logbook.py list
+```
+
+### Micro-MOMO Dashboard (HTML)
+
+Generate a single-file report:
+
+```bash
+make momo-dashboard
+# -> out/micro_momo_dashboard.html
+```
+
+Includes Scored, Orders, Journal, EOD Summary, and Trigger Log when present.
+
 
 
 ### Live enrichment (v1.1)
