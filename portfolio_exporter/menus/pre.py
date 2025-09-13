@@ -11,6 +11,7 @@ from portfolio_exporter.scripts import (
     orchestrate_dataset,
     tech_scan,
 )
+from portfolio_exporter.scripts import micro_momo_analyzer
 
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
 import builtins
@@ -87,6 +88,7 @@ def launch(status: StatusBar, default_fmt: str):
             ("q", "Quick chain"),
             ("o", "Option chain snapshot"),
             ("n", "Net-Liq history"),
+            ("m", "Micro-MOMO Analyzer"),
             ("x", "External technical scan"),
             ("y", "Pre-flight check (env & CSVs)"),
             ("z", "Run overnight batch"),
@@ -125,6 +127,7 @@ def launch(status: StatusBar, default_fmt: str):
             "q": _quick_chain,
             "o": option_chain_snapshot.run,
             "n": net_liq_history_export.run,
+            "m": lambda fmt=default_fmt: _run_micro_momo(console),
             "x": lambda fmt=default_fmt: _external_scan(fmt),
             "y": lambda fmt=default_fmt: orchestrate_dataset.preflight_check(
                 no_pretty=bool(os.getenv("PE_QUIET"))
@@ -143,3 +146,21 @@ def launch(status: StatusBar, default_fmt: str):
             finally:
                 if status:
                     status.update("Ready", "green")
+
+
+def _run_micro_momo(console: Console) -> None:
+    try:
+        default_inp = os.getenv("MOMO_INPUT", "tests/data/meme_scan_sample.csv")
+        default_cfg = "micro_momo_config.json" if os.path.exists("micro_momo_config.json") else "tests/data/micro_momo_config.json"
+        default_out = os.getenv("MOMO_OUT", "out")
+        inp = _input(f"Input CSV [{default_inp}]: ").strip() or default_inp
+        cfg = _input(f"Config JSON [{default_cfg}]: ").strip() or default_cfg
+        out_dir = _input(f"Output dir [{default_out}]: ").strip() or default_out
+        chd = _input("Chains dir (optional): ").strip()
+        argv = ["--input", inp, "--cfg", cfg, "--out_dir", out_dir]
+        if chd:
+            argv += ["--chains_dir", chd]
+        micro_momo_analyzer.main(argv)
+        console.print(f"[green]Micro-MOMO complete → {out_dir}[/]")
+    except Exception as exc:  # pragma: no cover - menu path
+        console.print(f"[red]Micro-MOMO error:[/] {exc}")

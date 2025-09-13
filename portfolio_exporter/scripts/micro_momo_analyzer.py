@@ -220,7 +220,26 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
         # Write order CSV
         orders: List[Dict[str, Any]] = []
         for r in results:
-            rr = ResultRow(**r)
+            rr = ResultRow(
+                symbol=r["symbol"],
+                raw_score=r["raw_score"],
+                tier=r["tier"],
+                passes_core_filter=r["passes_core_filter"],
+                direction=r["direction"],
+                structure_template=r["structure_template"],
+                contracts=r["contracts"],
+                entry_trigger=r["entry_trigger"],
+                tp=r["tp"],
+                sl=r["sl"],
+                expiry=r.get("expiry"),
+                long_strike=r.get("long_strike"),
+                short_strike=r.get("short_strike"),
+                debit_or_credit=r.get("debit_or_credit"),
+                width=r.get("width"),
+                per_leg_oi_ok=r.get("per_leg_oi_ok", False),
+                per_leg_spread_pct=r.get("per_leg_spread_pct"),
+                needs_chain=r.get("needs_chain", False),
+            )
             orders.append(rr.to_orders_csv())
         order_cols = [
             "symbol",

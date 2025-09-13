@@ -322,6 +322,10 @@ Outputs when files are enabled:
 
 If a chain file is missing for a symbol, a `Template` structure is emitted with `needs_chain=1` so you can add data or switch to live providers in a later version.
 
+Run via task or menu
+- Task runner: `python main.py --task micro-momo`
+- Pre-Market menu: choose “Micro-MOMO Analyzer” and provide paths.
+
 ### Alerts & IB Basket (v1.2)
 
 - Alerts: build a compact alerts list for each scored row and write `out/micro_momo_alerts.json`.

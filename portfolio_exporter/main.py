@@ -17,7 +17,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional
 
 
 SCRIPTS_PACKAGE_DIR = Path(__file__).parent / "scripts"
@@ -89,6 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
         description="Task discovery and planner for portfolio_exporter scripts",
         epilog=epilog,
         formatter_class=argparse.RawTextHelpFormatter,
+    )
+    p.add_argument(
+        "--task",
+        help="Run a single custom task by name (e.g., micro-momo)",
     )
     p.add_argument(
         "--list-tasks",
@@ -212,6 +216,32 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     registry = discover_tasks()
 
+    # Custom tasks registry (functions executed in-process)
+    def micro_momo() -> None:
+        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
+        import datetime as _dt
+        import pathlib
+
+        cfg = (
+            "tests/data/micro_momo_config.json"
+            if os.getenv("PE_TEST_MODE")
+            else "micro_momo_config.json"
+        )
+        inp = os.getenv("MOMO_INPUT") or "tests/data/meme_scan_sample.csv"
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        argv2: list[str] = ["--input", inp, "--cfg", cfg, "--out_dir", out_dir]
+        chd = os.getenv("MOMO_CHAINS_DIR")
+        if chd:
+            argv2 += ["--chains_dir", chd]
+        if os.getenv("PE_TEST_MODE"):
+            argv2 += ["--json", "--no-files"]
+        _mm.main(argv2)
+
+    CUSTOM_TASKS: Dict[str, Callable[[], None]] = {
+        "micro-momo": micro_momo,
+        "momo": micro_momo,
+    }
+
     # Optional bootstrap of memory file
     if args.bootstrap_memory:
         try:
@@ -232,9 +262,15 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.list_tasks:
         _print_registry(registry)
+        if CUSTOM_TASKS:
+            print("Custom tasks:")
+            for name in sorted(CUSTOM_TASKS):
+                print(f"   - {name}")
         return 0
 
     requested: list[str] = []
+    if args.task:
+        requested = [args.task]
     if args.tasks:
         requested = list(args.tasks)
     elif args.workflow:
@@ -249,6 +285,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             t = registry[idx - 1]
             if t not in queue:
                 queue.append(t)
+
+    # Execute custom tasks immediately
+    if requested and all(name in CUSTOM_TASKS for name in requested):
+        for name in requested:
+            try:
+                CUSTOM_TASKS[name]()
+            except Exception as exc:
+                print(f"Task failed: {name}: {exc}")
+                return 1
+        return 0
 
     if args.dry_run:
         _print_plan(queue)
