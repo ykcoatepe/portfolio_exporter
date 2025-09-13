@@ -129,3 +129,29 @@ sanity-trades-report-excel: setup
 .PHONY: sanity-menus-quick
 sanity-menus-quick: setup
 	@./scripts/sanity_menus_quick.sh
+
+# --- Micro-MOMO helpers ---
+.PHONY: momo-journal
+momo-journal:
+	python -m portfolio_exporter.scripts.micro_momo_analyzer \
+	  --input tests/data/meme_scan_sample.csv \
+	  --cfg tests/data/micro_momo_config.json \
+	  --out_dir out \
+	  --data-mode csv-only \
+	  --journal-template
+
+.PHONY: momo-sentinel-offline
+momo-sentinel-offline:
+	python -m portfolio_exporter.scripts.micro_momo_sentinel \
+	  --scored-csv out/micro_momo_scored.csv \
+	  --cfg tests/data/micro_momo_config.json \
+	  --out_dir out \
+	  --interval 2 \
+	  --offline
+
+.PHONY: momo-eod-offline
+momo-eod-offline:
+	python -m portfolio_exporter.scripts.micro_momo_eod \
+	  --journal out/micro_momo_journal.csv \
+	  --out_dir out \
+	  --offline

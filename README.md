@@ -386,6 +386,17 @@ python -m portfolio_exporter.scripts.micro_momo_eod \
   --offline
 ```
 
+### Run from task registry
+
+- Sentinel (test/offline):
+  `python main.py --task micro-momo-sentinel`
+
+- EOD scorer (offline):
+  `python main.py --task micro-momo-eod`
+
+Environment overrides:
+- `MOMO_SCORED`, `MOMO_CFG`, `MOMO_OUT`, `MOMO_INTERVAL`, `MOMO_WEBHOOK`, `MOMO_OFFLINE`, `MOMO_JOURNAL`
+
 
 
 ### Live enrichment (v1.1)

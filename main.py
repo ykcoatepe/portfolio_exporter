@@ -178,6 +178,39 @@ def task_registry(fmt: str) -> dict[str, callable]:
             argv += ["--json", "--no-files"]
         _mm.main(argv)
 
+    def micro_momo_sentinel() -> None:
+        from portfolio_exporter.scripts import micro_momo_sentinel as _sent
+        scored = os.getenv("MOMO_SCORED") or "out/micro_momo_scored.csv"
+        cfg = os.getenv("MOMO_CFG") or (
+            "tests/data/micro_momo_config.json" if os.getenv("PE_TEST_MODE") else "micro_momo_config.json"
+        )
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        interval = os.getenv("MOMO_INTERVAL") or "10"
+        argv = [
+            "--scored-csv",
+            scored,
+            "--cfg",
+            cfg,
+            "--out_dir",
+            out_dir,
+            "--interval",
+            interval,
+        ]
+        if os.getenv("MOMO_OFFLINE") in ("1", "true", "yes"):
+            argv += ["--offline"]
+        if os.getenv("MOMO_WEBHOOK"):
+            argv += ["--webhook", os.getenv("MOMO_WEBHOOK")]
+        _sent.main(argv)
+
+    def micro_momo_eod() -> None:
+        from portfolio_exporter.scripts import micro_momo_eod as _eod
+        j = os.getenv("MOMO_JOURNAL") or "out/micro_momo_journal.csv"
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        argv = ["--journal", j, "--out_dir", out_dir]
+        if os.getenv("MOMO_OFFLINE") in ("1", "true", "yes"):
+            argv += ["--offline"]
+        _eod.main(argv)
+
     return {
         "snapshot-quotes": snapshot_quotes,
         "quotes": snapshot_quotes,
@@ -191,6 +224,10 @@ def task_registry(fmt: str) -> dict[str, callable]:
         "netliq-export": netliq_export,
         "micro-momo": micro_momo,
         "momo": micro_momo,
+        "micro-momo-sentinel": micro_momo_sentinel,
+        "momo-sentinel": micro_momo_sentinel,
+        "micro-momo-eod": micro_momo_eod,
+        "momo-eod": micro_momo_eod,
     }
 
 
