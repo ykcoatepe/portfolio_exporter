@@ -194,6 +194,12 @@ def task_registry(fmt: str) -> dict[str, callable]:
             auto_config,
             auto_chains_dir,
         )
+        # Lazy import to avoid startup cost unless needed
+        try:
+            from portfolio_exporter.core.memory import get_pref as _get_pref  # type: ignore
+        except Exception:
+            def _get_pref(key: str, default: str | None = None) -> str | None:  # type: ignore
+                return default
         from tools.logbook import logbook_on_success
 
         pe_test = os.getenv("PE_TEST_MODE")
@@ -224,6 +230,10 @@ def task_registry(fmt: str) -> dict[str, callable]:
 
         out_dir = os.getenv("MOMO_OUT") or "out"
         argv = ["--input", inp, "--cfg", cfg, "--out_dir", out_dir]
+        # Optional symbols from env or memory preference
+        sym_in = os.getenv("MOMO_SYMBOLS") or (_get_pref("micro_momo.symbols") or "")
+        if sym_in:
+            argv += ["--symbols", sym_in]
 
         chd = os.getenv("MOMO_CHAINS_DIR") or auto_chains_dir(
             [

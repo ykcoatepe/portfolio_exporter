@@ -14,6 +14,7 @@ from portfolio_exporter.scripts import (
 from portfolio_exporter.scripts import micro_momo_dashboard as _dash
 import os, webbrowser
 from portfolio_exporter.scripts import micro_momo_analyzer
+from portfolio_exporter.core.memory import get_pref, set_pref
 from portfolio_exporter.core.fs_utils import find_latest_file, auto_chains_dir
 
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
@@ -189,13 +190,19 @@ def _run_micro_momo(console: Console) -> None:
         if chd:
             argv += ["--chains_dir", chd]
         # Optional symbols override (comma-separated). Blank → keep file-based defaults.
+        # Prefill from env or memory; persist back to memory on use.
         try:
+            d_syms = os.getenv("MOMO_SYMBOLS") or (get_pref("micro_momo.symbols") or "")
             # Use menu-aware input to keep keystrokes visible in this UI
-            sym_in = _input("Symbols (comma, optional): ").strip()
+            sym_in = _input(f"Symbols (comma, optional) [{d_syms}]: ").strip() or d_syms
         except Exception:
-            sym_in = ""
+            sym_in = os.getenv("MOMO_SYMBOLS") or (get_pref("micro_momo.symbols") or "")
         if sym_in:
             argv += ["--symbols", sym_in]
+            try:
+                set_pref("micro_momo.symbols", sym_in)
+            except Exception:
+                pass
         # Optional data-mode/providers/offline via env passthrough
         dm = os.getenv("MOMO_DATA_MODE")
         if dm:
