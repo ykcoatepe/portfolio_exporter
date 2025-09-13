@@ -19,6 +19,16 @@
       "event": "Trades report: fix Action + intent; restore combos",
       "details": "Normalize Side/side and BOT/SLD→BUY/SELL; position_effect streaming uses Side.fillna(side), keys STK by symbol, and honors openClose. Fallback uses realized_pnl when prior absent. save_combos default restored to emit trades_combos.csv. Docs updated; memory prefers preferences.trades_prior_positions when present.",
       "timestamp": "2025-09-11T00:00:00Z"
+    },
+    {
+      "event": "Micro-MOMO v1 landed (CSV-only)",
+      "details": "Added CLI micro-momo; filters, scoring, tiering, direction, structure picker, sizing + TP/SL, triggers; outputs scored+orders CSV; tests & fixtures; Makefile sanity-micro-momo.",
+      "timestamp": "2025-09-13T13:00:00Z"
+    },
+    {
+      "event": "Micro-MOMO v1.1 enrichment + halts + provenance",
+      "details": "--data-mode/--providers/--offline/--halts-source; IBKR quotes/bars/shortable/chains primary; Yahoo fundamentals/chains fallback; Nasdaq halts; provenance src_* and data_errors in outputs; tests mock providers (no network).",
+      "timestamp": "2025-09-13T13:40:00Z"
     }
   ],
   "decisions": [
@@ -49,6 +59,20 @@
       "decision": "Correct Action mapping (BUY/SELL vs BOT/SLD), improve position_effect (Side.fillna(side); STK keyed by symbol; openClose override; realized_pnl fallback), restore combos CSV by default, and use memory preferences.trades_prior_positions when available.",
       "context": "Make intent robust without prior snapshot and consistent across menu/CLI; keep offline-friendly behaviour.",
       "timestamp": "2025-09-11T00:00:00Z"
+    },
+    {
+      "id": 5,
+      "title": "MICRO_MOMO_V1",
+      "decision": "CSV-only Micro-MOMO Analyzer landed: filters, weighted scoring, A/B/C tiers, direction, option structure picker (Debit Call / Bear Call Credit), sizing + TP/SL, human-readable triggers; CLI + tests + fixtures; scored/orders CSV outputs.",
+      "context": "Deterministic v1 with no providers; Makefile sanity target; module entry portfolio_exporter.scripts.micro_momo_analyzer.",
+      "timestamp": "2025-09-13T13:00:00Z"
+    },
+    {
+      "id": 6,
+      "title": "MICRO_MOMO_V1_1",
+      "decision": "Live enrichment via IBKR (primary) and Yahoo (fallback) with halts + provenance. Adds --data-mode/--providers/--offline/--halts-source flags; enrichment fills last/prev_close, premarket gap, RVOL(1m/5m), VWAP, ORB, float/ADV/short%, borrow, chain near-money OI/spread, halts_count_today. Provenance src_* columns and data_errors included.",
+      "context": "CI-safe via offline mode; tests mock providers; CSV precedence respected in enrich mode.",
+      "timestamp": "2025-09-13T13:40:00Z"
     }
   ],
   "preferences": {

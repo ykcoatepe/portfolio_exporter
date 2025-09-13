@@ -41,8 +41,9 @@ alias memory='python -m portfolio_exporter.scripts.memory'
 	•	make lint — runs Ruff per pyproject.toml.
 	•	make test — runs unit tests.
 	•	make sanity-order-builder — quick JSON-only sanity for order‑builder presets.
-	•	make menus-sanity — import/preview smoke for Trades menu helpers.
-	•	make memory-* — see §4.
+		•	make menus-sanity — import/preview smoke for Trades menu helpers.
+		•	make sanity-micro-momo — Micro‑MOMO JSON-only sanity (CSV fixtures; no files)
+		•	make memory-* — see §4.
 
 Typical loop: make setup && make lint && make test.
 
@@ -221,6 +222,10 @@ This ensures memory exists, logs session_start, and prints concise context (pref
 When making changes:
 	•	After notable edits → memory add-decision … and memory changelog ….
 	•	Before proposing PRs → make memory-validate and include make memory-digest output.
+
+Micro‑MOMO notes
+- v1 CSV-only is deterministic and offline; use the Makefile target above.
+- v1.1 adds `--data-mode/--providers/--offline/--halts-source`. In CI/offline, prefer `--data-mode csv-only` or `--offline` to avoid network calls.
 
 Prompt recipes (examples):
 	•	Task intake → memory add-task "Refactor exporter" --labels infra --priority 2.
