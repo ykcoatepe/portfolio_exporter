@@ -4,7 +4,7 @@ import numpy as np
 import tempfile
 from pathlib import Path
 
-import daily_pulse as dp
+import legacy.daily_pulse as dp
 
 
 class DailyPulseTests(unittest.TestCase):

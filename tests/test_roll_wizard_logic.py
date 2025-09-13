@@ -1,0 +1,73 @@
+import builtins
+import datetime as dt
+from pathlib import Path
+import importlib.util
+import pathlib
+import types
+import pandas as pd
+
+spec = importlib.util.spec_from_file_location(
+    "roll_manager",
+    pathlib.Path(__file__).resolve().parents[1] / "portfolio_exporter/scripts/roll_manager.py",
+)
+roll_manager = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(roll_manager)
+from portfolio_exporter.core.config import settings
+
+
+def _setup(monkeypatch, tmp_path: Path):
+    tomorrow = dt.date.today() + dt.timedelta(days=1)
+    exp = tomorrow.isoformat()
+
+    # positions DataFrame indexed by pseudo conIds
+    pos_df = pd.DataFrame(
+        {
+            "underlying": ["XYZ", "XYZ"],
+            "qty": [-1, 1],
+            "right": ["C", "C"],
+            "strike": [100.0, 105.0],
+            "expiry": [exp, exp],
+            "delta": [-0.5, 0.5],
+            "theta": [0.1, -0.1],
+            "multiplier": [100, 100],
+        },
+        index=[1, 2],
+    )
+    fake_pg = types.SimpleNamespace(_load_positions=lambda: pos_df)
+    monkeypatch.setattr(roll_manager, "portfolio_greeks", fake_pg)
+
+    combo_df = pd.DataFrame(
+        {
+            "structure": ["VertCall"],
+            "underlying": ["XYZ"],
+            "expiry": [exp],
+            "qty": [-1],
+            "delta": [0.0],
+            "theta": [0.0],
+            "legs": [[1, 2]],
+        },
+        index=["c1"],
+    )
+    monkeypatch.setattr(roll_manager, "detect_combos", lambda df: combo_df)
+
+    chain_df = pd.DataFrame(
+        [
+            {"strike": 100.0, "right": "C", "mid": 1.0, "delta": 0.2, "theta": -0.02},
+            {"strike": 105.0, "right": "C", "mid": 0.5, "delta": 0.15, "theta": -0.01},
+        ]
+    )
+    monkeypatch.setattr(roll_manager, "fetch_chain", lambda sym, exp, strikes=None: chain_df)
+
+    monkeypatch.setattr(settings, "output_dir", str(tmp_path))
+
+
+def test_roll_wizard_logic(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path)
+    inputs = iter([" ", "r", "q"])
+    monkeypatch.setattr(builtins, "input", lambda *a, **k: next(inputs))
+    roll_manager.run()
+
+    ticket = list(Path(tmp_path).glob("roll_ticket_*.json"))
+    preview = list(Path(tmp_path).glob("roll_preview_*.csv"))
+    assert ticket, "Ticket JSON not created"
+    assert preview, "Preview CSV not created"

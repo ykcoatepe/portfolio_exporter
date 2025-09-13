@@ -3,7 +3,7 @@ import unittest.mock
 from pathlib import Path
 import tempfile
 
-import orchestrate_dataset as od
+import legacy.orchestrate_dataset as od
 
 
 class OrchestrateTests(unittest.TestCase):

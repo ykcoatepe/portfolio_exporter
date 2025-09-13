@@ -4,7 +4,7 @@ This document provides project-specific context, conventions, and commands for t
 
 ## Project Overview
 
-`portfolio_exporter` is a Python-based toolkit for financial portfolio analysis, exporting data, and interacting with the Interactive Brokers (IBKR) API. It includes tools for fetching historical prices, calculating portfolio greeks, analyzing technical signals, and managing trade reports.
+`portfolio_exporter` is a Python-based toolkit for financial portfolio analysis, exporting data, and interacting with the Interactive Brokers (IBKR) API. It now features a unified `market_analyzer.py` script that consolidates functionalities for fetching historical prices, calculating portfolio greeks, analyzing technical signals, and managing trade reports.
 
 ## Key Technologies
 
@@ -14,7 +14,8 @@ This document provides project-specific context, conventions, and commands for t
 
 ## Project Structure
 
-- `*.py`: Core scripts for various data export and analysis tasks.
+- `market_analyzer.py`: The primary script for all market analysis tasks.
+- `*.py`: Other core scripts for specific data export and analysis tasks (e.g., `trades_report.py`, `net_liq_history_export.py`).
 - `iv_history/`: Contains CSV files with historical volatility data for various tickers.
 - `tests/`: Contains unit tests for the core scripts.
 - `utils/`: Shared utility modules.

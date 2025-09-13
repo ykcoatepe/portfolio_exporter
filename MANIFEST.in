@@ -1,0 +1,2 @@
+include schemas/*.json
+include docs/assets/theme.css

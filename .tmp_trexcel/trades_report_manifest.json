@@ -1,0 +1,38 @@
+{
+  "script": "trades_report",
+  "argv": {
+    "exec_csv": ".tmp_trexcel/exec.csv",
+    "debug_combos": false,
+    "debug_intent": false,
+    "prior_positions_csv": null,
+    "since": null,
+    "until": null,
+    "summary_only": false,
+    "cluster_window_sec": 60,
+    "json": true,
+    "no_pretty": false,
+    "no_files": false,
+    "output_dir": ".tmp_trexcel",
+    "excel": true,
+    "debug_timings": false
+  },
+  "env": {
+    "OUTPUT_DIR": null,
+    "PE_OUTPUT_DIR": null,
+    "PE_QUIET": null,
+    "TWS_EXPORT_DIR": false,
+    "CP_REFRESH_TOKEN": false
+  },
+  "start": "2025-09-07T09:18:36.123496",
+  "end": "2025-09-07T09:18:36.188104",
+  "duration_ms": 64,
+  "outputs": [
+    {
+      "path": ".tmp_trexcel/trades_report.xlsx",
+      "sha256": "34f1fb6dbd2b267ca635d50538bd6fe17267e08f8ad3f5b1e4ce3a3080dd45b6",
+      "bytes": 5868
+    }
+  ],
+  "warnings": [],
+  "version": null
+}

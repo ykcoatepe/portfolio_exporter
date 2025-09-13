@@ -29,7 +29,7 @@ contract_mod = types.ModuleType("ib_insync.contract")
 setattr(contract_mod, "Contract", type("Contract", (), {}))
 sys.modules["ib_insync.contract"] = contract_mod
 
-pg = importlib.import_module("portfolio_greeks")
+pg = importlib.import_module("legacy.portfolio_greeks")
 bs = importlib.import_module("utils.bs")
 
 
