@@ -115,6 +115,8 @@ def run(
     providers: List[str],
     offline: bool,
     halts_source: Optional[str],
+    auto_producers: bool = False,
+    upstream_timeout_sec: int = 30,
     webhook: Optional[str] = None,
     alerts_json_only: bool = False,
     ib_basket_out: Optional[str] = None,
@@ -130,6 +132,18 @@ def run(
         "offline": bool(offline),
         "halts_source": halts_source or cfg["data"].get("halts_source", "nasdaq"),
         "cache": cfg["data"].get("cache", {"enabled": True, "dir": os.path.join(out_dir, ".cache"), "ttl_sec": 60}),
+        # new: expose artifact/chains dirs and auto‑producers toggle to sources
+        "artifact_dirs": list(
+            dict.fromkeys(
+                [
+                    os.path.join(out_dir, ".cache"),
+                    out_dir,
+                ]
+            )
+        ),
+        "chains_dir": chains_dir,
+        "auto_producers": bool(cfg["data"].get("auto_producers", False)) or bool(auto_producers),
+        "upstream_timeout_sec": int(cfg["data"].get("upstream_timeout_sec", upstream_timeout_sec)),
     })
     # Build scans list either from symbols (synthesized) or from CSV
     scans: List[ScanRow]
@@ -351,6 +365,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--providers", default="ib,yahoo", help="Comma-separated providers in priority order")
     p.add_argument("--offline", action="store_true", help="Disable all live fetches and halts")
     p.add_argument("--halts-source", default="nasdaq", help="Halts source (nasdaq); ignored when --offline")
+    # auto-producers (chains/bars before providers)
+    p.add_argument("--auto-producers", action="store_true", help="Attempt to generate missing local artifacts (bars/chains) via in-repo scripts before using providers")
+    # legacy compatibility (treat as same)
+    p.add_argument("--auto-upstream", action="store_true", help=argparse.SUPPRESS)
     # v1.2 outputs
     p.add_argument("--webhook", help="Webhook URL for alerts (e.g., Slack)")
     p.add_argument("--alerts-json-only", action="store_true", help="Build alerts JSON but do not POST")
@@ -406,6 +424,8 @@ def main(argv: List[str] | None = None) -> int:
                 providers=[s for s in (args.providers or "").split(",") if s],
                 offline=bool(args.offline),
                 halts_source=(None if args.offline else args.halts_source),
+                auto_producers=bool(args.auto_producers or args.auto_upstream),
+                upstream_timeout_sec=30,
                 webhook=args.webhook,
                 alerts_json_only=bool(args.alerts_json_only),
                 ib_basket_out=args.ib_basket_out,
@@ -432,6 +452,8 @@ def main(argv: List[str] | None = None) -> int:
         providers=[s for s in (args.providers or "").split(",") if s],
         offline=bool(args.offline),
         halts_source=(None if args.offline else args.halts_source),
+        auto_producers=bool(args.auto_producers or args.auto_upstream),
+        upstream_timeout_sec=30,
         webhook=args.webhook,
         alerts_json_only=bool(args.alerts_json_only),
         ib_basket_out=args.ib_basket_out,

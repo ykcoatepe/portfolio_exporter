@@ -302,6 +302,9 @@ per-stage timings in the JSON summary.
 
 Micro-MOMO is a lightweight shortlist analyzer that operates entirely offline for v1.
 
+- Intraday patterns: computed from 1‑min bars (VWAP reclaim/reject, ORB/Retest, HOD/LOD) and exposed as `pattern_signal`, with `above_vwap_now` and `vwap_distance_pct`.
+- Expiry selection: prefers a DTE window (config `options.{dte_min,dte_max}`), then the nearest weekly strictly above `dte_max` by ≤7 days (Friday when available), then nearest overall. When multiple match, it prefers higher near‑money OI.
+
 - Inputs: a scan CSV and optional per-symbol option chain CSVs named `{SYMBOL}_{YYYYMMDD}.csv`.
 - Flow: filters → scoring → tier & direction → structure pick (DebitCall for long, BearCallCredit for short) → sizing → TP/SL → entry trigger.
 
@@ -538,10 +541,16 @@ Micro‑MOMO can enrich shortlist rows with live data (IBKR primary, Yahoo fallb
   - `--data-mode {csv-only,enrich,fetch}`: enrich fills missing fields only; fetch rebuilds all fields from providers.
   - `--providers ib,yahoo`: comma‑separated priority (default `ib,yahoo`).
   - `--offline`: disable network fetches and halts; useful in CI.
-  - `--halts-source nasdaq`: enable halts count (cached; disabled when `--offline`).
+- `--halts-source nasdaq`: enable halts count (cached; disabled when `--offline`).
+
+Auto‑producers (optional)
+- `--auto-producers`: when artifacts (minute bars / option chains) are missing, try to generate them via in‑repo scripts first, then re‑read artifacts before falling back to providers.
+- Works in both `--symbols` mode and with `--input` CSVs. In `csv-only` data mode, only artifacts are used (no providers).
 
 Enrichment & caching (Yahoo)
 - 1m bars: populates `rvol_1m`, `rvol_5m`, `vwap`, `orb_high/low`, and derives `above_vwap_now`/`pattern_signal`.
+  - Patterns computed locally: `VWAP Reclaim`, `VWAP Reject`, `ORB`, `ORB Retest`, `HOD Reclaim`, `LOD Break`, `Fail`.
+  - `vwap_distance_pct` indicates absolute distance to VWAP (fraction).
 - Option chains: sets `optionable=Yes`, fills `oi_near_money` and `spread_pct_near_money` from the nearest expiry.
 - Local cache: responses stored under `out/.cache/yahoo_*.json` (configurable via `cfg.data.cache.{enabled,dir,ttl_sec}`) and reused even when `--offline` is set.
 - Symbols mode: when `--symbols` is provided, the analyzer synthesizes rows and uses provider data + cache; chain CSVs are optional.

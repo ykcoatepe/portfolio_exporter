@@ -6,6 +6,7 @@ import os
 from typing import Dict, Iterable, List, Optional, Tuple, Any
 
 from .micro_momo_types import ChainRow, ScanRow
+from .patterns import compute_patterns
 from .providers import ib_provider, yahoo_provider, halts_nasdaq
 
 
@@ -59,15 +60,91 @@ def find_chain_file_for_symbol(chains_dir: Optional[str], symbol: str) -> Option
     return matches[0] if matches else None
 
 
-def enrich_inplace(_rows: List[ScanRow], _cfg: Dict[str, object]) -> None:  # v1 no-op
+def load_minute_bars(symbol: str, artifact_dirs: Iterable[str]) -> List[Dict[str, Any]]:
+    """Load minute bars from local artifact CSVs if present.
+
+    Expected columns: ts, open, high, low, close, volume.
+    File name patterns are flexible to accommodate different producers.
+    """
+    sym = symbol.upper()
+    patterns = [
+        f"{sym}_bars.csv",
+        f"{sym}_minute.csv",
+        f"minute_bars_{sym}.csv",
+        f"bars_{sym}.csv",
+        f"{sym}_1m.csv",
+    ]
+    for d in artifact_dirs or []:
+        if not d:
+            continue
+        for pat in patterns:
+            for path in sorted(glob.glob(os.path.join(d, pat))):
+                try:
+                    out: List[Dict[str, Any]] = []
+                    with open(path, newline="", encoding="utf-8") as f:
+                        r = csv.DictReader(f)
+                        for row in r:
+                            try:
+                                out.append(
+                                    {
+                                        "ts": row.get("ts") or row.get("timestamp") or row.get("time"),
+                                        "open": float(row.get("open", 0) or 0),
+                                        "high": float(row.get("high", 0) or 0),
+                                        "low": float(row.get("low", 0) or 0),
+                                        "close": float(row.get("close", 0) or 0),
+                                        "volume": int(float(row.get("volume", 0) or 0)),
+                                    }
+                                )
+                            except Exception:
+                                continue
+                    if out:
+                        return out
+                except Exception:
+                    continue
+    return []
+
+
+def load_option_chain(symbol: str, search_dirs: Iterable[str]) -> List[ChainRow]:
+    """Search multiple directories for a chain CSV and return parsed rows."""
+    for d in search_dirs or []:
+        if not d:
+            continue
+        # Prefer files that look like SYMBOL_YYYYMMDD.csv
+        pattern = os.path.join(d, f"{symbol.upper()}_*.csv")
+        candidates = sorted(glob.glob(pattern))
+        # Filter to those whose suffix after '_' is all digits (likely an expiry tag)
+        def _looks_like_chain(path: str) -> bool:
+            base = os.path.basename(path)
+            stem = os.path.splitext(base)[0]
+            parts = stem.split("_")
+            return len(parts) >= 2 and parts[-1].isdigit()
+
+        for p in [c for c in candidates if _looks_like_chain(c)]:
+            rows = load_chain_csv(p)
+            if rows:
+                return rows
+    return []
+
+
+def enrich_inplace(_rows: List[ScanRow], _cfg: Dict[str, object]) -> None:  # v1 with artifacts
     cfg: Dict[str, Any] = dict(_cfg)  # shallow copy only for typing
     data = cfg.get("data", {})
     mode = data.get("mode", "csv-only")
-    if mode == "csv-only":
-        return None
+    # artifact/context
+    artifact_dirs: List[str] = list(data.get("artifact_dirs", [])) or []
+    cache_dir = None
+    try:
+        cache_dir = (data.get("cache", {}) or {}).get("dir") if isinstance(data.get("cache", {}), dict) else None
+    except Exception:
+        cache_dir = None
+    if cache_dir and cache_dir not in artifact_dirs:
+        artifact_dirs.append(str(cache_dir))
+    chains_dir = data.get("chains_dir")
 
     offline = bool(data.get("offline", False))
     providers: List[str] = list(data.get("providers", ["ib", "yahoo"]))
+    auto_producers = bool(data.get("auto_producers", False))
+    upstream_timeout = int(data.get("upstream_timeout_sec", 30))
 
     # Halts map
     halts: Dict[str, int] = {}
@@ -162,63 +239,66 @@ def enrich_inplace(_rows: List[ScanRow], _cfg: Dict[str, object]) -> None:  # v1
             except Exception:
                 errors.append("gap_error")
 
-        # Intraday bars → RVOL, VWAP, ORB
+        # Intraday bars → prefer artifacts, optionally auto‑produce, then providers
         bars: List[Dict[str, Any]] = []
-        for p in providers:
-            if p == "ib" and not bars:
-                bars = try_ib_bars(sym)
-            if p == "yahoo" and not bars:
-                bars = try_yf_bars(sym)
+        bars_src: Optional[str] = None
+        # 1) artifacts
+        try:
+            bars = load_minute_bars(sym, artifact_dirs)
+            if bars:
+                bars_src = "artifact"
+        except Exception:
+            bars = []
+        # 2) auto‑producers
+        if not bars and auto_producers:
+            try:
+                from .upstream import run_live_bars
+
+                if run_live_bars([sym], timeout=upstream_timeout):
+                    bars = load_minute_bars(sym, artifact_dirs)
+                    if bars:
+                        bars_src = "artifact"
+            except Exception:
+                pass
+        # 3) providers (only when not csv‑only)
+        if not bars and mode != "csv-only":
+            for p in providers:
+                if p == "ib" and not bars:
+                    bars = try_ib_bars(sym)
+                    if bars:
+                        bars_src = "ib"
+                if p == "yahoo" and not bars:
+                    bars = try_yf_bars(sym)
+                    if bars:
+                        bars_src = "yahoo"
         if bars:
-            vols = [b.get("volume", 0) for b in bars]
-            mean_vol = (sum(vols) / max(1, len(vols))) if vols else 0.0
-            last1 = sum(vols[-1:])
-            last5 = sum(vols[-5:])
-            if mean_vol > 0:
-                set_field(row, "rvol_1m", last1 / mean_vol, "src_rvol", prov.get("src_rvol", "ib" if providers and providers[0] == "ib" else "yahoo"))
-                set_field(row, "rvol_5m", last5 / (mean_vol * min(5, len(vols))), "src_rvol5", prov.get("src_rvol5", "ib" if providers and providers[0] == "ib" else "yahoo"))
-            # VWAP
-            pv = 0.0
-            tv = 0.0
-            for b in bars:
-                c = float(b.get("close", 0.0))
-                v = float(b.get("volume", 0.0))
-                pv += c * v
-                tv += v
-            if tv > 0:
-                set_field(row, "vwap", pv / tv, "src_vwap", prov.get("src_vwap", "ib" if providers and providers[0] == "ib" else "yahoo"))
-            # ORB using first up to 5 bars
-            orb_bars = bars[: min(5, len(bars))]
-            if orb_bars:
-                hi = max(b.get("high", b.get("close", 0.0)) for b in orb_bars)
-                lo = min(b.get("low", b.get("close", 0.0)) for b in orb_bars)
-                set_field(row, "orb_high", hi, "src_orb", prov.get("src_orb", "ib" if providers and providers[0] == "ib" else "yahoo"))
-                set_field(row, "orb_low", lo, "src_orb", prov.get("src_orb", "ib" if providers and providers[0] == "ib" else "yahoo"))
+            # Compute using the centralized pattern engine
+            patt = compute_patterns(bars)
             # Last price from last bar if not present
             try:
                 last_close = float(bars[-1].get("close", 0.0))
                 if getattr(row, "last_price", None) in (None, "") and last_close > 0:
-                    set_field(row, "last_price", last_close, "src_last", prov.get("src_last", "yahoo"))
+                    set_field(row, "last_price", last_close, "src_last", bars_src or prov.get("src_last", "yahoo"))
             except Exception:
                 pass
-            # Derived signals: above VWAP now and simple pattern
-            try:
-                last_close = float(bars[-1].get("close", 0.0))
-                vwap = getattr(row, "vwap", None)
-                if isinstance(vwap, (int, float)) and vwap > 0:
-                    set_field(row, "above_vwap_now", "Yes" if last_close >= float(vwap) else "No", "src_above_vwap", prov.get("src_vwap", "yahoo"))
-                # Pattern: 'orb' if last close breaks ORB high; 'reclaim' if first close below VWAP and last above
-                first_close = float(bars[0].get("close", 0.0)) if bars else 0.0
-                orb_hi = getattr(row, "orb_high", None)
-                patt = None
-                if isinstance(orb_hi, (int, float)) and orb_hi and last_close > float(orb_hi):
-                    patt = "orb"
-                elif isinstance(vwap, (int, float)) and vwap and first_close < float(vwap) <= last_close:
-                    patt = "reclaim"
-                if patt:
-                    set_field(row, "pattern_signal", patt, "src_pattern", prov.get("src_vwap", "yahoo"))
-            except Exception:
-                pass
+
+            # Fill computed fields
+            if patt.get("rvol_1m"):
+                set_field(row, "rvol_1m", float(patt["rvol_1m"]), "src_rvol", bars_src or "yahoo")
+            if patt.get("rvol_5m"):
+                set_field(row, "rvol_5m", float(patt["rvol_5m"]), "src_rvol5", bars_src or "yahoo")
+            if patt.get("vwap") is not None:
+                set_field(row, "vwap", float(patt["vwap"]) if patt["vwap"] is not None else None, "src_vwap", bars_src or "yahoo")
+            if patt.get("orb_high") is not None:
+                set_field(row, "orb_high", float(patt["orb_high"]) if patt["orb_high"] is not None else None, "src_orb", bars_src or "yahoo")
+            if patt.get("orb_low") is not None:
+                set_field(row, "orb_low", float(patt["orb_low"]) if patt["orb_low"] is not None else None, "src_orb", bars_src or "yahoo")
+            if patt.get("above_vwap_now"):
+                set_field(row, "above_vwap_now", patt["above_vwap_now"], "src_above_vwap", bars_src or "yahoo")
+            if patt.get("vwap_distance_pct") is not None:
+                set_field(row, "vwap_distance_pct", float(patt["vwap_distance_pct"]), "src_vwap_dist", bars_src or "yahoo")
+            if patt.get("pattern_signal") is not None:
+                set_field(row, "pattern_signal", str(patt["pattern_signal"]), "src_pattern", bars_src or "yahoo")
 
         # Yahoo summary fundamentals → float/adv/short
         if ysum:
@@ -244,22 +324,48 @@ def enrich_inplace(_rows: List[ScanRow], _cfg: Dict[str, object]) -> None:  # v1
                 if sdat.get("fee_rate") is not None:
                     set_field(row, "borrow_rate_pct", sdat.get("fee_rate"), "src_borrow_rate", "ib")
 
-        # Option chains → optionable + near money stats
+        # Option chains → optionable + near money stats (artifacts → auto‑producers → providers)
         chain: List[Dict[str, Any]] = []
-        if not offline:
+        chain_src: Optional[str] = None
+        # 1) local files (explicit chains_dir first)
+        try:
+            # Prefer explicit chains_dir strictly to avoid matching unrelated CSVs
+            search_dirs = [chains_dir] if chains_dir else artifact_dirs
+            chain = load_option_chain(sym, search_dirs)
+            if chain:
+                chain_src = "artifact"
+        except Exception:
+            chain = []
+        # 2) auto‑producers
+        if not chain and auto_producers:
+            try:
+                from .upstream import run_chain_snapshot
+
+                if run_chain_snapshot([sym], timeout=upstream_timeout):
+                    chain = load_option_chain(sym, search_dirs)
+                    if chain:
+                        chain_src = "artifact"
+            except Exception:
+                pass
+        # 3) providers
+        if not chain and not offline and mode != "csv-only":
             for p in providers:
                 if p == "ib" and not chain:
                     chain = try_ib_chain(sym)
+                    if chain:
+                        chain_src = "ib"
                 if p == "yahoo" and not chain:
                     chain = try_yf_chain(sym)
+                    if chain:
+                        chain_src = "yahoo"
         if chain:
-            set_field(row, "optionable", "Yes", "src_chain", providers[0])
+            set_field(row, "optionable", "Yes", "src_chain", chain_src or (providers[0] if providers else "provider"))
             spot = getattr(row, "last_price", None) or getattr(row, "price", None) or 0
             if spot:
                 oi, spr = near_money_stats(chain, float(spot), 3.0)
-                set_field(row, "oi_near_money", oi, "src_chain_oi", providers[0])
+                set_field(row, "oi_near_money", oi, "src_chain_oi", chain_src or (providers[0] if providers else "provider"))
                 if spr is not None:
-                    set_field(row, "spread_pct_near_money", spr, "src_chain_spread", providers[0])
+                    set_field(row, "spread_pct_near_money", spr, "src_chain_spread", chain_src or (providers[0] if providers else "provider"))
             # Expose fetched chain rows to downstream consumers (e.g., structure picker)
             try:
                 setattr(row, "_chain_rows", chain)
@@ -284,14 +390,20 @@ def near_money_stats(chain_rows: List[Dict[str, Any]] | List[ChainRow], spot: fl
     total_oi = 0
     spreads: List[float] = []
     for r in chain_rows:
-        strike = float(getattr(r, "strike", r.get("strike")))  # type: ignore[attr-defined]
+        # support both dataclass and plain dict rows without evaluating defaults eagerly
+        strike = float(getattr(r, "strike", float(r["strike"])) if isinstance(r, dict) else getattr(r, "strike", 0.0))  # type: ignore[index]
         if lo <= strike <= hi:
-            bid = float(getattr(r, "bid", r.get("bid", 0.0)))  # type: ignore[attr-defined]
-            ask = float(getattr(r, "ask", r.get("ask", 0.0)))  # type: ignore[attr-defined]
+            if isinstance(r, dict):
+                bid = float(r.get("bid", 0.0))
+                ask = float(r.get("ask", 0.0))
+                oi = int(float(r.get("oi", 0)))
+            else:
+                bid = float(getattr(r, "bid", 0.0))
+                ask = float(getattr(r, "ask", 0.0))
+                oi = int(getattr(r, "oi", 0))
             mid = (bid + ask) / 2 if (bid > 0 and ask > 0) else max(bid, ask)
             if mid > 0 and ask > 0 and bid > 0:
                 spreads.append((ask - bid) / mid)
-            oi = int(getattr(r, "oi", r.get("oi", 0)))  # type: ignore[attr-defined]
             total_oi += oi
     avg_spread = (sum(spreads) / len(spreads)) if spreads else None
     return total_oi, avg_spread
