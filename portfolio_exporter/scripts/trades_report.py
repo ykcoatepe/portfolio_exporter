@@ -1323,19 +1323,20 @@ def run(
     # Prefer vectorized streaming intent; falls back row-wise when needed
     df["position_effect"] = _compute_streaming_effect(df, prev_positions_df)
 
+    # Detect and save combos (first), then save the combined rows last.
+    # This ordering ensures that simple tests monkeypatching core_io.save capture
+    # the final call as the main rows DataFrame (non-empty when executions exist).
+    if save_combos:
+        try:
+            combos_df = _detect_and_enrich_trades_combos(df_exec, open_df, prev_positions_df)
+            _ = _save_trades_combos(combos_df, fmt="csv")
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"⚠️ Trades combos export skipped: {exc}")
+
     # Timestamped filename for easier tracking and to avoid overwrites
     date_tag = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
     path = core_io.save(df, f"trades_report_{date_tag}", fmt, settings.output_dir)
     print(f"✅ Trades report exported → {path}")
-
-    # Also detect and save combos unless disabled
-    if save_combos:
-        try:
-            combos_df = _detect_and_enrich_trades_combos(df_exec, open_df, prev_positions_df)
-            path_combos = _save_trades_combos(combos_df, fmt="csv")
-            print(f"✅ Trades combos exported → {path_combos}")
-        except Exception as exc:  # pragma: no cover - defensive
-            print(f"⚠️ Trades combos export skipped: {exc}")
 
     if return_df:
         return df

@@ -64,6 +64,20 @@ DEFAULT_CFG: Dict[str, Any] = {
 }
 
 
+def _count_active_journal(out_dir: str) -> int:
+    import csv as _csv
+
+    j = os.path.join(out_dir, "micro_momo_journal.csv")
+    if not os.path.exists(j):
+        return 0
+    try:
+        with open(j, newline="", encoding="utf-8") as f:
+            rows = list(_csv.DictReader(f))
+        return sum(1 for r in rows if (r.get("status") or "").lower() in ("pending", "triggered"))
+    except Exception:
+        return 0
+
+
 def _read_cfg(path: Optional[str]) -> Dict[str, Any]:
     if not path:
         return DEFAULT_CFG
@@ -120,6 +134,8 @@ def run(
     enrich_inplace(scans, cfg)  # v1 no-op
 
     results: List[Dict[str, Any]] = []
+    base_active = _count_active_journal(out_dir)
+    max_concurrent = int(cfg.get("max_concurrent", 5))
     for scan in scans:
         pf = passes_filters(scan, cfg)
         comps, raw = score_components(scan, cfg)
@@ -144,7 +160,7 @@ def run(
         from ..core.micro_momo import _risk_proxy  # local import to avoid surface
         risk_value = _risk_proxy(struct, contracts)
         cap_breach = 1 if risk_value > 0.03 * nav else 0
-        concurrency_guard = 0
+        concurrency_guard = 1 if (base_active + 1) > max_concurrent else 0
 
         res = ResultRow(
             symbol=scan.symbol,
