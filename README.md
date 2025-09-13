@@ -322,6 +322,35 @@ Outputs when files are enabled:
 
 If a chain file is missing for a symbol, a `Template` structure is emitted with `needs_chain=1` so you can add data or switch to live providers in a later version.
 
+### Alerts & IB Basket (v1.2)
+
+- Alerts: build a compact alerts list for each scored row and write `out/micro_momo_alerts.json`.
+  - JSON-only (no POST): add `--alerts-json-only`.
+  - Webhook POST: add `--webhook https://hooks.slack.com/services/...` (skipped when `--offline`).
+
+- IB Basket export: write a BasketTrader-friendly CSV plus notes (TP/SL/trigger per order). OCO is not encoded in the CSV.
+
+Examples:
+
+```
+# Alerts only, no POST
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input tests/data/meme_scan_sample.csv \
+  --cfg tests/data/micro_momo_config.json \
+  --out_dir out --alerts-json-only --no-files
+
+# Webhook POST to Slack-compatible endpoint (skips when --offline)
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input meme_scan_YYYYMMDD.csv --cfg micro_momo_config.json \
+  --out_dir out --webhook https://hooks.slack.com/services/XXX/YYY/ZZZ
+
+# IB basket CSV + notes
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input meme_scan_YYYYMMDD.csv --cfg micro_momo_config.json \
+  --out_dir out --ib-basket-out out/micro_momo_basket.csv
+```
+
+
 ### Live enrichment (v1.1)
 
 Micro‑MOMO can enrich shortlist rows with live data (IBKR primary, Yahoo fallback).

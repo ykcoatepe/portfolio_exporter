@@ -221,6 +221,20 @@ def size_and_targets(struct: Structure, row: ScanRow, cfg: Dict[str, object]) ->
     return contracts, tp, sl
 
 
+def _risk_proxy(struct: Structure, contracts: int) -> float:
+    if contracts <= 0:
+        return 0.0
+    if struct.debit_or_credit == "debit":
+        debit = float(struct.limit_price or 0.0)
+        return debit * 100.0 * contracts
+    if struct.debit_or_credit == "credit":
+        credit = float(struct.limit_price or 0.0)
+        width = float(struct.width or 0.0)
+        max_loss = max(0.0, (width - credit) * 100.0)
+        return max_loss * contracts
+    return 0.0
+
+
 def entry_trigger(direction: str, row: ScanRow, cfg: Dict[str, object]) -> str | float:
     confirm = cfg.get("rvol_confirm_entry", 1.5)  # type: ignore[assignment]
     vwap = _get(row, "vwap", "NA")

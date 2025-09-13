@@ -21,6 +21,8 @@ from ..core.micro_momo_sources import (
     load_scan_csv,
 )
 from ..core.micro_momo_types import ResultRow, ScanRow
+from ..core.alerts import emit_alerts
+from ..core.ib_export import export_ib_basket, export_ib_notes
 
 
 DEFAULT_CFG: Dict[str, Any] = {
@@ -88,7 +90,8 @@ def _write_csv(path: str, rows: List[Dict[str, Any]], header: List[str]) -> None
 
 
 def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_dir: str, emit_json: bool, no_files: bool,
-        data_mode: str, providers: List[str], offline: bool, halts_source: Optional[str]) -> List[Dict[str, Any]]:
+        data_mode: str, providers: List[str], offline: bool, halts_source: Optional[str],
+        webhook: Optional[str] = None, alerts_json_only: bool = False, ib_basket_out: Optional[str] = None) -> List[Dict[str, Any]]:
     cfg = _read_cfg(cfg_path)
     # Merge runtime data config
     cfg.setdefault("data", {})
@@ -110,9 +113,16 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
 
         chain_file = find_chain_file_for_symbol(chains_dir, scan.symbol)
         chain_rows = load_chain_csv(chain_file) if chain_file else []
-        struct = pick_structure(scan, chain_rows, direction, cfg)
+        struct = pick_structure(scan, chain_rows, direction, cfg, tier=tier)
         contracts, tp, sl = size_and_targets(struct, scan, cfg)
         trig = entry_trigger(direction, scan, cfg)
+
+        # Guards
+        nav = float(cfg.get("sizing", {}).get("nav", 100000.0))  # type: ignore[union-attr]
+        from ..core.micro_momo import _risk_proxy  # local import to avoid surface
+        risk_value = _risk_proxy(struct, contracts)
+        cap_breach = 1 if risk_value > 0.03 * nav else 0
+        concurrency_guard = 0
 
         res = ResultRow(
             symbol=scan.symbol,
@@ -135,6 +145,8 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
             needs_chain=struct.needs_chain,
         )
         base = asdict(res)
+        base["cap_breach"] = cap_breach
+        base["concurrency_guard"] = concurrency_guard
         # Pass-through: append any attributes present on the scan row without overwriting
         for k, v in getattr(scan, "__dict__", {}).items():
             if k in base:
@@ -153,6 +165,31 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
 
     if emit_json:
         print(json.dumps(results, indent=2))
+
+    # Build alerts
+    alerts: List[Dict[str, Any]] = []
+    for r in results:
+        levels = {
+            "orb_high": r.get("orb_high"),
+            "vwap": r.get("vwap"),
+            "stop": (r.get("vwap") * 0.97 if isinstance(r.get("vwap"), (int, float)) else None),
+        }
+        alerts.append({
+            "symbol": r["symbol"],
+            "direction": r["direction"],
+            "trigger": r["entry_trigger"],
+            "rvol_confirm": cfg.get("rvol_confirm_entry", 1.5),
+            "levels": levels,
+        })
+
+    # Always write alerts JSON
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, "micro_momo_alerts.json"), "w", encoding="utf-8") as f:
+        json.dump(alerts, f, indent=2)
+
+    # Optional webhook
+    if webhook and not alerts_json_only and not cfg.get("data", {}).get("offline", False):
+        emit_alerts(alerts, webhook, dry_run=False, offline=False)
 
     if not no_files:
         # Write scored CSV
@@ -175,6 +212,8 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
             "per_leg_oi_ok",
             "per_leg_spread_pct",
             "needs_chain",
+            "cap_breach",
+            "concurrency_guard",
         ]
         _write_csv(os.path.join(out_dir, "micro_momo_scored.csv"), results, scored_cols)
 
@@ -198,7 +237,14 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
             "entry_trigger",
             "notes",
         ]
-        _write_csv(os.path.join(out_dir, "micro_momo_orders.csv"), orders, order_cols)
+        orders_path = os.path.join(out_dir, "micro_momo_orders.csv")
+        _write_csv(orders_path, orders, order_cols)
+
+        # Optional IB basket export
+        if ib_basket_out:
+            export_ib_basket(orders, ib_basket_out)
+            notes_path = os.path.splitext(ib_basket_out)[0] + "_ib_notes.txt"
+            export_ib_notes(orders, notes_path)
 
     return results
 
@@ -216,6 +262,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--providers", default="ib,yahoo", help="Comma-separated providers in priority order")
     p.add_argument("--offline", action="store_true", help="Disable all live fetches and halts")
     p.add_argument("--halts-source", default="nasdaq", help="Halts source (nasdaq); ignored when --offline")
+    # v1.2 outputs
+    p.add_argument("--webhook", help="Webhook URL for alerts (e.g., Slack)")
+    p.add_argument("--alerts-json-only", action="store_true", help="Build alerts JSON but do not POST")
+    p.add_argument("--ib-basket-out", help="Path to write IB Basket CSV; notes saved alongside with _ib_notes.txt suffix")
     return p
 
 
@@ -232,6 +282,9 @@ def main(argv: List[str] | None = None) -> int:
         providers=[s for s in (args.providers or "").split(",") if s],
         offline=bool(args.offline),
         halts_source=(None if args.offline else args.halts_source),
+        webhook=args.webhook,
+        alerts_json_only=bool(args.alerts_json_only),
+        ib_basket_out=args.ib_basket_out,
     )
     return 0
 
