@@ -245,6 +245,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         sym = os.getenv("MOMO_SYMBOLS")
         if sym:
             argv2 += ["--symbols", sym]
+        # Optional data mode/providers/offline passthrough via environment
+        dm = os.getenv("MOMO_DATA_MODE")
+        if dm:
+            argv2 += ["--data-mode", dm]
+        prv = os.getenv("MOMO_PROVIDERS")
+        if prv:
+            argv2 += ["--providers", prv]
+        off = os.getenv("MOMO_OFFLINE")
+        if off and off not in ("0", "false", "False"):
+            argv2 += ["--offline"]
         if pe_test:
             argv2 += ["--json", "--no-files"]
         try:
@@ -341,28 +351,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         if rc != 0:
             print(f"Task failed: {t.name} (exit {rc})")
             return rc
-        # Successful completion → optionally append to logbook for selected tasks
+        # Successful completion → optionally append to logbook for all tasks
         try:
             from tools.logbook import logbook_on_success as _lb
 
-            if t.name == "micro_momo_sentinel":
-                _lb(
-                    "micro-momo sentinel",
-                    scope="trigger watcher",
-                    files=["portfolio_exporter/scripts/micro_momo_sentinel.py"],
-                )
-            elif t.name == "micro_momo_eod":
-                _lb(
-                    "micro-momo eod scorer",
-                    scope="journal outcomes",
-                    files=["portfolio_exporter/scripts/micro_momo_eod.py"],
-                )
-            elif t.name == "micro_momo_dashboard":
-                _lb(
-                    "micro-momo dashboard",
-                    scope="html report",
-                    files=["portfolio_exporter/scripts/micro_momo_dashboard.py"],
-                )
+            # Map discovered task name to its script path
+            script_path = f"portfolio_exporter/scripts/{t.name}.py"
+            _lb(task=t.name.replace("_", "-"), scope="script run", files=[script_path])
         except Exception:
             # Logging is best-effort; never fail the task on logbook issues
             pass

@@ -194,6 +194,31 @@ def enrich_inplace(_rows: List[ScanRow], _cfg: Dict[str, object]) -> None:  # v1
                 lo = min(b.get("low", b.get("close", 0.0)) for b in orb_bars)
                 set_field(row, "orb_high", hi, "src_orb", prov.get("src_orb", "ib" if providers and providers[0] == "ib" else "yahoo"))
                 set_field(row, "orb_low", lo, "src_orb", prov.get("src_orb", "ib" if providers and providers[0] == "ib" else "yahoo"))
+            # Last price from last bar if not present
+            try:
+                last_close = float(bars[-1].get("close", 0.0))
+                if getattr(row, "last_price", None) in (None, "") and last_close > 0:
+                    set_field(row, "last_price", last_close, "src_last", prov.get("src_last", "yahoo"))
+            except Exception:
+                pass
+            # Derived signals: above VWAP now and simple pattern
+            try:
+                last_close = float(bars[-1].get("close", 0.0))
+                vwap = getattr(row, "vwap", None)
+                if isinstance(vwap, (int, float)) and vwap > 0:
+                    set_field(row, "above_vwap_now", "Yes" if last_close >= float(vwap) else "No", "src_above_vwap", prov.get("src_vwap", "yahoo"))
+                # Pattern: 'orb' if last close breaks ORB high; 'reclaim' if first close below VWAP and last above
+                first_close = float(bars[0].get("close", 0.0)) if bars else 0.0
+                orb_hi = getattr(row, "orb_high", None)
+                patt = None
+                if isinstance(orb_hi, (int, float)) and orb_hi and last_close > float(orb_hi):
+                    patt = "orb"
+                elif isinstance(vwap, (int, float)) and vwap and first_close < float(vwap) <= last_close:
+                    patt = "reclaim"
+                if patt:
+                    set_field(row, "pattern_signal", patt, "src_pattern", prov.get("src_vwap", "yahoo"))
+            except Exception:
+                pass
 
         # Yahoo summary fundamentals → float/adv/short
         if ysum:
@@ -235,6 +260,11 @@ def enrich_inplace(_rows: List[ScanRow], _cfg: Dict[str, object]) -> None:  # v1
                 set_field(row, "oi_near_money", oi, "src_chain_oi", providers[0])
                 if spr is not None:
                     set_field(row, "spread_pct_near_money", spr, "src_chain_spread", providers[0])
+            # Expose fetched chain rows to downstream consumers (e.g., structure picker)
+            try:
+                setattr(row, "_chain_rows", chain)
+            except Exception:
+                pass
 
         # Halts
         if halts:

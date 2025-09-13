@@ -160,6 +160,18 @@ def run(
             chain_file = find_chain_file_for_symbol(chains_dir, scan.symbol) if chains_dir else None
         if chain_file:
             chain_rows = load_chain_csv(chain_file)
+        # Fallback to provider-fetched chain attached during enrichment
+        if not chain_rows:
+            cr_fetched = getattr(scan, "_chain_rows", None)
+            if isinstance(cr_fetched, list) and cr_fetched:
+                chain_rows = cr_fetched
+        # Ensure price is usable for structure picking (prefer last_price if present)
+        try:
+            lp = getattr(scan, "last_price", None)
+            if lp and (not getattr(scan, "price", None) or float(getattr(scan, "price", 0.0)) <= 0):
+                setattr(scan, "price", float(lp))
+        except Exception:
+            pass
         struct = pick_structure(scan, chain_rows, direction, cfg, tier=tier)
         contracts, tp, sl = size_and_targets(struct, scan, cfg)
         trig = entry_trigger(direction, scan, cfg)

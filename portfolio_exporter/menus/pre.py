@@ -196,6 +196,16 @@ def _run_micro_momo(console: Console) -> None:
             sym_in = ""
         if sym_in:
             argv += ["--symbols", sym_in]
+        # Optional data-mode/providers/offline via env passthrough
+        dm = os.getenv("MOMO_DATA_MODE")
+        if dm:
+            argv += ["--data-mode", dm]
+        prv = os.getenv("MOMO_PROVIDERS")
+        if prv:
+            argv += ["--providers", prv]
+        off = os.getenv("MOMO_OFFLINE")
+        if off and off not in ("0", "false", "False"):
+            argv += ["--offline"]
         if pe_test:
             argv += ["--json", "--no-files"]
         micro_momo_analyzer.main(argv)
