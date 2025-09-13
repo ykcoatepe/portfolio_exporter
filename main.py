@@ -99,32 +99,92 @@ def parse_args() -> argparse.Namespace:
 def task_registry(fmt: str) -> dict[str, callable]:
     def snapshot_quotes() -> None:
         from portfolio_exporter.scripts import live_feed
+        from tools.logbook import logbook_on_success as _lb
 
-        live_feed.run(fmt=fmt, include_indices=False)
+        try:
+            live_feed.run(fmt=fmt, include_indices=False)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "snapshot-quotes",
+                scope="live feed snapshot",
+                files=["portfolio_exporter/scripts/live_feed.py"],
+            )
 
     def portfolio_greeks() -> None:
         from portfolio_exporter.scripts import portfolio_greeks as _portfolio_greeks
+        from tools.logbook import logbook_on_success as _lb
 
-        _portfolio_greeks.run(fmt=fmt)
+        try:
+            _portfolio_greeks.run(fmt=fmt)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "portfolio-greeks",
+                scope="portfolio greeks",
+                files=["portfolio_exporter/scripts/portfolio_greeks.py"],
+            )
 
     def option_chain_snapshot() -> None:
         from portfolio_exporter.scripts import option_chain_snapshot as _ocs
+        from tools.logbook import logbook_on_success as _lb
 
-        _ocs.run(fmt=fmt)
+        try:
+            _ocs.run(fmt=fmt)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "option-chain-snapshot",
+                scope="chain snapshot",
+                files=["portfolio_exporter/scripts/option_chain_snapshot.py"],
+            )
 
     def trades_report() -> None:
         from portfolio_exporter.scripts import trades_report as _trades
+        from tools.logbook import logbook_on_success as _lb
 
-        _trades.run(fmt=fmt)
+        try:
+            _trades.run(fmt=fmt)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "trades-report",
+                scope="executions report",
+                files=["portfolio_exporter/scripts/trades_report.py"],
+            )
 
     def daily_report() -> None:
         from portfolio_exporter.scripts import daily_report as _daily
+        from tools.logbook import logbook_on_success as _lb
 
-        _daily.run(fmt=fmt)
+        try:
+            _daily.run(fmt=fmt)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "daily-report",
+                scope="one-page report",
+                files=["portfolio_exporter/scripts/daily_report.py"],
+            )
 
     def netliq_export() -> None:
         from portfolio_exporter.scripts import net_liq_history_export as _netliq
-        _netliq.run(fmt=fmt, plot=True)
+        from tools.logbook import logbook_on_success as _lb
+        try:
+            _netliq.run(fmt=fmt, plot=True)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "netliq-export",
+                scope="net liq history",
+                files=["portfolio_exporter/scripts/net_liq_history_export.py"],
+            )
 
     def micro_momo() -> None:
         # CSV-only defaults unless env provides paths; JSON-only in PE_TEST_MODE
