@@ -16,8 +16,56 @@ CSS = (
     ".badge.A{background:#1b8e5a}.badge.B{background:#9b870c}.badge.C{background:#8b0000}"
     "kbd{background:#f4f4f4;border:1px solid #ddd;border-bottom-color:#ccc;border-radius:3px;padding:0.1em 0.4em}"
     ".small{color:#666;font-size:12px}"
-    ".summary{margin:10px 0 18px 0}"
 )
+
+
+def _count_tiers(rows: List[Dict[str, Any]]) -> Dict[str, int]:
+    out: Dict[str, int] = {"A": 0, "B": 0, "C": 0}
+    for r in rows:
+        t = (r.get("tier") or "").strip()
+        if t in out:
+            out[t] += 1
+    return out
+
+
+def _count_provenance(rows: List[Dict[str, Any]], field: str = "src_vwap") -> Dict[str, int]:
+    out: Dict[str, int] = {"artifact": 0, "yahoo": 0, "csv": 0, "": 0}
+    for r in rows:
+        v = (r.get(field) or "").strip().lower()
+        if v in out:
+            out[v] += 1
+        else:
+            out[""] += 1
+    return out
+
+
+def _sum_concurrency(rows: List[Dict[str, Any]]) -> int:
+    s = 0
+    for r in rows:
+        try:
+            s += int(r.get("concurrency_guard") or 0)
+        except Exception:
+            pass
+    return s
+
+
+def _summary_block(scored: List[Dict[str, Any]]) -> str:
+    tiers = _count_tiers(scored)
+    prov = _count_provenance(scored, "src_vwap")
+    guards = _sum_concurrency(scored)
+    html_parts = [
+        "<div class='small' style='margin:6px 0 14px 0'>",
+        f"Tiers: <span class='badge A'>A {tiers['A']}</span> · ",
+        f"<span class='badge B'>B {tiers['B']}</span> · ",
+        f"<span class='badge C'>C {tiers['C']}</span> &nbsp; ",
+        "Provenance (VWAP): ",
+        f"<kbd>artifact</kbd> {prov['artifact']} · ",
+        f"<kbd>yahoo</kbd> {prov['yahoo']} · ",
+        f"<kbd>csv</kbd> {prov['csv']} &nbsp; ",
+        f"Guards: <kbd>concurrency_guard</kbd> {guards}",
+        "</div>",
+    ]
+    return "".join(html_parts)
 
 
 def _read_csv(path: Path) -> List[Dict[str, Any]]:
@@ -27,42 +75,7 @@ def _read_csv(path: Path) -> List[Dict[str, Any]]:
         return list(csv.DictReader(f))
 
 
-def _summary(scored_rows: List[Dict[str, Any]]) -> str:
-    """Build a compact summary header.
-
-    - Totals by tier (A/B/C)
-    - Provenance counts for VWAP source (artifact/yahoo/csv)
-    - Guards: sum of concurrency_guard
-    """
-    n = len(scored_rows)
-    a = sum(1 for r in scored_rows if (r.get("tier") or "").upper() == "A")
-    b = sum(1 for r in scored_rows if (r.get("tier") or "").upper() == "B")
-    # Treat anything not A/B as C for a quick snapshot
-    c = max(0, n - a - b)
-
-    srcs = [str(r.get("src_vwap", "")).lower() for r in scored_rows]
-    src_art = sum(1 for s in srcs if s == "artifact")
-    src_yf = sum(1 for s in srcs if s == "yahoo")
-    src_csv = sum(1 for s in srcs if s == "csv")
-
-    guards = 0
-    for r in scored_rows:
-        try:
-            guards += int(float(r.get("concurrency_guard", 0) or 0))
-        except Exception:
-            continue
-
-    return (
-        "<div class='summary'>"
-        f"<div>"
-        f"<span class='badge A'>A: {a}</span> "
-        f"<span class='badge B'>B: {b}</span> "
-        f"<span class='badge C'>C: {c}</span> "
-        f"<span class='badge' style='background:#555'>Guards: {guards}</span>"
-        f"</div>"
-        f"<div class='small'>VWAP src → artifact:{src_art} · yahoo:{src_yf} · csv:{src_csv}</div>"
-        "</div>"
-    )
+    # (Note: _summary_block replaces the older _summary implementation.)
 
 
 def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
@@ -119,6 +132,8 @@ def main(argv: List[str] | None = None) -> int:
     eod = _read_csv(out / "micro_momo_eod_summary.csv")
     triggers = _read_csv(out / "micro_momo_triggers_log.csv")
 
+    summary = _summary_block(scored) if scored else "<div class='small'>No scored rows to summarize.</div>"
+
     html_doc = [
         "<!doctype html><meta charset='utf-8'><title>Micro-MOMO Dashboard</title>",
         f"<style>{CSS}</style>",
@@ -126,7 +141,7 @@ def main(argv: List[str] | None = None) -> int:
         "<div class='small'>Sections: "
         "<a href='#scored'>Scored</a> · <a href='#orders'>Orders</a> · <a href='#journal'>Journal</a> · "
         "<a href='#eod-summary'>EOD Summary</a> · <a href='#trigger-log'>Trigger Log</a></div>",
-        _summary(scored),
+        summary,
         _section("Scored", scored, "scored"),
         _section("Orders", orders, "orders"),
         _section("Journal", journal, "journal"),
