@@ -326,7 +326,7 @@ Run via task or menu
 - Task runner: `python main.py --task micro-momo`
 - Pre-Market menu: choose “Micro-MOMO Analyzer” and provide paths.
 
-Auto-discovery: If `MOMO_INPUT` is not set, the task looks for the newest `meme_scan_YYYYMMDD.csv` in `MOMO_INPUT_DIR` (if set) or in `./, ./data, ./scans, ./inputs`. Override the glob with `MOMO_INPUT_GLOB` (comma-separated).
+Auto-discovery: If `MOMO_INPUT` is not set, the task looks for the newest `meme_scan_YYYYMMDD.csv` in `MOMO_INPUT_DIR` (if set) or in `./, ./data, ./scans, ./inputs`. Override the glob with `MOMO_INPUT_GLOB` (comma-separated). When `--chains_dir` is set, the analyzer picks the newest per‑symbol chain file (`SYMBOL_YYYYMMDD.csv`, falling back to `SYMBOL.csv`).
 
 ### Alerts & IB Basket (v1.2)
 

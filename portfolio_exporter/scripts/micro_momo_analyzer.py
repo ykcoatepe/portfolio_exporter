@@ -23,6 +23,7 @@ from ..core.micro_momo_sources import (
 from ..core.micro_momo_types import ResultRow, ScanRow
 from ..core.alerts import emit_alerts
 from ..core.ib_export import export_ib_basket, export_ib_notes
+from ..core.fs_utils import find_latest_chain_for_symbol
 
 
 DEFAULT_CFG: Dict[str, Any] = {
@@ -111,8 +112,16 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
         comps, raw = score_components(scan, cfg)
         tier, direction = tier_and_dir(scan, raw, cfg)
 
-        chain_file = find_chain_file_for_symbol(chains_dir, scan.symbol)
-        chain_rows = load_chain_csv(chain_file) if chain_file else []
+        chain_rows: List[Dict[str, Any]] | List[ScanRow] = []
+        chain_file: Optional[str] = None
+        if chains_dir:
+            best = find_latest_chain_for_symbol(chains_dir, scan.symbol)
+            if best:
+                chain_file = best
+        if not chain_file:
+            chain_file = find_chain_file_for_symbol(chains_dir, scan.symbol) if chains_dir else None
+        if chain_file:
+            chain_rows = load_chain_csv(chain_file)
         struct = pick_structure(scan, chain_rows, direction, cfg, tier=tier)
         contracts, tp, sl = size_and_targets(struct, scan, cfg)
         trig = entry_trigger(direction, scan, cfg)
