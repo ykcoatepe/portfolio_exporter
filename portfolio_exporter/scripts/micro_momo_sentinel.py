@@ -10,7 +10,7 @@ from datetime import time as dt_time
 from ..core.alerts import emit_alerts
 from ..core.journal import update_journal
 from ..core.providers import ib_provider
-from ..core.market_clock import rth_window_tr, is_after, pretty_tr
+from ..core.market_clock import rth_window_tr, is_after, pretty_tr, TZ_TR
 from ..core.config_overlay import overlay_sentinel
 from ..core.memory import load_memory
 
@@ -145,6 +145,11 @@ def main(argv: List[str] | None = None) -> int:
         sym0 = row.get("symbol")
         if sym0:
             state[sym0] = {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None}
+    # Post-halt single re-arm trackers
+    post_halt_used: Dict[str, bool] = {row.get("symbol"): False for row in scored if row.get("symbol")}
+    halts_seen: Dict[str, int] = {row.get("symbol"): 0 for row in scored if row.get("symbol")}
+    last_halts_check = 0.0
+    HALTS_POLL_SEC = 30
     armed_afternoon = False  # optional single re-arm flip in the afternoon
     while True:
         logs: List[Dict[str, Any]] = []
@@ -155,6 +160,66 @@ def main(argv: List[str] | None = None) -> int:
         if schedule.no_new_signals_after_tr and is_after(schedule.no_new_signals_after_tr):
             # Hard “no-new” guard late day — do not ARM new names
             allow_new = False
+        # Halts polling (ET feed → convert to TR)
+        now_ts = time.time()
+        if cfg_sen.get("halt_rearm", True) and (now_ts - last_halts_check) >= HALTS_POLL_SEC:
+            last_halts_check = now_ts
+            try:
+                from ..core.providers.halts_nasdaq import (
+                    fetch_current_halts_csv,
+                    parse_resume_events,
+                )
+
+                rows = fetch_current_halts_csv()
+                resumes = parse_resume_events(rows)
+
+                def _et_to_tr(et_hhmmss: str):
+                    if not et_hhmmss:
+                        return None
+                    from zoneinfo import ZoneInfo
+                    from datetime import datetime
+
+                    now_ny = datetime.now(ZoneInfo("America/New_York"))
+                    y, m, d = now_ny.year, now_ny.month, now_ny.day
+                    parts = et_hhmmss.split(":")
+                    if len(parts) < 2:
+                        return None
+                    hh = int(parts[0])
+                    mm = int(parts[1])
+                    ss = int(parts[2]) if len(parts) > 2 else 0
+                    dt_ny = datetime(y, m, d, hh, mm, ss, tzinfo=ZoneInfo("America/New_York"))
+                    return dt_ny.astimezone(TZ_TR)
+
+                for sym, ev in resumes.items():
+                    if sym not in state:
+                        continue
+                    if post_halt_used.get(sym):
+                        continue
+                    # skip if exceeded per-day max
+                    if halts_seen.get(sym, 0) >= int(cfg_sen.get("max_halts_per_day", 1)):
+                        continue
+                    rq_tr = _et_to_tr(ev.get("resume_quote_et", ""))
+                    if not rq_tr:
+                        continue
+                    # Apply schedule gates: only re-arm if before our TR cutoff and after open
+                    if schedule.no_new_signals_after_tr and rq_tr >= schedule.no_new_signals_after_tr:
+                        continue
+                    if rq_tr < schedule.open_tr:
+                        continue
+                    st = state[sym]
+                    st["fired"] = False
+                    st["cooldown"] = 0
+                    st["last_side"] = None
+                    st["halt_rearm_not_before"] = rq_tr.timestamp() + int(
+                        cfg_sen.get("halt_rearm_grace_sec", 45)
+                    )
+                    st["halt_mini_orb_bars_target"] = int(
+                        cfg_sen.get("halt_mini_orb_minutes", 3)
+                    )
+                    st["halt_mini_orb_bars"] = 0
+                    halts_seen[sym] = halts_seen.get(sym, 0) + 1
+            except Exception:
+                pass
         if (not armed_afternoon) and schedule.afternoon_rearm_tr and is_after(schedule.afternoon_rearm_tr):
             if cfg_sen.get("allow_afternoon_rearm", True):
                 # simplest: allow one extra bite by clearing fired flags once
@@ -195,7 +260,7 @@ def main(argv: List[str] | None = None) -> int:
             levels = {"vwap": vwap, "orb_high": orb}
             # Cooldown + VWAP recross gating
             st = state.setdefault(sym, {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None})
-            # Decrement cooldown only on a new bar
+            # Decrement cooldown only on a new bar; also track mini-ORB bar accrual
             last_ts = None
             if bars:
                 lb = bars[-1]
@@ -206,10 +271,21 @@ def main(argv: List[str] | None = None) -> int:
                     last_ts = time.strftime("%Y-%m-%d %H:%M")
                 except Exception:
                     last_ts = None
-            if st.get("last_bar_ts") != last_ts:
+            prev_ts = st.get("last_bar_ts")
+            changed = prev_ts != last_ts
+            if changed:
                 if int(st.get("cooldown", 0)) > 0:
                     st["cooldown"] = max(0, int(st["cooldown"]) - 1)
                 st["last_bar_ts"] = last_ts
+
+            # Post-halt mini-ORB: wait grace + accrue bars before allowing evaluation
+            if "halt_rearm_not_before" in st:
+                if time.time() < float(st.get("halt_rearm_not_before", 0)):
+                    continue
+                if changed and bars:
+                    st["halt_mini_orb_bars"] = int(st.get("halt_mini_orb_bars", 0)) + 1
+                if int(st.get("halt_mini_orb_bars", 0)) < int(st.get("halt_mini_orb_bars_target", 0)):
+                    continue
 
             side_now = _side_vs_vwap(snap.get("last"), vwap)
             # Gate 1: cooldown
@@ -228,6 +304,14 @@ def main(argv: List[str] | None = None) -> int:
             if ok:
                 fired[sym] = True
                 st["fired"] = True
+                if "halt_rearm_not_before" in st:
+                    post_halt_used[sym] = True
+                    for k in (
+                        "halt_rearm_not_before",
+                        "halt_mini_orb_bars_target",
+                        "halt_mini_orb_bars",
+                    ):
+                        st.pop(k, None)
                 logs.append(
                     {
                         "ts": time.strftime("%Y-%m-%d %H:%M:%S"),

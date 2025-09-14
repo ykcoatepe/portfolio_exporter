@@ -51,6 +51,21 @@ def overlay_sentinel(base: Dict[str, Any], memory: Dict[str, Any]) -> Dict[str, 
         eff["et_afternoon_rearm"] = str(mem["et_afternoon_rearm"])
     if "et_no_new_signals_after" in mem:
         eff["et_no_new_signals_after"] = str(mem["et_no_new_signals_after"])
+    if "halt_mini_orb_minutes" in mem:
+        try:
+            eff["halt_mini_orb_minutes"] = int(mem["halt_mini_orb_minutes"])
+        except Exception:
+            pass
+    if "halt_rearm_grace_sec" in mem:
+        try:
+            eff["halt_rearm_grace_sec"] = int(mem["halt_rearm_grace_sec"])
+        except Exception:
+            pass
+    if "max_halts_per_day" in mem:
+        try:
+            eff["max_halts_per_day"] = int(mem["max_halts_per_day"])
+        except Exception:
+            pass
 
     # 2) ENV overlay
     b = _env_bool("MOMO_SEN_ALLOW_AFTERNOON_REARM")
@@ -65,6 +80,11 @@ def overlay_sentinel(base: Dict[str, Any], memory: Dict[str, Any]) -> Dict[str, 
     eff["et_afternoon_rearm"] = eff.get("et_afternoon_rearm", "13:30") if not s else s
     s = os.getenv("MOMO_SEN_ET_NO_NEW_AFTER")
     eff["et_no_new_signals_after"] = eff.get("et_no_new_signals_after", "15:30") if not s else s
+    i = _env_int("MOMO_SEN_HALT_MINI_ORB_MINUTES")
+    eff["halt_mini_orb_minutes"] = eff.get("halt_mini_orb_minutes", 3) if i is None else i
+    i = _env_int("MOMO_SEN_HALT_REARM_GRACE_SEC")
+    eff["halt_rearm_grace_sec"] = eff.get("halt_rearm_grace_sec", 45) if i is None else i
+    i = _env_int("MOMO_SEN_MAX_HALTS_PER_DAY")
+    eff["max_halts_per_day"] = eff.get("max_halts_per_day", 1) if i is None else i
 
     return eff
-

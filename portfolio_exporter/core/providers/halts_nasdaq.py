@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 import time
-from typing import Any, Dict
+import urllib.request
+from typing import Any, Dict, List
+from zoneinfo import ZoneInfo
 
 
 def _cache_path(cfg: Dict[str, Any]) -> str:
@@ -42,4 +46,42 @@ def get_halts_today(cfg: Dict[str, Any]) -> Dict[str, int]:
     except Exception:
         pass
     return data
+
+
+# Live halts CSV (times in ET). Tests can monkeypatch these functions.
+TZ_NY = ZoneInfo("America/New_York")
+
+
+def fetch_current_halts_csv(timeout: int = 5) -> List[Dict[str, str]]:
+    """Fetch Nasdaq Trader Current Trading Halts CSV and return list of dict rows.
+
+    Source: https://www.nasdaqtrader.com/trader.aspx?id=tradehalts
+    """
+    url = "https://www.nasdaqtrader.com/dynamic/symdir/tradehalts.csv"
+    with urllib.request.urlopen(url, timeout=timeout) as resp:
+        raw = resp.read().decode("utf-8", errors="ignore")
+    reader = csv.DictReader(io.StringIO(raw))
+    return [dict(row) for row in reader]
+
+
+def parse_resume_events(rows: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+    """Extract resumption events keyed by symbol.
+
+    Returns: {SYM: {halt_time_et, resume_quote_et, resume_trade_et, reason}}
+    """
+    out: Dict[str, Dict[str, str]] = {}
+    for d in rows:
+        sym = (d.get("Issue Symbol") or d.get("Symbol") or "").strip().upper()
+        if not sym:
+            continue
+        rq = (d.get("Resumption Quote Time") or "").strip()
+        rt = (d.get("Resumption Trade Time") or "").strip()
+        if rq or rt:
+            out[sym] = {
+                "halt_time_et": (d.get("Halt Time") or "").strip(),
+                "resume_quote_et": rq,
+                "resume_trade_et": rt,
+                "reason": (d.get("Reason Code") or "").strip(),
+            }
+    return out
 

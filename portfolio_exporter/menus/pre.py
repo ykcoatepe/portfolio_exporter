@@ -331,6 +331,27 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
             f"[dim]Recross[/]: {'ON' if require_recross else 'OFF'}  [dim]Cooldown bars[/]: {cooldown_bars}",
             highlight=False,
         )
+        # Show halt re-arm parameters
+        try:
+            halt_on = (get_pref("sentinel.halt_rearm") or "true").lower() not in ("0", "false", "no")
+        except Exception:
+            halt_on = True
+        try:
+            mini_orb = int(get_pref("sentinel.halt_mini_orb_minutes") or 3)
+        except Exception:
+            mini_orb = 3
+        try:
+            grace = int(get_pref("sentinel.halt_rearm_grace_sec") or 45)
+        except Exception:
+            grace = 45
+        try:
+            max_per_day = int(get_pref("sentinel.max_halts_per_day") or 1)
+        except Exception:
+            max_per_day = 1
+        console.print(
+            f"[dim]Halt re-arm[/]: {'ON' if halt_on else 'OFF'}  •  [dim]mini-ORB[/]: {mini_orb}m  •  [dim]grace[/]: {grace}s  •  [dim]max/day[/]: {max_per_day}",
+            highlight=False,
+        )
         console.print(
             f"Status: {'[green]RUNNING[/]' if running else '[red]STOPPED[/]'}",
             highlight=False,
