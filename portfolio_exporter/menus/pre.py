@@ -15,6 +15,12 @@ from portfolio_exporter.scripts import micro_momo_dashboard as _dash
 import os, webbrowser
 from portfolio_exporter.scripts import micro_momo_analyzer
 from portfolio_exporter.core.memory import get_pref, set_pref
+from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.proc import (
+    start as sentinel_start,
+    stop as sentinel_stop,
+    status as sentinel_status,
+)
 from portfolio_exporter.core.fs_utils import find_latest_file, auto_chains_dir
 from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
 
@@ -91,6 +97,7 @@ def launch(status: StatusBar, default_fmt: str):
             ("n", "Net-Liq history"),
             ("m", "Micro-MOMO Analyzer"),
             ("d", "Micro-MOMO Dashboard"),
+            ("u", "Sentinel (Start/Stop/Status)"),
             ("x", "External technical scan"),
             ("y", "Pre-flight check (env & CSVs)"),
             ("z", "Run overnight batch"),
@@ -131,6 +138,7 @@ def launch(status: StatusBar, default_fmt: str):
             "n": net_liq_history_export.run,
             "m": lambda fmt=default_fmt: _run_micro_momo(console),
             "d": lambda fmt=default_fmt: launch_micro_momo_dashboard(status, fmt),
+            "u": lambda fmt=default_fmt: launch_sentinel_menu(status, fmt),
             "x": lambda fmt=default_fmt: _external_scan(fmt),
             "y": lambda fmt=default_fmt: orchestrate_dataset.preflight_check(
                 no_pretty=bool(os.getenv("PE_QUIET"))
@@ -251,3 +259,104 @@ def launch_micro_momo_dashboard(status: StatusBar, fmt: str) -> None:  # noqa: A
         from rich.console import Console as _C
 
         _C().print(f"[red]Micro-MOMO Dashboard failed:[/] {exc}")
+
+
+def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
+    from rich.console import Console
+
+    console = status.console if status else Console()
+    while True:
+        s = sentinel_status()
+        running = bool(s.get("running"))
+        console.rule("[bold]Sentinel")
+        console.print(
+            f"Status: {'[green]RUNNING[/]' if running else '[red]STOPPED[/]'}",
+            highlight=False,
+        )
+        if running:
+            console.print(
+                f"PID: {s.get('pid')}  Started: {s.get('started_at')}  Args: {s.get('argv')}",
+                overflow="fold",
+            )
+        console.print(
+            "\nOptions: [b]1[/]) Start  [b]2[/]) Stop  [b]3[/]) Active positions  [b]0[/]) Back"
+        )
+
+        choice = core_ui.prompt_input("› ").strip()
+        if choice == "0":
+            return
+        if choice == "1":
+            momo_scored = os.getenv("MOMO_SCORED") or "out/micro_momo_scored.csv"
+            cfg = os.getenv("MOMO_CFG") or "micro_momo_config.json"
+            out_dir = os.getenv("MOMO_OUT") or "out"
+            interval = os.getenv("MOMO_INTERVAL") or "10"
+            args = [
+                "--scored-csv",
+                momo_scored,
+                "--cfg",
+                cfg,
+                "--out_dir",
+                out_dir,
+                "--interval",
+                interval,
+            ]
+            if os.getenv("MOMO_WEBHOOK"):
+                args += ["--webhook", os.getenv("MOMO_WEBHOOK")]
+            if os.getenv("MOMO_THREAD"):
+                args += ["--thread", os.getenv("MOMO_THREAD")]
+            if (os.getenv("MOMO_OFFLINE") or "").lower() in ("1", "true", "yes"):
+                args += ["--offline"]
+            res = sentinel_start(args)
+            console.print(
+                f"[green]Started[/] PID {res.get('pid')}"
+                if res.get("ok")
+                else f"[yellow]{res.get('msg')}"
+            )
+        elif choice == "2":
+            res = sentinel_stop()
+            console.print(
+                f"[green]{res.get('msg', 'stopped')}[/]"
+                if res.get("ok")
+                else f"[yellow]{res.get('msg')}"
+            )
+        elif choice == "3":
+            _show_active_positions(console)
+        else:
+            console.print("[yellow]Unknown choice[/]")
+
+
+def _show_active_positions(console):
+    import csv
+
+    p = "out/micro_momo_journal.csv"
+    if not os.path.exists(p):
+        console.print("[yellow]No journal found (out/micro_momo_journal.csv)[/]")
+        return
+    with open(p, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    active = [r for r in rows if (str(r.get("status", "")).lower() in ("pending", "triggered"))]
+    if not active:
+        console.print("[green]No active positions[/]")
+        return
+    from rich.table import Table
+
+    t = Table(title="Active positions")
+    for c in [
+        "symbol",
+        "status",
+        "direction",
+        "structure",
+        "contracts",
+        "entry_trigger",
+    ]:
+        t.add_column(c)
+    for r in active:
+        t.add_row(
+            r.get("symbol", ""),
+            r.get("status", ""),
+            r.get("direction", ""),
+            r.get("structure", ""),
+            str(r.get("contracts", "")),
+            (r.get("entry_trigger", "") or "")[:80],
+        )
+    console.print(t)

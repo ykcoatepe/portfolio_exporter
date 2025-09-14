@@ -17,6 +17,47 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
 | `daily_report.py` | Render a one-page HTML/PDF snapshot from the latest portfolio greeks CSVs. |
 
+### Utilities → Sentinel (Micro‑MOMO)
+
+A lightweight background watcher that monitors scored Micro‑MOMO candidates and posts triggers.
+
+- Start/Stop/Status live in the TUI under Pre‑Market → Sentinel.
+- Writes PID and metadata under `out/.pid/` for safe lifecycle management.
+- Shows an “Active positions” view sourced from `out/micro_momo_journal.csv` (Pending/Triggered).
+
+Menu usage
+
+1. `python main.py` → select `Pre‑Market` → `Sentinel`.
+2. Options: `Start` (background), `Stop` (graceful), `Status`, `Active positions`.
+
+Environment (optional)
+
+- `MOMO_SCORED` default `out/micro_momo_scored.csv`
+- `MOMO_CFG` default `micro_momo_config.json`
+- `MOMO_OUT` default `out`
+- `MOMO_INTERVAL` default `10` seconds
+- `MOMO_WEBHOOK`, `MOMO_THREAD` for alerting
+- `MOMO_OFFLINE=1` to avoid live fetches
+
+Files created
+
+- `out/.pid/momo_sentinel.pid`
+- `out/.pid/momo_sentinel.meta.json`
+
+Behavior
+
+- Start uses a detached `subprocess.Popen` of `portfolio_exporter.scripts.micro_momo_sentinel` and writes a PID file.
+- Stop sends a graceful terminate (SIGTERM) and falls back to kill if needed.
+- Status validates the PID (uses `psutil` when available; falls back to `os.kill(pid, 0)`).
+
+Direct CLI (advanced)
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv --cfg micro_momo_config.json \
+  --out_dir out --interval 10 [--webhook ...] [--thread ...] [--offline]
+```
+
 ## Strike Enrichment in Combos
 
 The `portfolio_greeks` workflow generates an additional combos CSV alongside the per‑position output. Strike details for option combos are consistently enriched across all combo sources.
