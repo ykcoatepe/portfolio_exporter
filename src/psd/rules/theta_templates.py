@@ -1,8 +1,8 @@
-"""Theta template selector (v0.1)."""
+"""Theta template enforcement (v0.2)."""
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Tuple
 
 
 def pick_by_vix(vix: float) -> Dict[str, float]:
@@ -12,3 +12,28 @@ def pick_by_vix(vix: float) -> Dict[str, float]:
     if vix <= 25:
         return {"dte_min": 30, "dte_max": 45, "tp_min": 0.40, "tp_max": 0.60}
     return {"dte_min": 14, "dte_max": 30, "tp_min": 0.30, "tp_max": 0.50}
+
+
+def enforce(vix: float, dte: int, credit: float, debit_now: float) -> Tuple[str, str]:
+    """Return (severity, reason) based on regime window and capture percent.
+
+    severity: 'action' (take profit), 'warn' (out-of-template), 'info' otherwise.
+    capture% = 1 - debit/credit; compared against regime tp bands.
+    """
+    tpl = pick_by_vix(vix)
+    if dte < int(tpl["dte_min"]) or dte > int(tpl["dte_max"]):
+        return "warn", "out-of-template"
+    if credit <= 0:
+        return "info", ""
+    capture = 1.0 - float(debit_now) / float(credit)
+    # v0.2: action when capture hits lower band or above
+    if capture >= float(tpl["tp_min"]):
+        return "action", "tp"
+    return "info", ""
+
+
+def theta_fees_warn(weekly_fees_abs: float, nav: float) -> bool:
+    """Warn when weekly theta fees exceed 0.20% of NAV (v0.2 heuristic)."""
+    if nav <= 0:
+        return False
+    return (weekly_fees_abs / nav) > 0.002

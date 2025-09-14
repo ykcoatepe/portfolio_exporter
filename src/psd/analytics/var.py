@@ -29,7 +29,7 @@ def var95_1d_from_closes(closes: Sequence[float], nav_exposed: float) -> float:
         # Minimal fallback when only one return is available
         return abs(rets[0]) * float(nav_exposed)
     rets_sorted = sorted(rets)
-    if len(rets_sorted) >= 30:
+    if len(rets_sorted) >= 252:
         idx = max(0, int(0.05 * len(rets_sorted)) - 1)
         q = rets_sorted[idx]
         return abs(q) * float(nav_exposed)
