@@ -20,6 +20,14 @@ def _load() -> Dict[str, Any]:
         return {"preferences": {}}
 
 
+def load_memory() -> Dict[str, Any]:
+    """Public helper to fetch full memory JSON (gracefully empty on errors)."""
+    try:
+        return _load()
+    except Exception:
+        return {"preferences": {}, "workflows": {}, "tasks": [], "questions": [], "decisions": [], "changelog": []}
+
+
 def _save(data: Dict[str, Any]) -> None:
     if os.getenv("MEMORY_READONLY") in ("1", "true", "yes", "True"):  # graceful no-op
         return
@@ -73,4 +81,3 @@ def set_pref(key: str, value: Any) -> None:
         node = nxt
     node[parts[-1]] = value
     _save(data)
-

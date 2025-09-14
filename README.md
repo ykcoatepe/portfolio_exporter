@@ -27,6 +27,8 @@ A lightweight background watcher that monitors scored Micro‑MOMO candidates an
 
 TR-local schedule: Sentinel computes today’s Turkey-local times from U.S. RTH 09:30–16:00 ET via timezone conversion (DST-aware). By default it hard-resets at RTH open, optionally re-arms at 13:30 ET (TR-local time displayed), disallows new signals after 15:30 ET, and can honor a single post-halt re-arm per day. You can toggle afternoon/halts behavior from the Sentinel menu. Times shown/logged are Europe/Istanbul while staying aligned to the U.S. session and DST automatically.
 
+Config precedence at runtime: CLI > ENV (`MOMO_SEN_*`) > Menu preferences (`.codex/memory.json` → `preferences.sentinel.*`) > `micro_momo_config.json` > defaults. This keeps runtime overrides in the environment while persisting simple operator toggles in repo memory; TR-local schedule remains DST-safe via `zoneinfo`.
+
 Menu usage
 
 1. `python main.py` → select `Pre‑Market` → `Sentinel`.

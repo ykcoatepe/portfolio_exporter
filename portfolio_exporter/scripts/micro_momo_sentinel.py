@@ -11,6 +11,8 @@ from ..core.alerts import emit_alerts
 from ..core.journal import update_journal
 from ..core.providers import ib_provider
 from ..core.market_clock import rth_window_tr, is_after, pretty_tr
+from ..core.config_overlay import overlay_sentinel
+from ..core.memory import load_memory
 
 
 def _load_scored(path: str) -> List[Dict[str, Any]]:
@@ -92,7 +94,14 @@ def main(argv: List[str] | None = None) -> int:
 
     scored = _load_scored(args.scored_csv)
     # Load sentinel behavior knobs and compute today's TR-local schedule
-    cfg_sen = _load_sentinel_cfg(args.cfg)
+    cfg_sen_file = _load_sentinel_cfg(args.cfg)
+    mem = {}
+    try:
+        m = load_memory()
+        mem = (m.get("preferences", {}).get("sentinel", {}) or {})
+    except Exception:
+        mem = {}
+    cfg_sen = overlay_sentinel(cfg_sen_file, mem)
     et_rearm = _parse_hhmm(cfg_sen.get("et_afternoon_rearm", "13:30"))
     et_cutoff = _parse_hhmm(cfg_sen.get("et_no_new_signals_after", "15:30"))
     schedule = rth_window_tr(

@@ -308,7 +308,7 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
         except Exception:
             pass
 
-        # Read menu toggles from memory (defaults: ON)
+        # Read menu toggles from memory (defaults: ON/10)
         try:
             allow_aft = (get_pref("sentinel.allow_afternoon_rearm") or "true").lower() not in ("0", "false", "no")
         except Exception:
@@ -317,6 +317,15 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
             allow_halt = (get_pref("sentinel.halt_rearm") or "true").lower() not in ("0", "false", "no")
         except Exception:
             allow_halt = True
+        try:
+            require_recross = (get_pref("sentinel.require_vwap_recross") or "true").lower() not in ("0", "false", "no")
+        except Exception:
+            require_recross = True
+        try:
+            cd_raw = get_pref("sentinel.cooldown_bars") or "10"
+            cooldown_bars = int(cd_raw)
+        except Exception:
+            cooldown_bars = 10
         console.print(
             f"Status: {'[green]RUNNING[/]' if running else '[red]STOPPED[/]'}",
             highlight=False,
@@ -329,7 +338,9 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
         console.print(
             "\nOptions: [b]1[/]) Start  [b]2[/]) Stop  [b]3[/]) Active positions  "
             f"[b]4[/]) Toggle afternoon re-arm (currently: {'ON' if allow_aft else 'OFF'})  "
-            f"[b]5[/]) Toggle 1 post-halt re-arm (currently: {'ON' if allow_halt else 'OFF'})  "
+            f"[b]5[/]) Toggle 1 post-halt re-arm (currently: {'ON' if allow_halt else 'OFF'})\n"
+            f"        [b]6[/]) Toggle 'Require VWAP recross' (currently: {'ON' if require_recross else 'OFF'})  "
+            f"[b]7[/]) Set cooldown bars (current: {cooldown_bars})  "
             "[b]0[/]) Back"
         )
 
@@ -388,6 +399,22 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
                 )
             except Exception as exc:
                 console.print(f"[yellow]Failed to update preference:[/] {exc}")
+        elif choice == "6":
+            try:
+                set_pref("sentinel.require_vwap_recross", not require_recross)
+                console.print(
+                    f"[green]Require VWAP recross set to[/] {'ON' if not require_recross else 'OFF'}"
+                )
+            except Exception as exc:
+                console.print(f"[yellow]Failed to update preference:[/] {exc}")
+        elif choice == "7":
+            try:
+                val = core_ui.prompt_input("Cooldown bars (integer, e.g., 10): ").strip()
+                new_cd = max(0, int(val))
+                set_pref("sentinel.cooldown_bars", new_cd)
+                console.print(f"[green]Cooldown bars set to[/] {new_cd}")
+            except Exception:
+                console.print("[yellow]Invalid number[/]")
         else:
             console.print("[yellow]Unknown choice[/]")
 
