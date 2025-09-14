@@ -1,0 +1,24 @@
+[
+  {
+    "symbol": "FORD",
+    "direction": "long?",
+    "trigger": "Lower-high \u2192 VWAP rejection (no fresh halt) (RVOL \u2265 1.5); levels: vwap=NA",
+    "rvol_confirm": 1.5,
+    "levels": {
+      "orb_high": null,
+      "vwap": null,
+      "stop": null
+    }
+  },
+  {
+    "symbol": "LDI",
+    "direction": "long?",
+    "trigger": "Lower-high \u2192 VWAP rejection (no fresh halt) (RVOL \u2265 1.5); levels: vwap=NA",
+    "rvol_confirm": 1.5,
+    "levels": {
+      "orb_high": null,
+      "vwap": null,
+      "stop": null
+    }
+  }
+]

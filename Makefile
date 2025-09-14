@@ -129,3 +129,65 @@ sanity-trades-report-excel: setup
 .PHONY: sanity-menus-quick
 sanity-menus-quick: setup
 	@./scripts/sanity_menus_quick.sh
+
+# --- Micro-MOMO helpers ---
+.PHONY: momo-journal
+momo-journal:
+	python -m portfolio_exporter.scripts.micro_momo_analyzer \
+	  --input tests/data/meme_scan_sample.csv \
+	  --cfg tests/data/micro_momo_config.json \
+	  --out_dir out \
+	  --data-mode csv-only \
+	  --journal-template
+
+.PHONY: momo-sentinel-offline
+momo-sentinel-offline:
+	python -m portfolio_exporter.scripts.micro_momo_sentinel \
+	  --scored-csv out/micro_momo_scored.csv \
+	  --cfg tests/data/micro_momo_config.json \
+	  --out_dir out \
+	  --interval 2 \
+	  --offline
+
+.PHONY: momo-eod-offline
+momo-eod-offline:
+	python -m portfolio_exporter.scripts.micro_momo_eod \
+	  --journal out/micro_momo_journal.csv \
+	  --out_dir out \
+	  --offline
+
+.PHONY: logbook-add
+logbook-add:
+	python tools/logbook.py add --task "$$TASK" --branch "$$BRANCH" --owner "$$OWNER" --commit "$$COMMIT" --scope "$$SCOPE" --files "$$FILES" --interfaces "$$INTERFACES" --status "$$STATUS" --next "$$NEXT" --notes "$$NOTES"
+
+.PHONY: momo-dashboard
+momo-dashboard:
+	python -m portfolio_exporter.scripts.micro_momo_dashboard --out_dir out
+
+.PHONY: momo-dashboard-open
+momo-dashboard-open:
+	python -m portfolio_exporter.scripts.micro_momo_dashboard --out_dir out; \
+	python -c "import webbrowser,os; p=os.path.abspath('out/micro_momo_dashboard.html'); print(p); webbrowser.open('file://'+p, new=2)"
+
+# --- Micro-MOMO + logbook variants (opt-in via LOGBOOK_AUTO=1) ---
+.PHONY: momo-journal-log momo-sentinel-offline-log momo-eod-offline-log momo-dashboard-open-log
+
+momo-journal-log: momo-journal
+ifeq ($(LOGBOOK_AUTO),1)
+	python tools/logbook.py add --task "micro-momo journal template" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "analyzer csv-only + journal" --files "portfolio_exporter/scripts/micro_momo_analyzer.py" --status "merged"
+endif
+
+momo-sentinel-offline-log: momo-sentinel-offline
+ifeq ($(LOGBOOK_AUTO),1)
+	python tools/logbook.py add --task "micro-momo sentinel (offline)" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "trigger watcher (offline)" --files "portfolio_exporter/scripts/micro_momo_sentinel.py" --status "merged"
+endif
+
+momo-eod-offline-log: momo-eod-offline
+ifeq ($(LOGBOOK_AUTO),1)
+	python tools/logbook.py add --task "micro-momo eod (offline)" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "eod outcomes" --files "portfolio_exporter/scripts/micro_momo_eod.py" --status "merged"
+endif
+
+momo-dashboard-open-log: momo-dashboard-open
+ifeq ($(LOGBOOK_AUTO),1)
+	python tools/logbook.py add --task "micro-momo dashboard" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "html report" --files "portfolio_exporter/scripts/micro_momo_dashboard.py" --status "merged"
+endif

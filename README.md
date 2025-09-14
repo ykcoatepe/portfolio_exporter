@@ -302,6 +302,9 @@ per-stage timings in the JSON summary.
 
 Micro-MOMO is a lightweight shortlist analyzer that operates entirely offline for v1.
 
+- Intraday patterns: computed from 1‑min bars (VWAP reclaim/reject, ORB/Retest, HOD/LOD) and exposed as `pattern_signal`, with `above_vwap_now` and `vwap_distance_pct`.
+- Expiry selection: prefers a DTE window (config `options.{dte_min,dte_max}`), then the nearest weekly strictly above `dte_max` by ≤7 days (Friday when available), then nearest overall. When multiple match, it prefers higher near‑money OI.
+
 - Inputs: a scan CSV and optional per-symbol option chain CSVs named `{SYMBOL}_{YYYYMMDD}.csv`.
 - Flow: filters → scoring → tier & direction → structure pick (DebitCall for long, BearCallCredit for short) → sizing → TP/SL → entry trigger.
 
@@ -316,11 +319,219 @@ micro-momo --input tests/data/meme_scan_sample.csv \
 micro-momo --input tests/data/meme_scan_sample.csv --cfg tests/data/micro_momo_config.json --chains_dir tests/data --out_dir out --json --no-files
 ```
 
+Symbols mode (no CSV):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --symbols AAPL,TSLA,MSFT \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --data-mode enrich --providers ib,yahoo
+```
+
+In the app (Pre-Market → Micro‑MOMO Analyzer), you can optionally type a comma‑separated symbol list; leave blank to use the latest `meme_scan_*.csv`.
+
 Outputs when files are enabled:
 - `out/micro_momo_scored.csv`
 - `out/micro_momo_orders.csv`
 
 If a chain file is missing for a symbol, a `Template` structure is emitted with `needs_chain=1` so you can add data or switch to live providers in a later version.
+
+Run via task or menu
+- Task runner: `python main.py --task micro-momo`
+- Pre-Market menu: choose “Micro-MOMO Analyzer” and provide paths.
+
+Auto-discovery: If `MOMO_INPUT` is not set, the task looks for the newest `meme_scan_YYYYMMDD.csv` in `MOMO_INPUT_DIR` (if set) or in `./, ./data, ./scans, ./inputs`. Override the glob with `MOMO_INPUT_GLOB` (comma-separated). When `--chains_dir` is set, the analyzer picks the newest per‑symbol chain file (`SYMBOL_YYYYMMDD.csv`, falling back to `SYMBOL.csv`).
+
+### Alerts & IB Basket (v1.2)
+
+- Alerts: build a compact alerts list for each scored row and write `out/micro_momo_alerts.json`.
+  - JSON-only (no POST): add `--alerts-json-only`.
+  - Webhook POST: add `--webhook https://hooks.slack.com/services/...` (skipped when `--offline`).
+
+- IB Basket export: write a BasketTrader-friendly CSV plus notes (TP/SL/trigger per order). OCO is not encoded in the CSV.
+
+Examples:
+
+```
+# Alerts only, no POST
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input tests/data/meme_scan_sample.csv \
+  --cfg tests/data/micro_momo_config.json \
+  --out_dir out --alerts-json-only --no-files
+
+# Webhook POST to Slack-compatible endpoint (skips when --offline)
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input meme_scan_YYYYMMDD.csv --cfg micro_momo_config.json \
+  --out_dir out --webhook https://hooks.slack.com/services/XXX/YYY/ZZZ
+
+# IB basket CSV + notes
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input meme_scan_YYYYMMDD.csv --cfg micro_momo_config.json \
+  --out_dir out --ib-basket-out out/micro_momo_basket.csv
+```
+
+
+### Journal & Sentinel (v1.3)
+
+- Journal template: the analyzer can emit a ready-to-fill journal CSV with `--journal-template`.
+  - Writes `out/micro_momo_journal.csv` with status=Pending rows for each scored candidate.
+
+- Sentinel (trigger watcher): monitors scored rows and logs when the trigger condition fires.
+
+```
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --interval 10 \
+  --offline
+```
+
+Notes: The sentinel is deliberately lightweight — it polls price/volume (IB provider when not offline), checks the simplified trigger rule (long: ORB break → pullback to VWAP → reclaim, short: lower-high → VWAP rejection) with RVOL ≥ confirm, then appends to `out/micro_momo_triggers_log.csv`, updates journal status to Triggered when present, and can send a webhook alert when `--webhook` is provided.
+
+Slack thread: pass `--thread <thread_ts>` to post alerts into an existing Slack thread (for incoming webhooks that honor `thread_ts`). When a thread is provided, the sentinel posts one alert per message.
+
+### EOD outcome scorer (v1.4)
+
+Compute end‑of‑day outcomes from the journal and update statuses/`result_R`.
+
+```
+python -m portfolio_exporter.scripts.micro_momo_eod \
+  --journal out/micro_momo_journal.csv \
+  --out_dir out \
+  --offline
+```
+
+### Run from task registry
+
+- Sentinel (test/offline):
+  `python main.py --task micro-momo-sentinel`
+
+- EOD scorer (offline):
+  `python main.py --task micro-momo-eod`
+
+Environment overrides:
+- `MOMO_SCORED`, `MOMO_CFG`, `MOMO_OUT`, `MOMO_INTERVAL`, `MOMO_WEBHOOK`, `MOMO_OFFLINE`, `MOMO_JOURNAL`
+
+### Logbook
+
+Append a quick entry to LOGBOOK.md and .codex/memory.json worklog:
+
+```bash
+make logbook-add \
+  TASK="Micro-MOMO v1.4 EOD + Guard" \
+  BRANCH="dev_yordam2" \
+  OWNER="codex" \
+  COMMIT="$(git rev-parse --short HEAD)" \
+  SCOPE="EOD scorer + guard" \
+  FILES="portfolio_exporter/scripts/micro_momo_eod.py" \
+  STATUS="merged" \
+  NEXT="Dashboard" \
+  NOTES="dtype warning benign"
+```
+
+List recent entries:
+
+```bash
+python tools/logbook.py list
+```
+
+Opt-in auto-logbook
+- Set `LOGBOOK_AUTO=1` to auto-append after app tasks succeed (micro‑momo, sentinel, EOD, dashboard).
+- Use Make “+log” variants to bundle run+log in one command (e.g., `make momo-dashboard-open-log`).
+
+### Micro-MOMO Dashboard (HTML)
+
+Generate a single-file report:
+
+```bash
+make momo-dashboard
+# -> out/micro_momo_dashboard.html
+```
+
+Includes Scored, Orders, Journal, EOD Summary, and Trigger Log when present.
+
+## Micro-MOMO — Operator Runbook (v1.4+)
+
+Morning (13:25 TRT)
+1) Drop your shortlist CSV (e.g., `data/meme_scan_YYYYMMDD.csv`).
+2) Run analyzer (auto‑enrich IB → Yahoo) and emit a journal template:
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input data/meme_scan_YYYYMMDD.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --data-mode enrich --providers ib,yahoo \
+  --journal-template
+```
+
+Outputs: `out/micro_momo_scored.csv`, `out/micro_momo_orders.csv`, `out/micro_momo_journal.csv`.
+
+During session
+3) Start sentinel (optional Slack thread):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --interval 10 \
+  --webhook https://hooks.slack.com/services/XXX/YYY/ZZZ \
+  --thread <thread_ts>   # optional
+```
+
+Logs firings to `out/micro_momo_triggers_log.csv` and updates journal status.
+
+End of day
+4) Score outcomes (offline OK):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_eod \
+  --journal out/micro_momo_journal.csv \
+  --out_dir out --offline
+```
+
+Writes `out/micro_momo_eod_summary.csv` and annotates the journal.
+
+Review
+5) Build & open dashboard:
+
+```bash
+make momo-dashboard-open
+# or via UI: Pre-Market → Micro-MOMO Dashboard
+```
+
+App task equivalents
+- Analyzer: `python main.py --task micro-momo`
+- Sentinel: `python main.py --task micro-momo-sentinel`
+- EOD: `python main.py --task micro-momo-eod`
+- Dashboard: `python main.py --task micro-momo-dashboard`
+
+Make helpers
+- `make momo-journal` (fixture CSV → journal template)
+- `make momo-sentinel-offline` (idle loop for CI)
+- `make momo-eod-offline` (journal update in offline mode)
+- `make momo-dashboard`, `make momo-dashboard-open`
+
+### Logbook habits for parallel Codex tracks
+
+- Append a log after each task merge:
+
+```bash
+make logbook-add TASK="Micro-MOMO v1.4 EOD + Guard" BRANCH="dev_yordam2" OWNER="codex" \
+  COMMIT="$(git rev-parse --short HEAD)" SCOPE="EOD scorer + guard" \
+  FILES="portfolio_exporter/scripts/micro_momo_eod.py" STATUS="merged" NEXT="Dashboard" NOTES="—"
+```
+
+- Quick tail:
+
+```bash
+python tools/logbook.py list
+```
+
+
 
 ### Live enrichment (v1.1)
 
@@ -330,7 +541,23 @@ Micro‑MOMO can enrich shortlist rows with live data (IBKR primary, Yahoo fallb
   - `--data-mode {csv-only,enrich,fetch}`: enrich fills missing fields only; fetch rebuilds all fields from providers.
   - `--providers ib,yahoo`: comma‑separated priority (default `ib,yahoo`).
   - `--offline`: disable network fetches and halts; useful in CI.
-  - `--halts-source nasdaq`: enable halts count (cached; disabled when `--offline`).
+- `--halts-source nasdaq`: enable halts count (cached; disabled when `--offline`).
+
+Auto‑producers (optional)
+- `--auto-producers`: when artifacts (minute bars / option chains) are missing, try to generate them via in‑repo scripts first, then re‑read artifacts before falling back to providers.
+- Works in both `--symbols` mode and with `--input` CSVs. In `csv-only` data mode, only artifacts are used (no providers).
+
+Enrichment & caching (Yahoo)
+- 1m bars: populates `rvol_1m`, `rvol_5m`, `vwap`, `orb_high/low`, and derives `above_vwap_now`/`pattern_signal`.
+  - Patterns computed locally: `VWAP Reclaim`, `VWAP Reject`, `ORB`, `ORB Retest`, `HOD Reclaim`, `LOD Break`, `Fail`.
+  - `vwap_distance_pct` indicates absolute distance to VWAP (fraction).
+- Option chains: sets `optionable=Yes`, fills `oi_near_money` and `spread_pct_near_money` from the nearest expiry.
+- Local cache: responses stored under `out/.cache/yahoo_*.json` (configurable via `cfg.data.cache.{enabled,dir,ttl_sec}`) and reused even when `--offline` is set.
+- Symbols mode: when `--symbols` is provided, the analyzer synthesizes rows and uses provider data + cache; chain CSVs are optional.
+
+Environment shortcuts
+- `MOMO_SYMBOLS`: pass comma‑separated symbols via task/menu.
+- `MOMO_DATA_MODE`, `MOMO_PROVIDERS`, `MOMO_OFFLINE`: forwarded to the analyzer from both the menu and `main.py --task micro-momo`.
 
 Provenance columns are appended to outputs when present: `src_last`, `src_prev_close`, `src_gap`, `src_rvol`, `src_vwap`, `src_orb`, `src_chain`, `src_float`, `src_adv`, `src_short_interest`, `src_borrow`, `src_borrow_rate`, `src_halts`. Any enrichment issues are summarized in `data_errors` (semicolon‑joined).
 

@@ -99,32 +99,239 @@ def parse_args() -> argparse.Namespace:
 def task_registry(fmt: str) -> dict[str, callable]:
     def snapshot_quotes() -> None:
         from portfolio_exporter.scripts import live_feed
+        from tools.logbook import logbook_on_success as _lb
 
-        live_feed.run(fmt=fmt, include_indices=False)
+        try:
+            live_feed.run(fmt=fmt, include_indices=False)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "snapshot-quotes",
+                scope="live feed snapshot",
+                files=["portfolio_exporter/scripts/live_feed.py"],
+            )
 
     def portfolio_greeks() -> None:
         from portfolio_exporter.scripts import portfolio_greeks as _portfolio_greeks
+        from tools.logbook import logbook_on_success as _lb
 
-        _portfolio_greeks.run(fmt=fmt)
+        try:
+            _portfolio_greeks.run(fmt=fmt)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "portfolio-greeks",
+                scope="portfolio greeks",
+                files=["portfolio_exporter/scripts/portfolio_greeks.py"],
+            )
 
     def option_chain_snapshot() -> None:
         from portfolio_exporter.scripts import option_chain_snapshot as _ocs
+        from tools.logbook import logbook_on_success as _lb
 
-        _ocs.run(fmt=fmt)
+        try:
+            _ocs.run(fmt=fmt)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "option-chain-snapshot",
+                scope="chain snapshot",
+                files=["portfolio_exporter/scripts/option_chain_snapshot.py"],
+            )
 
     def trades_report() -> None:
         from portfolio_exporter.scripts import trades_report as _trades
+        from tools.logbook import logbook_on_success as _lb
 
-        _trades.run(fmt=fmt)
+        try:
+            _trades.run(fmt=fmt)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "trades-report",
+                scope="executions report",
+                files=["portfolio_exporter/scripts/trades_report.py"],
+            )
 
     def daily_report() -> None:
         from portfolio_exporter.scripts import daily_report as _daily
+        from tools.logbook import logbook_on_success as _lb
 
-        _daily.run(fmt=fmt)
+        try:
+            _daily.run(fmt=fmt)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "daily-report",
+                scope="one-page report",
+                files=["portfolio_exporter/scripts/daily_report.py"],
+            )
 
     def netliq_export() -> None:
         from portfolio_exporter.scripts import net_liq_history_export as _netliq
-        _netliq.run(fmt=fmt, plot=True)
+        from tools.logbook import logbook_on_success as _lb
+        try:
+            _netliq.run(fmt=fmt, plot=True)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "netliq-export",
+                scope="net liq history",
+                files=["portfolio_exporter/scripts/net_liq_history_export.py"],
+            )
+
+    def micro_momo() -> None:
+        # CSV-only defaults unless env provides paths; JSON-only in PE_TEST_MODE
+        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
+        from portfolio_exporter.core.fs_utils import (
+            find_latest_file,
+            auto_config,
+            auto_chains_dir,
+        )
+        # Lazy import to avoid startup cost unless needed
+        try:
+            from portfolio_exporter.core.memory import get_pref as _get_pref  # type: ignore
+        except Exception:
+            def _get_pref(key: str, default: str | None = None) -> str | None:  # type: ignore
+                return default
+        from tools.logbook import logbook_on_success
+
+        pe_test = os.getenv("PE_TEST_MODE")
+        cfg = os.getenv("MOMO_CFG") or auto_config(
+            [
+                "micro_momo_config.json",
+                "config/micro_momo_config.json",
+                "tests/data/micro_momo_config.json" if pe_test else None,
+            ]
+        ) or ("tests/data/micro_momo_config.json" if pe_test else "micro_momo_config.json")
+
+        if os.getenv("MOMO_INPUT"):
+            inp = os.getenv("MOMO_INPUT")
+        else:
+            search_dirs = [
+                os.getenv("MOMO_INPUT_DIR"),
+                ".",
+                "./data",
+                "./scans",
+                "./inputs",
+                "tests/data" if pe_test else None,
+            ]
+            patterns = tuple((os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(","))
+            auto = find_latest_file([d for d in search_dirs if d], patterns)
+            if pe_test and not auto:
+                auto = "tests/data/meme_scan_sample.csv"
+            inp = auto or "meme_scan.csv"
+
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        argv = ["--input", inp, "--cfg", cfg, "--out_dir", out_dir]
+        # Optional symbols from env or memory preference
+        sym_in = os.getenv("MOMO_SYMBOLS") or (_get_pref("micro_momo.symbols") or "")
+        if sym_in:
+            argv += ["--symbols", sym_in]
+
+        chd = os.getenv("MOMO_CHAINS_DIR") or auto_chains_dir(
+            [
+                "./option_chains",
+                "./chains",
+                "./data/chains",
+                "tests/data" if pe_test else None,
+            ]
+        )
+        if chd:
+            argv += ["--chains_dir", chd]
+        if pe_test:
+            argv += ["--json", "--no-files"]
+        try:
+            _mm.main(argv)
+        except Exception:
+            raise
+        else:
+            logbook_on_success(
+                "micro-momo analyzer",
+                scope="analyze+score+journal",
+                files=["portfolio_exporter/scripts/micro_momo_analyzer.py"],
+            )
+
+    def micro_momo_sentinel() -> None:
+        from portfolio_exporter.scripts import micro_momo_sentinel as _sent
+        scored = os.getenv("MOMO_SCORED") or "out/micro_momo_scored.csv"
+        cfg = os.getenv("MOMO_CFG") or (
+            "tests/data/micro_momo_config.json" if os.getenv("PE_TEST_MODE") else "micro_momo_config.json"
+        )
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        interval = os.getenv("MOMO_INTERVAL") or "10"
+        argv = [
+            "--scored-csv",
+            scored,
+            "--cfg",
+            cfg,
+            "--out_dir",
+            out_dir,
+            "--interval",
+            interval,
+        ]
+        if os.getenv("MOMO_OFFLINE") in ("1", "true", "yes"):
+            argv += ["--offline"]
+        if os.getenv("MOMO_WEBHOOK"):
+            argv += ["--webhook", os.getenv("MOMO_WEBHOOK")]
+        from tools.logbook import logbook_on_success as _lb
+        try:
+            _sent.main(argv)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "micro-momo sentinel",
+                scope="trigger watcher",
+                files=["portfolio_exporter/scripts/micro_momo_sentinel.py"],
+            )
+
+    def micro_momo_eod() -> None:
+        from portfolio_exporter.scripts import micro_momo_eod as _eod
+        j = os.getenv("MOMO_JOURNAL") or "out/micro_momo_journal.csv"
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        argv = ["--journal", j, "--out_dir", out_dir]
+        if os.getenv("MOMO_OFFLINE") in ("1", "true", "yes"):
+            argv += ["--offline"]
+        from tools.logbook import logbook_on_success as _lb
+        try:
+            _eod.main(argv)
+        except Exception:
+            raise
+        else:
+            _lb(
+                "micro-momo eod scorer",
+                scope="journal outcomes",
+                files=["portfolio_exporter/scripts/micro_momo_eod.py"],
+            )
+
+    def micro_momo_dashboard() -> None:
+        from portfolio_exporter.scripts import micro_momo_dashboard as _dash
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        from tools.logbook import logbook_on_success as _lb
+        try:
+            _dash.main(["--out_dir", out_dir])
+        except Exception:
+            raise
+        else:
+            _lb(
+                "micro-momo dashboard",
+                scope="html report",
+                files=["portfolio_exporter/scripts/micro_momo_dashboard.py"],
+            )
+        try:
+            import webbrowser as _wb, os as _os
+            path = _os.path.join(out_dir, "micro_momo_dashboard.html")
+            if _os.path.exists(path):
+                _wb.open(f"file://{_os.path.abspath(path)}", new=2)
+        except Exception:
+            pass
 
     return {
         "snapshot-quotes": snapshot_quotes,
@@ -137,6 +344,14 @@ def task_registry(fmt: str) -> dict[str, callable]:
         "trades-report": trades_report,
         "daily-report": daily_report,
         "netliq-export": netliq_export,
+        "micro-momo": micro_momo,
+        "momo": micro_momo,
+        "micro-momo-sentinel": micro_momo_sentinel,
+        "momo-sentinel": micro_momo_sentinel,
+        "micro-momo-eod": micro_momo_eod,
+        "momo-eod": micro_momo_eod,
+        "micro-momo-dashboard": micro_momo_dashboard,
+        "momo-dashboard": micro_momo_dashboard,
     }
 
 

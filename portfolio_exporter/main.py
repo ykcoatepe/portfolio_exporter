@@ -17,7 +17,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional
 
 
 SCRIPTS_PACKAGE_DIR = Path(__file__).parent / "scripts"
@@ -89,6 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
         description="Task discovery and planner for portfolio_exporter scripts",
         epilog=epilog,
         formatter_class=argparse.RawTextHelpFormatter,
+    )
+    p.add_argument(
+        "--task",
+        help="Run a single custom task by name (e.g., micro-momo)",
     )
     p.add_argument(
         "--list-tasks",
@@ -212,6 +216,72 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     registry = discover_tasks()
 
+    # Custom tasks registry (functions executed in-process)
+    def micro_momo() -> None:
+        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
+        import datetime as _dt
+        import pathlib
+        # Import lazily to keep CLI startup fast
+        from tools.logbook import logbook_on_success
+
+        pe_test = os.getenv("PE_TEST_MODE")
+        cfg_env = os.getenv("MOMO_CFG")
+        cfg_candidates = [
+            cfg_env,
+            "micro_momo_config.json",
+            "configs/micro_momo_config.json",
+            ("tests/data/micro_momo_config.json" if pe_test else None),
+        ]
+        cfg = next((p for p in cfg_candidates if p and os.path.exists(p)), None)
+        inp = os.getenv("MOMO_INPUT") or "tests/data/meme_scan_sample.csv"
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        argv2: list[str] = ["--input", inp, "--out_dir", out_dir]
+        if cfg:
+            argv2 += ["--cfg", cfg]
+        chd = os.getenv("MOMO_CHAINS_DIR")
+        if chd:
+            argv2 += ["--chains_dir", chd]
+        # symbols: env first, then memory fallback (optional), else none
+        sym = os.getenv("MOMO_SYMBOLS")
+        if not sym:
+            try:
+                from portfolio_exporter.core.memory import get_pref
+
+                sym = get_pref("micro_momo.symbols") or ""
+            except Exception:
+                sym = ""
+        if sym:
+            argv2 += ["--symbols", sym]
+        # Optional data mode/providers/offline passthrough via environment
+        dm = os.getenv("MOMO_DATA_MODE")
+        if dm:
+            argv2 += ["--data-mode", dm]
+        prv = os.getenv("MOMO_PROVIDERS")
+        if prv:
+            argv2 += ["--providers", prv]
+        off = os.getenv("MOMO_OFFLINE")
+        if off and off not in ("0", "false", "False"):
+            argv2 += ["--offline"]
+        if pe_test:
+            argv2 += ["--json", "--no-files"]
+        try:
+            _mm.main(argv2)
+        except Exception:
+            # Surface failure to caller without logging success
+            raise
+        else:
+            # On success, optionally log to logbook/worklog
+            logbook_on_success(
+                "micro-momo analyzer",
+                scope="analyze+score+journal",
+                files=["portfolio_exporter/scripts/micro_momo_analyzer.py"],
+            )
+
+    CUSTOM_TASKS: Dict[str, Callable[[], None]] = {
+        "micro-momo": micro_momo,
+        "momo": micro_momo,
+    }
+
     # Optional bootstrap of memory file
     if args.bootstrap_memory:
         try:
@@ -232,9 +302,15 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.list_tasks:
         _print_registry(registry)
+        if CUSTOM_TASKS:
+            print("Custom tasks:")
+            for name in sorted(CUSTOM_TASKS):
+                print(f"   - {name}")
         return 0
 
     requested: list[str] = []
+    if args.task:
+        requested = [args.task]
     if args.tasks:
         requested = list(args.tasks)
     elif args.workflow:
@@ -249,6 +325,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             t = registry[idx - 1]
             if t not in queue:
                 queue.append(t)
+
+    # Execute custom tasks immediately
+    if requested and all(name in CUSTOM_TASKS for name in requested):
+        for name in requested:
+            try:
+                CUSTOM_TASKS[name]()
+            except Exception as exc:
+                print(f"Task failed: {name}: {exc}")
+                return 1
+        return 0
 
     if args.dry_run:
         _print_plan(queue)
@@ -272,6 +358,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         if rc != 0:
             print(f"Task failed: {t.name} (exit {rc})")
             return rc
+        # Successful completion → optionally append to logbook for all tasks
+        try:
+            from tools.logbook import logbook_on_success as _lb
+
+            # Map discovered task name to its script path
+            script_path = f"portfolio_exporter/scripts/{t.name}.py"
+            _lb(task=t.name.replace("_", "-"), scope="script run", files=[script_path])
+        except Exception:
+            # Logging is best-effort; never fail the task on logbook issues
+            pass
     return 0
 
 

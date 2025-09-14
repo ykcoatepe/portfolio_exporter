@@ -2229,61 +2229,8 @@ def run(
     except Exception:
         pass
 
-    # Optional offline positions override
-    positions_override: pd.DataFrame | None = None
-    if "args" in globals() and getattr(globals()["args"], "positions_csv", None):
-        try:
-            positions_override = pd.read_csv(os.path.expanduser(globals()["args"].positions_csv))
-            logger.info(
-                f"Loaded positions from CSV: {globals()['args'].positions_csv} rows={len(positions_override)}"
-            )
-        except Exception as e:
-            logger.error(f"Failed to read --positions-csv: {e}")
-            positions_override = None
-
-    pos_df: pd.DataFrame
-    if positions_override is None:
-        pos_df = run_with_spinner("Fetching positions…", _load_positions).copy()
-    else:
-        csv_df = positions_override.copy()
-        for col in ["delta", "gamma", "vega", "theta", "multiplier"]:
-            if col not in csv_df.columns:
-                csv_df[col] = np.nan
-        if "symbol" not in csv_df.columns and "underlying" in csv_df.columns:
-            csv_df["symbol"] = csv_df["underlying"]
-        # Build a minimal positions DataFrame compatible with downstream logic
-        cols = [
-            "symbol",
-            "secType",
-            "expiry",
-            "strike",
-            "right",
-            "qty",
-            "multiplier",
-            "underlying",
-            "conId",
-            "delta",
-            "gamma",
-            "vega",
-            "theta",
-        ]
-        for c in cols:
-            if c not in csv_df.columns:
-                csv_df[c] = np.nan
-        pos_df = csv_df[cols].copy()
-        # synthesize conId if missing
-        if pos_df.get("conId").isna().any():
-            def _synth(row):
-                try:
-                    v = row.get("conId")
-                    if pd.notna(v):
-                        return int(v)
-                except Exception:
-                    pass
-                key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike','')}"
-                import hashlib as _hl
-                return -int(int.from_bytes(_hl.sha1(key.encode()).digest()[:4], 'big'))
-            pos_df["conId"] = pos_df.apply(_synth, axis=1).astype("Int64")
+    # Load positions via live loader (tests may monkeypatch _load_positions)
+    pos_df: pd.DataFrame = run_with_spinner("Fetching positions…", _load_positions).copy()
     if pos_df.empty:
         pos_df = pd.DataFrame(
             columns=[
@@ -2315,20 +2262,13 @@ def run(
             )
         )
 
-    # Ensure numeric types for exposure math
-    for col in ["qty", "multiplier", "delta", "gamma", "vega", "theta"]:
-        try:
-            pos_df[col] = pd.to_numeric(pos_df[col], errors="coerce").astype(float).fillna(0.0)
-        except Exception:
-            pos_df[col] = 0.0
-    # Compute per-row exposures explicitly as float to avoid dtype quirks
+    # Compute per-row exposures using robust numeric coercion (avoids dtype quirks)
+    qty_f = pd.to_numeric(pos_df.get("qty", 0.0), errors="coerce").astype(float).fillna(0.0)
+    mult_f = pd.to_numeric(pos_df.get("multiplier", 0.0), errors="coerce").astype(float).fillna(0.0)
     for greek in ["delta", "gamma", "vega", "theta"]:
+        g_f = pd.to_numeric(pos_df.get(greek, 0.0), errors="coerce").astype(float).fillna(0.0)
         try:
-            pos_df[f"{greek}_exposure"] = (
-                pos_df[greek].astype(float)
-                * pos_df["qty"].astype(float)
-                * pos_df["multiplier"].astype(float)
-            ).astype(float)
+            pos_df[f"{greek}_exposure"] = (g_f * qty_f * mult_f).astype(float)
         except Exception:
             pos_df[f"{greek}_exposure"] = 0.0
 

@@ -29,7 +29,12 @@ class Settings(BaseSettings):
     broker: str = "IBKR"
     default_account: str = "UXXXXXXX"
     greeks: GreeksSettings = GreeksSettings()
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    # Allow unknown env vars (e.g., LOGBOOK_AUTO) without failing validation
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()  # singleton

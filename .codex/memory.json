@@ -19,6 +19,22 @@
       "event": "Trades report: fix Action + intent; restore combos",
       "details": "Normalize Side/side and BOT/SLD→BUY/SELL; position_effect streaming uses Side.fillna(side), keys STK by symbol, and honors openClose. Fallback uses realized_pnl when prior absent. save_combos default restored to emit trades_combos.csv. Docs updated; memory prefers preferences.trades_prior_positions when present.",
       "timestamp": "2025-09-11T00:00:00Z"
+    },
+    {
+      "event": "Micro-MOMO v1 landed (CSV-only)",
+      "details": "Added CLI micro-momo; filters, scoring, tiering, direction, structure picker, sizing + TP/SL, triggers; outputs scored+orders CSV; tests & fixtures; Makefile sanity-micro-momo.",
+      "timestamp": "2025-09-13T13:00:00Z"
+    },
+    {
+      "event": "Micro-MOMO v1.1 enrichment + halts + provenance",
+      "details": "--data-mode/--providers/--offline/--halts-source; IBKR quotes/bars/shortable/chains primary; Yahoo fundamentals/chains fallback; Nasdaq halts; provenance src_* and data_errors in outputs; tests mock providers (no network).",
+      "timestamp": "2025-09-13T13:40:00Z"
+    }
+    ,
+    {
+      "event": "Micro-MOMO: symbols mode + Yahoo enrichment + caching",
+      "details": "Analyzer accepts --symbols (CSV optional). Yahoo 1m bars + option chains with local JSON cache; derived RVOL/VWAP/ORB + above_vwap_now/pattern; menu symbols prompt; task/menu env passthrough.",
+      "timestamp": "2025-09-13T16:00:00Z"
     }
   ],
   "decisions": [
@@ -49,6 +65,28 @@
       "decision": "Correct Action mapping (BUY/SELL vs BOT/SLD), improve position_effect (Side.fillna(side); STK keyed by symbol; openClose override; realized_pnl fallback), restore combos CSV by default, and use memory preferences.trades_prior_positions when available.",
       "context": "Make intent robust without prior snapshot and consistent across menu/CLI; keep offline-friendly behaviour.",
       "timestamp": "2025-09-11T00:00:00Z"
+    },
+    {
+      "id": 5,
+      "title": "MICRO_MOMO_V1",
+      "decision": "CSV-only Micro-MOMO Analyzer landed: filters, weighted scoring, A/B/C tiers, direction, option structure picker (Debit Call / Bear Call Credit), sizing + TP/SL, human-readable triggers; CLI + tests + fixtures; scored/orders CSV outputs.",
+      "context": "Deterministic v1 with no providers; Makefile sanity target; module entry portfolio_exporter.scripts.micro_momo_analyzer.",
+      "timestamp": "2025-09-13T13:00:00Z"
+    },
+    {
+      "id": 6,
+      "title": "MICRO_MOMO_V1_1",
+      "decision": "Live enrichment via IBKR (primary) and Yahoo (fallback) with halts + provenance. Adds --data-mode/--providers/--offline/--halts-source flags; enrichment fills last/prev_close, premarket gap, RVOL(1m/5m), VWAP, ORB, float/ADV/short%, borrow, chain near-money OI/spread, halts_count_today. Provenance src_* columns and data_errors included.",
+      "context": "CI-safe via offline mode; tests mock providers; CSV precedence respected in enrich mode.",
+      "timestamp": "2025-09-13T13:40:00Z"
+    }
+    ,
+    {
+      "id": 7,
+      "title": "MICRO_MOMO_SYMBOLS_YAHOO_CACHE",
+      "decision": "Add --symbols mode to run without a shortlist CSV; implement Yahoo 1m bars and option chains with a local JSON cache; compute RVOL/VWAP/ORB and derive above_vwap_now/pattern; fallback to provider chains when CSV missing; add visible menu symbols prompt and env passthrough.",
+      "context": "Reduce dependence on external sources by reusing local files and cached provider data; enable quick multi-symbol ad-hoc runs.",
+      "timestamp": "2025-09-13T16:00:00Z"
     }
   ],
   "preferences": {
@@ -74,8 +112,47 @@
   "tasks": [],
   "workflows": {
     "submenu_queue": {
-      "live": ["quick-chain", "daily-report"],
-      "sanity": ["trades-report", "daily-report"]
+      "live": [
+        "quick-chain",
+        "daily-report"
+      ],
+      "sanity": [
+        "trades-report",
+        "daily-report"
+      ]
     }
-  }
+  },
+  "worklog": [
+    {
+      "date": "2025-09-13T19:28:46+03:00",
+      "task": "micro-momo analyzer",
+      "branch": "dev_yordam2",
+      "owner": "codex",
+      "commit": "c233116",
+      "files": [
+        "portfolio_exporter/scripts/micro_momo_analyzer.py"
+      ],
+      "interfaces": {},
+      "status": "merged",
+      "notes": ""
+    }
+    ,
+    {
+      "date": "2025-09-13T19:45:00+03:00",
+      "task": "micro-momo analyzer",
+      "branch": "dev_yordam2",
+      "owner": "codex",
+      "commit": "fec3519",
+      "files": [
+        "portfolio_exporter/scripts/micro_momo_analyzer.py",
+        "portfolio_exporter/core/providers/yahoo_provider.py",
+        "portfolio_exporter/core/micro_momo_sources.py",
+        "portfolio_exporter/menus/pre.py",
+        "portfolio_exporter/main.py"
+      ],
+      "interfaces": {},
+      "status": "merged",
+      "notes": "symbols mode + Yahoo enrichment + cache"
+    }
+  ]
 }

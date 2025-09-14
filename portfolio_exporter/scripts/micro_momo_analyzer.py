@@ -21,6 +21,9 @@ from ..core.micro_momo_sources import (
     load_scan_csv,
 )
 from ..core.micro_momo_types import ResultRow, ScanRow
+from ..core.alerts import emit_alerts
+from ..core.ib_export import export_ib_basket, export_ib_notes
+from ..core.fs_utils import find_latest_chain_for_symbol
 
 
 DEFAULT_CFG: Dict[str, Any] = {
@@ -61,6 +64,20 @@ DEFAULT_CFG: Dict[str, Any] = {
 }
 
 
+def _count_active_journal(out_dir: str) -> int:
+    import csv as _csv
+
+    j = os.path.join(out_dir, "micro_momo_journal.csv")
+    if not os.path.exists(j):
+        return 0
+    try:
+        with open(j, newline="", encoding="utf-8") as f:
+            rows = list(_csv.DictReader(f))
+        return sum(1 for r in rows if (r.get("status") or "").lower() in ("pending", "triggered"))
+    except Exception:
+        return 0
+
+
 def _read_cfg(path: Optional[str]) -> Dict[str, Any]:
     if not path:
         return DEFAULT_CFG
@@ -87,8 +104,25 @@ def _write_csv(path: str, rows: List[Dict[str, Any]], header: List[str]) -> None
             w.writerow({k: r.get(k, "") for k in header})
 
 
-def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_dir: str, emit_json: bool, no_files: bool,
-        data_mode: str, providers: List[str], offline: bool, halts_source: Optional[str]) -> List[Dict[str, Any]]:
+def run(
+    cfg_path: Optional[str],
+    input_csv: Optional[str],
+    chains_dir: Optional[str],
+    out_dir: str,
+    emit_json: bool,
+    no_files: bool,
+    data_mode: str,
+    providers: List[str],
+    offline: bool,
+    halts_source: Optional[str],
+    auto_producers: bool = False,
+    upstream_timeout_sec: int = 30,
+    webhook: Optional[str] = None,
+    alerts_json_only: bool = False,
+    ib_basket_out: Optional[str] = None,
+    journal_template: bool = False,
+    prebuilt_scans: Optional[List[ScanRow]] = None,
+) -> List[Dict[str, Any]]:
     cfg = _read_cfg(cfg_path)
     # Merge runtime data config
     cfg.setdefault("data", {})
@@ -98,21 +132,70 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
         "offline": bool(offline),
         "halts_source": halts_source or cfg["data"].get("halts_source", "nasdaq"),
         "cache": cfg["data"].get("cache", {"enabled": True, "dir": os.path.join(out_dir, ".cache"), "ttl_sec": 60}),
+        # new: expose artifact/chains dirs and auto‑producers toggle to sources
+        "artifact_dirs": list(
+            dict.fromkeys(
+                [
+                    os.path.join(out_dir, ".cache"),
+                    out_dir,
+                ]
+            )
+        ),
+        "chains_dir": chains_dir,
+        "auto_producers": bool(cfg["data"].get("auto_producers", False)) or bool(auto_producers),
+        "upstream_timeout_sec": int(cfg["data"].get("upstream_timeout_sec", upstream_timeout_sec)),
     })
-    scans = load_scan_csv(input_csv)
+    # Build scans list either from symbols (synthesized) or from CSV
+    scans: List[ScanRow]
+    if prebuilt_scans is not None:
+        scans = list(prebuilt_scans)
+    elif isinstance(input_csv, str) and input_csv:
+        scans = load_scan_csv(input_csv)
+    else:
+        # Neither input CSV nor prebuilt scans provided → empty set
+        scans = []
     enrich_inplace(scans, cfg)  # v1 no-op
 
     results: List[Dict[str, Any]] = []
+    base_active = _count_active_journal(out_dir)
+    max_concurrent = int(cfg.get("max_concurrent", 5))
     for scan in scans:
         pf = passes_filters(scan, cfg)
         comps, raw = score_components(scan, cfg)
         tier, direction = tier_and_dir(scan, raw, cfg)
 
-        chain_file = find_chain_file_for_symbol(chains_dir, scan.symbol)
-        chain_rows = load_chain_csv(chain_file) if chain_file else []
-        struct = pick_structure(scan, chain_rows, direction, cfg)
+        chain_rows: List[Dict[str, Any]] | List[ScanRow] = []
+        chain_file: Optional[str] = None
+        if chains_dir:
+            best = find_latest_chain_for_symbol(chains_dir, scan.symbol)
+            if best:
+                chain_file = best
+        if not chain_file:
+            chain_file = find_chain_file_for_symbol(chains_dir, scan.symbol) if chains_dir else None
+        if chain_file:
+            chain_rows = load_chain_csv(chain_file)
+        # Fallback to provider-fetched chain attached during enrichment
+        if not chain_rows:
+            cr_fetched = getattr(scan, "_chain_rows", None)
+            if isinstance(cr_fetched, list) and cr_fetched:
+                chain_rows = cr_fetched
+        # Ensure price is usable for structure picking (prefer last_price if present)
+        try:
+            lp = getattr(scan, "last_price", None)
+            if lp and (not getattr(scan, "price", None) or float(getattr(scan, "price", 0.0)) <= 0):
+                setattr(scan, "price", float(lp))
+        except Exception:
+            pass
+        struct = pick_structure(scan, chain_rows, direction, cfg, tier=tier)
         contracts, tp, sl = size_and_targets(struct, scan, cfg)
         trig = entry_trigger(direction, scan, cfg)
+
+        # Guards
+        nav = float(cfg.get("sizing", {}).get("nav", 100000.0))  # type: ignore[union-attr]
+        from ..core.micro_momo import _risk_proxy  # local import to avoid surface
+        risk_value = _risk_proxy(struct, contracts)
+        cap_breach = 1 if risk_value > 0.03 * nav else 0
+        concurrency_guard = 1 if (base_active + 1) > max_concurrent else 0
 
         res = ResultRow(
             symbol=scan.symbol,
@@ -135,6 +218,8 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
             needs_chain=struct.needs_chain,
         )
         base = asdict(res)
+        base["cap_breach"] = cap_breach
+        base["concurrency_guard"] = concurrency_guard
         # Pass-through: append any attributes present on the scan row without overwriting
         for k, v in getattr(scan, "__dict__", {}).items():
             if k in base:
@@ -153,6 +238,31 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
 
     if emit_json:
         print(json.dumps(results, indent=2))
+
+    # Build alerts
+    alerts: List[Dict[str, Any]] = []
+    for r in results:
+        levels = {
+            "orb_high": r.get("orb_high"),
+            "vwap": r.get("vwap"),
+            "stop": (r.get("vwap") * 0.97 if isinstance(r.get("vwap"), (int, float)) else None),
+        }
+        alerts.append({
+            "symbol": r["symbol"],
+            "direction": r["direction"],
+            "trigger": r["entry_trigger"],
+            "rvol_confirm": cfg.get("rvol_confirm_entry", 1.5),
+            "levels": levels,
+        })
+
+    # Always write alerts JSON
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, "micro_momo_alerts.json"), "w", encoding="utf-8") as f:
+        json.dump(alerts, f, indent=2)
+
+    # Optional webhook
+    if webhook and not alerts_json_only and not cfg.get("data", {}).get("offline", False):
+        emit_alerts(alerts, webhook, dry_run=False, offline=False)
 
     if not no_files:
         # Write scored CSV
@@ -175,13 +285,34 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
             "per_leg_oi_ok",
             "per_leg_spread_pct",
             "needs_chain",
+            "cap_breach",
+            "concurrency_guard",
         ]
         _write_csv(os.path.join(out_dir, "micro_momo_scored.csv"), results, scored_cols)
 
         # Write order CSV
         orders: List[Dict[str, Any]] = []
         for r in results:
-            rr = ResultRow(**r)
+            rr = ResultRow(
+                symbol=r["symbol"],
+                raw_score=r["raw_score"],
+                tier=r["tier"],
+                passes_core_filter=r["passes_core_filter"],
+                direction=r["direction"],
+                structure_template=r["structure_template"],
+                contracts=r["contracts"],
+                entry_trigger=r["entry_trigger"],
+                tp=r["tp"],
+                sl=r["sl"],
+                expiry=r.get("expiry"),
+                long_strike=r.get("long_strike"),
+                short_strike=r.get("short_strike"),
+                debit_or_credit=r.get("debit_or_credit"),
+                width=r.get("width"),
+                per_leg_oi_ok=r.get("per_leg_oi_ok", False),
+                per_leg_spread_pct=r.get("per_leg_spread_pct"),
+                needs_chain=r.get("needs_chain", False),
+            )
             orders.append(rr.to_orders_csv())
         order_cols = [
             "symbol",
@@ -198,17 +329,35 @@ def run(cfg_path: Optional[str], input_csv: str, chains_dir: Optional[str], out_
             "entry_trigger",
             "notes",
         ]
-        _write_csv(os.path.join(out_dir, "micro_momo_orders.csv"), orders, order_cols)
+        orders_path = os.path.join(out_dir, "micro_momo_orders.csv")
+        _write_csv(orders_path, orders, order_cols)
+
+        # Optional IB basket export
+        if ib_basket_out:
+            export_ib_basket(orders, ib_basket_out)
+            notes_path = os.path.splitext(ib_basket_out)[0] + "_ib_notes.txt"
+            export_ib_notes(orders, notes_path)
+
+    # Journal template (independent from no_files)
+    if journal_template:
+        from ..core.journal import write_journal_template
+
+        os.makedirs(out_dir, exist_ok=True)
+        write_journal_template(results, os.path.join(out_dir, "micro_momo_journal.csv"))
 
     return results
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="micro-momo", description="Micro-MOMO Analyzer (CSV-only v1)")
-    p.add_argument("--input", required=True, help="Path to shortlist scan CSV")
+    p.add_argument("--input", required=False, help="Path to shortlist scan CSV")
     p.add_argument("--cfg", help="Path to config JSON")
     p.add_argument("--chains_dir", help="Directory with SYMBOL_YYYYMMDD.csv chain files")
     p.add_argument("--out_dir", default="out", help="Output directory for CSVs")
+    p.add_argument(
+        "--symbols",
+        help="Comma-separated symbols (alternative to --input). When both are provided, --symbols wins.",
+    )
     p.add_argument("--json", action="store_true", help="Emit results JSON to stdout")
     p.add_argument("--no-files", action="store_true", help="Skip writing CSV files")
     # v1.1 data flags
@@ -216,11 +365,82 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--providers", default="ib,yahoo", help="Comma-separated providers in priority order")
     p.add_argument("--offline", action="store_true", help="Disable all live fetches and halts")
     p.add_argument("--halts-source", default="nasdaq", help="Halts source (nasdaq); ignored when --offline")
+    # auto-producers (chains/bars before providers)
+    p.add_argument("--auto-producers", action="store_true", help="Attempt to generate missing local artifacts (bars/chains) via in-repo scripts before using providers")
+    # legacy compatibility (treat as same)
+    p.add_argument("--auto-upstream", action="store_true", help=argparse.SUPPRESS)
+    # v1.2 outputs
+    p.add_argument("--webhook", help="Webhook URL for alerts (e.g., Slack)")
+    p.add_argument("--alerts-json-only", action="store_true", help="Build alerts JSON but do not POST")
+    p.add_argument("--ib-basket-out", help="Path to write IB Basket CSV; notes saved alongside with _ib_notes.txt suffix")
+    # v1.3 journal
+    p.add_argument("--journal-template", action="store_true", help="Write a journal template CSV (Pending rows)")
     return p
 
 
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # Build scans from --symbols when provided; otherwise, keep CSV behavior.
+    # Note: when both --input and --symbols are present, --symbols takes precedence.
+    scans: List[ScanRow] = []
+    if getattr(args, "symbols", None):
+        syms = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
+        # Synthesize minimal ScanRow entries; enrichment/fetch can fill fields later.
+        scans = [
+            ScanRow(
+                symbol=s,
+                price=0.0,
+                volume=0,
+                rel_strength=0.0,
+                short_interest=0.0,
+                turnover=0.0,
+                iv_rank=0.0,
+                atr_pct=0.0,
+                trend=0.0,
+            )
+            for s in syms
+        ]
+
+    # Fast path: if symbols were provided, run directly using synthesized scans without CSV.
+    if scans:
+        # We reuse the run() pipeline but bypass CSV loading by passing input_csv=None
+        # and injecting our synthesized scans via a minimal shim.
+        # Inject: temporarily monkeypatch load_scan_csv to return our scans.
+        _orig = load_scan_csv
+
+        def _fake_load_scan_csv(_path: str) -> List[ScanRow]:  # pragma: no cover (tiny shim)
+            return list(scans)
+
+        try:
+            globals()["load_scan_csv"] = _fake_load_scan_csv  # type: ignore[assignment]
+            run(
+                cfg_path=args.cfg,
+                input_csv=None,
+                chains_dir=args.chains_dir,
+                out_dir=args.out_dir,
+                emit_json=args.json,
+                no_files=args.no_files,
+                data_mode=args.data_mode,
+                providers=[s for s in (args.providers or "").split(",") if s],
+                offline=bool(args.offline),
+                halts_source=(None if args.offline else args.halts_source),
+                auto_producers=bool(args.auto_producers or args.auto_upstream),
+                upstream_timeout_sec=30,
+                webhook=args.webhook,
+                alerts_json_only=bool(args.alerts_json_only),
+                ib_basket_out=args.ib_basket_out,
+                journal_template=bool(args.journal_template),
+                prebuilt_scans=scans,
+            )
+        finally:
+            globals()["load_scan_csv"] = _orig  # restore
+        return 0
+
+    # Fallback: CSV path is required when no symbols are provided
+    if not args.input:
+        print("error: --input is required when --symbols is not provided", flush=True)
+        return 2
+
     run(
         cfg_path=args.cfg,
         input_csv=args.input,
@@ -232,6 +452,12 @@ def main(argv: List[str] | None = None) -> int:
         providers=[s for s in (args.providers or "").split(",") if s],
         offline=bool(args.offline),
         halts_source=(None if args.offline else args.halts_source),
+        auto_producers=bool(args.auto_producers or args.auto_upstream),
+        upstream_timeout_sec=30,
+        webhook=args.webhook,
+        alerts_json_only=bool(args.alerts_json_only),
+        ib_basket_out=args.ib_basket_out,
+        journal_template=bool(args.journal_template),
     )
     return 0
 
