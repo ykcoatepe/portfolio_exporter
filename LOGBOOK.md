@@ -1,3 +1,9 @@
+# 2025-09-14 • Task: PSD v0.1 implemented • Branch: feature/psd-sentinel-v0
+Owner: codex (session/codex)
+Scope: scan_once, memos JSONL, CLI table, rules & tests
+Key files: src/psd/**, config/rules.yaml, scripts/run_sentinel.py, tests/test_*
+Status: merged @ v0.1 scaffold → implementation
+
 # 2025-09-14 • Task: Scaffold PSD (v0.1) • Branch: feature/psd-sentinel-v0
 Owner: codex (session/codex)
 Scope: Create structure and placeholders for PSD; no logic yet

@@ -1,10 +1,47 @@
-# Portfolio Sentinel Dashboard rules configuration (skeleton)
-# TODO: fill in at v0.1
+# Portfolio Sentinel Dashboard rules configuration (v0.1 defaults)
 
-sleeves: {}
-universal: {}
-theta_templates: {}
-risk_bands: {}
-circuit_breakers: {}
+sleeves:
+  core_pct: 0.50
+  momo_pct: 0.10
+  alpha_pct: 0.25   # 20–30% band; default mid
+  theta_pct: 0.20
+  alts_pct: 0.10
+  meme_pct: 0.05
+  meme_per_trade_pct: 0.01
+
+universal:
+  oco:
+    stop_R: -1.0
+    target_R: 2.0
+  liquidity_max_spread_mid: 0.10
+  event_window_days: 10
+
+theta_templates:
+  low_vix:   { vix_lt: 15,        dte_min: 45, dte_max: 60, tp_min: 0.50, tp_max: 0.70 }
+  mid_vix:   { vix_min: 15, vix_max: 25, dte_min: 30, dte_max: 45, tp_min: 0.40, tp_max: 0.60 }
+  high_vix:  { vix_gt: 25,        dte_min: 14, dte_max: 30, tp_min: 0.30, tp_max: 0.50 }
+
+risk_bands:
+  vix_le_20:
+    vix_max: 20
+    delta_beta_band: [0.45, 0.60]
+    var95_1d_max: 0.009
+    margin_max: 0.70
+  vix_20_30:
+    vix_min: 20
+    vix_max: 30
+    delta_beta_band: [0.40, 0.55]
+    var95_1d_max: 0.008
+    margin_max: 0.60
+  vix_gt_30:
+    vix_min: 30
+    delta_beta_band: [0.35, 0.50]
+    var95_1d_max: 0.007
+    margin_max: 0.50
+
+circuit_breakers:
+  soft_pre: -0.010
+  freeze_1d: -0.015
+  cut_var: -0.025
+
 budgets: {}
-

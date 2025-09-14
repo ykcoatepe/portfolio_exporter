@@ -3,9 +3,6 @@ target-version = "py311"
 line-length = 110
 extend-exclude = ["legacy", "tests"]
 
-[tool.ruff.lint]
-extend-ignore = ["F401","F841","E402","E401","E731","E701","E741","F821","F811"]
-
 [build-system]
 requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -65,14 +62,10 @@ include-package-data = true
 line-length = 88
 target-version = ["py311"]
 
-[tool.ruff]
-# Keep existing settings; ensure target-version is set
-target-version = "py311"
-
 [tool.ruff.lint]
-# Preserve existing ignores; add standard select/ignore set
+extend-ignore = ["F401","F841","E402","E401","E731","E701","E741","F821","F811"]
 select = ["E", "F", "I", "UP", "B"]
-ignore = ["E203", "W503"]
+ignore = ["E203"]
 
 [tool.mypy]
 python_version = "3.11"
