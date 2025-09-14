@@ -25,6 +25,8 @@ A lightweight background watcher that monitors scored Micro‑MOMO candidates an
 - Writes PID and metadata under `out/.pid/` for safe lifecycle management.
 - Shows an “Active positions” view sourced from `out/micro_momo_journal.csv` (Pending/Triggered).
 
+TR-local schedule: Sentinel computes today’s Turkey-local times from U.S. RTH 09:30–16:00 ET via timezone conversion (DST-aware). By default it hard-resets at RTH open, optionally re-arms at 13:30 ET (TR-local time displayed), disallows new signals after 15:30 ET, and can honor a single post-halt re-arm per day. You can toggle afternoon/halts behavior from the Sentinel menu. Times shown/logged are Europe/Istanbul while staying aligned to the U.S. session and DST automatically.
+
 Menu usage
 
 1. `python main.py` → select `Pre‑Market` → `Sentinel`.
@@ -525,6 +527,14 @@ python main.py --task micro-momo-go
 ```
 
 Expect analyzer+dashboard; sentinel only if `MOMO_START_SENTINEL=1`.
+
+Go‑Live publishes a curated pack to `out/publish/YYYY-MM-DD/` and, on macOS, opens the dashboard in your default browser. Use `--publish-dir` to override the publish root and `--publish` to keep the step enabled (default).
+
+Slack digest (optional)
+- Env switch: set `MOMO_POST_DIGEST=1` to post a one‑shot Block Kit digest after publish.
+- Webhook path: also set `MOMO_WEBHOOK=…` to post via incoming webhooks (no `ts` returned).
+- Web API path: set `MOMO_SLACK_TOKEN=xoxb-…` and `MOMO_SLACK_CHANNEL=C123…` to post with `chat.postMessage` and capture the message `ts`; it is saved under `preferences.slack.digest_ts` and used to auto‑thread the Sentinel when started.
+- Threading: replies are posted by including `thread_ts` in the payload.
 
 ## Micro-MOMO — Operator Runbook (v1.4+)
 

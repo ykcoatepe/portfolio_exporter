@@ -2,6 +2,11 @@ from rich.table import Table
 import re
 from rich.console import Console
 from portfolio_exporter.core.ui import StatusBar
+from portfolio_exporter.core.publish import (
+    publish_pack,
+    open_in_finder,
+    open_dashboard,
+)
 from portfolio_exporter.scripts import (
     update_tickers,
     historic_prices,
@@ -23,6 +28,7 @@ from portfolio_exporter.core.proc import (
 )
 from portfolio_exporter.core.fs_utils import find_latest_file, auto_chains_dir
 from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
+from portfolio_exporter.core.market_clock import rth_window_tr, pretty_tr
 
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
 import builtins
@@ -97,6 +103,7 @@ def launch(status: StatusBar, default_fmt: str):
             ("n", "Net-Liq history"),
             ("m", "Micro-MOMO Analyzer"),
             ("d", "Micro-MOMO Dashboard"),
+            ("g", "Open Published Folder (today)"),
             ("u", "Sentinel (Start/Stop/Status)"),
             ("x", "External technical scan"),
             ("y", "Pre-flight check (env & CSVs)"),
@@ -138,6 +145,7 @@ def launch(status: StatusBar, default_fmt: str):
             "n": net_liq_history_export.run,
             "m": lambda fmt=default_fmt: _run_micro_momo(console),
             "d": lambda fmt=default_fmt: launch_micro_momo_dashboard(status, fmt),
+            "g": lambda fmt=default_fmt: launch_open_published(status, fmt),
             "u": lambda fmt=default_fmt: launch_sentinel_menu(status, fmt),
             "x": lambda fmt=default_fmt: _external_scan(fmt),
             "y": lambda fmt=default_fmt: orchestrate_dataset.preflight_check(
@@ -261,6 +269,24 @@ def launch_micro_momo_dashboard(status: StatusBar, fmt: str) -> None:  # noqa: A
         _C().print(f"[red]Micro-MOMO Dashboard failed:[/] {exc}")
 
 
+def launch_open_published(status: StatusBar, fmt: str) -> None:  # noqa: ARG001
+    try:
+        if status:
+            status.update("Publishing/Opening", "cyan")
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        pub = publish_pack(out_dir)  # no-op if already copied today
+        # On macOS, `open` will open the folder or file in the default app
+        open_in_finder(pub)
+        # and try to open the dashboard too, if present
+        open_dashboard(pub)
+        if status:
+            status.update("Ready", "green")
+    except Exception as exc:  # pragma: no cover - UI path
+        from rich.console import Console
+
+        Console().print(f"[red]Open Published Folder failed:[/] {exc}")
+
+
 def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
     from rich.console import Console
 
@@ -269,6 +295,28 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
         s = sentinel_status()
         running = bool(s.get("running"))
         console.rule("[bold]Sentinel")
+        # Display today's TR-local schedule derived from US RTH
+        try:
+            sched = rth_window_tr()
+            console.print(
+                f"[dim]TR schedule[/]: open {pretty_tr(sched.open_tr)}, "
+                f"afternoon {pretty_tr(sched.afternoon_rearm_tr)}, "
+                f"cutoff {pretty_tr(sched.no_new_signals_after_tr)}, "
+                f"close {pretty_tr(sched.close_tr)}",
+                highlight=False,
+            )
+        except Exception:
+            pass
+
+        # Read menu toggles from memory (defaults: ON)
+        try:
+            allow_aft = (get_pref("sentinel.allow_afternoon_rearm") or "true").lower() not in ("0", "false", "no")
+        except Exception:
+            allow_aft = True
+        try:
+            allow_halt = (get_pref("sentinel.halt_rearm") or "true").lower() not in ("0", "false", "no")
+        except Exception:
+            allow_halt = True
         console.print(
             f"Status: {'[green]RUNNING[/]' if running else '[red]STOPPED[/]'}",
             highlight=False,
@@ -279,7 +327,10 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
                 overflow="fold",
             )
         console.print(
-            "\nOptions: [b]1[/]) Start  [b]2[/]) Stop  [b]3[/]) Active positions  [b]0[/]) Back"
+            "\nOptions: [b]1[/]) Start  [b]2[/]) Stop  [b]3[/]) Active positions  "
+            f"[b]4[/]) Toggle afternoon re-arm (currently: {'ON' if allow_aft else 'OFF'})  "
+            f"[b]5[/]) Toggle 1 post-halt re-arm (currently: {'ON' if allow_halt else 'OFF'})  "
+            "[b]0[/]) Back"
         )
 
         choice = core_ui.prompt_input("› ").strip()
@@ -321,6 +372,22 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
             )
         elif choice == "3":
             _show_active_positions(console)
+        elif choice == "4":
+            try:
+                set_pref("sentinel.allow_afternoon_rearm", not allow_aft)
+                console.print(
+                    f"[green]Afternoon re-arm set to[/] {'ON' if not allow_aft else 'OFF'}"
+                )
+            except Exception as exc:
+                console.print(f"[yellow]Failed to update preference:[/] {exc}")
+        elif choice == "5":
+            try:
+                set_pref("sentinel.halt_rearm", not allow_halt)
+                console.print(
+                    f"[green]Post-halt re-arm set to[/] {'ON' if not allow_halt else 'OFF'}"
+                )
+            except Exception as exc:
+                console.print(f"[yellow]Failed to update preference:[/] {exc}")
         else:
             console.print("[yellow]Unknown choice[/]")
 

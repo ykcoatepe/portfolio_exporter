@@ -4,11 +4,13 @@ import argparse
 import csv
 import os
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from datetime import time as dt_time
 
 from ..core.alerts import emit_alerts
 from ..core.journal import update_journal
 from ..core.providers import ib_provider
+from ..core.market_clock import rth_window_tr, is_after, pretty_tr
 
 
 def _load_scored(path: str) -> List[Dict[str, Any]]:
@@ -25,6 +27,36 @@ def _append_log(path: str, rows: List[Dict[str, Any]]) -> None:
             w.writeheader()
         for r in rows:
             w.writerow(r)
+
+
+def _load_sentinel_cfg(cfg_path: Optional[str]) -> dict:
+    import json
+    import os
+
+    base = {
+        "orb_minutes": 5,
+        "single_fire": True,
+        "allow_afternoon_rearm": True,
+        "cooldown_bars": 10,
+        "require_vwap_recross": True,
+        "halt_rearm": True,
+        "max_halts_per_day": 1,
+        # anchors in ET (we’ll convert & DISPLAY in TR)
+        "et_afternoon_rearm": "13:30",
+        "et_no_new_signals_after": "15:30",
+    }
+    if cfg_path and os.path.exists(cfg_path):
+        try:
+            data = json.loads(open(cfg_path, encoding="utf-8").read())
+            base.update((data.get("sentinel") or {}))
+        except Exception:
+            pass
+    return base
+
+
+def _parse_hhmm(s: str) -> dt_time:
+    hh, mm = s.split(":")
+    return dt_time(int(hh), int(mm))
 
 
 def _check_trigger_long(snapshot: Dict[str, Any], confirm_rvol: float, levels: Dict[str, Any]) -> bool:
@@ -59,6 +91,24 @@ def main(argv: List[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     scored = _load_scored(args.scored_csv)
+    # Load sentinel behavior knobs and compute today's TR-local schedule
+    cfg_sen = _load_sentinel_cfg(args.cfg)
+    et_rearm = _parse_hhmm(cfg_sen.get("et_afternoon_rearm", "13:30"))
+    et_cutoff = _parse_hhmm(cfg_sen.get("et_no_new_signals_after", "15:30"))
+    schedule = rth_window_tr(
+        et_open=dt_time(9, 30),
+        et_close=dt_time(16, 0),
+        et_afternoon_rearm=et_rearm if cfg_sen.get("allow_afternoon_rearm", True) else None,
+        et_no_new_after=et_cutoff,
+    )
+    # Log today's TR-local schedule
+    print(
+        f"[Sentinel schedule — TR] open: {pretty_tr(schedule.open_tr)}, "
+        f"afternoon: {pretty_tr(schedule.afternoon_rearm_tr)}, "
+        f"cutoff: {pretty_tr(schedule.no_new_signals_after_tr)}, "
+        f"close: {pretty_tr(schedule.close_tr)}",
+        flush=True,
+    )
     confirm = 1.3
     try:
         import json
@@ -70,14 +120,29 @@ def main(argv: List[str] | None = None) -> int:
         pass
 
     fired: Dict[str, bool] = {}
+    cooldown: Dict[str, int] = {}
+    armed_afternoon = False  # optional single re-arm flip in the afternoon
     while True:
         logs: List[Dict[str, Any]] = []
         alerts: List[Dict[str, Any]] = []
         updates: Dict[str, Dict[str, Any]] = {}
+        # Time-based gates (TR-local)
+        allow_new = True
+        if schedule.no_new_signals_after_tr and is_after(schedule.no_new_signals_after_tr):
+            # Hard “no-new” guard late day — do not ARM new names
+            allow_new = False
+        if (not armed_afternoon) and schedule.afternoon_rearm_tr and is_after(schedule.afternoon_rearm_tr):
+            if cfg_sen.get("allow_afternoon_rearm", True):
+                # simplest: allow one extra bite by clearing fired flags once
+                fired = {}
+            armed_afternoon = True
         for row in scored:
             sym = row.get("symbol")
             direction = str(row.get("direction", "long"))
             if not sym or fired.get(sym):
+                continue
+            if not allow_new:
+                # Past the no-new guard; skip arming new names
                 continue
             # snapshot via IB (tests can monkeypatch)
             snap = {"last": None, "rvol": 0.0}
