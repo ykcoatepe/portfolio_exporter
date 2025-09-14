@@ -32,8 +32,13 @@ def enforce(vix: float, dte: int, credit: float, debit_now: float) -> Tuple[str,
     return "info", ""
 
 
-def theta_fees_warn(weekly_fees_abs: float, nav: float) -> bool:
-    """Warn when weekly theta fees exceed 0.20% of NAV (v0.2 heuristic)."""
+def theta_fees_warn(weekly_fees_abs: float, nav: float, threshold_nav_frac: float | None = None) -> bool:
+    """Warn when weekly theta fees exceed a NAV fraction.
+
+    threshold_nav_frac defaults to 0.20% (0.002) if not provided. Make this
+    configurable via rules.yaml (per regime or global), if available upstream.
+    """
     if nav <= 0:
         return False
-    return (weekly_fees_abs / nav) > 0.002
+    t = 0.002 if threshold_nav_frac is None else float(threshold_nav_frac)
+    return (weekly_fees_abs / nav) > t

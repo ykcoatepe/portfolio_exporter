@@ -38,11 +38,10 @@ def build_menu() -> None:
     table.add_row("1", "Pre-Market")
     table.add_row("2", "Live-Market")
     table.add_row("3", "Trades & Reports")
-    table.add_row("4", "Portfolio Greeks")
     table.add_row("0", "Exit")
     console.print(table)
     console.print("Hotkeys: s=Sync tickers, 0=Exit")
-    console.print("Multi-select hint: e.g., 2,4")
+    console.print("Multi-select hint: e.g., 2,3")
 
 
 def parse_args() -> argparse.Namespace:
@@ -568,7 +567,7 @@ def _main_impl(args) -> None:
                 update_tickers.run(args.format)
                 continue
             # Only numeric choices are supported for queued input
-            if choice not in {"1", "2", "3", "4"}:
+            if choice not in {"1", "2", "3"}:
                 console.print("[red]Invalid choice")
                 continue
             if choice == "1":
@@ -591,15 +590,6 @@ def _main_impl(args) -> None:
                 from portfolio_exporter.menus import trade
 
                 trade.launch(status, args.format)
-                continue
-            if choice == "4":
-                if status:
-                    status.update("Running Portfolio Greeks", "cyan")
-                from portfolio_exporter.scripts import portfolio_greeks
-
-                portfolio_greeks.run(args.format)
-                if status:
-                    status.update("Ready", "green")
                 continue
             console.print("[red]Invalid choice")
 

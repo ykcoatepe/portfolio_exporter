@@ -28,9 +28,30 @@ def render_dashboard(dto: Dict[str, Any]) -> str:
     lines = [top]
     breaches = snap.get("breaches", {}) or {}
     breakers = snap.get("breakers", {}) or {}
+    bstate = snap.get("breaker_state", {}) or {}
+    state = bstate.get("state", "ok") if isinstance(bstate, dict) else "ok"
+    if state != "ok":
+        lines.append(f"BREAKER: {state}")
     active = [k for k, v in {**breaches, **breakers}.items() if v]
     if active:
         lines.append("BREACH: " + ",".join(active))
     lines.append("")
     lines.append(render_table(rows))
+    # Footer budgets
+    b = dto.get("budgets") or {}
+    if isinstance(b, dict):
+        th = b.get("theta", {}) or {}
+        hd = b.get("hedge", {}) or {}
+        def pct(x):
+            try: return f"{float(x)*100:.2f}%"
+            except Exception: return "0.00%"
+        footer = [
+            f"θ weekly fees: {pct(th.get('burn',0))}{' WARN' if th.get('warn') else ''}",
+            f"Hedge MTD: {pct(hd.get('burn',0))}{' WARN' if hd.get('warn') else ''}",
+        ]
+        lines.append("")
+        lines.extend(footer)
+    # Digest message
+    if dto.get("digest_path"):
+        lines.append(f"Digest saved: {dto['digest_path']}")
     return "\n".join(lines)

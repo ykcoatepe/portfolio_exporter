@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-from functools import lru_cache
 
 try:
     from portfolio_exporter.core.providers import yahoo_provider
@@ -11,7 +10,9 @@ except Exception:  # pragma: no cover - fallback in minimal envs
     yahoo_provider = None  # type: ignore
 
 
-@lru_cache(maxsize=16)
+_VIX_LAST: float | None = None
+
+
 def get_vix(cfg: Dict[str, Any] | None = None) -> float | None:
     """Return latest VIX level using in-repo Yahoo provider when available.
 
@@ -19,10 +20,13 @@ def get_vix(cfg: Dict[str, Any] | None = None) -> float | None:
     """
     try:
         if yahoo_provider is None:
-            return None
+            # no provider; return cached
+            return _VIX_LAST
         s = yahoo_provider.get_summary("^VIX", cfg or {})
         v = s.get("last") or s.get("prev_close")
-        return float(v) if v is not None else None
+        val = float(v) if v is not None else None
+        globals()["_VIX_LAST"] = val
+        return val
     except Exception:
         return None
 
