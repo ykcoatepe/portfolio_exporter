@@ -380,6 +380,8 @@ python -m portfolio_exporter.scripts.micro_momo_analyzer \
 
 In the app (Pre-Market → Micro‑MOMO Analyzer), you can optionally type a comma‑separated symbol list; leave blank to use the latest `meme_scan_*.csv`.
 
+Clear scanner list: In the Analyzer menu, choose C and type CLEAR to wipe the saved symbols. (We confirm destructive actions per HIG/NNg.)
+
 Outputs when files are enabled:
 - `out/micro_momo_scored.csv`
 - `out/micro_momo_orders.csv`

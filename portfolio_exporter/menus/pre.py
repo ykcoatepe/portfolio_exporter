@@ -168,6 +168,22 @@ def launch(status: StatusBar, default_fmt: str):
 
 
 def _run_micro_momo(console: Console) -> None:
+    def _clear_saved_symbols(console) -> None:
+        # Confirm per HIG / NN/g for destructive actions
+        ans = core_ui.prompt_input(
+            "Clear saved scanner symbols? Type 'CLEAR' to confirm, or press Enter to cancel: "
+        ).strip()
+        if ans != "CLEAR":
+            console.print("[yellow]Canceled.[/]")
+            return
+        try:
+            set_pref("micro_momo.symbols", "")
+            console.print("[green]Saved symbols cleared.[/]")
+        except Exception as exc:  # pragma: no cover - UI path
+            from rich.console import Console as _C
+
+            _C().print(f"[red]Failed to clear symbols:[/] {exc}")
+
     try:
         pe_test = os.getenv("PE_TEST_MODE")
         # Auto-config
@@ -207,6 +223,18 @@ def _run_micro_momo(console: Console) -> None:
         if chd:
             argv += ["--chains_dir", chd]
         # Optional symbols override (comma-separated). Blank → keep file-based defaults.
+        # Present lightweight options, including a destructive 'clear' with confirmation.
+        console.print(
+            "Options: [Enter] run  ·  [C] Clear saved symbols  ·  [0] Back",
+            highlight=False,
+        )
+        choice = core_ui.prompt_input("› ").strip().lower()
+        if choice == "0":
+            return
+        if choice == "c":
+            _clear_saved_symbols(console)
+            return  # return to Analyzer screen so user sees blank default next time
+
         # Prefill from env or memory; persist back to memory on use.
         try:
             d_syms = os.getenv("MOMO_SYMBOLS") or (get_pref("micro_momo.symbols") or "")
