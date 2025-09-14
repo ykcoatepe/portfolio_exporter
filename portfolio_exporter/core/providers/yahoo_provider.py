@@ -13,6 +13,48 @@ def _ensure_online(cfg: Dict[str, Any]) -> None:
         raise RuntimeError("Yahoo provider disabled in offline mode")
 
 
+def _scalar(value: Any) -> Any:
+    """Return a best-effort scalar from pandas/NumPy/singleton containers.
+
+    Avoids FutureWarning/TypeError from calling float()/int() on a single-element
+    pandas Series by extracting the first element when appropriate.
+    """
+    try:
+        # pandas Series with a single element
+        if hasattr(value, "iloc") and hasattr(value, "__len__") and len(value) == 1:
+            return value.iloc[0]
+    except Exception:
+        pass
+    try:
+        # NumPy scalar
+        if hasattr(value, "item"):
+            return value.item()
+    except Exception:
+        pass
+    # Simple Python containers
+    if isinstance(value, (list, tuple)) and len(value) == 1:
+        return value[0]
+    return value
+
+
+def _to_float(value: Any, default: float = math.nan) -> float:
+    v = _scalar(value)
+    try:
+        f = float(v)
+        return f
+    except Exception:
+        return default
+
+
+def _to_int(value: Any, default: int = 0) -> int:
+    v = _scalar(value)
+    try:
+        i = int(v)
+        return i
+    except Exception:
+        return default
+
+
 def _cache_cfg(cfg: Dict[str, Any]) -> tuple[bool, str, int]:
     d = cfg.get("data", {}).get("cache", {}) if isinstance(cfg.get("data", {}), dict) else {}
     enabled = bool(d.get("enabled", False))
@@ -134,11 +176,11 @@ def get_intraday_bars(symbol: str, cfg: Dict[str, Any], minutes: int = 60, prepo
                 rows.append(
                     {
                         "ts": int(idx.timestamp()) if hasattr(idx, "timestamp") else None,
-                        "open": float(r.get("Open", r.get("open", math.nan))),
-                        "high": float(r.get("High", r.get("high", math.nan))),
-                        "low": float(r.get("Low", r.get("low", math.nan))),
-                        "close": float(r.get("Close", r.get("close", math.nan))),
-                        "volume": int(r.get("Volume", r.get("volume", 0)) or 0),
+                        "open": _to_float(r.get("Open", r.get("open", math.nan))),
+                        "high": _to_float(r.get("High", r.get("high", math.nan))),
+                        "low": _to_float(r.get("Low", r.get("low", math.nan))),
+                        "close": _to_float(r.get("Close", r.get("close", math.nan))),
+                        "volume": _to_int(r.get("Volume", r.get("volume", 0)) or 0),
                     }
                 )
             except Exception:
@@ -183,12 +225,12 @@ def get_option_chain(symbol: str, cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
                             "symbol": symbol.upper(),
                             "expiry": exp_yymmdd,
                             "right": side,
-                            "strike": float(r.get("strike", 0.0)),
-                            "bid": float(r.get("bid", 0.0)),
-                            "ask": float(r.get("ask", 0.0)),
-                            "last": float(r.get("lastPrice", r.get("last_price", 0.0))),
-                            "volume": int(r.get("volume", 0) or 0),
-                            "oi": int(r.get("openInterest", r.get("open_interest", 0)) or 0),
+                            "strike": _to_float(r.get("strike", 0.0), 0.0),
+                            "bid": _to_float(r.get("bid", 0.0), 0.0),
+                            "ask": _to_float(r.get("ask", 0.0), 0.0),
+                            "last": _to_float(r.get("lastPrice", r.get("last_price", 0.0)), 0.0),
+                            "volume": _to_int(r.get("volume", 0) or 0, 0),
+                            "oi": _to_int(r.get("openInterest", r.get("open_interest", 0)) or 0, 0),
                         }
                     )
                 except Exception:
