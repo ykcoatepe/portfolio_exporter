@@ -10,3 +10,6 @@ __pycache__/
 # Ignore Python package metadata
 *.egg-info/
 combos_preview.txt
+
+# ignore outputs
+out/

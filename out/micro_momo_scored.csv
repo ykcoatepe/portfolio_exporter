@@ -1,3 +1,0 @@
-symbol,raw_score,tier,passes_core_filter,direction,structure_template,contracts,entry_trigger,tp,sl,expiry,long_strike,short_strike,debit_or_credit,width,per_leg_oi_ok,per_leg_spread_pct,needs_chain,cap_breach,concurrency_guard
-F,10.4,C,False,long?,BearCallCredit,1,Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ 1.5); levels: vwap=NA,7.69,2.56,20250919,6.85,1.85,credit,5.0,False,0.1461,True,0,0
-LDI,10.4,C,False,long?,BearCallCredit,1,Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ 1.5); levels: vwap=NA,5.96,1.99,20250919,7.5,0.5,credit,7.0,False,0.6667,True,0,0
