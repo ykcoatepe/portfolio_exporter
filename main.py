@@ -333,6 +333,77 @@ def task_registry(fmt: str) -> dict[str, callable]:
         except Exception:
             pass
 
+    def micro_momo_go() -> None:
+        """Run analyzer → journal → basket → dashboard in one go.
+
+        Environment knobs (optional):
+        - MOMO_SYMBOLS: comma-separated symbols (overrides CSV input)
+        - MOMO_DATA_MODE: csv-only|enrich|fetch
+        - MOMO_PROVIDERS: comma-separated providers (e.g., "yahoo" or "ib,yahoo")
+        - MOMO_OFFLINE: 1 to disable any live fetches
+        - MOMO_AUTO_PRODUCERS: 1 to pre-generate local artifacts before providers
+        - MOMO_OUT: output directory (default: out)
+        - MOMO_START_SENTINEL: 1 to start sentinel after artifacts are built
+        """
+        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
+        from portfolio_exporter.scripts import micro_momo_dashboard as _dash
+        from tools.logbook import logbook_on_success as _lb
+
+        out_dir = os.getenv("MOMO_OUT") or "out"
+        try:
+            from portfolio_exporter.core.fs_utils import auto_config as _auto_config
+        except Exception:
+            _auto_config = lambda paths: None  # type: ignore
+        cfg = os.getenv("MOMO_CFG") or _auto_config(
+            [
+                "micro_momo_config.json",
+                "config/micro_momo_config.json",
+                "tests/data/micro_momo_config.json" if os.getenv("PE_TEST_MODE") else None,
+            ]
+        ) or ("tests/data/micro_momo_config.json" if os.getenv("PE_TEST_MODE") else None)
+        symbols = os.getenv("MOMO_SYMBOLS") or ""
+        data_mode = os.getenv("MOMO_DATA_MODE") or "enrich"
+        providers = os.getenv("MOMO_PROVIDERS") or "ib,yahoo"
+        offline = os.getenv("MOMO_OFFLINE") in ("1", "true", "yes")
+        auto_prod = os.getenv("MOMO_AUTO_PRODUCERS") in ("1", "true", "yes")
+
+        argv = [
+            "--out_dir",
+            out_dir,
+            "--data-mode",
+            data_mode,
+            "--providers",
+            providers,
+        ]
+        if cfg and os.path.exists(cfg):
+            argv = ["--cfg", cfg] + argv
+        if symbols:
+            argv += ["--symbols", symbols]
+        if offline:
+            argv += ["--offline"]
+        if auto_prod:
+            argv += ["--auto-producers"]
+        # Always produce a journal template and IB basket artifacts
+        argv += ["--journal-template", "--ib-basket-out", f"{out_dir}/micro_momo_basket.csv"]
+
+        try:
+            _mm.main(argv)
+            _dash.main(["--out_dir", out_dir])
+        except Exception:
+            raise
+        else:
+            _lb(
+                "micro-momo go-live",
+                scope="analyze → journal → basket → dashboard",
+                files=[
+                    "portfolio_exporter/scripts/micro_momo_analyzer.py",
+                    "portfolio_exporter/scripts/micro_momo_dashboard.py",
+                ],
+            )
+        # Optional sentinel kick-off; will block until interrupted.
+        if os.getenv("MOMO_START_SENTINEL") in ("1", "true", "yes"):
+            micro_momo_sentinel()
+
     return {
         "snapshot-quotes": snapshot_quotes,
         "quotes": snapshot_quotes,
@@ -352,6 +423,8 @@ def task_registry(fmt: str) -> dict[str, callable]:
         "momo-eod": micro_momo_eod,
         "micro-momo-dashboard": micro_momo_dashboard,
         "momo-dashboard": micro_momo_dashboard,
+        "micro-momo-go": micro_momo_go,
+        "momo-go": micro_momo_go,
     }
 
 
