@@ -25,3 +25,21 @@ def test_parse_resume_events_basic():
     assert ev["ABC"]["reason"] == "LUDP"
     assert "NORES" not in ev
 
+
+def test_event_type_tagging_post_halt_like_row():
+    # Mimic sentinel's log append decision
+    sym = "ABC"
+    direction = "long"
+    snap = {"last": 10.0, "rvol": 1.5}
+    post_halt_used = {sym: True}
+    event_type = "post_halt" if post_halt_used.get(sym) else "standard"
+    row = {
+        "ts": "2025-01-01 10:00:00",
+        "symbol": sym,
+        "direction": direction,
+        "event": "TRIGGERED",
+        "price": snap.get("last"),
+        "rvol": snap.get("rvol"),
+        "event_type": event_type,
+    }
+    assert row["event_type"] == "post_halt"

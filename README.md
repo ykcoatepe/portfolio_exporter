@@ -29,6 +29,8 @@ TR-local schedule: Sentinel computes today’s Turkey-local times from U.S. RTH 
 
 Config precedence at runtime: CLI > ENV (`MOMO_SEN_*`) > Menu preferences (`.codex/memory.json` → `preferences.sentinel.*`) > `micro_momo_config.json` > defaults. This keeps runtime overrides in the environment while persisting simple operator toggles in repo memory; TR-local schedule remains DST-safe via `zoneinfo`.
 
+Early close aware: set `MOMO_SEN_EARLY_CLOSE_TODAY=1` or provide a JSON list via `MOMO_SEN_EARLY_CLOSE_JSON` to auto-shift today’s ET close to 1:00 p.m. and adjust the TR-local schedule accordingly.
+
 Menu usage
 
 1. `python main.py` → select `Pre‑Market` → `Sentinel`.

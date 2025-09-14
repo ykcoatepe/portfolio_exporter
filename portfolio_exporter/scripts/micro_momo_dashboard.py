@@ -18,6 +18,9 @@ CSS = (
     ".small{color:#666;font-size:12px}"
 )
 
+def _count_post_halt(triggers: List[Dict[str, Any]]) -> int:
+    return sum(1 for r in triggers if (str(r.get("event_type") or "").lower() == "post_halt"))
+
 
 def _count_tiers(rows: List[Dict[str, Any]]) -> Dict[str, int]:
     out: Dict[str, int] = {"A": 0, "B": 0, "C": 0}
@@ -133,6 +136,12 @@ def main(argv: List[str] | None = None) -> int:
     triggers = _read_csv(out / "micro_momo_triggers_log.csv")
 
     summary = _summary_block(scored) if scored else "<div class='small'>No scored rows to summarize.</div>"
+    # Add post-halt re-arm count when trigger log present
+    try:
+        post_halt_n = _count_post_halt(triggers)
+        summary += f"<div class='small'>Post-halt re-arms used: <kbd>{post_halt_n}</kbd></div>"
+    except Exception:
+        pass
 
     html_doc = [
         "<!doctype html><meta charset='utf-8'><title>Micro-MOMO Dashboard</title>",

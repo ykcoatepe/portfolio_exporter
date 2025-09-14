@@ -11,6 +11,7 @@ from ..core.alerts import emit_alerts
 from ..core.journal import update_journal
 from ..core.providers import ib_provider
 from ..core.market_clock import rth_window_tr, is_after, pretty_tr, TZ_TR
+from ..core.market_calendar import infer_close_et
 from ..core.config_overlay import overlay_sentinel
 from ..core.memory import load_memory
 
@@ -24,7 +25,18 @@ def _append_log(path: str, rows: List[Dict[str, Any]]) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     write_header = not os.path.exists(path)
     with open(path, "a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["ts", "symbol", "direction", "event", "price", "rvol"])
+        w = csv.DictWriter(
+            f,
+            fieldnames=[
+                "ts",
+                "symbol",
+                "direction",
+                "event",
+                "price",
+                "rvol",
+                "event_type",
+            ],
+        )
         if write_header:
             w.writeheader()
         for r in rows:
@@ -111,11 +123,16 @@ def main(argv: List[str] | None = None) -> int:
     except Exception:
         mem = {}
     cfg_sen = overlay_sentinel(cfg_sen_file, mem)
+    # Early close adjustment (ET), convert to TR via schedule builder
+    dates_json = os.getenv("MOMO_SEN_EARLY_CLOSE_JSON") or (
+        cfg_sen.get("early_close_dates_json") if isinstance(cfg_sen.get("early_close_dates_json"), str) else None
+    )
+    et_close_time = infer_close_et(dates_json=dates_json)
     et_rearm = _parse_hhmm(cfg_sen.get("et_afternoon_rearm", "13:30"))
     et_cutoff = _parse_hhmm(cfg_sen.get("et_no_new_signals_after", "15:30"))
     schedule = rth_window_tr(
         et_open=dt_time(9, 30),
-        et_close=dt_time(16, 0),
+        et_close=et_close_time,
         et_afternoon_rearm=et_rearm if cfg_sen.get("allow_afternoon_rearm", True) else None,
         et_no_new_after=et_cutoff,
     )
@@ -312,6 +329,7 @@ def main(argv: List[str] | None = None) -> int:
                         "halt_mini_orb_bars",
                     ):
                         st.pop(k, None)
+                event_type = "post_halt" if post_halt_used.get(sym) else "standard"
                 logs.append(
                     {
                         "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -320,6 +338,7 @@ def main(argv: List[str] | None = None) -> int:
                         "event": "TRIGGERED",
                         "price": snap.get("last"),
                         "rvol": snap.get("rvol"),
+                        "event_type": event_type,
                     }
                 )
                 alerts.append(
