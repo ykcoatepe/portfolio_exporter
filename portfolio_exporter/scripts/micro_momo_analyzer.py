@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from datetime import datetime
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
@@ -20,7 +21,8 @@ from ..core.micro_momo_sources import (
     load_chain_csv,
     load_scan_csv,
 )
-from ..core.micro_momo_types import ResultRow, ScanRow
+from ..core.micro_momo_types import ResultRow, ScanRow, Structure
+from ..core.market_clock import rth_window_tr, TZ_TR
 from ..core.alerts import emit_alerts
 from ..core.ib_export import export_ib_basket, export_ib_notes
 from ..core.fs_utils import find_latest_chain_for_symbol
@@ -63,6 +65,15 @@ DEFAULT_CFG: Dict[str, Any] = {
         "cache": {"enabled": True, "dir": "out/.cache", "ttl_sec": 60},
     },
 }
+
+
+def _direction_from_structure(template: str, fallback: str) -> str:
+    t = (template or "").lower()
+    if t == "bearcallcredit":
+        return "short"
+    if t in ("debitcall", "bullputcredit"):
+        return "long"
+    return fallback
 
 
 def _count_active_journal(out_dir: str) -> int:
@@ -190,6 +201,43 @@ def run(
         struct = pick_structure(scan, chain_rows, direction, cfg, tier=tier)
         contracts, tp, sl = size_and_targets(struct, scan, cfg)
         trig = entry_trigger(direction, scan, cfg)
+
+        # --- Direction/structure alignment + market-closed guard ---
+        # TR-local market window (DST-safe ET→TR via zoneinfo)
+        sch = rth_window_tr()
+        now_tr = datetime.now(TZ_TR)
+        market_open_now = sch.open_tr <= now_tr <= sch.close_tr
+
+        # Intraday availability check
+        vwap_val = getattr(scan, "vwap", None)
+        r1 = getattr(scan, "rvol_1m", None)
+        r5 = getattr(scan, "rvol_5m", None)
+        no_intraday = (vwap_val is None) and (not r1) and (not r5)
+
+        # Align direction to structure if we actually picked one
+        direction = _direction_from_structure(struct.template, direction)
+
+        # If market is closed OR intraday signals are absent, neutralize
+        if (not market_open_now) or no_intraday:
+            # Replace with a neutral Template to avoid suggesting shorts off-hours
+            struct = Structure(
+                template="Template",
+                expiry=None,
+                long_strike=None,
+                short_strike=None,
+                debit_or_credit=None,
+                width=None,
+                per_leg_oi_ok=False,
+                per_leg_spread_pct=None,
+                needs_chain=True,
+                limit_price=None,
+            )
+            contracts, tp, sl = (0, None, None)
+            trig = (
+                f"Market closed — preview only. At open: ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
+                f"levels: orb=NA, vwap=NA"
+            )
+        # --- end guard ---
 
         # Guards
         nav = float(cfg.get("sizing", {}).get("nav", 100000.0))  # type: ignore[union-attr]
