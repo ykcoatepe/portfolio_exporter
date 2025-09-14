@@ -16,6 +16,7 @@ import os, webbrowser
 from portfolio_exporter.scripts import micro_momo_analyzer
 from portfolio_exporter.core.memory import get_pref, set_pref
 from portfolio_exporter.core.fs_utils import find_latest_file, auto_chains_dir
+from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
 
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
 import builtins
@@ -198,7 +199,10 @@ def _run_micro_momo(console: Console) -> None:
         except Exception:
             sym_in = os.getenv("MOMO_SYMBOLS") or (get_pref("micro_momo.symbols") or "")
         if sym_in:
-            argv += ["--symbols", sym_in]
+            # Normalize against alias map before passing down to analyzer
+            alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])  # env path wins, if set
+            syms = normalize_symbols(sym_in.split(","), alias_map)
+            argv += ["--symbols", ",".join(syms)]
             try:
                 set_pref("micro_momo.symbols", sym_in)
             except Exception:

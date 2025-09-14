@@ -24,6 +24,7 @@ from ..core.micro_momo_types import ResultRow, ScanRow
 from ..core.alerts import emit_alerts
 from ..core.ib_export import export_ib_basket, export_ib_notes
 from ..core.fs_utils import find_latest_chain_for_symbol
+from ..core.symbols import load_alias_map, normalize_symbols
 
 
 DEFAULT_CFG: Dict[str, Any] = {
@@ -384,7 +385,8 @@ def main(argv: List[str] | None = None) -> int:
     # Note: when both --input and --symbols are present, --symbols takes precedence.
     scans: List[ScanRow] = []
     if getattr(args, "symbols", None):
-        syms = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
+        alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])  # env-provided path has priority
+        syms = normalize_symbols([s for s in str(args.symbols).split(",") if s.strip()], alias_map)
         # Synthesize minimal ScanRow entries; enrichment/fetch can fill fields later.
         scans = [
             ScanRow(

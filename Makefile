@@ -169,6 +169,11 @@ momo-dashboard-open:
 	python -m portfolio_exporter.scripts.micro_momo_dashboard --out_dir out; \
 	python -c "import webbrowser,os; p=os.path.abspath('out/micro_momo_dashboard.html'); print(p); webbrowser.open('file://'+p, new=2)"
 
+# Orchestrator: analyze → journal → basket → dashboard (optional sentinel)
+.PHONY: momo-go
+momo-go:
+	python -m portfolio_exporter.scripts.micro_momo_go --out_dir out
+
 # --- Micro-MOMO + logbook variants (opt-in via LOGBOOK_AUTO=1) ---
 .PHONY: momo-journal-log momo-sentinel-offline-log momo-eod-offline-log momo-dashboard-open-log
 

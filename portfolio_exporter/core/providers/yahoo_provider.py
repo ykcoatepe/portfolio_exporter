@@ -21,8 +21,26 @@ def _cache_cfg(cfg: Dict[str, Any]) -> tuple[bool, str, int]:
     return enabled, cdir, ttl
 
 
+def _ttl(cfg: Dict[str, Any]) -> int:
+    """Return cache TTL with env override.
+
+    Environment variable MOMO_CACHE_TTL, when set to an integer, overrides
+    the configured TTL (cfg["data"]["cache"]["ttl_sec"]).
+    """
+    try:
+        v = os.getenv("MOMO_CACHE_TTL")
+        if v:
+            return int(v)
+    except Exception:
+        pass
+    try:
+        return int(cfg.get("data", {}).get("cache", {}).get("ttl_sec", 60))
+    except Exception:
+        return 60
+
+
 def _cache_read(cfg: Dict[str, Any], key: str) -> Any | None:
-    enabled, cdir, ttl = _cache_cfg(cfg)
+    enabled, cdir, _ = _cache_cfg(cfg)
     if not enabled:
         return None
     path = os.path.join(cdir, f"yahoo_{key}.json")
@@ -30,6 +48,7 @@ def _cache_read(cfg: Dict[str, Any], key: str) -> Any | None:
         if not os.path.exists(path):
             return None
         age = time.time() - os.path.getmtime(path)
+        ttl = _ttl(cfg)
         if ttl and age > ttl:
             return None
         with open(path, "r", encoding="utf-8") as fh:

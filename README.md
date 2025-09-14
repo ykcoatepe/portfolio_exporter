@@ -452,6 +452,39 @@ make momo-dashboard
 
 Includes Scored, Orders, Journal, EOD Summary, and Trigger Log when present.
 
+### Go-Live Orchestrator
+One command for pre-market: analyze → journal → basket → dashboard (optional sentinel).
+
+```bash
+# task runner
+python main.py --task micro-momo-go
+
+# env overrides (examples)
+MOMO_SYMBOLS="F,LDI" MOMO_DATA_MODE=enrich MOMO_PROVIDERS=yahoo \
+MOMO_WEBHOOK=https://hooks.slack.com/services/... MOMO_THREAD=169... \
+MOMO_AUTO_PRODUCERS=1 MOMO_START_SENTINEL=1 \
+python main.py --task micro-momo-go
+```
+
+The orchestrator respects `--offline` and uses your cache/artifacts first.
+
+Make helper:
+
+```bash
+make momo-go
+```
+
+#### Acceptance
+- `make lint`
+- Dry run:
+
+```bash
+MOMO_SYMBOLS="F,LDI" MOMO_DATA_MODE=csv-only \
+python main.py --task micro-momo-go
+```
+
+Expect analyzer+dashboard; sentinel only if `MOMO_START_SENTINEL=1`.
+
 ## Micro-MOMO — Operator Runbook (v1.4+)
 
 Morning (13:25 TRT)

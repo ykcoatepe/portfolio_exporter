@@ -223,6 +223,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         import pathlib
         # Import lazily to keep CLI startup fast
         from tools.logbook import logbook_on_success
+        # Lightweight import; used only when symbols provided
+        from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
 
         pe_test = os.getenv("PE_TEST_MODE")
         cfg_env = os.getenv("MOMO_CFG")
@@ -251,7 +253,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             except Exception:
                 sym = ""
         if sym:
-            argv2 += ["--symbols", sym]
+            # Normalize symbols using alias map (env path has priority)
+            alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])  # type: ignore[arg-type]
+            normalized = normalize_symbols(sym.split(","), alias_map)
+            argv2 += ["--symbols", ",".join(normalized)]
         # Optional data mode/providers/offline passthrough via environment
         dm = os.getenv("MOMO_DATA_MODE")
         if dm:
@@ -277,9 +282,38 @@ def main(argv: Optional[List[str]] = None) -> int:
                 files=["portfolio_exporter/scripts/micro_momo_analyzer.py"],
             )
 
+    def micro_momo_go() -> None:
+        from portfolio_exporter.scripts import micro_momo_go as _go
+        import os as _os
+
+        argv: list[str] = []
+        if _os.getenv("MOMO_SYMBOLS"):
+            argv += ["--symbols", _os.getenv("MOMO_SYMBOLS") or ""]
+        if _os.getenv("MOMO_CFG"):
+            argv += ["--cfg", _os.getenv("MOMO_CFG") or ""]
+        if _os.getenv("MOMO_OUT"):
+            argv += ["--out_dir", _os.getenv("MOMO_OUT") or "out"]
+        if _os.getenv("MOMO_PROVIDERS"):
+            argv += ["--providers", _os.getenv("MOMO_PROVIDERS") or "ib,yahoo"]
+        if _os.getenv("MOMO_DATA_MODE"):
+            argv += ["--data-mode", _os.getenv("MOMO_DATA_MODE") or "enrich"]
+        if _os.getenv("MOMO_WEBHOOK"):
+            argv += ["--webhook", _os.getenv("MOMO_WEBHOOK") or ""]
+        if _os.getenv("MOMO_THREAD"):
+            argv += ["--thread", _os.getenv("MOMO_THREAD") or ""]
+        if _os.getenv("MOMO_OFFLINE") in ("1", "true", "True", "yes", "YES"):
+            argv += ["--offline"]
+        if _os.getenv("MOMO_AUTO_PRODUCERS") in ("1", "true", "True", "yes", "YES"):
+            argv += ["--auto-producers"]
+        if _os.getenv("MOMO_START_SENTINEL") in ("1", "true", "True", "yes", "YES"):
+            argv += ["--start-sentinel"]
+        _go.main(argv)
+
     CUSTOM_TASKS: Dict[str, Callable[[], None]] = {
         "micro-momo": micro_momo,
         "momo": micro_momo,
+        "micro-momo-go": micro_momo_go,
+        "momo-go": micro_momo_go,
     }
 
     # Optional bootstrap of memory file
