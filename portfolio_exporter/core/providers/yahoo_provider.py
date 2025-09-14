@@ -93,8 +93,9 @@ def get_intraday_bars(symbol: str, cfg: Dict[str, Any], minutes: int = 60, prepo
         _ensure_online(cfg)
         import yfinance as yf  # type: ignore
 
-        # Fetch up to last `minutes` 1m bars. Using period='90m' to be safe.
-        period = "90m" if minutes <= 90 else "1d"
+        # Fetch up to last `minutes` 1m bars. Use a valid yfinance period.
+        # Note: '90m' is not a valid period in recent yfinance versions; use '1d' for intraday 1m bars.
+        period = "1d"
         df = yf.download(
             tickers=symbol,
             period=period,
