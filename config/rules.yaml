@@ -1,0 +1,10 @@
+# Portfolio Sentinel Dashboard rules configuration (skeleton)
+# TODO: fill in at v0.1
+
+sleeves: {}
+universal: {}
+theta_templates: {}
+risk_bands: {}
+circuit_breakers: {}
+budgets: {}
+

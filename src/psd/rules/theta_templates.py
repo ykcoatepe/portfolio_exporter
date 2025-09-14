@@ -1,0 +1,4 @@
+"""Theta template rules (placeholder)."""
+
+# TODO: fill in at v0.1
+

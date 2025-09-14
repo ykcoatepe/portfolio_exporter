@@ -13,3 +13,9 @@ combos_preview.txt
 
 # ignore outputs
 out/
+
+# PSD
+var/memos/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

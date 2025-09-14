@@ -1,0 +1,2 @@
+"""Sentinel engine components (placeholder)."""
+

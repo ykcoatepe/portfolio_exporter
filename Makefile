@@ -196,3 +196,11 @@ momo-dashboard-open-log: momo-dashboard-open
 ifeq ($(LOGBOOK_AUTO),1)
 	python tools/logbook.py add --task "micro-momo dashboard" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "html report" --files "portfolio_exporter/scripts/micro_momo_dashboard.py" --status "merged"
 endif
+
+# --- PSD placeholders ---
+.PHONY: psd-run psd-scan-once psd-dash sanity-fast
+
+psd-run: ; @python -m scripts.run_sentinel
+psd-scan-once: ; @python -c "print('scan_once placeholder')"
+psd-dash: ; @python -c "print('dash placeholder')"
+sanity-fast: ; ruff check . && pytest -q || true
