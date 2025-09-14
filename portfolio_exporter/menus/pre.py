@@ -326,6 +326,11 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
             cooldown_bars = int(cd_raw)
         except Exception:
             cooldown_bars = 10
+        # Small UX note for operators
+        console.print(
+            f"[dim]Recross[/]: {'ON' if require_recross else 'OFF'}  [dim]Cooldown bars[/]: {cooldown_bars}",
+            highlight=False,
+        )
         console.print(
             f"Status: {'[green]RUNNING[/]' if running else '[red]STOPPED[/]'}",
             highlight=False,

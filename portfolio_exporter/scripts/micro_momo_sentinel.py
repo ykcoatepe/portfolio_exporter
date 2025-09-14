@@ -31,6 +31,15 @@ def _append_log(path: str, rows: List[Dict[str, Any]]) -> None:
             w.writerow(r)
 
 
+def _side_vs_vwap(last_price: float | None, vwap: float | None) -> str | None:
+    if last_price is None or vwap is None:
+        return None
+    try:
+        return "above" if float(last_price) >= float(vwap) else "below"
+    except Exception:
+        return None
+
+
 def _load_sentinel_cfg(cfg_path: Optional[str]) -> dict:
     import json
     import os
@@ -130,6 +139,12 @@ def main(argv: List[str] | None = None) -> int:
 
     fired: Dict[str, bool] = {}
     cooldown: Dict[str, int] = {}
+    # Per-symbol runtime state
+    state: Dict[str, Dict[str, Any]] = {}
+    for row in scored:
+        sym0 = row.get("symbol")
+        if sym0:
+            state[sym0] = {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None}
     armed_afternoon = False  # optional single re-arm flip in the afternoon
     while True:
         logs: List[Dict[str, Any]] = []
@@ -144,6 +159,14 @@ def main(argv: List[str] | None = None) -> int:
             if cfg_sen.get("allow_afternoon_rearm", True):
                 # simplest: allow one extra bite by clearing fired flags once
                 fired = {}
+                # Reset state to allow clean re-arm
+                try:
+                    for st in state.values():
+                        st["fired"] = False
+                        st["cooldown"] = 0
+                        st["last_side"] = None
+                except Exception:
+                    pass
             armed_afternoon = True
         for row in scored:
             sym = row.get("symbol")
@@ -155,6 +178,7 @@ def main(argv: List[str] | None = None) -> int:
                 continue
             # snapshot via IB (tests can monkeypatch)
             snap = {"last": None, "rvol": 0.0}
+            bars: List[Dict[str, Any]] = []
             if not args.offline:
                 try:
                     q = ib_provider.get_quote(sym, {"data": {"offline": False}})
@@ -169,9 +193,41 @@ def main(argv: List[str] | None = None) -> int:
             vwap = float(row.get("vwap") or 0) or None
             orb = float(row.get("orb_high") or 0) or None
             levels = {"vwap": vwap, "orb_high": orb}
+            # Cooldown + VWAP recross gating
+            st = state.setdefault(sym, {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None})
+            # Decrement cooldown only on a new bar
+            last_ts = None
+            if bars:
+                lb = bars[-1]
+                last_ts = lb.get("ts") or lb.get("time") or lb.get("t") or lb.get("date")
+            if last_ts is None:
+                # Coarse fallback to minute clock if bars lack a timestamp field
+                try:
+                    last_ts = time.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    last_ts = None
+            if st.get("last_bar_ts") != last_ts:
+                if int(st.get("cooldown", 0)) > 0:
+                    st["cooldown"] = max(0, int(st["cooldown"]) - 1)
+                st["last_bar_ts"] = last_ts
+
+            side_now = _side_vs_vwap(snap.get("last"), vwap)
+            # Gate 1: cooldown
+            if int(st.get("cooldown", 0)) > 0:
+                continue
+            # Gate 2: VWAP recross
+            if cfg_sen.get("require_vwap_recross", True):
+                if st.get("last_side") is None:
+                    st["last_side"] = side_now
+                    continue
+                if side_now is None or side_now == st.get("last_side"):
+                    continue
             ok = _check_trigger_long(snap, confirm, levels) if direction.startswith("long") else _check_trigger_short(snap, confirm, levels)
+            # Remember the side evaluated on
+            st["last_side"] = side_now
             if ok:
                 fired[sym] = True
+                st["fired"] = True
                 logs.append(
                     {
                         "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -186,6 +242,12 @@ def main(argv: List[str] | None = None) -> int:
                     {"symbol": sym, "direction": direction, "trigger": "Signal fired", "rvol_confirm": confirm, "levels": levels}
                 )
                 updates[sym] = {"status": "Triggered", "status_ts": time.strftime("%Y-%m-%d %H:%M:%S")}
+            else:
+                # Put on cooldown to avoid flapping
+                try:
+                    st["cooldown"] = max(0, int(cfg_sen.get("cooldown_bars", 10)))
+                except Exception:
+                    st["cooldown"] = 10
         if logs:
             _append_log(os.path.join(args.out_dir, "micro_momo_triggers_log.csv"), logs)
             if args.webhook and not args.offline:
