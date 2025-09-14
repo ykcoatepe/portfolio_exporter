@@ -355,6 +355,8 @@ Micro-MOMO is a lightweight shortlist analyzer that operates entirely offline fo
 - Inputs: a scan CSV and optional per-symbol option chain CSVs named `{SYMBOL}_{YYYYMMDD}.csv`.
 - Flow: filters → scoring → tier & direction → structure pick (DebitCall for long, BearCallCredit for short) → sizing → TP/SL → entry trigger.
 
+- Off-hours safety: when the market is closed (TR-local) or intraday signals are unavailable (VWAP/RVOL N/A), the analyzer emits a neutral `Template` structure with a "market-closed" preview trigger to avoid suggesting short entries.
+
 Examples:
 
 ```bash
