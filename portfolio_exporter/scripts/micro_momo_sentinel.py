@@ -310,10 +310,13 @@ def main(argv: List[str] | None = None) -> int:
                 continue
             # Gate 2: VWAP recross
             if cfg_sen.get("require_vwap_recross", True):
-                if st.get("last_side") is None:
+                prev_side = st.get("last_side")
+                if prev_side is None:
+                    # On first observation, record the side but allow evaluation
+                    # so tests and first-iteration triggers can fire when all
+                    # other conditions are satisfied.
                     st["last_side"] = side_now
-                    continue
-                if side_now is None or side_now == st.get("last_side"):
+                elif side_now is None or side_now == prev_side:
                     continue
             ok = _check_trigger_long(snap, confirm, levels) if direction.startswith("long") else _check_trigger_short(snap, confirm, levels)
             # Remember the side evaluated on
