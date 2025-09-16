@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 try:
     from portfolio_exporter.core.providers import yahoo_provider
@@ -13,7 +13,7 @@ except Exception:  # pragma: no cover - fallback in minimal envs
 _VIX_LAST: float | None = None
 
 
-def get_vix(cfg: Dict[str, Any] | None = None) -> float | None:
+def get_vix(cfg: dict[str, Any] | None = None) -> float | None:
     """Return latest VIX level using in-repo Yahoo provider when available.
 
     Returns None if unavailable. Cached per-process for speed.
@@ -31,7 +31,7 @@ def get_vix(cfg: Dict[str, Any] | None = None) -> float | None:
         return None
 
 
-def get_closes(symbol: str, days: int = 60, cfg: Dict[str, Any] | None = None) -> List[float]:
+def get_closes(symbol: str, days: int = 60, cfg: dict[str, Any] | None = None) -> list[float]:
     """Return recent close prices for VaR calculation.
 
     Uses yfinance via provider or returns [] when unavailable. Tests can
@@ -41,7 +41,7 @@ def get_closes(symbol: str, days: int = 60, cfg: Dict[str, Any] | None = None) -
         import yfinance as yf  # type: ignore
 
         period = f"{max(days, 30)}d"
-        df = yf.download(tickers=symbol, period=period, interval="1d", progress=False)
+        df = yf.download(tickers=symbol, period=period, interval="1d", progress=False, auto_adjust=False)
         if df is None or len(df) == 0:
             return []
         closes = df.get("Close") or df.get("close")
@@ -52,7 +52,7 @@ def get_closes(symbol: str, days: int = 60, cfg: Dict[str, Any] | None = None) -
         return []
 
 
-def get_earnings_date(symbol: str, cfg: Dict[str, Any] | None = None) -> str | None:
+def get_earnings_date(symbol: str, cfg: dict[str, Any] | None = None) -> str | None:
     """Optional earnings date helper. Returns YYYY-MM-DD or None.
 
     Minimal placeholder to avoid coupling. Tests can patch.

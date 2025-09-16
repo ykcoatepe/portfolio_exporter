@@ -55,7 +55,9 @@ def main(argv: List[str] | None = None) -> int:
         argv_ana += ["--offline"]
     if args.auto_producers:
         argv_ana += ["--auto-producers"]
-    ana.main(argv_ana)
+    rc = ana.main(argv_ana)
+    if rc != 0:
+        return rc
 
     # 2) Dashboard (always)
     dash.main(["--out_dir", args.out_dir])

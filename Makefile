@@ -201,6 +201,14 @@ endif
 .PHONY: psd-run psd-scan-once psd-dash sanity-fast
 
 psd-run: ; @python -m scripts.run_sentinel
-psd-scan-once: ; @python -c "print('scan_once placeholder')"
-psd-dash: ; @python -c "print('dash placeholder')"
+psd-scan-once: ; @python -c "from src.psd.sentinel.engine import scan_once; print('alerts', len(scan_once({}).get('rows', [])))"
+psd-dash: ; @python -c "from src.psd.ui.cli import run_dash; run_dash()"
 sanity-fast: ; ruff check . && pytest -q || true
+
+.PHONY: psd-start
+# Dev/ops helper: start PSD runner (not a public CLI)
+psd-start: ; python scripts/psd_start.py
+
+.PHONY: psd-sim
+psd-sim:
+	python scripts/psd_sim.py

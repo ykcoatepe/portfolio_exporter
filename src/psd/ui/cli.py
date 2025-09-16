@@ -1,4 +1,8 @@
-"""PSD CLI table rendering (v0.1)."""
+"""PSD CLI (text) helpers for the Portfolio Sentinel Dashboard.
+
+This module provides lightweight rendering utilities and a small runnable
+``run_dash()`` entry that the TUI menu and developer helpers can call.
+"""
 
 from __future__ import annotations
 
@@ -55,3 +59,22 @@ def render_dashboard(dto: Dict[str, Any]) -> str:
     if dto.get("digest_path"):
         lines.append(f"Digest saved: {dto['digest_path']}")
     return "\n".join(lines)
+
+
+def run_dash(cfg: Dict[str, Any] | None = None) -> None:
+    """Run a one-shot PSD dashboard render to stdout.
+
+    This uses the same underlying scan used by the CLI scheduler and returns
+    a simple text dashboard suitable for terminal output. It intentionally
+    avoids heavy imports at module import time for fast startup in the TUI.
+
+    Parameters
+    - cfg: optional dictionary to override defaults for the sentinel scan.
+    """
+    if cfg is None:
+        cfg = {}
+    # Lazy imports to keep CLI + TUI startup snappy
+    from src.psd.sentinel.engine import scan_once  # type: ignore
+
+    dto = scan_once(cfg)
+    print(render_dashboard(dto))

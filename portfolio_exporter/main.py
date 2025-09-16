@@ -287,26 +287,69 @@ def main(argv: Optional[List[str]] = None) -> int:
         import os as _os
 
         argv: list[str] = []
-        if _os.getenv("MOMO_SYMBOLS"):
-            argv += ["--symbols", _os.getenv("MOMO_SYMBOLS") or ""]
-        if _os.getenv("MOMO_CFG"):
-            argv += ["--cfg", _os.getenv("MOMO_CFG") or ""]
-        if _os.getenv("MOMO_OUT"):
-            argv += ["--out_dir", _os.getenv("MOMO_OUT") or "out"]
-        if _os.getenv("MOMO_PROVIDERS"):
-            argv += ["--providers", _os.getenv("MOMO_PROVIDERS") or "ib,yahoo"]
-        if _os.getenv("MOMO_DATA_MODE"):
-            argv += ["--data-mode", _os.getenv("MOMO_DATA_MODE") or "enrich"]
-        if _os.getenv("MOMO_WEBHOOK"):
-            argv += ["--webhook", _os.getenv("MOMO_WEBHOOK") or ""]
-        if _os.getenv("MOMO_THREAD"):
-            argv += ["--thread", _os.getenv("MOMO_THREAD") or ""]
+        pe_test = _os.getenv("PE_TEST_MODE")
+
+        cfg_env = _os.getenv("MOMO_CFG")
+        if cfg_env:
+            argv += ["--cfg", cfg_env]
+        else:
+            for path in (
+                "micro_momo_config.json",
+                "config/micro_momo_config.json",
+                "configs/micro_momo_config.json",
+                ("tests/data/micro_momo_config.json" if pe_test else None),
+            ):
+                if path and _os.path.exists(path):
+                    argv += ["--cfg", path]
+                    break
+
+        out_dir = _os.getenv("MOMO_OUT")
+        if out_dir:
+            argv += ["--out_dir", out_dir]
+
+        providers = _os.getenv("MOMO_PROVIDERS")
+        if providers:
+            argv += ["--providers", providers]
+
+        data_mode = _os.getenv("MOMO_DATA_MODE")
+        if data_mode:
+            argv += ["--data-mode", data_mode]
+
+        webhook = _os.getenv("MOMO_WEBHOOK")
+        if webhook:
+            argv += ["--webhook", webhook]
+
+        thread = _os.getenv("MOMO_THREAD")
+        if thread:
+            argv += ["--thread", thread]
+
         if _os.getenv("MOMO_OFFLINE") in ("1", "true", "True", "yes", "YES"):
             argv += ["--offline"]
         if _os.getenv("MOMO_AUTO_PRODUCERS") in ("1", "true", "True", "yes", "YES"):
             argv += ["--auto-producers"]
         if _os.getenv("MOMO_START_SENTINEL") in ("1", "true", "True", "yes", "YES"):
             argv += ["--start-sentinel"]
+
+        symbols = _os.getenv("MOMO_SYMBOLS") or ""
+        if not symbols:
+            try:
+                from portfolio_exporter.core.memory import get_pref
+
+                symbols = get_pref("micro_momo.symbols") or ""
+            except Exception:
+                symbols = ""
+        if symbols:
+            try:
+                from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
+
+                alias_map = load_alias_map([_os.getenv("MOMO_ALIASES_PATH") or ""])
+                normalized = normalize_symbols([s for s in symbols.split(",") if s.strip()], alias_map)
+                if normalized:
+                    argv += ["--symbols", ",".join(normalized)]
+            except Exception:
+                # Fallback: pass raw symbols string if normalization fails
+                argv += ["--symbols", symbols]
+
         _go.main(argv)
 
     CUSTOM_TASKS: Dict[str, Callable[[], None]] = {

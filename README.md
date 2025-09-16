@@ -1272,3 +1272,12 @@ Troubleshooting
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+### Browser Dashboard (PSD)
+
+- Access via TUI only: open the app and navigate to "Portfolio Sentinel". The dashboard auto-starts once per session (web + browser + loop).
+- Disable auto-start by setting `psd.auto.start_on_menu: false` in `config/rules.yaml`; then use the menu action `o = Open in browser` to trigger the starter on demand.
+- The server is a minimal FastAPI + WebSocket app; broadcasts are pushed from the in-process scheduler each iteration.
+
+#### Ops (optional)
+
+- For systemd/launchd integrations, call `python scripts/psd_start.py` to run the internal starter. This is not a public CLI command.

@@ -38,6 +38,7 @@ def build_menu() -> None:
     table.add_row("1", "Pre-Market")
     table.add_row("2", "Live-Market")
     table.add_row("3", "Trades & Reports")
+    table.add_row("4", "Portfolio Sentinel")
     table.add_row("0", "Exit")
     console.print(table)
     console.print("Hotkeys: s=Sync tickers, 0=Exit")
@@ -567,7 +568,7 @@ def _main_impl(args) -> None:
                 update_tickers.run(args.format)
                 continue
             # Only numeric choices are supported for queued input
-            if choice not in {"1", "2", "3"}:
+            if choice not in {"1", "2", "3", "4"}:
                 console.print("[red]Invalid choice")
                 continue
             if choice == "1":
@@ -590,6 +591,13 @@ def _main_impl(args) -> None:
                 from portfolio_exporter.menus import trade
 
                 trade.launch(status, args.format)
+                continue
+            if choice == "4":
+                if status:
+                    status.update("Opening Portfolio Sentinel", "cyan")
+                from portfolio_exporter.menus import psd
+
+                psd.launch(status, args.format)
                 continue
             console.print("[red]Invalid choice")
 

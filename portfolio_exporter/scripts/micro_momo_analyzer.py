@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
@@ -134,6 +134,7 @@ def run(
     ib_basket_out: Optional[str] = None,
     journal_template: bool = False,
     prebuilt_scans: Optional[List[ScanRow]] = None,
+    force_live_flag: bool = False,
 ) -> List[Dict[str, Any]]:
     cfg = _read_cfg(cfg_path)
     # Merge runtime data config
@@ -157,6 +158,23 @@ def run(
         "auto_producers": bool(cfg["data"].get("auto_producers", False)) or bool(auto_producers),
         "upstream_timeout_sec": int(cfg["data"].get("upstream_timeout_sec", upstream_timeout_sec)),
     })
+    # ENV/flag overlay for live refresh
+    env_force = str(os.getenv("MOMO_FORCE_LIVE", "")).lower() in ("1", "true", "yes")
+    force_live = bool(env_force or force_live_flag)
+    if force_live:
+        # Force fetch with TTL=0 and offline disabled; preserve providers if already set
+        cache_dir = (
+            cfg.get("data", {}).get("cache", {}).get("dir")
+            or os.path.join(out_dir, ".cache")
+        )
+        cfg.setdefault("data", {}).update(
+            {
+                "mode": "fetch",
+                "providers": cfg.get("data", {}).get("providers", ["yahoo"]),
+                "offline": False,
+                "cache": {"enabled": True, "dir": cache_dir, "ttl_sec": 0},
+            }
+        )
     # Build scans list either from symbols (synthesized) or from CSV
     scans: List[ScanRow]
     if prebuilt_scans is not None:
@@ -202,24 +220,92 @@ def run(
         contracts, tp, sl = size_and_targets(struct, scan, cfg)
         trig = entry_trigger(direction, scan, cfg)
 
-        # --- Direction/structure alignment + market-closed guard ---
-        # TR-local market window (DST-safe ET→TR via zoneinfo)
+        # --- Direction/structure alignment + live/preview guard with grace + force-live ---
         sch = rth_window_tr()
         now_tr = datetime.now(TZ_TR)
-        market_open_now = sch.open_tr <= now_tr <= sch.close_tr
 
-        # Intraday availability check
-        vwap_val = getattr(scan, "vwap", None)
-        r1 = getattr(scan, "rvol_1m", None)
-        r5 = getattr(scan, "rvol_5m", None)
-        no_intraday = (vwap_val is None) and (not r1) and (not r5)
+        # small grace right after open to avoid neutralizing during first bars
+        open_grace = timedelta(minutes=3)
+        market_window = sch.open_tr <= now_tr <= sch.close_tr
+        within_grace = sch.open_tr <= now_tr <= (sch.open_tr + open_grace)
 
-        # Align direction to structure if we actually picked one
+        no_intraday = (
+            getattr(scan, "vwap", None) is None
+        ) and not (getattr(scan, "rvol_1m", 0) or 0) and not (getattr(scan, "rvol_5m", 0) or 0)
+
+        # sync direction to the structure we actually chose
         direction = _direction_from_structure(struct.template, direction)
 
-        # If market is closed OR intraday signals are absent, neutralize
-        if (not market_open_now) or no_intraday:
-            # Replace with a neutral Template to avoid suggesting shorts off-hours
+        if market_window:
+            if no_intraday:
+                if force_live:
+                    # we already set cfg.data.mode=fetch & TTL=0 above; enrichment just ran with those settings
+                    # if still empty, show a "warming up" trigger instead of market-closed
+                    trig = (
+                        f"Warming up — first bars arriving. At open: ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
+                        f"levels: orb=NA, vwap=NA"
+                    )
+                    # keep Template if we truly have no intraday; structures remain Template naturally
+                    struct = Structure(
+                        template="Template",
+                        expiry=None,
+                        long_strike=None,
+                        short_strike=None,
+                        debit_or_credit=None,
+                        width=None,
+                        per_leg_oi_ok=False,
+                        per_leg_spread_pct=None,
+                        needs_chain=True,
+                        limit_price=None,
+                    )
+                    contracts, tp, sl = (0, None, None)
+                elif within_grace:
+                    # no force-live, but still inside grace window — be gentle
+                    trig = (
+                        f"Warming up (grace {int(open_grace.total_seconds()/60)}m). ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
+                        f"levels: orb=NA, vwap=NA"
+                    )
+                    struct = Structure(
+                        template="Template",
+                        expiry=None,
+                        long_strike=None,
+                        short_strike=None,
+                        debit_or_credit=None,
+                        width=None,
+                        per_leg_oi_ok=False,
+                        per_leg_spread_pct=None,
+                        needs_chain=True,
+                        limit_price=None,
+                    )
+                    contracts, tp, sl = (0, None, None)
+                else:
+                    # past grace and no intraday: neutral preview
+                    trig = (
+                        f"Market open, but intraday unavailable — preview only. ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
+                        f"levels: orb=NA, vwap=NA"
+                    )
+                    struct = Structure(
+                        template="Template",
+                        expiry=None,
+                        long_strike=None,
+                        short_strike=None,
+                        debit_or_credit=None,
+                        width=None,
+                        per_leg_oi_ok=False,
+                        per_leg_spread_pct=None,
+                        needs_chain=True,
+                        limit_price=None,
+                    )
+                    contracts, tp, sl = (0, None, None)
+            else:
+                # we have live intraday — keep existing trigger/structure
+                pass
+        else:
+            # outside RTH: keep neutral preview
+            trig = (
+                f"Market closed — preview only. At open: ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
+                f"levels: orb=NA, vwap=NA"
+            )
             struct = Structure(
                 template="Template",
                 expiry=None,
@@ -233,10 +319,6 @@ def run(
                 limit_price=None,
             )
             contracts, tp, sl = (0, None, None)
-            trig = (
-                f"Market closed — preview only. At open: ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
-                f"levels: orb=NA, vwap=NA"
-            )
         # --- end guard ---
 
         # Guards
@@ -314,8 +396,8 @@ def run(
         emit_alerts(alerts, webhook, dry_run=False, offline=False)
 
     if not no_files:
-        # Write scored CSV
-        scored_cols = [
+        # Write scored CSV with enrichment/provenance columns preserved
+        base_cols = [
             "symbol",
             "raw_score",
             "tier",
@@ -337,6 +419,19 @@ def run(
             "cap_breach",
             "concurrency_guard",
         ]
+        extra_cols_set: set[str] = set()
+        for row in results:
+            for key in row.keys():
+                if key.startswith("_"):
+                    continue
+                if key not in base_cols:
+                    extra_cols_set.add(key)
+        extra_cols: list[str] = sorted(extra_cols_set)
+        # Keep data_errors at the end for readability if present
+        if "data_errors" in extra_cols:
+            extra_cols.remove("data_errors")
+            extra_cols.append("data_errors")
+        scored_cols = base_cols + extra_cols
         _write_csv(os.path.join(out_dir, "micro_momo_scored.csv"), results, scored_cols)
 
         # Write order CSV
@@ -414,6 +509,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--providers", default="ib,yahoo", help="Comma-separated providers in priority order")
     p.add_argument("--offline", action="store_true", help="Disable all live fetches and halts")
     p.add_argument("--halts-source", default="nasdaq", help="Halts source (nasdaq); ignored when --offline")
+    # force-live refresh
+    p.add_argument(
+        "--force-live",
+        action="store_true",
+        help="Force live refresh: data-mode=fetch, TTL=0, offline=False (ignores stale cache)",
+    )
     # auto-producers (chains/bars before providers)
     p.add_argument("--auto-producers", action="store_true", help="Attempt to generate missing local artifacts (bars/chains) via in-repo scripts before using providers")
     # legacy compatibility (treat as same)
@@ -429,6 +530,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # friendly input validation
+    if not getattr(args, "symbols", None):
+        if not getattr(args, "input", None):
+            print("error: provide --symbols SYM1,SYM2 or --input <scan.csv>", flush=True)
+            return 2
+        else:
+            if not os.path.exists(args.input):
+                print(f"error: input CSV not found: {args.input}", flush=True)
+                return 2
     # Build scans from --symbols when provided; otherwise, keep CSV behavior.
     # Note: when both --input and --symbols are present, --symbols takes precedence.
     scans: List[ScanRow] = []
@@ -481,6 +591,7 @@ def main(argv: List[str] | None = None) -> int:
                 ib_basket_out=args.ib_basket_out,
                 journal_template=bool(args.journal_template),
                 prebuilt_scans=scans,
+                force_live_flag=bool(getattr(args, "force_live", False)),
             )
         finally:
             globals()["load_scan_csv"] = _orig  # restore
@@ -508,6 +619,7 @@ def main(argv: List[str] | None = None) -> int:
         alerts_json_only=bool(args.alerts_json_only),
         ib_basket_out=args.ib_basket_out,
         journal_template=bool(args.journal_template),
+        force_live_flag=bool(getattr(args, "force_live", False)),
     )
     return 0
 

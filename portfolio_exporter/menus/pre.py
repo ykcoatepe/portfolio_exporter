@@ -25,10 +25,15 @@ from portfolio_exporter.core.proc import (
     start as sentinel_start,
     stop as sentinel_stop,
     status as sentinel_status,
+    start_module,
+    status_module,
+    start_module_logged,
+    stop_module,
 )
 from portfolio_exporter.core.fs_utils import find_latest_file, auto_chains_dir
 from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
 from portfolio_exporter.core.market_clock import rth_window_tr, pretty_tr
+import time, glob, shutil
 
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
 import builtins
@@ -168,6 +173,40 @@ def launch(status: StatusBar, default_fmt: str):
 
 
 def _run_micro_momo(console: Console) -> None:
+    symbols: str = ""
+    def _yahoo_cache_dir(out_dir: str) -> str:
+        return os.path.join(out_dir, ".cache")
+
+    def _clear_yahoo_cache(out_dir: str, console) -> None:
+        cache_dir = _yahoo_cache_dir(out_dir)
+        hits = glob.glob(os.path.join(cache_dir, "yahoo_*"))
+        if not hits:
+            console.print("[yellow]No provider cache to clear.[/]")
+            return
+        cleared = 0
+        for p in hits:
+            try:
+                if os.path.isdir(p):
+                    shutil.rmtree(p)
+                else:
+                    os.remove(p)
+                cleared += 1
+            except Exception:
+                pass
+        console.print(f"[green]Cleared {cleared} cache item(s).[/]")
+
+    def _tail_file(path: str, n: int = 20) -> list[str]:
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+            return lines[-n:]
+        except Exception:
+            return []
+
+    def _resolve_symbols_for_bg() -> str:
+        env_syms = os.getenv("MOMO_SYMBOLS") or ""
+        mem_syms = get_pref("micro_momo.symbols", "") or ""
+        return (env_syms or mem_syms or symbols).strip()
     def _clear_saved_symbols(console) -> None:
         # Confirm per HIG / NN/g for destructive actions
         ans = core_ui.prompt_input(
@@ -220,12 +259,13 @@ def _run_micro_momo(console: Console) -> None:
         chd = os.getenv("MOMO_CHAINS_DIR") or auto_chains_dir(
             ["./option_chains", "./chains", "./data/chains", "tests/data" if pe_test else None]
         )
+        chains_dir = chd
         if chd:
             argv += ["--chains_dir", chd]
         # Optional symbols override (comma-separated). Blank → keep file-based defaults.
         # Present lightweight options, including a destructive 'clear' with confirmation.
         console.print(
-            "Options: [Enter] run  ·  [C] Clear saved symbols  ·  [0] Back",
+            "Options: [Enter] run  ·  [B] Run in background  ·  [L] Run LIVE (background)  ·  [S] Status  ·  [T] Stop background  ·  [R] Rebuild dashboard  ·  [K] Clear cache  ·  [O] Open dashboard  ·  [C] Clear saved symbols  ·  [0] Back",
             highlight=False,
         )
         choice = core_ui.prompt_input("› ").strip().lower()
@@ -234,6 +274,106 @@ def _run_micro_momo(console: Console) -> None:
         if choice == "c":
             _clear_saved_symbols(console)
             return  # return to Analyzer screen so user sees blank default next time
+        if choice == "b":
+            resolved = _resolve_symbols_for_bg()
+            if not resolved:
+                console.print("[yellow]No symbols found.[/] Enter symbols first (press Enter), or provide a scan CSV.")
+                return
+            bg_argv = ["--out_dir", out_dir, "--symbols", resolved]
+            if cfg and os.path.exists(cfg):
+                bg_argv += ["--cfg", cfg]
+            if chains_dir:
+                bg_argv += ["--chains_dir", chains_dir]
+            if (os.getenv("MOMO_FORCE_LIVE") or "").lower() in ("1", "true", "yes"):
+                bg_argv += ["--force-live"]
+            log_path = os.path.join(out_dir, ".logs", "momo_analyzer.log")
+            res = start_module_logged(
+                "momo_analyzer",
+                "portfolio_exporter.scripts.micro_momo_analyzer",
+                bg_argv,
+                log_path,
+            )
+            console.print(
+                f"[green]Analyzer started[/] PID {res.get('pid')}  log: {res.get('log')}"
+                if res.get("ok")
+                else f"[yellow]{res.get('msg')}"
+            )
+            return
+        if choice == "l":
+            resolved = _resolve_symbols_for_bg()
+            if not resolved:
+                console.print("[yellow]No symbols found.[/] Enter symbols first (press Enter), or provide a scan CSV.")
+                return
+            live_argv = ["--out_dir", out_dir, "--symbols", resolved, "--force-live"]
+            if cfg and os.path.exists(cfg):
+                live_argv += ["--cfg", cfg]
+            if chains_dir:
+                live_argv += ["--chains_dir", chains_dir]
+            log_path = os.path.join(out_dir, ".logs", "momo_analyzer.log")
+            res = start_module_logged(
+                "momo_analyzer",
+                "portfolio_exporter.scripts.micro_momo_analyzer",
+                live_argv,
+                log_path,
+            )
+            console.print(
+                f"[green]Analyzer (LIVE) started[/] PID {res.get('pid')}  log: {res.get('log')}"
+                if res.get("ok")
+                else f"[yellow]{res.get('msg')}"
+            )
+            return
+        if choice == "k":
+            _clear_yahoo_cache(out_dir, console)
+            return
+        if choice == "r":
+            # Rebuild dashboard now
+            try:
+                from portfolio_exporter.scripts import micro_momo_dashboard as _dash
+
+                _dash.main(["--out_dir", out_dir])
+                open_dashboard(out_dir)
+            except Exception as exc:
+                console.print(f"[yellow]Dashboard rebuild failed:[/] {exc}")
+            return
+        if choice == "s":
+            st = status_module("momo_analyzer")
+            running = st.get("running", False)
+            console.print(
+                f"Analyzer: {'[green]RUNNING[/]' if running else '[red]STOPPED[/]'}   PID: {st.get('pid','-')}"
+            )
+            # last scored
+            try:
+                from pathlib import Path as _P
+
+                p = _P(out_dir) / "micro_momo_scored.csv"
+                if p.exists():
+                    console.print(
+                        f"Last scored mtime: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(p.stat().st_mtime))}"
+                    )
+            except Exception:
+                pass
+            # tail log if present
+            log_path = st.get("log") if isinstance(st.get("log"), str) else os.path.join(out_dir, ".logs", "momo_analyzer.log")
+            lines = _tail_file(str(log_path), 20)
+            if lines:
+                from rich.panel import Panel
+
+                console.print(Panel.fit("".join(lines) or "(log empty)", title="log tail", border_style="cyan"))
+            else:
+                console.print("[dim]No log yet[/]")
+            return
+        if choice == "t":
+            res = stop_module("momo_analyzer")
+            console.print(
+                f"[green]{res.get('msg', 'stopped')}[/]"
+                if res.get("ok")
+                else f"[yellow]{res.get('msg')}"
+            )
+            return
+        if choice == "o":
+            # Open current dashboard from out/ (works even while analyzer is running)
+            open_dashboard(out_dir)
+            return
 
         # Prefill from env or memory; persist back to memory on use.
         try:
@@ -246,7 +386,8 @@ def _run_micro_momo(console: Console) -> None:
             # Normalize against alias map before passing down to analyzer
             alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])  # env path wins, if set
             syms = normalize_symbols(sym_in.split(","), alias_map)
-            argv += ["--symbols", ",".join(syms)]
+            symbols = ",".join(syms)
+            argv += ["--symbols", symbols]
             try:
                 set_pref("micro_momo.symbols", sym_in)
             except Exception:

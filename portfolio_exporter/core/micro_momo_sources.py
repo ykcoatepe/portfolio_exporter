@@ -299,6 +299,8 @@ def enrich_inplace(_rows: List[ScanRow], _cfg: Dict[str, object]) -> None:  # v1
                 set_field(row, "vwap_distance_pct", float(patt["vwap_distance_pct"]), "src_vwap_dist", bars_src or "yahoo")
             if patt.get("pattern_signal") is not None:
                 set_field(row, "pattern_signal", str(patt["pattern_signal"]), "src_pattern", bars_src or "yahoo")
+        else:
+            errors.append("bars_missing")
 
         # Yahoo summary fundamentals → float/adv/short
         if ysum:
@@ -371,13 +373,19 @@ def enrich_inplace(_rows: List[ScanRow], _cfg: Dict[str, object]) -> None:  # v1
                 setattr(row, "_chain_rows", chain)
             except Exception:
                 pass
+        else:
+            errors.append("chain_missing")
 
         # Halts
         if halts:
             set_field(row, "halts_count_today", int(halts.get(sym, 0)), "src_halts", "nasdaq")
 
         if errors:
-            setattr(row, "_data_errors", errors)
+            uniq_errors = []
+            for err in errors:
+                if err not in uniq_errors:
+                    uniq_errors.append(err)
+            setattr(row, "_data_errors", uniq_errors)
         if prov:
             setattr(row, "_provenance", {**prov, **getattr(row, "_provenance", {})})
 

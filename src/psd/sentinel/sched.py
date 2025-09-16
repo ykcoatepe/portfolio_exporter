@@ -175,7 +175,13 @@ def io_request(
         backoff = min(backoff * 2.0, 30.0)
 
 
-def run_loop(interval: int = 60, cfg: Optional[Dict[str, Any]] = None) -> None:
+def run_loop(
+    interval: int = 60,
+    cfg: Optional[Dict[str, Any]] = None,
+    *,
+    loops: int | None = None,
+    web_broadcast: Callable[[dict], None] | None = None,
+) -> None:
     """Run the paced intraday loop.
 
     - Invokes ``scan_once`` every ``interval`` seconds.
@@ -192,7 +198,16 @@ def run_loop(interval: int = 60, cfg: Optional[Dict[str, Any]] = None) -> None:
 
     last_marks: Dict[str, float] = {}
 
-    while True:
+    # Support bounded iterations for simulators/tests while keeping default infinite loop
+    def _iter_range() -> Iterable[int]:
+        if loops is None:
+            while True:
+                yield 1
+        else:
+            for i in range(loops):
+                yield i
+
+    for _ in _iter_range():
         t0 = time.monotonic()
 
         # Optionally fetch or wrap positions to control pacing.
@@ -210,6 +225,18 @@ def run_loop(interval: int = 60, cfg: Optional[Dict[str, Any]] = None) -> None:
 
         # Evaluate once per cadence
         dto = scan_once(cfg)
+
+        # Optional web broadcast hook
+        if callable(web_broadcast):
+            try:
+                # Ensure JSON-serializable payloads by converting keys/values conservatively
+                import json as _json
+
+                _json.dumps(dto)
+                web_broadcast(dto)
+            except Exception:
+                # Do not disrupt the loop on broadcast failures
+                pass
 
         # Last-mark cache: collect simple marks per underlying symbol
         try:
@@ -244,4 +271,3 @@ def run_loop(interval: int = 60, cfg: Optional[Dict[str, Any]] = None) -> None:
         elapsed = time.monotonic() - t0
         to_sleep = max(0.0, float(interval) - elapsed)
         time.sleep(to_sleep)
-

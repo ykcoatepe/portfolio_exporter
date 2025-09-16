@@ -52,3 +52,23 @@ budgets: {}
 budgets:
   theta_weekly: 0.001    # 0.10% of NAV per week
   hedge_monthly: 0.0035  # 0.35% of NAV per month
+
+# Alert controls
+alerts:
+  debounce_min: 5           # suppress duplicate alerts within this window
+  snooze_default_min: 30    # default snooze duration
+  snooze_options_min: [10, 30, 60]
+
+# One-step starter defaults
+psd:
+  auto:
+    start_on_menu: true
+    open_browser: true
+    web_host: "127.0.0.1"
+    web_port: 0              # 0 = choose free port automatically
+    interval_sec: 60
+    ib:
+      connect_retries: 10
+      backoff_sec: [1, 2, 3, 5]  # used cyclically
+      require_initial_positions: true
+      initial_timeout_sec: 20

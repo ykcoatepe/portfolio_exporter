@@ -29,6 +29,10 @@ dependencies = [
 [project.optional-dependencies]
 ib = ["ib_insync>=0.9.86"]
 pdf = ["reportlab>=4.0"]
+psd = [
+  "fastapi>=0.110",
+  "uvicorn>=0.22"
+]
 
 [project.scripts]
 portfolio_playbook = "main:main"
