@@ -69,6 +69,54 @@ def _rebuild_state_from_memos(memo_path: str) -> None:
         _state_loaded = True
 
 
+def _load_positions(cfg: Dict[str, Any]) -> List[Position]:
+    positions: List[Position] = []
+    src_positions = cfg.get("positions_override")
+    if src_positions is None:
+        src_positions = ib_src.get_positions(cfg)
+    try:
+        iterator = list(src_positions or [])
+    except Exception:
+        iterator = []
+    for row in iterator:
+        try:
+            pos = row if isinstance(row, Position) else Position(**row)
+            if getattr(pos, "legs", None):
+                fixed: list[OptionLeg] = []
+                for lg in list(pos.legs or []):  # type: ignore[attr-defined]
+                    if isinstance(lg, OptionLeg):
+                        fixed.append(lg)
+                    else:
+                        try:
+                            fixed.append(OptionLeg(**lg))  # type: ignore[arg-type]
+                        except Exception:
+                            continue
+                pos.legs = fixed  # type: ignore[assignment]
+            positions.append(pos)
+        except Exception:
+            continue
+    return positions
+
+
+def _risk_context(
+    positions: List[Position],
+    cfg: Dict[str, Any],
+    nav: float,
+) -> Tuple[RiskSnapshot, str, Dict[str, bool], Dict[str, bool], Dict[str, str]]:
+    vix = yf_src.get_vix(cfg) or 20.0
+    d_beta = delta_beta_exposure(positions, nav)
+    closes = yf_src.get_closes("SPY", 60, cfg)
+    var_abs = var95_1d_from_closes(closes, nav * abs(d_beta)) if closes else 0.0
+    margin_used = float(cfg.get("margin_used", 0.0))
+    snapshot = RiskSnapshot(nav=nav, vix=vix, delta_beta=d_beta, var95_1d=var_abs, margin_used=margin_used)
+    band_key, breaches = risk_bands.evaluate(vix, d_beta, var_abs / nav if nav else 0.0, margin_used)
+    daily_ret = float(cfg.get("daily_return", 0.0))
+    var_change = float(cfg.get("var_change", 0.0))
+    breakers = circuit_breakers.evaluate(daily_ret, var_change)
+    breaker_state = circuit_breakers.derive_state(float(cfg.get("day_pl", daily_ret)), float(cfg.get("month_pl", 0.0)))
+    return snapshot, band_key, breaches, breakers, breaker_state
+
+
 def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
     """Run a single scan and return a DTO for CLI rendering.
 
@@ -104,44 +152,20 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
                 {"ts": now, "type": "snooze", "uid": uid, "rule": rule, "until": until, "minutes": minutes or None},
             )
 
-    positions: List[Position] = []
-    # Datasource integration is mocked in tests; default empty
-    for row in ib_src.get_positions(cfg):
+    positions = _load_positions(cfg)
+    mark_backfills: List[str] = []
+    if hasattr(ib_src, "consume_mark_backfills"):
         try:
-            pos = row if isinstance(row, Position) else Position(**row)
-            # Ensure legs are OptionLeg instances when provided
-            if getattr(pos, "legs", None):
-                fixed: list[OptionLeg] = []
-                for lg in list(pos.legs or []):  # type: ignore[attr-defined]
-                    if isinstance(lg, OptionLeg):
-                        fixed.append(lg)
-                    else:
-                        try:
-                            fixed.append(OptionLeg(**lg))  # type: ignore[arg-type]
-                        except Exception:
-                            continue
-                pos.legs = fixed  # type: ignore[assignment]
-            positions.append(pos)
+            mark_backfills = ib_src.consume_mark_backfills()  # type: ignore[attr-defined]
         except Exception:
-            continue
-
-    vix = yf_src.get_vix(cfg) or 20.0
-    # Exposure and VaR
-    d_beta = delta_beta_exposure(positions, nav)
-    closes = yf_src.get_closes("SPY", 60, cfg)
-    var_abs = var95_1d_from_closes(closes, nav * abs(d_beta)) if closes else 0.0
-    margin_used = float(cfg.get("margin_used", 0.0))
-    snapshot = RiskSnapshot(nav=nav, vix=vix, delta_beta=d_beta, var95_1d=var_abs, margin_used=margin_used)
-
-    # Evaluate bands and breakers (toy daily_return and var_change from cfg)
-    band_key, breaches = risk_bands.evaluate(vix, d_beta, var_abs / nav if nav else 0.0, margin_used)
-    daily_ret = float(cfg.get("daily_return", 0.0))
-    var_change = float(cfg.get("var_change", 0.0))
-    breakers = circuit_breakers.evaluate(daily_ret, var_change)
-    breaker_state = circuit_breakers.derive_state(float(cfg.get("day_pl", daily_ret)), float(cfg.get("month_pl", 0.0)))
+            mark_backfills = []
+    snapshot, band_key, breaches, breakers, breaker_state = _risk_context(positions, cfg, nav)
+    vix = float(snapshot.vix)
 
     # Recognize combos (spreads/condors) and orphan risk
     combos, orphans = recognize(positions)
+
+    margin_used = snapshot.margin_used or 0.0
 
     # Build alerts and rows
     alerts: List[Alert] = []
@@ -223,6 +247,19 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
             }
         )
         _last_alert_ts[key] = now_ts
+    if mark_backfills:
+        for sym in mark_backfills:
+            write_jsonl(
+                memo_path,
+                {
+                    "ts": now_ts,
+                    "type": "info",
+                    "uid": f"STK-{sym}",
+                    "rule": "mark-backfill",
+                    "message": f"mark from yf for {sym}",
+                },
+            )
+
     for o in orphans:
         uid = f"{o['symbol']}-{o['expiry']}-orphan-{o['side']}"
         key = (uid, "orphan")
@@ -232,16 +269,16 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
                 memo_path,
                 {"ts": now_ts, "type": "snoozed", "uid": uid, "rule": "orphan", "next": until},
             )
-            rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": 0, "alert": (o.get("reason", "") + " [SNOOZED]")})
+            rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": None, "alert": (o.get("reason", "") + " [SNOOZED]")})
         else:
             last = _last_alert_ts.get(key, 0)
             if last and (now_ts - last) < debounce_sec:
                 nxt = last + debounce_sec
                 write_jsonl(memo_path, {"ts": now_ts, "type": "suppressed", "uid": uid, "rule": "orphan", "next": nxt})
-                rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": 0, "alert": (o.get("reason", "") + " (debounced)")})
+                rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": None, "alert": (o.get("reason", "") + " (debounced)")})
             else:
                 alerts.append(Alert(uid=uid, rule="orphan", severity="warn", message=o.get("reason", "orphan-risk")))
-                rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": 0, "alert": o.get("reason", "")})
+                rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": None, "alert": o.get("reason", "")})
                 _last_alert_ts[key] = now_ts
 
     # Budgets footer
@@ -318,4 +355,19 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
         "budgets": budgets_dto,
         "alerts": [{"uid": a.uid, "rule": a.rule, "severity": a.severity, "message": a.message, "data": a.data} for a in alerts],
         "rows": rows,
+    }
+
+
+def compute_snapshot(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """Lightweight helper returning risk snapshot context without memo side-effects."""
+    cfg = cfg or {}
+    nav = float(cfg.get("nav", 100_000.0))
+    positions = _load_positions(cfg)
+    snapshot, band_key, breaches, breakers, breaker_state = _risk_context(positions, cfg, nav)
+    return {
+        "snapshot": snapshot,
+        "band": band_key,
+        "breaches": breaches,
+        "breakers": breakers,
+        "breaker_state": breaker_state,
     }

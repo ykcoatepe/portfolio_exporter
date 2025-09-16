@@ -19,6 +19,12 @@ class RTHWindowTR:
     no_new_signals_after_tr: Optional[datetime] = None
 
 
+@dataclass
+class SessionWindowTR:
+    start_tr: datetime
+    end_tr: datetime
+
+
 def _combine(d: date, hh: int, mm: int, tz: ZoneInfo) -> datetime:
     return datetime(d.year, d.month, d.day, hh, mm, tzinfo=tz)
 
@@ -59,6 +65,18 @@ def rth_window_tr(
         afternoon_rearm_tr=aft_tr,
         no_new_signals_after_tr=cutoff_tr,
     )
+
+
+def premarket_window_tr(
+    et_start: time = time(4, 0),
+    et_end: time = time(9, 30),
+) -> SessionWindowTR:
+    """Return TR-local pre-market window (default 04:00-09:30 ET)."""
+    now_ny = datetime.now(TZ_NY)
+    ny_day = now_ny.date()
+    start_tr = _combine(ny_day, et_start.hour, et_start.minute, TZ_NY).astimezone(TZ_TR)
+    end_tr = _combine(ny_day, et_end.hour, et_end.minute, TZ_NY).astimezone(TZ_TR)
+    return SessionWindowTR(start_tr=start_tr, end_tr=end_tr)
 
 
 def is_after(dt_tr: datetime, now_tr: Optional[datetime] = None) -> bool:

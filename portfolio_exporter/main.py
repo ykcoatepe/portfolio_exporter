@@ -235,11 +235,47 @@ def main(argv: Optional[List[str]] = None) -> int:
             ("tests/data/micro_momo_config.json" if pe_test else None),
         ]
         cfg = next((p for p in cfg_candidates if p and os.path.exists(p)), None)
-        inp = os.getenv("MOMO_INPUT") or "tests/data/meme_scan_sample.csv"
+        inp = os.getenv("MOMO_INPUT")
+        if not inp:
+            search_dirs = [
+                os.getenv("MOMO_INPUT_DIR"),
+                ".",
+                "./data",
+                "./scans",
+                "./inputs",
+                "tests/data" if pe_test else None,
+            ]
+            patterns = tuple((os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(","))
+            latest: tuple[float, pathlib.Path] | None = None
+            for directory in search_dirs:
+                if not directory:
+                    continue
+                base = pathlib.Path(directory)
+                if not base.exists():
+                    continue
+                for pattern in patterns:
+                    if not pattern:
+                        continue
+                    for candidate in sorted(base.glob(pattern)):
+                        try:
+                            cand_mtime = candidate.stat().st_mtime
+                        except OSError:
+                            continue
+                        if latest is None or cand_mtime >= latest[0]:
+                            latest = (cand_mtime, candidate)
+            if latest:
+                inp = str(latest[1])
+            elif pe_test:
+                inp = "tests/data/meme_scan_sample.csv"
         out_dir = os.getenv("MOMO_OUT") or "out"
-        argv2: list[str] = ["--input", inp, "--out_dir", out_dir]
+        argv2: list[str] = ["--out_dir", out_dir]
         if cfg:
             argv2 += ["--cfg", cfg]
+        session_env = os.getenv("MOMO_SESSION")
+        if session_env:
+            argv2 += ["--session", session_env]
+        if inp:
+            argv2 += ["--input", inp]
         chd = os.getenv("MOMO_CHAINS_DIR")
         if chd:
             argv2 += ["--chains_dir", chd]

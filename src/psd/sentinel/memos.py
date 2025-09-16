@@ -8,6 +8,8 @@ from typing import Any, Dict
 
 
 def write_jsonl(path: str, obj: Dict[str, Any]) -> None:
+    if not path:
+        return
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     line = json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
     with open(path, "a", encoding="utf-8") as fh:

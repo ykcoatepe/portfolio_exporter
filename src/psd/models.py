@@ -43,7 +43,7 @@ class Position:
     sleeve: Sleeve
     kind: Kind
     qty: int
-    mark: float
+    mark: float | None
     beta: float | None = None
     # for options
     legs: list[OptionLeg] = field(default_factory=list)
@@ -53,7 +53,7 @@ class Position:
             raise ValueError("Position.uid required")
         if not self.symbol:
             raise ValueError("Position.symbol required")
-        if self.mark < 0:
+        if self.mark is not None and self.mark < 0:
             raise ValueError("Position.mark cannot be negative")
         if self.kind in ("credit_spread", "iron_condor") and not self.legs:
             raise ValueError("Defined-risk positions require legs")

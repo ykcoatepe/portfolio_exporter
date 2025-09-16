@@ -4,6 +4,7 @@ import argparse
 import csv
 import html
 import os
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -42,6 +43,19 @@ def _count_provenance(rows: List[Dict[str, Any]], field: str = "src_vwap") -> Di
     return out
 
 
+def _count_data_errors(rows: List[Dict[str, Any]]) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for r in rows:
+        raw = str(r.get("data_errors") or "")
+        if not raw:
+            continue
+        for part in raw.split(";"):
+            key = part.strip()
+            if key:
+                counts[key] += 1
+    return counts
+
+
 def _sum_concurrency(rows: List[Dict[str, Any]]) -> int:
     s = 0
     for r in rows:
@@ -56,6 +70,7 @@ def _summary_block(scored: List[Dict[str, Any]]) -> str:
     tiers = _count_tiers(scored)
     prov = _count_provenance(scored, "src_vwap")
     guards = _sum_concurrency(scored)
+    errors = _count_data_errors(scored)
     html_parts = [
         "<div class='small' style='margin:6px 0 14px 0'>",
         f"Tiers: <span class='badge A'>A {tiers['A']}</span> · ",
@@ -68,6 +83,18 @@ def _summary_block(scored: List[Dict[str, Any]]) -> str:
         f"Guards: <kbd>concurrency_guard</kbd> {guards}",
         "</div>",
     ]
+    if errors:
+        err_bits = " · ".join(f"{html.escape(k)} {v}" for k, v in sorted(errors.items()))
+        html_parts.append(f"<div class='small'>Data issues: {err_bits}</div>")
+    warn_warmup = any(
+        "warming up" in str(r.get("entry_trigger", "")).lower()
+        and str(r.get("structure_template") or r.get("structure")) == "Template"
+        for r in scored
+    )
+    if warn_warmup:
+        html_parts.append(
+            "<div class='small'>Heads-up: Force-live refresh shows 'Warming up' Template rows until intraday bars arrive.</div>"
+        )
     return "".join(html_parts)
 
 
@@ -84,7 +111,14 @@ def _read_csv(path: Path) -> List[Dict[str, Any]]:
 def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
     if not rows:
         return f"<h2 id='{html.escape(anchor)}'>{html.escape(title)}</h2><div class='small'>No data</div>"
-    cols = list(rows[0].keys())
+    # build union of columns across all rows to avoid dropping sparse diagnostics
+    cols: List[str] = []
+    seen_cols: set[str] = set()
+    for row in rows:
+        for col in row.keys():
+            if col not in seen_cols:
+                seen_cols.add(col)
+                cols.append(col)
     wanted = [
         c
         for c in [

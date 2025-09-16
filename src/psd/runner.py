@@ -79,22 +79,22 @@ def start_psd(*, loops: int | None = None, interval_override: float | None = Non
     import sys as _sys
     import importlib as _importlib
 
-    web = _importlib.import_module(
-        "psd.web.server" if "psd.web.server" in _sys.modules else "src.psd.web.server"
-    )
-    sched = _importlib.import_module(
-        "psd.sentinel.sched" if "psd.sentinel.sched" in _sys.modules else "src.psd.sentinel.sched"
-    )
+    _sys_modules = _sys.modules
+    if "psd.web.server" not in _sys_modules and "src.psd.web.server" in _sys_modules:
+        _sys_modules["psd.web.server"] = _sys_modules["src.psd.web.server"]
+    if "psd.sentinel.sched" not in _sys_modules and "src.psd.sentinel.sched" in _sys_modules:
+        _sys_modules["psd.sentinel.sched"] = _sys_modules["src.psd.sentinel.sched"]
+    if "psd.datasources.ibkr" not in _sys_modules and "src.psd.datasources.ibkr" in _sys_modules:
+        _sys_modules["psd.datasources.ibkr"] = _sys_modules["src.psd.datasources.ibkr"]
+
+    web = _importlib.import_module("psd.web.server" if "psd.web.server" in _sys_modules else "src.psd.web.server")
+    sched = _importlib.import_module("psd.sentinel.sched" if "psd.sentinel.sched" in _sys_modules else "src.psd.sentinel.sched")
 
     # IBKR datasource is optional; tests will monkeypatch as needed
     ib_get_positions = None
     try:
-        mod_name = (
-            "psd.datasources.ibkr"
-            if "psd.datasources.ibkr" in _sys.modules
-            else "src.psd.datasources.ibkr"
-        )
-        ib_mod = _importlib.import_module(mod_name)
+        ds_module = "psd.datasources.ibkr" if "psd.datasources.ibkr" in _sys_modules else "src.psd.datasources.ibkr"
+        ib_mod = _importlib.import_module(ds_module)
         ib_get_positions = getattr(ib_mod, "get_positions", None)
     except Exception:
         ib_get_positions = None
@@ -105,9 +105,18 @@ def start_psd(*, loops: int | None = None, interval_override: float | None = Non
     interval = float(interval_override if interval_override is not None else cfg.get("interval_sec", 60))
 
     # Start web server in background and open browser if requested
-    host, port = web.start(host=host, port=port, background=True)
+    web_started = True
+    try:
+        host, port = web.start(host=host, port=port, background=True)
+    except ModuleNotFoundError:
+        web_started = False
+    except RuntimeError as exc:
+        if "uvicorn" in str(exc).lower() or "fastapi" in str(exc).lower():
+            web_started = False
+        else:
+            raise
     url = f"http://{host}:{int(port)}"
-    if bool(cfg.get("open_browser", True)):
+    if web_started and bool(cfg.get("open_browser", True)):
         try:
             import webbrowser
 

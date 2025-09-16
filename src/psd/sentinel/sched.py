@@ -23,7 +23,7 @@ from __future__ import annotations
 import random
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 # Lazy import to keep CLI startup fast and allow test monkeypatching
@@ -45,7 +45,7 @@ class TokenBucket:
     refill_rate_per_sec: float
     tokens: float | None = None
     last_refill: float | None = None
-    lock: threading.Lock = threading.Lock()
+    lock: threading.Lock = field(default_factory=threading.Lock)
 
     def __post_init__(self) -> None:
         if self.tokens is None:

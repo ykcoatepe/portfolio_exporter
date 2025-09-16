@@ -174,6 +174,10 @@ momo-dashboard-open:
 momo-go:
 	python -m portfolio_exporter.scripts.micro_momo_go --out_dir out
 
+.PHONY: momo-diag
+momo-diag:
+	python3 -m portfolio_exporter.scripts.micro_momo_diag --out_dir out
+
 # --- Micro-MOMO + logbook variants (opt-in via LOGBOOK_AUTO=1) ---
 .PHONY: momo-journal-log momo-sentinel-offline-log momo-eod-offline-log momo-dashboard-open-log
 

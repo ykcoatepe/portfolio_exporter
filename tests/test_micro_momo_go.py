@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import portfolio_exporter.main as pe_main
 from portfolio_exporter.scripts import micro_momo_go
 
@@ -61,3 +63,49 @@ def test_task_runner_passes_memory_symbols(monkeypatch) -> None:
     assert "--symbols" in argv
     idx = argv.index("--symbols")
     assert argv[idx + 1] == "FORD,TSLA"
+
+
+def test_micro_momo_go_respects_no_publish(monkeypatch, tmp_path) -> None:
+    out_dir = tmp_path / "out"
+    publish_called = {"publish": False, "open": False}
+
+    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_analyzer.main", lambda argv: 0)
+    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_dashboard.main", lambda argv: 0)
+
+    def _fake_publish(out_dir_arg: str, publish_dir: str) -> Path:
+        publish_called["publish"] = True
+        return Path(publish_dir)
+
+    def _fake_open(path: Path) -> None:
+        publish_called["open"] = True
+
+    monkeypatch.setattr("portfolio_exporter.core.publish.publish_pack", _fake_publish)
+    monkeypatch.setattr("portfolio_exporter.core.publish.open_dashboard", _fake_open)
+
+    rc = micro_momo_go.main(["--out_dir", str(out_dir), "--no-publish"])
+    assert rc == 0
+    assert publish_called["publish"] is False
+    assert publish_called["open"] is False
+
+
+def test_micro_momo_go_default_publishes(monkeypatch, tmp_path) -> None:
+    out_dir = tmp_path / "out"
+    publish_called = {"publish": False, "open": False}
+
+    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_analyzer.main", lambda argv: 0)
+    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_dashboard.main", lambda argv: 0)
+
+    def _fake_publish(out_dir_arg: str, publish_dir: str) -> Path:
+        publish_called["publish"] = True
+        return Path(publish_dir)
+
+    def _fake_open(path: Path) -> None:
+        publish_called["open"] = True
+
+    monkeypatch.setattr("portfolio_exporter.core.publish.publish_pack", _fake_publish)
+    monkeypatch.setattr("portfolio_exporter.core.publish.open_dashboard", _fake_open)
+
+    rc = micro_momo_go.main(["--out_dir", str(out_dir)])
+    assert rc == 0
+    assert publish_called["publish"] is True
+    assert publish_called["open"] is True

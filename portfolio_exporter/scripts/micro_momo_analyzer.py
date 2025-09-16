@@ -22,7 +22,7 @@ from ..core.micro_momo_sources import (
     load_scan_csv,
 )
 from ..core.micro_momo_types import ResultRow, ScanRow, Structure
-from ..core.market_clock import rth_window_tr, TZ_TR
+from ..core.market_clock import rth_window_tr, premarket_window_tr, pretty_tr, TZ_TR
 from ..core.alerts import emit_alerts
 from ..core.ib_export import export_ib_basket, export_ib_notes
 from ..core.fs_utils import find_latest_chain_for_symbol
@@ -135,6 +135,7 @@ def run(
     journal_template: bool = False,
     prebuilt_scans: Optional[List[ScanRow]] = None,
     force_live_flag: bool = False,
+    session_mode: str = "auto",
 ) -> List[Dict[str, Any]]:
     cfg = _read_cfg(cfg_path)
     # Merge runtime data config
@@ -175,6 +176,9 @@ def run(
                 "cache": {"enabled": True, "dir": cache_dir, "ttl_sec": 0},
             }
         )
+    session_effective = (session_mode or "auto").lower()
+    if session_effective not in {"auto", "rth", "premarket"}:
+        session_effective = "auto"
     # Build scans list either from symbols (synthesized) or from CSV
     scans: List[ScanRow]
     if prebuilt_scans is not None:
@@ -189,6 +193,20 @@ def run(
     results: List[Dict[str, Any]] = []
     base_active = _count_active_journal(out_dir)
     max_concurrent = int(cfg.get("max_concurrent", 5))
+    def _neutral_structure() -> Structure:
+        return Structure(
+            template="Template",
+            expiry=None,
+            long_strike=None,
+            short_strike=None,
+            debit_or_credit=None,
+            width=None,
+            per_leg_oi_ok=False,
+            per_leg_spread_pct=None,
+            needs_chain=True,
+            limit_price=None,
+        )
+
     for scan in scans:
         pf = passes_filters(scan, cfg)
         comps, raw = score_components(scan, cfg)
@@ -222,12 +240,17 @@ def run(
 
         # --- Direction/structure alignment + live/preview guard with grace + force-live ---
         sch = rth_window_tr()
+        pre_window = premarket_window_tr()
         now_tr = datetime.now(TZ_TR)
 
         # small grace right after open to avoid neutralizing during first bars
         open_grace = timedelta(minutes=3)
         market_window = sch.open_tr <= now_tr <= sch.close_tr
         within_grace = sch.open_tr <= now_tr <= (sch.open_tr + open_grace)
+        premarket_window_active = pre_window.start_tr <= now_tr < sch.open_tr
+        allow_premarket = session_effective == "premarket" or (
+            session_effective == "auto" and premarket_window_active
+        )
 
         no_intraday = (
             getattr(scan, "vwap", None) is None
@@ -235,6 +258,7 @@ def run(
 
         # sync direction to the structure we actually chose
         direction = _direction_from_structure(struct.template, direction)
+        session_state = "rth" if market_window else ("premarket" if allow_premarket and premarket_window_active else "closed")
 
         if market_window:
             if no_intraday:
@@ -246,18 +270,7 @@ def run(
                         f"levels: orb=NA, vwap=NA"
                     )
                     # keep Template if we truly have no intraday; structures remain Template naturally
-                    struct = Structure(
-                        template="Template",
-                        expiry=None,
-                        long_strike=None,
-                        short_strike=None,
-                        debit_or_credit=None,
-                        width=None,
-                        per_leg_oi_ok=False,
-                        per_leg_spread_pct=None,
-                        needs_chain=True,
-                        limit_price=None,
-                    )
+                    struct = _neutral_structure()
                     contracts, tp, sl = (0, None, None)
                 elif within_grace:
                     # no force-live, but still inside grace window — be gentle
@@ -265,18 +278,7 @@ def run(
                         f"Warming up (grace {int(open_grace.total_seconds()/60)}m). ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
                         f"levels: orb=NA, vwap=NA"
                     )
-                    struct = Structure(
-                        template="Template",
-                        expiry=None,
-                        long_strike=None,
-                        short_strike=None,
-                        debit_or_credit=None,
-                        width=None,
-                        per_leg_oi_ok=False,
-                        per_leg_spread_pct=None,
-                        needs_chain=True,
-                        limit_price=None,
-                    )
+                    struct = _neutral_structure()
                     contracts, tp, sl = (0, None, None)
                 else:
                     # past grace and no intraday: neutral preview
@@ -284,40 +286,34 @@ def run(
                         f"Market open, but intraday unavailable — preview only. ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
                         f"levels: orb=NA, vwap=NA"
                     )
-                    struct = Structure(
-                        template="Template",
-                        expiry=None,
-                        long_strike=None,
-                        short_strike=None,
-                        debit_or_credit=None,
-                        width=None,
-                        per_leg_oi_ok=False,
-                        per_leg_spread_pct=None,
-                        needs_chain=True,
-                        limit_price=None,
-                    )
+                    struct = _neutral_structure()
                     contracts, tp, sl = (0, None, None)
             else:
                 # we have live intraday — keep existing trigger/structure
                 pass
+        elif allow_premarket and premarket_window_active:
+            if no_intraday:
+                if force_live:
+                    trig = (
+                        f"Pre-market force-live — waiting for first prints before open {pretty_tr(sch.open_tr)}."
+                    )
+                else:
+                    trig = (
+                        f"Pre-market — waiting for first prints before open {pretty_tr(sch.open_tr)}."
+                    )
+                struct = _neutral_structure()
+                contracts, tp, sl = (0, None, None)
+            else:
+                trig = (
+                    f"Pre-market setup — plan ORB at {pretty_tr(sch.open_tr)} (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)})."
+                )
         else:
             # outside RTH: keep neutral preview
             trig = (
                 f"Market closed — preview only. At open: ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
                 f"levels: orb=NA, vwap=NA"
             )
-            struct = Structure(
-                template="Template",
-                expiry=None,
-                long_strike=None,
-                short_strike=None,
-                debit_or_credit=None,
-                width=None,
-                per_leg_oi_ok=False,
-                per_leg_spread_pct=None,
-                needs_chain=True,
-                limit_price=None,
-            )
+            struct = _neutral_structure()
             contracts, tp, sl = (0, None, None)
         # --- end guard ---
 
@@ -351,6 +347,7 @@ def run(
         base = asdict(res)
         base["cap_breach"] = cap_breach
         base["concurrency_guard"] = concurrency_guard
+        base["session_state"] = session_state
         # Pass-through: append any attributes present on the scan row without overwriting
         for k, v in getattr(scan, "__dict__", {}).items():
             if k in base:
@@ -504,6 +501,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--json", action="store_true", help="Emit results JSON to stdout")
     p.add_argument("--no-files", action="store_true", help="Skip writing CSV files")
+    p.add_argument(
+        "--session",
+        choices=["auto", "rth", "premarket"],
+        help="Session guard (auto picks based on clock; premarket allows pre-open structures)",
+    )
     # v1.1 data flags
     p.add_argument("--data-mode", choices=["csv-only", "enrich", "fetch"], default="enrich")
     p.add_argument("--providers", default="ib,yahoo", help="Comma-separated providers in priority order")
@@ -530,10 +532,31 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    session_mode = (args.session or os.getenv("MOMO_SESSION") or "auto").lower()
+    if session_mode not in {"auto", "rth", "premarket"}:
+        session_mode = "auto"
+    # allow environment/memory to backfill symbols when neither --symbols nor --input provided
+    if not getattr(args, "symbols", None) and not getattr(args, "input", None):
+        sym_source = os.getenv("MOMO_SYMBOLS") or ""
+        if not sym_source:
+            try:
+                from ..core.memory import get_pref
+
+                sym_source = get_pref("micro_momo.symbols") or ""
+            except Exception:
+                sym_source = ""
+        if sym_source:
+            alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])
+            normalized = normalize_symbols([s for s in sym_source.split(",") if s.strip()], alias_map)
+            if normalized:
+                setattr(args, "symbols", ",".join(normalized))
     # friendly input validation
     if not getattr(args, "symbols", None):
         if not getattr(args, "input", None):
-            print("error: provide --symbols SYM1,SYM2 or --input <scan.csv>", flush=True)
+            print(
+                "error: provide --symbols SYM1,SYM2 (or set MOMO_SYMBOLS / memory pref) or --input <scan.csv>",
+                flush=True,
+            )
             return 2
         else:
             if not os.path.exists(args.input):
@@ -592,6 +615,7 @@ def main(argv: List[str] | None = None) -> int:
                 journal_template=bool(args.journal_template),
                 prebuilt_scans=scans,
                 force_live_flag=bool(getattr(args, "force_live", False)),
+                session_mode=session_mode,
             )
         finally:
             globals()["load_scan_csv"] = _orig  # restore
@@ -620,6 +644,7 @@ def main(argv: List[str] | None = None) -> int:
         ib_basket_out=args.ib_basket_out,
         journal_template=bool(args.journal_template),
         force_live_flag=bool(getattr(args, "force_live", False)),
+        session_mode=session_mode,
     )
     return 0
 

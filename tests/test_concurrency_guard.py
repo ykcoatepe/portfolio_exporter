@@ -44,3 +44,37 @@ def test_concurrency_guard(tmp_path: Path) -> None:
         ]
     )
 
+
+def test_concurrency_guard_marks_overflow(tmp_path: Path, capsys) -> None:
+    out = tmp_path / "out"
+    out.mkdir()
+    scan = tmp_path / "scan.csv"
+    scan.write_text(
+        "symbol,price,volume,rel_strength,short_interest,turnover,iv_rank,atr_pct,trend\n"
+        "ABC,12,10000,60,5,2,10,1.0,0.2\n"
+        "XYZ,10,12000,65,5,2,12,1.2,0.3\n",
+        encoding="utf-8",
+    )
+    cfg = tmp_path / "cfg.json"
+    cfg.write_text(json.dumps({"max_concurrent": 1}), encoding="utf-8")
+
+    mm_main(
+        [
+            "--input",
+            str(scan),
+            "--cfg",
+            str(cfg),
+            "--out_dir",
+            str(out),
+            "--json",
+            "--no-files",
+            "--data-mode",
+            "csv-only",
+        ]
+    )
+    captured = capsys.readouterr()
+    data = json.loads(captured.out)
+    assert len(data) == 2
+    assert data[0].get("concurrency_guard") == 0
+    assert data[1].get("concurrency_guard") == 1
+

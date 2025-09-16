@@ -13,8 +13,13 @@ def render_table(rows: List[Dict[str, Any]]) -> str:
     cols = ["uid", "sleeve", "kind", "R", "stop", "target", "mark", "alert"]
     header = " | ".join(cols)
     lines = [header, "-" * len(header)]
+    def _fmt(val: Any) -> str:
+        if val is None:
+            return "—"
+        return str(val)
+
     for r in rows:
-        lines.append(" | ".join(str(r.get(c, "")) for c in cols))
+        lines.append(" | ".join(_fmt(r.get(c, "")) for c in cols))
     return "\n".join(lines)
 
 
@@ -25,10 +30,12 @@ def render_dashboard(dto: Dict[str, Any]) -> str:
     """
     snap = dto.get("snapshot", {})
     rows = dto.get("rows", [])
-    vix = snap.get("vix", 0.0)
+    vix = float(snap.get("vix", 0.0) or 0.0)
     regime = "<15" if vix < 15 else ("15-25" if vix <= 25 else ">25")
-    margin_pct = float(snap.get("margin_used", 0.0)) * 100.0
-    top = f"Regime: {regime} | Δβ: {snap.get('delta_beta', 0):.4f} | VaR95(1d): {snap.get('var95_1d', 0):.2f} | Margin%: {margin_pct:.1f}"
+    margin_pct = float(snap.get("margin_used", 0.0) or 0.0) * 100.0
+    delta_beta_val = float(snap.get("delta_beta", 0.0) or 0.0)
+    var_val = float(snap.get("var95_1d", 0.0) or 0.0)
+    top = f"Regime: {regime} | Δβ: {delta_beta_val:.4f} | VaR95(1d): {var_val:.2f} | Margin%: {margin_pct:.1f}"
     lines = [top]
     breaches = snap.get("breaches", {}) or {}
     breakers = snap.get("breakers", {}) or {}

@@ -21,6 +21,14 @@ theta_templates:
   mid_vix:   { vix_min: 15, vix_max: 25, dte_min: 30, dte_max: 45, tp_min: 0.40, tp_max: 0.60, fee_nav_warn: 0.002 }
   high_vix:  { vix_gt: 25,        dte_min: 14, dte_max: 30, tp_min: 0.30, tp_max: 0.50, fee_nav_warn: 0.002 }
 
+ibkr:
+  market_data_mode: auto   # "live" | "delayed" | "auto"
+  mktdata_timeout_sec: 2.0
+  greeks_timeout_sec: 5.0
+
+fill:
+  allow_yf_equity_marks: true
+
 # Optional theta global knobs (defaults used when regime-specific keys absent)
 theta:
   weekly_fee_nav_warn: 0.002  # 0.20% of NAV per week

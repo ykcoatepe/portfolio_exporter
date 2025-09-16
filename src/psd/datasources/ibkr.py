@@ -1,30 +1,249 @@
-"""IBKR datasource wrappers (v0.1).
+"""IBKR datasource wrappers for the Portfolio Sentinel Dashboard.
 
-These are thin adapters intended to reuse in-repo exporter functions, while
-remaining safe under unit tests (no network I/O). Tests can monkeypatch these
-functions to supply fixtures.
+The helpers in this module keep the IBKR integration light-weight so unit
+tests can patch behaviour without touching the network.  Production callers
+are expected to provide live objects (``ib_insync.IB``) while tests can inject
+pragmatic stubs.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import logging
+import math
+import time
+from datetime import datetime
+from functools import lru_cache
+from typing import Any, Callable, Dict, Iterable, List, Literal, Sequence
+
+from . import yfin
+
+logger = logging.getLogger(__name__)
+
+MarketDataMode = Literal["live", "delayed", "auto"]
+
+_MARKET_DATA_MODES: Dict[str, int] = {"live": 1, "delayed": 4}
+_ENTITLEMENT_CODES = {10167, 354, 162, 200}
+_LAST_MARKET_MODE: str | None = None
+_MARK_BACKFILLS: set[str] = set()
+_GREEKS_WARNED: set[str] = set()
 
 
-def get_positions(cfg: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
-    """Return PSD position dicts, wired to portfolio_greeks when available.
+@lru_cache(maxsize=1)
+def _rules_cfg() -> Dict[str, Any]:
+    try:
+        import yaml  # type: ignore
 
-    Behavior
-    - Attempts to import and call ``portfolio_exporter.scripts.portfolio_greeks._load_positions``
-      to fetch a live snapshot from IBKR (requires TWS/Gateway). On failure, returns ``[]``.
-    - Transforms the resulting DataFrame rows into PSD position dicts expected by the engine:
-      equity rows as kind="equity" and aggregated option legs per underlying as kind="option".
+        with open("config/rules.yaml", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
-    Notes
-    - Keeps this logic light and tolerant; missing prices default to 0.0 to satisfy
-      non-negative ``mark`` constraints on the Position dataclass.
-    - Tests monkeypatch this function directly; no network I/O occurs during unit tests.
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        out = float(value)
+    except Exception:
+        return None
+    if math.isnan(out):
+        return None
+    return out
+
+
+def _normalize_expiry(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        cleaned = value.strip().replace("-", "").replace("/", "")
+        return cleaned[:8]
+    for attr in ("to_pydatetime", "to_datetime"):
+        if hasattr(value, attr):
+            try:
+                value = getattr(value, attr)()
+            except Exception:
+                pass
+    if isinstance(value, datetime):
+        return value.strftime("%Y%m%d")
+    return str(value)
+
+
+def _underlying_mark(row: Any) -> float | None:
+    if not hasattr(row, "get"):
+        return None
+    for key in (
+        "underlying_price",
+        "underlyingPrice",
+        "underlying_mark",
+        "underlyingMark",
+        "underlying_last",
+        "underlyingLast",
+    ):
+        if key in row:
+            val = _safe_float(row.get(key))
+            if val is not None:
+                return val
+    return None
+
+
+def is_entitlement_error(err_code: int) -> bool:
+    """Return True when *err_code* matches known IB entitlement failures."""
+    try:
+        return int(err_code) in _ENTITLEMENT_CODES
+    except Exception:
+        return False
+
+
+def _extract_error_code(exc: BaseException) -> int | None:
+    for attr in ("errorCode", "code", "errCode"):
+        val = getattr(exc, attr, None)
+        if val is None:
+            continue
+        try:
+            return int(val)
+        except Exception:
+            continue
+    return None
+
+
+def mkt_data_timeout(sec: float) -> Callable[[], bool]:
+    """Return a callable that evaluates to ``True`` once *sec* elapsed."""
+    deadline = time.monotonic() + max(sec, 0.0)
+
+    def _expired() -> bool:
+        return time.monotonic() >= deadline
+
+    return _expired
+
+
+def set_market_data_mode(
+    mode: MarketDataMode,
+    *,
+    client: Any | None = None,
+    timeout: float | None = None,
+    has_ticks: Callable[[], bool] | None = None,
+    sleep: Callable[[float], None] | None = None,
+) -> str:
+    """Request the desired market-data mode and return the effective mode.
+
+    ``mode`` may be ``"live"``, ``"delayed"`` or ``"auto"``.  When ``auto`` is
+    requested the helper attempts live data first and falls back to delayed
+    quotes when entitlement errors are observed or no ticks arrive before the
+    timeout expires.
     """
-    # Lazy import so PSD remains usable without portfolio_greeks/network
+    global _LAST_MARKET_MODE
+
+    target = str(mode or "auto").strip().lower()
+    if target not in ("live", "delayed", "auto"):
+        target = "auto"
+
+    def _req(mtype: str) -> bool:
+        if not client or not hasattr(client, "reqMarketDataType"):
+            return True
+        try:
+            result = client.reqMarketDataType(_MARKET_DATA_MODES[mtype])
+        except Exception as exc:  # pragma: no cover - network runtime
+            logger.debug("reqMarketDataType(%s) failed: %s", mtype, exc)
+            raise
+        return False if result is False else True
+
+    if target in ("live", "delayed"):
+        _req(target)
+        _LAST_MARKET_MODE = target
+        return target
+
+    effective = "live"
+    timeout_val = timeout if timeout is not None else 2.0
+    sleeper = sleep or time.sleep
+
+    try:
+        ok = _req("live")
+    except Exception as exc:
+        code = _extract_error_code(exc)
+        if code is not None and is_entitlement_error(code):
+            logger.warning("IBKR live market data entitlement missing (code %s); switching to delayed.", code)
+        else:
+            logger.debug("reqMarketDataType(live) raised %s; using delayed data.", exc)
+        effective = "delayed"
+    else:
+        if not ok:
+            effective = "delayed"
+
+    if effective == "live" and has_ticks is not None:
+        deadline = time.monotonic() + max(timeout_val, 0.0)
+        while time.monotonic() < deadline:
+            try:
+                if has_ticks():
+                    break
+            except Exception:
+                break
+            sleeper(0.05)
+        else:
+            logger.warning("No live ticks within %.2fs – falling back to delayed market data.", timeout_val)
+            effective = "delayed"
+
+    if effective == "delayed":
+        _req("delayed")
+
+    _LAST_MARKET_MODE = effective
+    return effective
+
+
+def consume_mark_backfills() -> List[str]:
+    """Return and clear the list of symbols whose marks were backfilled."""
+    global _MARK_BACKFILLS
+    symbols = sorted(_MARK_BACKFILLS)
+    _MARK_BACKFILLS.clear()
+    return symbols
+
+
+def _resolve_cfg(cfg: Dict[str, Any] | None) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    base = _rules_cfg()
+    ibkr_cfg: Dict[str, Any] = {}
+    fill_cfg: Dict[str, Any] = {}
+    if isinstance(base.get("ibkr"), dict):
+        ibkr_cfg.update(base["ibkr"])
+    if isinstance(base.get("fill"), dict):
+        fill_cfg.update(base["fill"])
+    if cfg is None:
+        return ibkr_cfg, fill_cfg
+    if isinstance(cfg.get("ibkr"), dict):
+        ibkr_cfg.update(cfg["ibkr"])
+    if isinstance(cfg.get("fill"), dict):
+        fill_cfg.update(cfg["fill"])
+    return ibkr_cfg, fill_cfg
+
+
+def _iter_rows(df: Any) -> Iterable[Any]:
+    try:
+        return list(df.iterrows())
+    except Exception:
+        return []
+
+
+def get_positions(
+    cfg: Dict[str, Any] | None = None,
+    *,
+    mode: MarketDataMode | None = None,
+) -> List[Dict[str, Any]]:
+    """Return PSD position dicts sourced from ``portfolio_greeks`` snapshots."""
+    ibkr_cfg, fill_cfg = _resolve_cfg(cfg or {})
+    market_mode = str(mode or (cfg or {}).get("market_data_mode") or ibkr_cfg.get("market_data_mode", "auto")).strip().lower()
+    if market_mode not in ("live", "delayed", "auto"):
+        market_mode = "auto"
+    timeout_sec = float(ibkr_cfg.get("mktdata_timeout_sec", 2.0) or 0.0)
+    greeks_timeout = float(ibkr_cfg.get("greeks_timeout_sec", 5.0) or 0.0)
+
+    client = None
+    if isinstance(cfg, dict):
+        client = cfg.get("ib_client") or cfg.get("ibkr_client")
+    has_ticks = cfg.get("ib_has_ticks") if isinstance(cfg, dict) else None
+    tick_probe = has_ticks if callable(has_ticks) else None
+
+    try:
+        set_market_data_mode(market_mode, client=client, timeout=timeout_sec, has_ticks=tick_probe)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Failed to negotiate IBKR market data mode (%s): %s", market_mode, exc)
+
     try:
         from portfolio_exporter.scripts import portfolio_greeks as pg  # type: ignore
         import pandas as pd  # type: ignore
@@ -32,171 +251,190 @@ def get_positions(cfg: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
         return []
 
     try:
-        df = pg._load_positions()  # pragma: no cover – tests patch this function
+        df = pg._load_positions()  # pragma: no cover - network
         if df is None:
             return []
     except Exception:
         return []
 
     try:
-        import math
-        # Normalize expected columns
-        cols = set(df.columns)
-        for c in [
-            "symbol",
-            "underlying",
-            "secType",
-            "qty",
-            "price",
-            "right",
-            "strike",
-            "expiry",
-        ]:
-            if c not in cols:
-                # tolerate missing; downstream uses defaults
-                df[c] = None
-
-        positions: List[Dict[str, Any]] = []
-
-        # 1) Equities / ETFs
-        eq = df[(df["secType"].astype(str).isin(["STK", "ETF"])) & (df["qty"].fillna(0) != 0)]
-        if not eq.empty:
-            for _, r in eq.iterrows():
-                sym = str(r.get("symbol") or r.get("underlying") or "").upper()
-                if not sym:
-                    continue
-                try:
-                    qty = int(r.get("qty") or 0)
-                except Exception:
-                    qty = 0
-                try:
-                    mark = float(r.get("price"))
-                    if math.isnan(mark):
-                        mark = 0.0
-                except Exception:
-                    mark = 0.0
-                positions.append(
-                    {
-                        "uid": f"STK-{sym}",
-                        "symbol": sym,
-                        "sleeve": "core",
-                        "kind": "equity",
-                        "qty": qty,
-                        "mark": max(0.0, float(mark)),
-                    }
-                )
-
-        # 2) Options/FOP – aggregate legs per underlying into a Position(kind='option')
-        opt = df[(df["secType"].astype(str).isin(["OPT", "FOP"])) & (df["qty"].fillna(0) != 0)]
-        if not opt.empty:
-            by_under: Dict[str, list[Dict[str, Any]]] = {}
-            # Import here to avoid import cycles at module import time
-            from ..models import OptionLeg  # type: ignore
-
-            for _, r in opt.iterrows():
-                sym = str(r.get("underlying") or r.get("symbol") or "").upper()
-                if not sym:
-                    continue
-                try:
-                    strike = float(r.get("strike")) if r.get("strike") is not None else None
-                except Exception:
-                    strike = None
-                try:
-                    qty = int(r.get("qty") or 0)
-                except Exception:
-                    qty = 0
-                try:
-                    price = float(r.get("price"))
-                    if math.isnan(price):
-                        price = 0.0
-                except Exception:
-                    price = 0.0
-                exp_raw = r.get("expiry")
-                expiry = None
-                if isinstance(exp_raw, str):
-                    expiry = exp_raw.replace("-", "")[:8]  # normalize YYYYMMDD
-                elif pd.notna(exp_raw):
-                    expiry = str(exp_raw)
-                try:
-                    leg_obj = OptionLeg(
-                        symbol=sym,
-                        expiry=(expiry or ""),
-                        right=(str(r.get("right") or "").upper() or "C"),
-                        strike=float(strike or 0.0),
-                        qty=int(qty),
-                        price=float(price),
-                        delta=None,
-                    )
-                    by_under.setdefault(sym, []).append(leg_obj)  # type: ignore[arg-type]
-                except Exception:
-                    continue
-
-            for sym, legs in by_under.items():
-                positions.append(
-                    {
-                        "uid": f"OPT-{sym}",
-                        "symbol": sym,
-                        "sleeve": "theta",
-                        "kind": "option",
-                        "qty": 0,
-                        "mark": 0.0,
-                        "legs": legs,
-                    }
-                )
-
-        # Optional lightweight equity mark enrichment (best-effort)
-        try:
-            import os as _os
-            if not _os.getenv("PE_TEST_MODE"):
-                # Build a symbol -> price map using Yahoo summary (cached when enabled)
-                syms = sorted({p["symbol"] for p in positions if p.get("kind") == "equity"})
-                quotes: Dict[str, float] = {}
-                provider = None
-                try:
-                    from portfolio_exporter.core.providers import yahoo_provider as _yp  # type: ignore
-
-                    provider = _yp
-                except Exception:
-                    provider = None
-                for sym in syms:
-                    last: float | None = None
-                    if provider is not None:
-                        try:
-                            s = provider.get_summary(sym, cfg or {})
-                            v = s.get("last") or s.get("prev_close")
-                            last = float(v) if v is not None else None
-                        except Exception:
-                            last = None
-                    if last is None:
-                        try:
-                            import yfinance as yf  # type: ignore
-
-                            t = yf.Ticker(sym)
-                            fi = getattr(t, "fast_info", {})
-                            last = fi.get("last_price") or fi.get("last_trade_price") or fi.get("previous_close")
-                            last = float(last) if last is not None else None
-                        except Exception:
-                            last = None
-                    if last is not None and last >= 0:
-                        quotes[sym] = float(last)
-                if quotes:
-                    for p in positions:
-                        if p.get("kind") == "equity":
-                            sym = str(p.get("symbol", "")).upper()
-                            if sym in quotes:
-                                p["mark"] = float(quotes[sym])
-        except Exception:
-            # best-effort enrichment only
-            pass
-        return positions
+        df = df.copy()
     except Exception:
         return []
 
+    required = ["symbol", "underlying", "secType", "qty", "price", "right", "strike", "expiry"]
+    for col in required:
+        if col not in df.columns:
+            df[col] = None
 
-def get_margin_status(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    """Return margin usage snapshot.
+    positions: List[Dict[str, Any]] = []
+    missing_equity_marks: List[tuple[int, str]] = []
+    missing_greeks: set[str] = set()
 
-    Keys: used_pct (0..1), available, maintenance, equity.
-    Default returns an empty structure; tests will patch.
-    """
-    return {"used_pct": None, "available": None, "maintenance": None, "equity": None}
+    try:
+        eq_mask = df["secType"].astype(str).isin(["STK", "ETF"])
+        qty_mask = df["qty"].fillna(0) != 0
+        eq_df = df[eq_mask & qty_mask]
+    except Exception:
+        eq_df = df.iloc[0:0]
+
+    for _, row in _iter_rows(eq_df):
+        sym = str(row.get("symbol") or row.get("underlying") or "").upper()
+        if not sym:
+            continue
+        qty = int(_safe_float(row.get("qty")) or 0)
+        mark = _safe_float(row.get("price"))
+        pos = {
+            "uid": f"STK-{sym}",
+            "symbol": sym,
+            "sleeve": "core",
+            "kind": "equity",
+            "qty": qty,
+            "mark": mark,
+        }
+        if mark is None:
+            missing_equity_marks.append((len(positions), sym))
+        positions.append(pos)
+
+    try:
+        opt_mask = df["secType"].astype(str).isin(["OPT", "FOP"])
+        opt_df = df[opt_mask & qty_mask]
+    except Exception:
+        opt_df = df.iloc[0:0]
+
+    if not opt_df.empty:
+        from ..models import OptionLeg
+
+        grouped: Dict[str, Dict[str, Any]] = {}
+        for _, row in _iter_rows(opt_df):
+            sym = str(row.get("underlying") or row.get("symbol") or "").upper()
+            if not sym:
+                continue
+            strike = _safe_float(row.get("strike"))
+            qty = int(_safe_float(row.get("qty")) or 0)
+            price = _safe_float(row.get("price")) or 0.0
+            expiry = _normalize_expiry(row.get("expiry"))
+            delta_val = None
+            for key in ("delta", "option_delta", "optionDelta", "Delta"):
+                if key in row and row.get(key) is not None:
+                    delta_val = _safe_float(row.get(key))
+                    if delta_val is not None:
+                        break
+            if delta_val is None:
+                exposure = _safe_float(row.get("delta_exposure"))
+                multiplier = _safe_float(row.get("multiplier")) or 100.0
+                under_mark = _underlying_mark(row) or 0.0
+                if exposure is not None and multiplier and under_mark and qty:
+                    try:
+                        delta_val = exposure / (multiplier * under_mark * qty)
+                    except Exception:
+                        delta_val = None
+            if delta_val is None:
+                missing_greeks.add(sym)
+
+            try:
+                leg = OptionLeg(
+                    symbol=sym,
+                    expiry=expiry or "",
+                    right=(str(row.get("right") or "").upper() or "C"),
+                    strike=float(strike or 0.0),
+                    qty=int(qty),
+                    price=float(price),
+                    delta=float(delta_val) if delta_val is not None else None,
+                )
+            except Exception:
+                continue
+
+            bucket = grouped.setdefault(sym, {"legs": [], "mark": None})
+            bucket["legs"].append(leg)  # type: ignore[arg-type]
+            under_mark = _underlying_mark(row)
+            if under_mark is not None:
+                bucket["mark"] = under_mark
+
+        for sym, info in grouped.items():
+            positions.append(
+                {
+                    "uid": f"OPT-{sym}",
+                    "symbol": sym,
+                    "sleeve": "theta",
+                    "kind": "option",
+                    "qty": 0,
+                    "mark": info.get("mark"),
+                    "legs": info.get("legs", []),
+                }
+            )
+
+    if missing_equity_marks and bool(fill_cfg.get("allow_yf_equity_marks", True)):
+        symbols = [sym for _, sym in missing_equity_marks]
+        fills = yfin.fill_equity_marks_from_yf(symbols)
+        for idx, sym in missing_equity_marks:
+            price = fills.get(sym)
+            if price is None:
+                continue
+            try:
+                positions[idx]["mark"] = float(price)
+            except Exception:
+                continue
+            _MARK_BACKFILLS.add(sym)
+
+    for sym in sorted(missing_greeks):
+        if sym in _GREEKS_WARNED:
+            continue
+        logger.warning("Greeks unavailable for %s within %.1fs; leaving legs with null values.", sym, greeks_timeout)
+        _GREEKS_WARNED.add(sym)
+
+    return positions
+
+
+def fetch_marks(
+    symbols: Sequence[str],
+    cfg: Dict[str, Any] | None = None,
+    *,
+    mode: MarketDataMode | None = None,
+) -> Dict[str, float | None]:
+    """Return the latest marks for ``symbols`` using ``get_positions``."""
+    wanted = {s.strip().upper() for s in symbols if s}
+    if not wanted:
+        return {}
+    data = get_positions(cfg, mode=mode)
+    marks: Dict[str, float | None] = {}
+    for row in data:
+        if row.get("kind") != "equity":
+            continue
+        sym = str(row.get("symbol") or "").upper()
+        if sym in wanted:
+            marks[sym] = row.get("mark")  # type: ignore[assignment]
+    return marks
+
+
+def fetch_greeks(
+    symbols: Sequence[str],
+    cfg: Dict[str, Any] | None = None,
+    *,
+    mode: MarketDataMode | None = None,
+) -> Dict[str, list[Dict[str, Any]]]:
+    """Return lightweight per-leg greek snapshots for ``symbols``."""
+    wanted = {s.strip().upper() for s in symbols if s}
+    if not wanted:
+        return {}
+    data = get_positions(cfg, mode=mode)
+    out: Dict[str, list[Dict[str, Any]]] = {}
+    for row in data:
+        if row.get("kind") != "option":
+            continue
+        sym = str(row.get("symbol") or "").upper()
+        if sym not in wanted:
+            continue
+        legs = []
+        for leg in row.get("legs", []) or []:
+            legs.append(
+                {
+                    "expiry": getattr(leg, "expiry", ""),
+                    "right": getattr(leg, "right", ""),
+                    "strike": getattr(leg, "strike", None),
+                    "qty": getattr(leg, "qty", None),
+                    "delta": getattr(leg, "delta", None),
+                }
+            )
+        out[sym] = legs
+    return out

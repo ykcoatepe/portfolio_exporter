@@ -27,3 +27,24 @@ def test_symbols_csv_only_json_no_files(tmp_path, capsys):
     syms = {row["symbol"] for row in arr}
     assert syms == {"AAA", "BBB"}
 
+
+def test_symbols_env_fallback(tmp_path, capsys, monkeypatch):
+    out = tmp_path / "out"
+    out.mkdir()
+    monkeypatch.setenv("MOMO_SYMBOLS", "ccc,ddd")
+    rc = mm_main([
+        "--cfg",
+        "tests/data/micro_momo_config.json",
+        "--out_dir",
+        str(out),
+        "--data-mode",
+        "csv-only",
+        "--json",
+        "--no-files",
+    ])
+    assert rc == 0
+    out_json = capsys.readouterr().out.strip()
+    arr = json.loads(out_json)
+    syms = {row["symbol"] for row in arr}
+    assert syms == {"CCC", "DDD"}
+

@@ -22,6 +22,7 @@ def main(argv: List[str] | None = None) -> int:
     ap.add_argument("--thread", help="Slack thread_ts (optional)")
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--auto-producers", action="store_true")
+    ap.add_argument("--session", choices=["auto", "rth", "premarket"], default=os.getenv("MOMO_SESSION"))
     args = ap.parse_args(argv)
 
     from portfolio_exporter.scripts import micro_momo_analyzer as ana
@@ -55,6 +56,8 @@ def main(argv: List[str] | None = None) -> int:
         argv_ana += ["--offline"]
     if args.auto_producers:
         argv_ana += ["--auto-producers"]
+    if args.session:
+        argv_ana += ["--session", args.session]
     rc = ana.main(argv_ana)
     if rc != 0:
         return rc

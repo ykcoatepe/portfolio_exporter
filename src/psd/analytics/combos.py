@@ -176,9 +176,17 @@ def recognize(positions: Iterable[Position]) -> Tuple[List[Combo], List[Dict[str
                     dte=dte,
                 )
             )
-        # orphan short without hedge on any side not forming a pair
-        if not pair_c and b["C_short"] and not b["C_long"]:
-            orphans.append({"symbol": sym, "expiry": exp, "side": "C", "reason": "orphan-risk"})
-        if not pair_p and b["P_short"] and not b["P_long"]:
-            orphans.append({"symbol": sym, "expiry": exp, "side": "P", "reason": "orphan-risk"})
+        # orphan short without hedge for any unmatched quantity on each side
+        short_call_qty = sum(abs(l.qty) for l in b["C_short"])
+        long_call_qty = sum(abs(l.qty) for l in b["C_long"])
+        if short_call_qty > max(long_call_qty, 0):
+            matched = min(short_call_qty, long_call_qty)
+            if short_call_qty - matched > 0:
+                orphans.append({"symbol": sym, "expiry": exp, "side": "C", "reason": "orphan-risk"})
+        short_put_qty = sum(abs(l.qty) for l in b["P_short"])
+        long_put_qty = sum(abs(l.qty) for l in b["P_long"])
+        if short_put_qty > max(long_put_qty, 0):
+            matched = min(short_put_qty, long_put_qty)
+            if short_put_qty - matched > 0:
+                orphans.append({"symbol": sym, "expiry": exp, "side": "P", "reason": "orphan-risk"})
     return combos, orphans
