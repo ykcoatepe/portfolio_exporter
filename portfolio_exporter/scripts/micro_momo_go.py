@@ -2,6 +2,14 @@ from __future__ import annotations
 
 import argparse
 import os
+try:
+    # Python 3.9+ exposes BooleanOptionalAction for --flag/--no-flag pairs
+    from argparse import BooleanOptionalAction  # noqa: F401
+
+    _HAS_BOA = True
+except Exception:  # pragma: no cover - fallback for <3.9
+    _HAS_BOA = False
+
 from pathlib import Path
 from typing import List
 
@@ -11,7 +19,27 @@ def main(argv: List[str] | None = None) -> int:
     ap.add_argument("--symbols", help="comma list (optional)")
     ap.add_argument("--cfg", default="micro_momo_config.json")
     ap.add_argument("--out_dir", default="out")
-    ap.add_argument("--publish", action="store_true", default=True)
+    if _HAS_BOA:
+        ap.add_argument(
+            "--publish",
+            action=BooleanOptionalAction,
+            default=True,
+            help="Publish outputs (use --no-publish to disable).",
+        )
+    else:
+        ap.add_argument(
+            "--publish",
+            dest="publish",
+            action="store_true",
+            default=True,
+            help="Publish outputs",
+        )
+        ap.add_argument(
+            "--no-publish",
+            dest="publish",
+            action="store_false",
+            help="Disable publishing",
+        )
     ap.add_argument("--publish-dir", default="out/publish")
     ap.add_argument("--providers", default=os.getenv("MOMO_PROVIDERS", "ib,yahoo"))
     ap.add_argument("--data-mode", default=os.getenv("MOMO_DATA_MODE", "enrich"))

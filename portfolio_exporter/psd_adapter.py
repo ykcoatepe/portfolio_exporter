@@ -1,0 +1,166 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import math
+import time
+from typing import Any, Iterable, List
+
+logger = logging.getLogger("portfolio_exporter.psd_adapter")
+
+
+async def load_positions() -> List[dict[str, Any]]:
+    """Fetch the latest positions using the portfolio exporter data layer."""
+    try:
+        from portfolio_exporter.scripts import portfolio_greeks
+        import pandas as pd  # type: ignore
+
+        def _fetch() -> List[dict[str, Any]]:
+            df = portfolio_greeks._load_positions()  # pragma: no cover - exercised via adapter
+            if not isinstance(df, pd.DataFrame):
+                return [] if df is None else list(df)
+            if df.empty:
+                return []
+            normalized = df.replace({math.nan: None})
+            return normalized.to_dict(orient="records")
+
+        return await asyncio.to_thread(_fetch)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.warning("load_positions fallback: %s", exc)
+        return []
+
+
+async def get_marks(positions: Iterable[dict[str, Any]]) -> dict[str, float]:
+    """Return mark prices for all symbols using the resilient quotes helper."""
+    symbols = sorted(
+        {
+            str(row.get("symbol", "")).strip()
+            for row in positions
+            if row.get("symbol")
+        }
+    )
+    if not symbols:
+        return {}
+    try:
+        from portfolio_exporter.core import quotes
+
+        return await asyncio.to_thread(quotes.snapshot, symbols)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.warning("get_marks fallback: %s", exc)
+        return {}
+
+
+async def compute_greeks(
+    positions: Iterable[dict[str, Any]],
+    marks: dict[str, float],
+) -> dict[str, float]:
+    """Aggregate greek exposures from the provided positions."""
+    totals = {"delta": 0.0, "gamma": 0.0, "vega": 0.0, "theta": 0.0}
+    for row in positions:
+        symbol = str(row.get("symbol", ""))
+        qty = float(row.get("qty", row.get("position", 0.0)) or 0.0)
+        mult = float(row.get("multiplier", 1.0) or 1.0)
+        delta = row.get("delta") or row.get("delta_exposure")
+        gamma = row.get("gamma") or row.get("gamma_exposure")
+        vega = row.get("vega") or row.get("vega_exposure")
+        theta = row.get("theta") or row.get("theta_exposure")
+        # When raw greeks missing, approximate deltas from mark * qty as fallback
+        if delta is None:
+            mark_val = marks.get(symbol)
+            if isinstance(mark_val, dict):
+                price = mark_val.get("price") or mark_val.get("mark")
+            else:
+                price = mark_val
+            if price is not None:
+                delta = qty * mult * float(price)
+        if gamma is None:
+            gamma = 0.0
+        if vega is None:
+            vega = 0.0
+        if theta is None:
+            theta = 0.0
+        try:
+            totals["delta"] += float(delta)
+            totals["gamma"] += float(gamma)
+            totals["vega"] += float(vega)
+            totals["theta"] += float(theta)
+        except Exception:
+            continue
+    return totals
+
+
+async def compute_risk(
+    positions: Iterable[dict[str, Any]],
+    marks: dict[str, Any],
+    greeks: dict[str, float],
+) -> dict[str, Any]:
+    """Produce a lightweight risk summary suitable for PSD consumers."""
+    notional = 0.0
+    margin_used = 0.0
+    for row in positions:
+        qty = float(row.get("qty", row.get("position", 0.0)) or 0.0)
+        price = row.get("mark") or row.get("price") or row.get("lastPrice")
+        if price is None:
+            mark_val = marks.get(str(row.get("symbol", "")))
+            if isinstance(mark_val, dict):
+                price = mark_val.get("price") or mark_val.get("mark")
+            elif mark_val is not None:
+                price = mark_val
+        mult = float(row.get("multiplier", 1.0) or 1.0)
+        if price is None:
+            continue
+        try:
+            price_val = float(price)
+        except (TypeError, ValueError):
+            continue
+        notional += abs(qty * mult * price_val)
+        margin_used += float(row.get("maintenanceMargin", 0.0) or 0.0)
+
+    delta = float(greeks.get("delta", 0.0))
+    beta = delta / notional if notional else 0.0
+    risk = {
+        "beta": beta,
+        "var95_1d": abs(delta) * 0.01,
+        "margin_pct": margin_used / notional if notional else 0.0,
+        "notional": notional,
+    }
+    return risk
+
+
+async def snapshot_once() -> dict[str, Any]:
+    """Return a PSD-ready snapshot containing positions, quotes, greeks and risk."""
+    ts = time.time()
+    try:
+        positions = await load_positions()
+    except Exception as exc:
+        logger.warning("snapshot positions failed: %s", exc)
+        positions = []
+    try:
+        marks = await get_marks(positions)
+    except Exception as exc:
+        logger.warning("snapshot marks failed: %s", exc)
+        marks = {}
+    try:
+        greeks = await compute_greeks(positions, marks)
+    except Exception as exc:
+        logger.warning("snapshot greeks failed: %s", exc)
+        greeks = {"delta": 0.0, "gamma": 0.0, "vega": 0.0, "theta": 0.0}
+    try:
+        risk = await compute_risk(positions, marks, greeks)
+    except Exception as exc:
+        logger.warning("snapshot risk failed: %s", exc)
+        risk = {"beta": 0.0, "var95_1d": 0.0, "margin_pct": 0.0, "notional": 0.0}
+
+    if not isinstance(positions, list):
+        raise TypeError("positions must be a list")
+    if not isinstance(marks, dict):
+        raise TypeError("marks must be a dict")
+    if not isinstance(risk, dict):
+        raise TypeError("risk must be a dict")
+
+    return {
+        "ts": ts,
+        "positions": positions,
+        "quotes": marks,
+        "risk": risk,
+    }

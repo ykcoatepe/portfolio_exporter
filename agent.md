@@ -12,3 +12,14 @@
 - Menu-only UX: there is no public CLI for PSD. Use the menu’s `o = Open in browser` action to start on demand when auto-start is disabled.
 - Ops: for systemd/launchd, invoke `python scripts/psd_start.py`.
 - Configure defaults under `config/rules.yaml` → `psd.auto`.
+
+## Pluggable Hooks
+
+- `PSD_SNAPSHOT_FN` and `PSD_RULES_FN` accept dotted callables like `pkg.module:func`; values load via `importlib.import_module`, which returns the requested module even for nested paths.
+- Override them per-process (e.g. exporting env vars before `make psd-up`) to attach custom data sources or rule evaluators without editing the core entrypoints.
+- Keep adapters side-effect free at import time so ingestion and scans stay snappy.
+
+## Observability
+
+- Prometheus metrics are exposed at `http://localhost:51127/metrics` when `make psd-up` is running.
+- Highlights: ingest timing histogram (`psd_ingest_tick_seconds`), last-refresh age gauge (`psd_data_age_seconds`), event counters (`psd_events_total`, `psd_stream_events_total`), and active SSE clients gauge (`psd_stream_clients`).

@@ -14,6 +14,7 @@ export PATH := $(VENV_BIN):$(PATH)
 setup:
 	@test -d $(VENV_DIR) || python3 -m venv $(VENV_DIR)
 	@$(PIP) -q install -U pip
+	@$(PIP) -q install -r requirements.txt
 	@$(PIP) -q install -e .
 	@[ -f requirements-dev.txt ] && $(PIP) -q install -r requirements-dev.txt || true
 	@echo "Venv ready → $(VENV_BIN)"
@@ -202,7 +203,17 @@ ifeq ($(LOGBOOK_AUTO),1)
 endif
 
 # --- PSD placeholders ---
-.PHONY: psd-run psd-scan-once psd-dash sanity-fast
+.PHONY: run-ingestor run-scan run-web psd-run psd-scan-once psd-dash sanity-fast
+
+run-ingestor: ; python -m psd.ingestor.main
+run-scan: ; python -m psd.sentinel.scan
+run-web: ; uvicorn psd.web.app:app --host 0.0.0.0 --port 51127 --ws none
+
+psd-up: ; ( \
+	[ -n "$PSD_SNAPSHOT_FN" ] || export PSD_SNAPSHOT_FN=portfolio_exporter.psd_adapter:snapshot_once; \
+	[ -n "$PSD_RULES_FN" ] || export PSD_RULES_FN=portfolio_exporter.psd_rules:evaluate; \
+	$(MAKE) -j3 run-ingestor run-scan run-web \
+)
 
 psd-run: ; @python -m scripts.run_sentinel
 psd-scan-once: ; @python -c "from src.psd.sentinel.engine import scan_once; print('alerts', len(scan_once({}).get('rows', [])))"

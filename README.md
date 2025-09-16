@@ -1277,6 +1277,7 @@ This project is licensed under the [MIT License](LICENSE).
 - Access via TUI only: open the app and navigate to "Portfolio Sentinel". The dashboard auto-starts once per session (web + browser + loop).
 - Disable auto-start by setting `psd.auto.start_on_menu: false` in `config/rules.yaml`; then use the menu action `o = Open in browser` to trigger the starter on demand.
 - The server is a minimal FastAPI + WebSocket app; broadcasts are pushed from the in-process scheduler each iteration.
+- Prometheus scrape target: `http://localhost:51127/metrics` (see ingest tick histogram, data age gauge, event counters, and SSE stream gauges).
 
 #### Ops (optional)
 

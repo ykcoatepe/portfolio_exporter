@@ -322,7 +322,8 @@ def run(
         from ..core.micro_momo import _risk_proxy  # local import to avoid surface
         risk_value = _risk_proxy(struct, contracts)
         cap_breach = 1 if risk_value > 0.03 * nav else 0
-        concurrency_guard = 1 if (base_active + 1) > max_concurrent else 0
+        # mark overflow when admitting this row would exceed batch cap
+        concurrency_guard = 1 if (base_active + len(results) + 1) > max_concurrent else 0
 
         res = ResultRow(
             symbol=scan.symbol,
