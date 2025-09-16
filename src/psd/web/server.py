@@ -1,145 +1,592 @@
-"""Minimal FastAPI + WebSocket server for PSD.
+"""Minimal FastAPI server for the Portfolio Sentinel Dashboard.
 
-This module intentionally imports FastAPI/uvicorn lazily so importing the
-package does not require those optional dependencies. The HTML served at `/`
-includes minimal CSS/JS and connects to the `/ws` endpoint.
+The server serves the single-page dashboard at `/` and reuses
+`psd.web.app` for stateful JSON endpoints and the SSE stream.
 """
 from __future__ import annotations
 
 import asyncio
 import json
-import time
-from collections.abc import Callable
-from datetime import datetime, timezone
 from typing import Any
 
-# Connection registry (per-process)
+_HTML_PAGE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Portfolio Sentinel Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+:root {
+  color-scheme: dark;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+body {
+  margin: 0;
+  background: #080b10;
+  color: #e6ecf3;
+}
+header {
+  position: sticky;
+  top: 0;
+  background: rgba(9, 12, 18, 0.97);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #1f2730;
+  padding: 14px 20px 12px;
+  z-index: 10;
+}
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.banner .title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: #1f2730;
+  color: #d8dee6;
+}
+.badge.warn {
+  background: #5a451c;
+  color: #f9d27d;
+}
+.badge.alert {
+  background: #5c1f26;
+  color: #f5a7a7;
+}
+.badge.hidden {
+  display: none;
+}
+main {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.summary-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.card {
+  background: #0c1119;
+  border: 1px solid #1a222b;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.card .label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b97a8;
+  margin-bottom: 4px;
+}
+.card .value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+#breach-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 24px;
+}
+#breach-list.empty {
+  color: #8b97a8;
+}
+.muted {
+  color: #8b97a8;
+  font-size: 0.9rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  background: #0c1119;
+  border: 1px solid #1a222b;
+  border-radius: 12px;
+  overflow: hidden;
+}
+th, td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #1a222b;
+  text-align: left;
+}
+th {
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: #8b97a8;
+}
+tbody tr:nth-child(2n) {
+  background: #0f141d;
+}
+td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+td.empty {
+  text-align: center;
+  padding: 24px 0;
+}
+#positions-info {
+  margin-bottom: 4px;
+}
+@media (max-width: 720px) {
+  header {
+    padding: 12px 16px 10px;
+  }
+  main {
+    padding: 16px;
+  }
+  th, td {
+    padding: 10px 12px;
+  }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="banner">
+    <div class="title">Portfolio Sentinel</div>
+    <span class="badge hidden" id="badge-ibkr">IBKR disconnected</span>
+    <span class="badge hidden" id="badge-stale">Stale data: <span id="stale-value">0</span>s</span>
+  </div>
+  <div class="muted" id="connection-status">Connecting…</div>
+</header>
+<main>
+  <section class="summary-grid">
+    <div class="card">
+      <div class="label">Last Update</div>
+      <div class="value" id="metric-updated">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Positions</div>
+      <div class="value" id="metric-positions">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Notional</div>
+      <div class="value" id="metric-notional">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Beta</div>
+      <div class="value" id="metric-beta">—</div>
+    </div>
+    <div class="card">
+      <div class="label">VaR 1d</div>
+      <div class="value" id="metric-var">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Margin Used</div>
+      <div class="value" id="metric-margin">—</div>
+    </div>
+  </section>
+  <section class="section">
+    <h2 class="section-title">Breaches</h2>
+    <div id="breach-list" class="empty muted">No active breaches</div>
+  </section>
+  <section class="section">
+    <h2 class="section-title">Positions</h2>
+    <div class="muted" id="positions-info">Waiting for data…</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Qty</th>
+          <th>Mark</th>
+          <th>Delta</th>
+          <th>Gamma</th>
+          <th>Theta</th>
+        </tr>
+      </thead>
+      <tbody id="positions-body">
+        <tr><td colspan="6" class="empty muted">Waiting for positions…</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+<script>
+(function () {
+  const store = {
+    snapshot: null,
+    positions: [],
+    risk: {},
+    breaches: [],
+    health: { ibkr_connected: null, data_age_s: null },
+    lastSnapshotMs: 0,
+    staleSeconds: 0,
+    es: null
+  };
+
+  const els = {
+    status: document.getElementById('connection-status'),
+    badgeIbkr: document.getElementById('badge-ibkr'),
+    badgeStale: document.getElementById('badge-stale'),
+    staleValue: document.getElementById('stale-value'),
+    breachList: document.getElementById('breach-list'),
+    positionsInfo: document.getElementById('positions-info'),
+    positionsBody: document.getElementById('positions-body'),
+    metrics: {
+      updated: document.getElementById('metric-updated'),
+      positions: document.getElementById('metric-positions'),
+      notional: document.getElementById('metric-notional'),
+      beta: document.getElementById('metric-beta'),
+      var: document.getElementById('metric-var'),
+      margin: document.getElementById('metric-margin')
+    }
+  };
+
+  function setStatus(text) {
+    els.status.textContent = text;
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function pick(row, keys) {
+    for (let i = 0; i < keys.length; i += 1) {
+      const key = keys[i];
+      if (row && Object.prototype.hasOwnProperty.call(row, key)) {
+        const val = row[key];
+        if (val !== undefined && val !== null && val !== '') {
+          return val;
+        }
+      }
+    }
+    return null;
+  }
+
+  function formatNumber(value, digits) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return '—';
+    }
+    const options = {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits
+    };
+    return num.toLocaleString(undefined, options);
+  }
+
+  function formatPercent(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return '—';
+    }
+    return formatNumber(num * 100, 1) + '%';
+  }
+
+  function formatCurrency(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return '—';
+    }
+    return num.toLocaleString(undefined, {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+  }
+
+  function formatTime(ms) {
+    if (!ms) {
+      return '—';
+    }
+    const d = new Date(ms);
+    if (!Number.isFinite(d.getTime())) {
+      return '—';
+    }
+    return d.toLocaleTimeString();
+  }
+
+  function parseBreaches(raw) {
+    if (!raw) {
+      return [];
+    }
+    if (Array.isArray(raw)) {
+      return raw.map((item) => String(item)).filter((item) => item.length > 0);
+    }
+    if (typeof raw === 'object') {
+      return Object.keys(raw).filter((key) => raw[key]);
+    }
+    return [];
+  }
+
+  function applySnapshot(data) {
+    if (!data || typeof data !== 'object') {
+      return;
+    }
+    store.snapshot = data;
+    store.positions = Array.isArray(data.positions) ? data.positions : [];
+    store.risk = data.risk && typeof data.risk === 'object' ? data.risk : {};
+    store.lastSnapshotMs = typeof data.ts === 'number' ? data.ts * 1000 : Date.now();
+    const snapshotBreaches = parseBreaches(data.breaches);
+    store.breaches = snapshotBreaches.length ? snapshotBreaches : [];
+    updateStaleTicker();
+    render();
+    setStatus('Snapshot · ' + formatTime(store.lastSnapshotMs));
+  }
+
+  async function loadInitial() {
+    try {
+      const response = await fetch('/state', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      const data = await response.json();
+      if (data && !data.empty) {
+        applySnapshot(data);
+      } else {
+        setStatus('Waiting for first snapshot…');
+      }
+    } catch (err) {
+      console.error('state fetch failed', err);
+      setStatus('Initial load failed – waiting for stream…');
+    }
+  }
+
+  function handleBreachEvent(payload) {
+    const breaches = parseBreaches(payload && payload.breaches);
+    store.breaches = breaches;
+    renderBreaches();
+    renderBanner();
+  }
+
+  function handleHealthEvent(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    const connected = Boolean(payload.ibkr_connected);
+    const age = typeof payload.data_age_s === 'number' ? payload.data_age_s : null;
+    store.health = { ibkr_connected: connected, data_age_s: age };
+    updateStaleTicker();
+    renderBanner();
+  }
+
+  function startSse() {
+    if (store.es) {
+      try {
+        store.es.close();
+      } catch (e) {
+        console.warn('closing prior EventSource failed', e);
+      }
+    }
+    const es = new EventSource('/stream');
+    store.es = es;
+
+    es.addEventListener('snapshot', (event) => {
+      try {
+        applySnapshot(JSON.parse(event.data));
+      } catch (err) {
+        console.error('snapshot parse failed', err);
+      }
+    });
+
+    es.addEventListener('breach', (event) => {
+      try {
+        handleBreachEvent(JSON.parse(event.data));
+      } catch (err) {
+        console.error('breach parse failed', err);
+      }
+    });
+
+    es.addEventListener('health', (event) => {
+      try {
+        handleHealthEvent(JSON.parse(event.data));
+      } catch (err) {
+        console.error('health parse failed', err);
+      }
+    });
+
+    es.addEventListener('heartbeat', () => {
+      setStatus('Live · heartbeat ' + new Date().toLocaleTimeString());
+    });
+
+    es.onerror = () => {
+      setStatus('Stream reconnecting…');
+    };
+
+    es.onopen = () => {
+      setStatus('Stream connected');
+    };
+  }
+
+  function updateStaleTicker() {
+    const nowMs = Date.now();
+    let computed = 0;
+    if (store.lastSnapshotMs) {
+      computed = Math.max(0, (nowMs - store.lastSnapshotMs) / 1000);
+    }
+    const healthAge = store.health && typeof store.health.data_age_s === 'number'
+      ? Number(store.health.data_age_s)
+      : 0;
+    store.staleSeconds = Math.max(computed, healthAge || 0);
+    renderBanner();
+  }
+
+  function renderBanner() {
+    const { badgeIbkr, badgeStale, staleValue } = els;
+    const connected = store.health && store.health.ibkr_connected !== null
+      ? Boolean(store.health.ibkr_connected)
+      : null;
+    if (connected === false) {
+      badgeIbkr.classList.remove('hidden');
+    } else {
+      badgeIbkr.classList.add('hidden');
+    }
+
+    if (!store.lastSnapshotMs) {
+      badgeStale.classList.add('hidden');
+      return;
+    }
+
+    const secs = Math.max(0, Number(store.staleSeconds || 0));
+    staleValue.textContent = Math.round(secs).toString();
+    badgeStale.classList.remove('hidden');
+    badgeStale.classList.remove('warn', 'alert');
+
+    if (secs > 60) {
+      badgeStale.classList.add('alert');
+    } else if (secs > 15) {
+      badgeStale.classList.add('warn');
+    }
+  }
+
+  function renderSummary() {
+    const risk = store.risk || {};
+    const totalPositions = store.positions.length;
+    const { updated, positions, notional, beta, var: varEl, margin } = els.metrics;
+    updated.textContent = formatTime(store.lastSnapshotMs);
+    positions.textContent = Number.isFinite(totalPositions)
+      ? totalPositions.toLocaleString()
+      : '—';
+    notional.textContent = formatCurrency(risk.notional);
+    beta.textContent = formatNumber(risk.beta, 2);
+    varEl.textContent = formatCurrency(risk.var95_1d);
+    margin.textContent = formatPercent(risk.margin_pct);
+  }
+
+  function renderBreaches() {
+    const { breachList } = els;
+    if (!store.breaches || store.breaches.length === 0) {
+      breachList.classList.add('empty');
+      breachList.innerHTML = 'No active breaches';
+      return;
+    }
+
+    breachList.classList.remove('empty');
+    breachList.innerHTML = store.breaches
+      .map((breach) => '<span class="badge alert">' + escapeHtml(breach) + '</span>')
+      .join('');
+  }
+
+  function renderPositions() {
+    const total = store.positions.length;
+    const limit = 30;
+    if (!total) {
+      els.positionsInfo.textContent = 'No positions available';
+      els.positionsBody.innerHTML = '<tr><td colspan="6" class="empty muted">No positions</td></tr>';
+      return;
+    }
+
+    els.positionsInfo.textContent = 'Showing ' + Math.min(limit, total) + ' of ' + total + ' positions';
+
+    const rows = store.positions.slice(0, limit).map((row) => {
+      const symbol = pick(row, ['symbol', 'underlying', 'localSymbol', 'ticker']) || '—';
+      const qty = pick(row, ['qty', 'position', 'quantity']);
+      const mark = pick(row, ['mark', 'price', 'marketPrice', 'lastPrice']);
+      const delta = pick(row, ['delta', 'delta_exposure', 'deltaExposure']);
+      const gamma = pick(row, ['gamma', 'gamma_exposure', 'gammaExposure']);
+      const theta = pick(row, ['theta', 'theta_exposure', 'thetaExposure']);
+
+      return '<tr>'
+        + '<td>' + escapeHtml(symbol) + '</td>'
+        + '<td class="num">' + formatNumber(qty, 2) + '</td>'
+        + '<td class="num">' + formatNumber(mark, 2) + '</td>'
+        + '<td class="num">' + formatNumber(delta, 2) + '</td>'
+        + '<td class="num">' + formatNumber(gamma, 4) + '</td>'
+        + '<td class="num">' + formatNumber(theta, 2) + '</td>'
+        + '</tr>';
+    }).join('');
+
+    els.positionsBody.innerHTML = rows;
+  }
+
+  function render() {
+    renderBanner();
+    renderSummary();
+    renderBreaches();
+    renderPositions();
+  }
+
+  loadInitial().finally(() => {
+    startSse();
+    setInterval(updateStaleTicker, 1000);
+    render();
+  });
+})();
+</script>
+</body>
+</html>
+"""
+
 _clients: set[Any] = set()
-_sse_clients: set[asyncio.Queue[str]] = set()
-_last_broadcast_ts: float | None = None
 
 
 def _html_page() -> str:
-    return (
-        "<!doctype html><html><head><meta charset='utf-8'>"
-        "<title>Portfolio Sentinel</title>"
-        "<style>body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;"
-        "margin:0;padding:0;background:#0b0e11;color:#e6e6e6}"
-        "header{position:sticky;top:0;background:#11151a;border-bottom:1px solid #222;"
-        "padding:10px 14px}"
-        "#ws-status{margin-top:4px;font-size:.85em}"
-        "table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #222;"
-        "padding:8px 10px;text-align:left}"
-        "tr:nth-child(even){background:#0f1216}.muted{opacity:.8;font-size:.9em}"
-        "</style></head><body>"
-        "<header><div id='banner-main'>Loading…</div><div id='ws-status' class='muted'>ws pending…</div></header>"
-        "<table><thead><tr><th>UID</th><th>Sleeve</th><th>Kind</th><th>R</th><th>Stop</th><th>Target</th><th>Mark</th><th>Alert</th></tr></thead>"
-        "<tbody id='rows'></tbody></table>"
-        "<script>\n"
-        "const wsUrl=`ws://${location.host}/ws`;\n"
-        "const banner=document.getElementById('banner-main');\n"
-        "const statusEl=document.getElementById('ws-status');\n"
-        "let ws=null;\n"
-        "let sse=null;\n"
-        "let wsOk=false;\n"
-        "let sseOk=false;\n"
-        "function render(dto){try{const r=document.getElementById('rows');\n"
-        "const snap=dto.snapshot||{};const regime=snap.band||'-';const db=(snap.delta_beta??0).toFixed(2);\n"
-        "const vr=(snap.var95_1d??0).toFixed(0);const mu=((snap.margin_used??0)*100).toFixed(1);\n"
-        "banner.innerHTML='<strong>Regime:</strong> ' + regime + ' <span class=\"muted\">' +"
-        "'&nbsp;Δβ=' + db + ' • VaR=' + vr + ' • Margin%=' + mu + '</span>';\n"
-        "const rows=(dto.rows||[]).map(function(x){return '<tr><td>' + (x.uid||'') + '</td>' +"
-        "'<td>' + (x.sleeve||'') + '</td><td>' + (x.kind||'') + '</td>' +"
-        "'<td>' + (x.R??'') + '</td><td>' + (x.stop||'') + '</td>' +"
-        "'<td>' + (x.target||'') + '</td><td>' + ((x.mark===null||x.mark===undefined||x.mark==='')?'—':x.mark) + '</td>' +"
-        "'<td>' + (x.alert||'') + '</td></tr>';}).join('');\n"
-        "r.innerHTML=rows;}catch(e){console.error(e)}}\n"
-        "function startSse(delay=1000){if(sse){return;}sse=new EventSource('/stream');\n"
-        "sse.onopen=()=>{sseOk=true;if(!wsOk){statusEl.textContent='SSE connected';}};\n"
-        "sse.onmessage=(e)=>{try{render(JSON.parse(e.data));statusEl.dataset.lastPush=Date.now();}catch(err){console.error(err)}};\n"
-        "sse.onerror=()=>{sseOk=false;try{sse.close();}catch(_){}sse=null;if(!wsOk){statusEl.textContent='SSE reconnecting…';setTimeout(()=>startSse(Math.min(delay*1.6,8000)),delay);}};\n"
-        "}\n"
-        "function connect(delay=500){if(ws){try{ws.close();}catch(_){}}ws=new WebSocket(wsUrl);\n"
-        "ws.onopen=()=>{wsOk=true;statusEl.textContent='WS connected';if(sse){try{sse.close();}catch(_){ }sse=null;sseOk=false;}};\n"
-        "ws.onmessage=(e)=>{try{render(JSON.parse(e.data));statusEl.dataset.lastPush=Date.now();}catch(err){console.error(err)}};\n"
-        "ws.onclose=()=>{wsOk=false;statusEl.textContent='WS reconnecting…';startSse();setTimeout(()=>connect(Math.min(delay*1.6,8000)),delay);};\n"
-        "ws.onerror=()=>{try{ws.close();}catch(_){}};}\n"
-        "connect();\n"
-        "async function pollHealth(){try{const res=await fetch('/healthz');if(!res.ok)throw new Error('bad');const data=await res.json();\n"
-        "const clients=data.clients??0;const ts=data.last_broadcast_iso||null;\n"
-        "let tsText='-';\n"
-        "if(ts){const d=new Date(ts);tsText=d.toLocaleTimeString();}\n"
-        "const base=wsOk?'WS OK':(sseOk?'SSE OK':'offline');\n"
-        "statusEl.textContent=base+' · clients='+clients+' · last push='+tsText;\n"
-        "}catch(err){statusEl.textContent='Status unavailable';}}\n"
-        "pollHealth();\n"
-        "setInterval(pollHealth,5000);\n"
-        "</script></body></html>"
-    )
+    return _HTML_PAGE
 
 
-def make_app():  # type: ignore[override]
-    """Create and return a FastAPI app instance.
+def make_app():
+    """Create and return the FastAPI application powering the PSD dashboard."""
+    from fastapi import WebSocket, WebSocketDisconnect
+    from fastapi.responses import HTMLResponse
 
-    Imported lazily to avoid hard dependency when unused.
-    """
-    from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+    from psd.web.app import app as api_app
 
-    app = FastAPI()
+    app = api_app
 
-    try:
-        from fastapi.middleware.cors import CORSMiddleware
+    if getattr(app.state, "psd_dashboard_registered", False):
+        return app
 
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_origin_regex=r".*",
-            allow_credentials=False,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-    except Exception:
-        pass
-
-    @app.get("/")
+    @app.get("/", include_in_schema=False)
     async def index() -> HTMLResponse:  # type: ignore[override]
         return HTMLResponse(content=_html_page())
 
-    @app.get("/healthz")
-    async def healthz() -> JSONResponse:  # type: ignore[override]
-        ts = _last_broadcast_ts
-        iso = None
-        if ts:
-            iso = datetime.fromtimestamp(ts, timezone.utc).isoformat()
-        total_clients = len(_clients) + len(_sse_clients)
-        return JSONResponse({"ok": True, "clients": total_clients, "last_broadcast": ts, "last_broadcast_iso": iso})
-
-    @app.get("/stream")
-    async def stream() -> StreamingResponse:  # type: ignore[override]
-        queue: asyncio.Queue[str] = asyncio.Queue(maxsize=1)
-        _sse_clients.add(queue)
-
-        async def _gen() -> Any:
-            try:
-                while True:
-                    payload = await queue.get()
-                    yield f"data: {payload}\n\n"
-            except asyncio.CancelledError:  # pragma: no cover - client disconnect
-                pass
-            finally:
-                _sse_clients.discard(queue)
-
-        return StreamingResponse(_gen(), media_type="text/event-stream")
-
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:  # type: ignore[override]
-        # Always accept the handshake first to avoid 403
         await ws.accept()
         _clients.add(ws)
         try:
             while True:
-                # Passive receive to keep connection alive; ignore payload
                 await ws.receive_text()
         except WebSocketDisconnect:
             pass
@@ -150,57 +597,12 @@ def make_app():  # type: ignore[override]
             except Exception:
                 pass
 
-    # Trailing-slash variant to tolerate client url typos (e.g., /ws/)
     @app.websocket("/ws/")
     async def ws_endpoint_slash(ws: WebSocket) -> None:  # type: ignore[override]
         await ws_endpoint(ws)
 
+    app.state.psd_dashboard_registered = True
     return app
-
-
-def broadcast(dto: dict) -> None:
-    """Send ``dto`` to all connected clients (best-effort)."""
-    global _last_broadcast_ts
-    _last_broadcast_ts = time.time()
-    payload = json.dumps(dto, separators=(",", ":"))
-
-    for queue in list(_sse_clients):
-        try:
-            queue.put_nowait(payload)
-        except asyncio.QueueFull:
-            try:
-                queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
-            try:
-                queue.put_nowait(payload)
-            except asyncio.QueueFull:  # pragma: no cover - defensive
-                continue
-
-    if not _clients:
-        return
-
-    async def _send_all() -> None:
-        living: set[Any] = set()
-        for ws in list(_clients):
-            try:
-                await ws.send_text(payload)
-                living.add(ws)
-            except Exception:
-                # Drop dead sockets silently
-                try:
-                    await ws.close()
-                except Exception:
-                    pass
-        _clients.clear()
-        _clients.update(living)
-
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        asyncio.run(_send_all())
-    else:
-        loop.create_task(_send_all())
 
 
 def pick_free_port(host: str) -> int:
@@ -218,20 +620,15 @@ def pick_free_port(host: str) -> int:
 
 
 def start(host: str = "127.0.0.1", port: int = 8787, *, background: bool = True) -> tuple[str, int]:
-    """Run the server with uvicorn.
-
-    When ``background`` is True (default), starts in a daemon thread and
-    returns ``(host, port)`` immediately. When False, blocks the caller.
-    If ``port`` is 0, a free port is chosen first.
-    """
+    """Start the PSD dashboard server via uvicorn."""
     try:
         import uvicorn  # type: ignore
-    except Exception as e:  # pragma: no cover - optional dep
-        raise RuntimeError("uvicorn is required to start the web server") from e
+    except Exception as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError("uvicorn is required to start the web server") from exc
+
     actual_port = int(port) if int(port) != 0 else pick_free_port(host)
     app = make_app()
-    # Allow selecting WS backend via env with sensible fallbacks.
-    # Supported values: auto (default), websockets, wsproto
+
     import os as _os
 
     ws_env = (_os.getenv("PSD_UVICORN_WS", "").strip().lower() or "auto")
@@ -259,10 +656,10 @@ def start(host: str = "127.0.0.1", port: int = 8787, *, background: bool = True)
             try:
                 _run_with_ws(ws_value)
                 return
-            except Exception as e:
-                last_err = e
+            except Exception as err:
+                last_err = err
                 try:
-                    print(f"[psd-web] ws backend {ws_value or 'auto'} failed: {e}")
+                    print(f"[psd-web] ws backend {ws_value or 'auto'} failed: {err}")
                 except Exception:
                     pass
                 continue
@@ -272,8 +669,37 @@ def start(host: str = "127.0.0.1", port: int = 8787, *, background: bool = True)
     if not background:
         _serve_with_fallbacks()
         return host, actual_port
+
     import threading
 
-    th = threading.Thread(target=_serve_with_fallbacks, name="psd-web", daemon=True)
-    th.start()
+    thread = threading.Thread(target=_serve_with_fallbacks, name="psd-web", daemon=True)
+    thread.start()
     return host, actual_port
+
+
+def broadcast(dto: dict) -> None:
+    """Best-effort broadcast to connected WebSocket clients."""
+    payload = json.dumps(dto, separators=(",", ":"))
+    if not _clients:
+        return
+
+    async def _send_all() -> None:
+        living: set[Any] = set()
+        for ws in list(_clients):
+            try:
+                await ws.send_text(payload)
+                living.add(ws)
+            except Exception:
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+        _clients.clear()
+        _clients.update(living)
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(_send_all())
+    else:
+        loop.create_task(_send_all())
