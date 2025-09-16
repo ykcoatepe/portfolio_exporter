@@ -1279,6 +1279,12 @@ This project is licensed under the [MIT License](LICENSE).
 - The server is a minimal FastAPI + WebSocket app; broadcasts are pushed from the in-process scheduler each iteration.
 - Prometheus scrape target: `http://localhost:51127/metrics` (see ingest tick histogram, data age gauge, event counters, and SSE stream gauges).
 
+> **SSE Troubleshooting:** If events appear in bursts, check proxy buffering or ensure `X-Accel-Buffering: no` is not ignored by `proxy_ignore_headers`.
+
+#### WAL FAQ
+
+SQLite runs the dashboard database in write-ahead logging mode, so a `*.db-wal` file sits next to the main file while writes stream in. That log lets readers keep working without blocking writers. Checkpoints will roll the changes back into the main file periodically, so seeing the `-wal` file grow and then shrink over time is expected.
+
 #### Ops (optional)
 
 - For systemd/launchd integrations, call `python scripts/psd_start.py` to run the internal starter. This is not a public CLI command.
