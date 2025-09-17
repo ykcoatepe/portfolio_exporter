@@ -1,0 +1,196 @@
+{
+  "consumer": {
+    "name": "web-ui"
+  },
+  "interactions": [
+    {
+      "description": "a request for stock positions",
+      "request": {
+        "headers": {
+          "accept": "application/json"
+        },
+        "method": "GET",
+        "path": "/positions/stocks"
+      },
+      "response": {
+        "body": {
+          "as_of": "2024-08-21T15:00:00.000Z",
+          "data": [
+            {
+              "average_price": 150.12,
+              "currency": "USD",
+              "day_pnl_amount": 125.98,
+              "day_pnl_percent": 1.23,
+              "exposure": 1500.43,
+              "mark_price": 151.42,
+              "mark_source": "MID",
+              "mark_time": "2024-08-21T14:05:00.000Z",
+              "quantity": 10.5,
+              "symbol": "AAPL",
+              "total_pnl_amount": 512.78,
+              "total_pnl_percent": 5.12
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json; charset=utf-8"
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.as_of": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
+                  "match": "datetime"
+                }
+              ]
+            },
+            "$.data": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.data[*].average_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].currency": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.data[*].day_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].day_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].exposure": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].mark_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].mark_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "MID|LAST|PREV"
+                }
+              ]
+            },
+            "$.data[*].mark_time": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
+                  "match": "datetime"
+                }
+              ]
+            },
+            "$.data[*].quantity": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].symbol": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.data[*].total_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].total_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            }
+          },
+          "header": {
+            "$['Content-Type'][0]": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json;?.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-js": {
+      "version": "10.4.1"
+    },
+    "pactRust": {
+      "ffi": "0.4.0",
+      "models": "1.0.4"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "positions-engine-api"
+  }
+}

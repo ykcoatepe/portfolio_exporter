@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
@@ -11,6 +12,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from prometheus_client import Counter, Gauge
 from starlette.middleware.cors import CORSMiddleware
 
+from psd.analytics.stats import compute_stats
 from psd.core.store import init, latest_snapshot, max_event_id, tail_events
 from psd.web.ready import router as ready_router
 
@@ -27,6 +29,10 @@ TEST_MODE = os.getenv("PSD_SSE_TEST_MODE", "").strip().lower() in {
     "yes",
     "on",
 }
+
+log = logging.getLogger("psd.web.stats")
+STALE_ALERT_THRESHOLD = 10
+_DEFAULT_STATS_EMPTY = compute_stats(None)
 
 
 @asynccontextmanager
@@ -60,6 +66,34 @@ def state():
             {"ts": None, "positions": [], "quotes": {}, "risk": {}, "empty": True}
         )
     return JSONResponse(snap)
+
+
+@app.get("/stats")
+def stats():
+    snap = latest_snapshot()
+    if not snap:
+        payload = dict(_DEFAULT_STATS_EMPTY)
+        payload.update({
+            "empty": True,
+            "ts": None,
+            "quotes_count": 0,
+        })
+        return JSONResponse(payload)
+
+    payload = compute_stats(snap)
+    payload = dict(payload)  # ensure mutable copy
+    quotes_obj = snap.get("quotes")
+    payload.update(
+        {
+            "empty": False,
+            "ts": snap.get("ts"),
+            "quotes_count": len(quotes_obj) if isinstance(quotes_obj, dict) else 0,
+        }
+    )
+    stale_count = int(payload.get("stale_quotes_count") or 0)
+    if stale_count > STALE_ALERT_THRESHOLD:
+        log.warning("stale_quotes_count exceeded threshold: %s", stale_count)
+    return JSONResponse(payload)
 
 
 # SSE stream: bootstrap snapshot (no id) followed by event/data/id frames with retry hints.

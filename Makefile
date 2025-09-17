@@ -11,15 +11,22 @@ THRESH ?= 3
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
+.PHONY: setup dev test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate serve-api
 .PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
-	@test -d $(VENV_DIR) || python3 -m venv $(VENV_DIR)
-	@$(PIP) -q install -U pip
-	@$(PIP) -q install -r requirements.txt
-	@$(PIP) -q install -e .
-	@[ -f requirements-dev.txt ] && $(PIP) -q install -r requirements-dev.txt || true
+	@if command -v uv >/dev/null 2>&1; then \
+		uv venv $(VENV_DIR); \
+		uv pip install -r requirements.txt; \
+		uv pip install -e .; \
+		if [ -f requirements-dev.txt ]; then uv pip install -r requirements-dev.txt; fi; \
+	else \
+		python3 -m venv $(VENV_DIR); \
+		$(PIP) -q install -U pip; \
+		$(PIP) -q install -r requirements.txt; \
+		$(PIP) -q install -e .; \
+		[ -f requirements-dev.txt ] && $(PIP) -q install -r requirements-dev.txt || true; \
+	fi
 	@echo "Venv ready → $(VENV_BIN)"
 
 dev:
@@ -36,14 +43,30 @@ ci-home: lint test build
 	@echo "✅  ci-home complete"
 
 lint:
-	# Ruff will pick up settings from pyproject.toml
+	# Ruff + Black share configuration in pyproject.toml
 	$(VENV)/bin/ruff check .
+	$(VENV)/bin/black --check .
 
 test:
 	$(PYTEST) -q
 
 build:
 	python -m build
+
+serve-api:
+	uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# ------------------------------------------------------------------
+# Web & API helpers
+# ------------------------------------------------------------------
+.PHONY: contract-sync ui-test ui-dev api-test api-serve perf-check
+
+contract-sync: ; cd apps/web && npx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api.d.ts
+ui-test: ; cd apps/web && npm run test
+ui-dev: ; cd apps/web && npm run dev
+api-test: ; pytest -q libs/py/positions_engine/tests
+api-serve: ; uvicorn apps.api.main:app --reload
+perf-check: ; python -m scripts.perf_fixture_run
 
 .PHONY: run-menu
 run-menu:

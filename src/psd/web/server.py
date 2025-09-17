@@ -236,6 +236,8 @@ td.empty {
     health: { ibkr_connected: null, data_age_s: null },
     lastSnapshotMs: 0,
     staleSeconds: 0,
+    stats: {},
+    staleAlertRaised: false,
     es: null
   };
 
@@ -244,6 +246,8 @@ td.empty {
     badgeIbkr: document.getElementById('badge-ibkr'),
     badgeStale: document.getElementById('badge-stale'),
     staleValue: document.getElementById('stale-value'),
+    badgeStaleQuotes: document.getElementById('badge-stale-quotes'),
+    staleQuotesCount: document.getElementById('stale-quotes-count'),
     breachList: document.getElementById('breach-list'),
     positionsInfo: document.getElementById('positions-info'),
     positionsBody: document.getElementById('positions-body'),
@@ -373,6 +377,22 @@ td.empty {
     }
   }
 
+  async function refreshStats() {
+    try {
+      const response = await fetch('/stats', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status);
+      }
+      const data = await response.json();
+      if (data && typeof data === 'object') {
+        store.stats = data;
+        renderBanner();
+      }
+    } catch (err) {
+      console.warn('stats fetch failed', err);
+    }
+  }
+
   function handleBreachEvent(payload) {
     const breaches = parseBreaches(payload && payload.breaches);
     store.breaches = breaches;
@@ -453,7 +473,7 @@ td.empty {
   }
 
   function renderBanner() {
-    const { badgeIbkr, badgeStale, staleValue } = els;
+    const { badgeIbkr, badgeStale, staleValue, badgeStaleQuotes, staleQuotesCount } = els;
     const connected = store.health && store.health.ibkr_connected !== null
       ? Boolean(store.health.ibkr_connected)
       : null;
@@ -465,6 +485,10 @@ td.empty {
 
     if (!store.lastSnapshotMs) {
       badgeStale.classList.add('hidden');
+      if (badgeStaleQuotes) {
+        badgeStaleQuotes.classList.add('hidden');
+      }
+      store.staleAlertRaised = false;
       return;
     }
 
@@ -477,6 +501,32 @@ td.empty {
       badgeStale.classList.add('alert');
     } else if (secs > 15) {
       badgeStale.classList.add('warn');
+    }
+
+    if (badgeStaleQuotes && staleQuotesCount) {
+      const stats = store.stats || {};
+      const staleCount = Number(stats.stale_quotes_count || 0);
+      const thresholdCandidate = Number(stats.stale_alert_threshold || stats.alert_threshold || 10);
+      const alertThreshold = Number.isFinite(thresholdCandidate) && thresholdCandidate > 0 ? thresholdCandidate : 10;
+      if (!Number.isFinite(staleCount) || staleCount <= 0) {
+        badgeStaleQuotes.classList.add('hidden');
+        badgeStaleQuotes.classList.remove('warn', 'alert');
+        store.staleAlertRaised = false;
+      } else {
+        badgeStaleQuotes.classList.remove('hidden');
+        badgeStaleQuotes.classList.remove('warn', 'alert');
+        staleQuotesCount.textContent = staleCount.toLocaleString();
+        if (staleCount > alertThreshold) {
+          badgeStaleQuotes.classList.add('alert');
+          if (!store.staleAlertRaised) {
+            console.warn('stale quotes exceeded threshold:', staleCount);
+            store.staleAlertRaised = true;
+          }
+        } else {
+          badgeStaleQuotes.classList.add('warn');
+          store.staleAlertRaised = false;
+        }
+      }
     }
   }
 
@@ -550,6 +600,8 @@ td.empty {
   loadInitial().finally(() => {
     startSse();
     setInterval(updateStaleTicker, 1000);
+    refreshStats();
+    setInterval(refreshStats, 5000);
     render();
   });
 })();
