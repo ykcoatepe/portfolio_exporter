@@ -1136,8 +1136,9 @@ week or the first Friday that is available.
 Scripts that use `ib_insync` (`historic_prices.py`, `live_feed.py` and
 `tech_signals_ibkr.py`) expect the IBKR Trader Workstation or IB Gateway to be
 running locally with API access enabled (default host `127.0.0.1` and port
-`7497`). Ensure your IBKR configuration allows API connections from your machine
-and that the account is logged in before running these scripts.
+`7496`; switch to `7497` for paper/simulated accounts). Ensure your IBKR
+configuration allows API connections from your machine and that the account is
+logged in before running these scripts.
 ## Automation
 
 Schedule `update_tickers.py` with cron or another task scheduler to run daily:

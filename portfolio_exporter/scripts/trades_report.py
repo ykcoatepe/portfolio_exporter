@@ -29,7 +29,7 @@ try:  # optional IBKR config
     from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
 except Exception:  # pragma: no cover - fallback defaults
     IB_HOST = "127.0.0.1"  # type: ignore
-    IB_PORT = 7497  # type: ignore
+    IB_PORT = 7496  # type: ignore  # set 7497 for paper/sim
 
     def _cid(name: str, default: int = 0) -> int:  # type: ignore
         return default

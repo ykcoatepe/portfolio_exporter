@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf  # pip install yfinance
 
+import asyncio
 import csv
 import logging
 import warnings
@@ -75,9 +76,22 @@ INDICATORS = [
 # --------------------------------------------------------------------------- #
 
 
+def _ensure_event_loop() -> asyncio.AbstractEventLoop:
+    """Ensure ib_insync has an event loop even on Python 3.11+."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
+
+
 def load_ib_positions_ib(
     host: str = "127.0.0.1",
-    port: int = 7497,
+    port: int = 7496,
     client_id: int = 999,
 ) -> pd.DataFrame:
     """
@@ -87,6 +101,7 @@ def load_ib_positions_ib(
     Columns returned: symbol · quantity · cost basis · mark price ·
     market_value · unrealized_pnl
     """
+    _ensure_event_loop()  # ib_insync expects a live asyncio loop on modern Python
     ib = IB()
     try:
         ib.connect(host, port, clientId=client_id)

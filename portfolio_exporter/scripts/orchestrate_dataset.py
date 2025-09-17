@@ -408,13 +408,13 @@ def preflight_check(no_pretty: bool = False) -> dict:
     # IBKR socket check (best-effort)
     if report["imports"]["ib_insync"]:
         try:
-            with socket.create_connection(("127.0.0.1", 7497), timeout=0.25):
+            with socket.create_connection(("127.0.0.1", 7496), timeout=0.25):
                 pass
             report["ibkr_socket_ok"] = True
         except Exception:
             report["ibkr_socket_ok"] = False
             report["warnings"].append(
-                "IBKR TWS/Gateway not reachable on 127.0.0.1:7497"
+                "IBKR TWS/Gateway not reachable on 127.0.0.1:7496 (use 7497 for paper)"
             )
 
     # CSV header sanity checks (best-effort)

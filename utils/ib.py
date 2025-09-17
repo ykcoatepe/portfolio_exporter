@@ -21,7 +21,7 @@ except ImportError:
 
 # --- Configuration ---
 IB_HOST = "127.0.0.1"
-IB_PORT = 7497
+IB_PORT = 7496  # use 7497 for paper/sim
 # Use a dedicated client ID for this utility module
 CLIENT_ID = 20
 

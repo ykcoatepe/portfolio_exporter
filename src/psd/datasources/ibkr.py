@@ -251,9 +251,12 @@ def get_positions(
         return []
 
     try:
-        df = pg._load_positions()  # pragma: no cover - network
+        df = pg.load_positions_sync()  # pragma: no cover - network
         if df is None:
             return []
+    except RuntimeError as exc:  # pragma: no cover - defensive
+        logger.warning("load_positions_sync failed: %s", exc)
+        return []
     except Exception:
         return []
 

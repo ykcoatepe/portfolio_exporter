@@ -11,7 +11,7 @@ THRESH ?= 3
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev test lint build ci-home run-menu sse-check memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
+.PHONY: setup dev test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
 .PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
@@ -52,6 +52,14 @@ run-menu:
 .PHONY: sse-check
 sse-check:
 	tools/check_sse.sh $(URL) $(THRESH)
+
+.PHONY: ib-port-guard
+ib-port-guard:
+	@if [ -x "$(PY)" ]; then \
+		"$(PY)" tools/check_ib_port_defaults.py; \
+	else \
+		python3 tools/check_ib_port_defaults.py; \
+	fi
 
 # ------------------------------------------------------------------
 # Assistant memory helpers

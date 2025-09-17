@@ -19,6 +19,7 @@ $ python portfolio_greeks.py --symbols MSFT,QQQ    # restrict to subset
 """
 
 import argparse
+import asyncio
 import csv
 import logging
 from portfolio_exporter.core.config import settings
@@ -35,7 +36,7 @@ import calendar
 import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, Sequence
 from pathlib import Path
 try:
     from rich.console import Console
@@ -70,6 +71,14 @@ from portfolio_exporter.core import config as config_core
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.runlog import RunLog
+from portfolio_exporter.ibx.compat import (
+    connect as ibx_connect,
+    disconnect as ibx_disconnect,
+    qualify_contracts as ibx_qualify,
+    req_contract_details as ibx_contract_details,
+    req_mkt_data as ibx_mkt,
+    req_positions as ibx_req_positions,
+)
 
 import numpy as np
 
@@ -354,75 +363,111 @@ def _has_any_greeks_populated(ticker: Ticker) -> bool:
 # ───────────────── pull positions & request data ─────────────────
 
 
-def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
-    """
-    Retrieve option/FOP positions and fetch live market data streams for Greeks.
-    """
-    raw_positions = [p for p in ib.positions() if p.position != 0]
+async def list_positions(
+    ib: IB,
+    *,
+    positions: Sequence[Position] | None = None,
+) -> List[Tuple[Position, Ticker]]:
+    """Retrieve option/FOP positions and fetch live market data streams for Greeks."""
+
+    if positions is None:
+        try:
+            raw_positions = await ibx_req_positions(ib)
+        except Exception as exc:
+            logger.error(f"Failed to request IBKR positions: {exc}")
+            return []
+    else:
+        raw_positions = list(positions)
+
+    raw_positions = [p for p in raw_positions if getattr(p, "position", 0) != 0]
+
+    last_req_ts = 0.0
+    try:
+        max_rps = float(os.getenv("PSD_IBKR_MAX_RPS", "40"))
+    except ValueError:
+        max_rps = 40.0
+
+    async def pace() -> None:
+        nonlocal last_req_ts
+        if max_rps <= 0:
+            return
+        now = time.monotonic()
+        wait_for = (1.0 / max_rps) - (now - last_req_ts)
+        if wait_for > 0:
+            await asyncio.sleep(wait_for)
+        last_req_ts = time.monotonic()
+
 
     # Expand IB "BAG" combo positions into per-leg pseudo-positions so we can
     # fetch Greeks for each option leg. Some accounts only show combos as BAGs
     # without separate option legs; previously these were silently skipped.
-    positions: list[Position] = []
+    positions_list: list[Position] = []
     for p in raw_positions:
         try:
             st = getattr(p.contract, "secType", "")
         except Exception:
             st = ""
         if st in {"OPT", "FOP"}:
-            positions.append(p)
+            positions_list.append(p)
             continue
         if st == "BAG":
             try:
                 legs = getattr(p.contract, "comboLegs", None) or []
                 if not legs:
                     continue
-                # For each leg, qualify by conId and synthesize a Position-like object
                 for leg in legs:
                     try:
-                        # Qualify the leg contract by conId to obtain full details
                         c = Contract()
                         c.conId = int(getattr(leg, "conId"))
-                        cds = ib.reqContractDetails(c)
-                        lc = cds[0].contract if cds else None
-                        if lc is None:
-                            continue
-                        # Compute effective leg quantity (respect leg action/buy/sell and ratio)
-                        ratio = int(getattr(leg, "ratio", 1) or 1)
-                        action = str(getattr(leg, "action", "")).upper()
-                        eff_qty = int(p.position) * ratio
-                        if action == "SELL":
-                            eff_qty *= -1
-
-                        # Build a minimal Position-like object with required attributes
-                        class _PosLike:
-                            def __init__(self, contract, position):
-                                self.contract = contract
-                                self.position = position
-
-                        positions.append(_PosLike(lc, eff_qty))
                     except Exception:
-                        # Skip legs we cannot qualify
                         continue
+                    try:
+                        cds = await ibx_contract_details(ib, c)
+                    except Exception:
+                        cds = []
+                    lc = cds[0].contract if cds else None
+                    if lc is None:
+                        continue
+                    try:
+                        ratio = int(getattr(leg, "ratio", 1) or 1)
+                    except Exception:
+                        ratio = 1
+                    action = str(getattr(leg, "action", "")).upper()
+                    try:
+                        eff_qty = int(p.position) * ratio
+                    except Exception:
+                        eff_qty = 0
+                    if action == "SELL":
+                        eff_qty *= -1
+
+                    class _PosLike:
+                        def __init__(self, contract, position):
+                            self.contract = contract
+                            self.position = position
+
+                    positions_list.append(_PosLike(lc, eff_qty))
             except Exception:
-                # Defensive: if anything goes wrong, just skip the BAG
                 continue
 
-    # Keep only option-like instruments after expansion
-    positions = [p for p in positions if getattr(p.contract, "secType", "") in {"OPT", "FOP"}]
-    if not positions:
+    positions_list = [p for p in positions_list if getattr(p.contract, "secType", "") in {"OPT", "FOP"}]
+    if not positions_list:
         return []
 
     logger.info(
-        f"Found {len(positions)} option/FOP positions. "
+        f"Found {len(positions_list)} option/FOP positions. "
         "Requesting live market data (Greeks)…"
     )
 
     bundles: List[Tuple[Position, Ticker]] = []
-    for pos in positions:
-        qc = ib.qualifyContracts(pos.contract)
+    for pos in positions_list:
+        try:
+            qc = await ibx_qualify(ib, pos.contract)
+        except Exception:
+            qc = []
         if not qc:
-            logger.warning(f"Could not qualify {pos.contract.localSymbol}. Skipping.")
+            logger.warning(
+                f"Could not qualify {getattr(pos.contract, 'localSymbol', 'contract')}. Skipping."
+            )
             continue
         c = qc[0]
         if not c.exchange:
@@ -430,24 +475,50 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
         if not c.currency:
             c.currency = "USD"
 
-        tk = ib.reqMktData(
-            c,
-            genericTickList="106",  # IV only; greeks auto-populate via MODEL_OPTION
-            snapshot=False,
-            regulatorySnapshot=False,
-        )
+        await pace()
+        try:
+            tk = await ibx_mkt(
+                ib,
+                c,
+                genericTickList="106",
+                snapshot=False,
+                regulatorySnapshot=False,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"reqMktDataAsync failed for {getattr(c, 'localSymbol', getattr(c, 'conId', 'contract'))}: {exc}"
+            )
+            continue
         bundles.append((pos, tk))
 
-    # wait until every ticker has at least one greek populated, or timeout
     deadline = time.time() + TIMEOUT_SECONDS
     while time.time() < deadline:
-        ib.sleep(0.25)
-        if all(_has_any_greeks_populated(tk) for _, tk in bundles):
+        if bundles and all(_has_any_greeks_populated(tk) for _, tk in bundles):
             break
+        try:
+            await ib.sleep(0.25)
+        except Exception:
+            await asyncio.sleep(0.25)
     else:
         logger.warning("Timeout waiting for Greeks; some tickers may lack data.")
 
     return bundles
+
+
+def list_positions_sync(
+    ib: IB,
+    *,
+    positions: Sequence[Position] | None = None,
+) -> List[Tuple[Position, Ticker]]:
+    """Synchronous wrapper for :func:`list_positions`."""
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(list_positions(ib, positions=positions))
+    raise RuntimeError(
+        "list_positions_sync() cannot be used inside a running event loop; await list_positions() instead."
+    )
 
 
 #
@@ -716,7 +787,7 @@ def main() -> None:
         else:
             NAV_LOG.write_text("timestamp,nav\n")
 
-    pkgs = list_positions(ib)
+    pkgs = list_positions_sync(ib)
     if not pkgs:
         logger.warning("No option/FOP positions with data – exiting.")
         ib.disconnect()
@@ -1047,140 +1118,143 @@ def main() -> None:
     ib.disconnect()
 
 
-def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
-    """Connect to IBKR and return current positions with greeks.
+async def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
+    """Connect to IBKR and return current positions with greeks."""
 
-    The returned DataFrame includes ``symbol``, ``secType``, ``qty``,
-    ``multiplier`` and the option greeks ``delta``, ``gamma``, ``vega`` and
-    ``theta``.  Option greeks are pulled live from IBKR while stock/ETF
-    positions receive a delta of ``1`` and zero for the remaining greeks.
-    """
-
-    ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
+        ib = await ibx_connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
     except Exception as exc:  # pragma: no cover - network
         logger.error(f"IBKR connect failed in _load_positions: {exc}")
         return pd.DataFrame()
 
-    # -------- options & futures options --------
-    bundles = list_positions(ib)
-    # Build avg cost lookup by conId for P&L calculations
-    avg_cost_map: dict[int, float] = {}
     try:
-        for p in ib.positions():
+        try:
+            positions_snapshot = await ibx_req_positions(ib)
+        except Exception:
+            positions_snapshot = []
+
+        bundles = await list_positions(ib, positions=positions_snapshot)
+
+        avg_cost_map: dict[int, float] = {}
+        for p in positions_snapshot:
             try:
                 cid = int(getattr(p.contract, "conId", 0))
                 if cid:
                     avg_cost_map[cid] = float(getattr(p, "avgCost", float("nan")))
             except Exception:
                 continue
-    except Exception:
-        pass
 
-    opt_rows: list[dict[str, float | str | int]] = []
-    for pos, tk in bundles:
-        c = pos.contract
-        mult = _multiplier(c)
-        qty = pos.position
-        # Try to pick a greeks source if available; otherwise leave NaN and let downstream handle
-        src = next(
-            (
-                getattr(tk, n)
-                for n in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks")
-                if getattr(tk, n, None) and getattr(getattr(tk, n), "delta") is not None
-            ),
-            None,
-        )
-        # robust option price (mid ▸ last ▸ close)
-        option_price = None
-        try:
-            option_price = tk.marketPrice()  # call as method
-        except Exception:
+        opt_rows: list[dict[str, float | str | int]] = []
+        for pos, tk in bundles:
+            c = pos.contract
+            mult = _multiplier(c)
+            qty = pos.position
+            src = next(
+                (
+                    getattr(tk, n)
+                    for n in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks")
+                    if getattr(tk, n, None) and getattr(getattr(tk, n), "delta") is not None
+                ),
+                None,
+            )
             option_price = None
-        if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
-            option_price = getattr(tk, "last", None)
-        if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
-            option_price = getattr(tk, "close", None)
-        try:
-            conid_val = int(getattr(c, "conId", 0))
-        except Exception:
-            conid_val = 0
-        avg_cost_raw = avg_cost_map.get(conid_val, float("nan"))
-        # Normalize avg cost to per-unit for options/FOP where needed.
-        # Some IB endpoints return avgCost per contract (price * multiplier), others per unit.
-        # Heuristic: if avg_cost is much larger than the current mark price and multiplier>1, treat it as per-contract and divide.
-        per_unit_cost = float("nan")
-        try:
-            ac = float(avg_cost_raw)
-            mp = float(option_price) if option_price is not None else float("nan")
-            if getattr(c, "secType", "") in {"OPT", "FOP"} and mult and float(mult) > 1:
-                if (not math.isnan(mp) and ac > mp * 10) or ac > 50:
-                    per_unit_cost = ac / float(mult)
+            try:
+                option_price = tk.marketPrice()
+            except Exception:
+                option_price = None
+            if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
+                option_price = getattr(tk, "last", None)
+            if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
+                option_price = getattr(tk, "close", None)
+            try:
+                conid_val = int(getattr(c, "conId", 0))
+            except Exception:
+                conid_val = 0
+            avg_cost_raw = avg_cost_map.get(conid_val, float("nan"))
+            per_unit_cost = float("nan")
+            try:
+                ac = float(avg_cost_raw)
+                mp = float(option_price) if option_price is not None else float("nan")
+                if getattr(c, "secType", "") in {"OPT", "FOP"} and mult and float(mult) > 1:
+                    if (not math.isnan(mp) and ac > mp * 10) or ac > 50:
+                        per_unit_cost = ac / float(mult)
+                    else:
+                        per_unit_cost = ac
                 else:
                     per_unit_cost = ac
-            else:
-                per_unit_cost = ac
-        except Exception:
-            per_unit_cost = float("nan")
-        try:
-            # Unrealized P&L per leg: (mark_per_unit − per_unit_cost) × qty × multiplier
-            pnl_leg = (float(option_price) - per_unit_cost) * float(qty) * float(mult)
-        except Exception:
-            pnl_leg = float("nan")
+            except Exception:
+                per_unit_cost = float("nan")
+            try:
+                pnl_leg = (float(option_price) - per_unit_cost) * float(qty) * float(mult)
+            except Exception:
+                pnl_leg = float("nan")
 
-        opt_rows.append(
-            {
-                "symbol": c.localSymbol,
-                "underlying": c.symbol,
-                "secType": c.secType,
-                "conId": getattr(c, "conId", None),
-                "qty": qty,
-                "multiplier": mult,
-                "right": getattr(c, "right", None),  # "C"/"P" for options
-                "strike": getattr(c, "strike", None),
-                "expiry": getattr(c, "lastTradeDateOrContractMonth", None),
-                "delta": getattr(src, "delta", float("nan")),
-                "gamma": getattr(src, "gamma", float("nan")),
-                "vega": getattr(src, "vega", float("nan")),
-                "theta": getattr(src, "theta", float("nan")),
-                "price": option_price if option_price is not None else float("nan"),
-                "avg_cost": avg_cost_raw,
-                "avg_cost_unit": per_unit_cost,
-                "pnl_leg": pnl_leg,
-            }
-        )
-
-    # -------- stock / ETF positions --------
-    stk_rows: list[dict[str, float | str | int]] = []
-    for p in ib.positions():
-        if p.contract.secType in {"STK", "ETF"} and p.position != 0:
-            # best-effort price snapshot is not fetched here; leave price NaN
-            ac = float(getattr(p, "avgCost", float("nan")))
-            stk_rows.append(
+            opt_rows.append(
                 {
-                    "symbol": p.contract.symbol,
-                    "underlying": p.contract.symbol,
-                    "secType": p.contract.secType,
-                    "qty": p.position,
-                    "multiplier": 1,
-                    "right": None,
-                    "strike": None,
-                    "expiry": None,
-                    # shares: delta = 1, other greeks 0
-                    "delta": 1.0,
-                    "gamma": 0.0,
-                    "vega": 0.0,
-                    "theta": 0.0,
-                    "price": float("nan"),
-                    "avg_cost": ac,
-                    "avg_cost_unit": ac,
-                    "pnl_leg": float("nan"),
+                    "symbol": getattr(c, "localSymbol", None),
+                    "underlying": getattr(c, "symbol", None),
+                    "secType": getattr(c, "secType", None),
+                    "conId": getattr(c, "conId", None),
+                    "qty": qty,
+                    "multiplier": mult,
+                    "right": getattr(c, "right", None),
+                    "strike": getattr(c, "strike", None),
+                    "expiry": getattr(c, "lastTradeDateOrContractMonth", None),
+                    "delta": getattr(src, "delta", float("nan")),
+                    "gamma": getattr(src, "gamma", float("nan")),
+                    "vega": getattr(src, "vega", float("nan")),
+                    "theta": getattr(src, "theta", float("nan")),
+                    "price": option_price if option_price is not None else float("nan"),
+                    "avg_cost": avg_cost_raw,
+                    "avg_cost_unit": per_unit_cost,
+                    "pnl_leg": pnl_leg,
                 }
             )
 
-    ib.disconnect()
-    return pd.DataFrame(opt_rows + stk_rows)
+        stk_rows: list[dict[str, float | str | int]] = []
+        for p in positions_snapshot:
+            try:
+                sec_type = p.contract.secType
+            except Exception:
+                continue
+            if sec_type in {"STK", "ETF"} and getattr(p, "position", 0) != 0:
+                ac = float(getattr(p, "avgCost", float("nan")))
+                stk_rows.append(
+                    {
+                        "symbol": getattr(p.contract, "symbol", None),
+                        "underlying": getattr(p.contract, "symbol", None),
+                        "secType": sec_type,
+                        "qty": getattr(p, "position", 0),
+                        "multiplier": 1,
+                        "right": None,
+                        "strike": None,
+                        "expiry": None,
+                        "delta": 1.0,
+                        "gamma": 0.0,
+                        "vega": 0.0,
+                        "theta": 0.0,
+                        "price": float("nan"),
+                        "avg_cost": ac,
+                        "avg_cost_unit": ac,
+                        "pnl_leg": float("nan"),
+                    }
+                )
+
+        return pd.DataFrame(opt_rows + stk_rows)
+    finally:
+        await ibx_disconnect()
+
+
+def load_positions_sync() -> pd.DataFrame:
+    """Synchronous wrapper around :func:`_load_positions`."""
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_load_positions())
+    raise RuntimeError(
+        "load_positions_sync() cannot be used inside a running event loop; await _load_positions() instead."
+    )
 
 
 def _load_db_legs_map() -> dict[str, list[dict[str, object]]]:
@@ -2230,7 +2304,7 @@ def run(
         pass
 
     # Load positions via live loader (tests may monkeypatch _load_positions)
-    pos_df: pd.DataFrame = run_with_spinner("Fetching positions…", _load_positions).copy()
+    pos_df: pd.DataFrame = run_with_spinner("Fetching positions…", load_positions_sync).copy()
     if pos_df.empty:
         pos_df = pd.DataFrame(
             columns=[

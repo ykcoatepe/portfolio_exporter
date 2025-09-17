@@ -35,7 +35,11 @@ def _snapshot(mark: float | None) -> pd.DataFrame:
 def test_equity_mark_backfills_from_yfinance(monkeypatch) -> None:
     from portfolio_exporter.scripts import portfolio_greeks as pg  # type: ignore
 
-    monkeypatch.setattr(pg, "_load_positions", lambda: _snapshot(None))
+    async def fake_loader():
+        return _snapshot(None)
+
+    monkeypatch.setattr(pg, "_load_positions", fake_loader)
+    monkeypatch.setattr(pg, "load_positions_sync", lambda: _snapshot(None))
     monkeypatch.setattr(yfin, "fill_equity_marks_from_yf", lambda symbols: {"AAPL": 197.25})
     ibkr.consume_mark_backfills()
 
@@ -48,7 +52,11 @@ def test_equity_mark_backfills_from_yfinance(monkeypatch) -> None:
 def test_none_mark_renders_dash_placeholder(monkeypatch) -> None:
     from portfolio_exporter.scripts import portfolio_greeks as pg  # type: ignore
 
-    monkeypatch.setattr(pg, "_load_positions", lambda: _snapshot(None))
+    async def fake_loader():
+        return _snapshot(None)
+
+    monkeypatch.setattr(pg, "_load_positions", fake_loader)
+    monkeypatch.setattr(pg, "load_positions_sync", lambda: _snapshot(None))
     monkeypatch.setattr(yfin, "fill_equity_marks_from_yf", lambda symbols: {"AAPL": None})
     ibkr.consume_mark_backfills()
 

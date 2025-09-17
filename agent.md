@@ -11,6 +11,7 @@
 ## Using the PSD Ops Menu
 
 The menu orchestrates the whole live PSD stack without manual commands.
+The menu auto-loads `.env` (or `PSD_ENV_FILE`) and fills safe defaults if keys are missing.
 
 **Start (recommended)**
 1. Ensure env is set (see `.env.example`): `PSD_SNAPSHOT_FN`, `PSD_RULES_FN`, `IB_HOST/IB_PORT/IB_CLIENT_ID` (unique per process), optional `PSD_PORT`.
@@ -48,7 +49,7 @@ The menu orchestrates the whole live PSD stack without manual commands.
 Set these before launching PSD locally or in production:
 - `PSD_SNAPSHOT_FN=portfolio_exporter.psd_adapter:snapshot_once`
 - `PSD_RULES_FN=portfolio_exporter.psd_rules:evaluate`
-- `IB_HOST=127.0.0.1` and `IB_PORT=7497` (override if you map Gateway to 4001/4002)
+- `IB_HOST=127.0.0.1` and `IB_PORT=7496` (use 7497 for paper; override if Gateway maps to 4001/4002)
 - `IB_CLIENT_ID=<unique>` per process/tool to avoid TWS collisions
 - Optional: `PSD_HEARTBEAT_S=2.0` to keep the ingestor loop cadence explicit
 - Leave `PSD_SSE_TEST_MODE` unset outside of tests; labs toggle it to fake SSE frames

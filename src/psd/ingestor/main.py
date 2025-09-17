@@ -5,7 +5,8 @@ import importlib
 import logging
 import os
 import time
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -85,6 +86,18 @@ async def fetch_snapshot() -> dict:
 
 async def run() -> None:
     init()
+    snapshot_env = os.getenv("PSD_SNAPSHOT_FN")
+    log.info(
+        "PSD ingestor starting with snapshot_fn=%s | IB %s:%s clientId=%s",
+        snapshot_env,
+        os.getenv("IB_HOST"),
+        os.getenv("IB_PORT"),
+        os.getenv("IB_CLIENT_ID"),
+    )
+    if not snapshot_env:
+        log.error(
+            "PSD_SNAPSHOT_FN is not set. Falling back may yield empty snapshots."
+        )
     checkpoint_every = _checkpoint_interval()
     last_ok_ts: float = 0.0
     tick_count = 0

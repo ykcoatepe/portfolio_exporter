@@ -11,23 +11,27 @@ logger = logging.getLogger("portfolio_exporter.psd_adapter")
 
 async def load_positions() -> List[dict[str, Any]]:
     """Fetch the latest positions using the portfolio exporter data layer."""
-    try:
-        from portfolio_exporter.scripts import portfolio_greeks
-        import pandas as pd  # type: ignore
 
-        def _fetch() -> List[dict[str, Any]]:
-            df = portfolio_greeks._load_positions()  # pragma: no cover - exercised via adapter
-            if not isinstance(df, pd.DataFrame):
-                return [] if df is None else list(df)
-            if df.empty:
-                return []
-            normalized = df.replace({math.nan: None})
-            return normalized.to_dict(orient="records")
+    from portfolio_exporter.scripts import portfolio_greeks
+    import pandas as pd  # type: ignore
 
-        return await asyncio.to_thread(_fetch)
-    except Exception as exc:  # pragma: no cover - defensive fallback
-        logger.warning("load_positions fallback: %s", exc)
+    df = await portfolio_greeks._load_positions()  # pragma: no cover - network
+    return _normalize_positions(df, pd)
+
+
+def _normalize_positions(df: Any, pd_module: Any) -> List[dict[str, Any]]:
+    if df is None:
         return []
+    if isinstance(df, pd_module.DataFrame):
+        if df.empty:
+            return []
+        normalized = df.replace({math.nan: None})
+        return normalized.to_dict(orient="records")
+    try:
+        return list(df)
+    except Exception:
+        return []
+
 
 
 async def get_marks(positions: Iterable[dict[str, Any]]) -> dict[str, float]:
@@ -134,7 +138,15 @@ async def snapshot_once() -> dict[str, Any]:
         positions = await load_positions()
     except Exception as exc:
         logger.warning("snapshot positions failed: %s", exc)
-        positions = []
+        try:
+            from portfolio_exporter.scripts import portfolio_greeks
+            import pandas as pd  # type: ignore
+
+            df_sync = await asyncio.to_thread(portfolio_greeks.load_positions_sync)  # pragma: no cover - network
+            positions = _normalize_positions(df_sync, pd)
+        except Exception as fallback_exc:
+            logger.warning("load_positions sync fallback failed: %s", fallback_exc)
+            positions = []
     try:
         marks = await get_marks(positions)
     except Exception as exc:

@@ -5,12 +5,12 @@ import pandas as pd
 import pytest
 
 
-from portfolio_exporter.scripts.portfolio_greeks import list_positions
+from portfolio_exporter.scripts.portfolio_greeks import list_positions_sync
 
 
 def test_list_positions_fill_exchange_and_currency():
     class DummyIB:
-        def positions(self):
+        async def reqPositionsAsync(self):
             P = type("Pos", (), {})()
             C = type(
                 "Contract",
@@ -21,16 +21,22 @@ def test_list_positions_fill_exchange_and_currency():
             P.position = 1
             return [P]
 
-        def qualifyContracts(self, contract):
+        async def qualifyContractsAsync(self, contract):
             return [contract]
 
-        def reqMktData(self, *args, **kwargs):
+        async def reqMktDataAsync(self, *args, **kwargs):
+            class Greeks:
+                delta = 0.5
+
+            class Ticker:
+                modelGreeks = Greeks()
+
+            return Ticker()
+
+        async def sleep(self, _):
             return None
 
-        def sleep(self, t):
-            pass
-
-    bundles = list_positions(DummyIB())
+    bundles = list_positions_sync(DummyIB())
     assert bundles, "No positions returned"
     pos, _ = bundles[0]
     assert pos.contract.exchange == "SMART"

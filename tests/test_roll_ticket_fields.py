@@ -33,7 +33,14 @@ def _prepare(monkeypatch, tmp_path: Path):
         },
         index=[1, 2],
     )
-    fake_pg = types.SimpleNamespace(_load_positions=lambda: pos_df)
+
+    async def fake_loader():
+        return pos_df
+
+    fake_pg = types.SimpleNamespace(
+        _load_positions=fake_loader,
+        load_positions_sync=lambda: pos_df,
+    )
     monkeypatch.setattr(roll_manager, "portfolio_greeks", fake_pg)
 
     combo_df = pd.DataFrame(

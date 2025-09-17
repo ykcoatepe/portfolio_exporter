@@ -1,6 +1,7 @@
 import os
 import csv
 import argparse
+import asyncio
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core import io
 from portfolio_exporter.core import ui as core_ui
@@ -44,10 +45,24 @@ EXTRA_TICKERS = ["SPY", "QQQ", "IWM", "^VIX", "DX-Y.NYB"]  # core indices
 PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}
 
 
+def _ensure_event_loop() -> asyncio.AbstractEventLoop:
+    """Ensure ib_insync has an event loop ready before initiating any async connect."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
+
+
 def _tickers_from_ib() -> list[str]:
     """Return unique stock tickers from current IBKR account positions."""
     if not IB_AVAILABLE:
         return []
+    _ensure_event_loop()
     ib = IB()
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)

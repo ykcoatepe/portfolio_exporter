@@ -41,7 +41,11 @@ def _option_snapshot() -> pd.DataFrame:
 def test_missing_greeks_logs_warning(monkeypatch, caplog) -> None:
     from portfolio_exporter.scripts import portfolio_greeks as pg  # type: ignore
 
-    monkeypatch.setattr(pg, "_load_positions", lambda: _option_snapshot())
+    async def fake_loader():
+        return _option_snapshot()
+
+    monkeypatch.setattr(pg, "_load_positions", fake_loader)
+    monkeypatch.setattr(pg, "load_positions_sync", lambda: _option_snapshot())
     caplog.set_level("WARNING")
 
     positions = ibkr.get_positions({})

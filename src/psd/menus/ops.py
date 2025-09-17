@@ -28,6 +28,7 @@ Config
   - PSD_PORT         Web port (default 51127)
   - PSD_RUN_DIR      Runtime dir for logs & PID file (default "run")
   - App-specific:    PSD_SNAPSHOT_FN / PSD_RULES_FN, IB_*... (read by the services)
+  - IB_PORT          Default: TWS live port 7496 (paper/simulated uses 7497)
 
 Idempotency & safety
 --------------------
@@ -46,13 +47,14 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import signal
 import subprocess
 import sys
 import time
 import webbrowser
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Dict, Iterable, Mapping
 
 from rich.console import Console
 from rich.markup import escape
@@ -85,6 +87,45 @@ _LOG_NAMES = {
     "web": "web.log",
 }
 
+LOG_TAIL_LINES = int(os.getenv("PSD_LOG_TAIL_LINES", "40"))
+
+ENV_SUMMARY_KEYS: tuple[str, ...] = (
+    "PSD_SNAPSHOT_FN",
+    "PSD_RULES_FN",
+    "IB_HOST",
+    "IB_PORT",
+    "IB_CLIENT_ID",
+)
+
+
+def _load_env_file(path: str = ".env") -> dict[str, str]:
+    env: dict[str, str] = {}
+    try:
+        with open(path, encoding="utf-8") as file:
+            for raw_line in file:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                env[key.strip()] = value.strip()
+    except FileNotFoundError:
+        pass
+    return env
+
+
+def _with_defaults(base: Mapping[str, str]) -> dict[str, str]:
+    out = dict(base)
+    out.setdefault(
+        "PSD_SNAPSHOT_FN", "portfolio_exporter.psd_adapter:snapshot_once"
+    )
+    out.setdefault("PSD_RULES_FN", "portfolio_exporter.psd_rules:evaluate")
+    out.setdefault("IB_HOST", "127.0.0.1")
+    out.setdefault("IB_PORT", "7496")
+    if not out.get("IB_CLIENT_ID"):
+        seed = 1000 + (os.getpid() % 7000) + random.randint(0, 999)
+        out["IB_CLIENT_ID"] = str(seed)
+    return out
+
 
 def _port_from_env() -> int:
     raw = os.getenv("PSD_PORT", str(DEFAULT_PORT))
@@ -114,7 +155,7 @@ def _wait_for_exit(pid: int, timeout: float) -> bool:
     return not _alive(pid)
 
 
-def _load_pid_file(console: Console | None = None) -> Dict[str, int]:
+def _load_pid_file(console: Console | None = None) -> dict[str, object]:
     try:
         content = PID_FILE.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -127,7 +168,8 @@ def _load_pid_file(console: Console | None = None) -> Dict[str, int]:
         return {}
     if not isinstance(data, dict):
         return {}
-    result: Dict[str, int] = {}
+    result: dict[str, object] = {}
+    env_data: dict[str, str] | None = None
     for key, value in data.items():
         if key == "port":
             try:
@@ -139,17 +181,25 @@ def _load_pid_file(console: Console | None = None) -> Dict[str, int]:
                 result[key] = int(value)
             except (TypeError, ValueError):
                 continue
+        elif key == "env" and isinstance(value, dict):
+            env_data = {str(k): str(v) for k, v in value.items() if isinstance(k, str)}
+    if env_data:
+        result["env"] = env_data
     return result
 
 
-def _save_pid_file(data: Mapping[str, int]) -> None:
+def _save_pid_file(data: Mapping[str, object]) -> None:
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     tmp_path = PID_FILE.with_suffix(".tmp")
     tmp_path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
     tmp_path.replace(PID_FILE)
 
 
-def _spawn(command: Iterable[str], log_path: Path, env: Mapping[str, str] | None = None) -> subprocess.Popen[bytes]:
+def _spawn(
+    command: Iterable[str],
+    log_path: Path,
+    env: Mapping[str, str] | None = None,
+) -> subprocess.Popen[bytes]:
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "ab", buffering=0) as log_file:
@@ -158,7 +208,7 @@ def _spawn(command: Iterable[str], log_path: Path, env: Mapping[str, str] | None
             stdout=log_file,
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
-            env=dict(os.environ, **env) if env else None,
+            env=dict(env) if env else None,
         )
     return process
 
@@ -185,8 +235,57 @@ def show_status(console: Console) -> None:
             color = "green" if state == "alive" else "red"
             table.add_row(service.title(), pid_text, f"[{color}]{state}[/{color}]")
         console.print(table)
+    env_info = data.get("env")
+    if isinstance(env_info, dict) and env_info:
+        env_table = Table(title="PSD Environment", show_header=False, header_style="dim")
+        env_table.add_column("Key", style="dim")
+        env_table.add_column("Value")
+        for key in ENV_SUMMARY_KEYS:
+            value = env_info.get(key)
+            if value is None:
+                continue
+            env_table.add_row(key, str(value))
+        console.print(env_table)
     port = data.get("port", _port_from_env())
     console.print(f"Dashboard: http://127.0.0.1:{port}")
+
+
+def show_logs(console: Console, lines: int = LOG_TAIL_LINES) -> None:
+    if lines <= 0:
+        console.print("[red]Log tail length must be positive.[/red]")
+        return
+    console.print(
+        Panel.fit(
+            f"Showing last {lines} line(s) from PSD logs in {RUN_DIR}",
+            title="Logs",
+            border_style="cyan",
+        )
+    )
+    any_found = False
+    for service in SERVICES:
+        log_name = _LOG_NAMES.get(service)
+        if not log_name:
+            continue
+        path = RUN_DIR / log_name
+        console.rule(f"[bold]{service.title()} ({log_name})")
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except FileNotFoundError:
+            console.print("[dim]Log file not found.[/dim]")
+            continue
+        except Exception as exc:  # pragma: no cover - defensive
+            console.print(f"[red]Failed to read log: {exc}[/red]")
+            continue
+        lines_data = text.splitlines()
+        tail = lines_data[-lines:] if lines < len(lines_data) else lines_data
+        if not tail:
+            console.print("[dim](empty log)[/dim]")
+        else:
+            any_found = True
+            for entry in tail:
+                console.print(entry)
+    if not any_found:
+        console.print("[yellow]No PSD log files found yet.[/yellow]")
 
 
 def open_dashboard(console: Console) -> None:
@@ -203,7 +302,18 @@ def open_dashboard(console: Console) -> None:
 def start_psd(console: Console) -> None:
     state = _load_pid_file(console)
     port = _port_from_env()
-    running: Dict[str, int] = {}
+    env_file = os.environ.get("PSD_ENV_FILE", ".env")
+    env_loaded = _load_env_file(env_file)
+    child_env = _with_defaults({**os.environ, **env_loaded})
+    console.print(
+        "[dim]Using {snapshot} | IB {host}:{port} clientId={client_id}[/]".format(
+            snapshot=child_env["PSD_SNAPSHOT_FN"],
+            host=child_env["IB_HOST"],
+            port=child_env["IB_PORT"],
+            client_id=child_env["IB_CLIENT_ID"],
+        )
+    )
+    running: dict[str, int] = {}
     for service in SERVICES:
         pid = state.get(service)
         if isinstance(pid, int) and _alive(pid):
@@ -226,10 +336,15 @@ def start_psd(console: Console) -> None:
         console.print(
             f"[cyan]Starting {service} -> {' '.join(cmd)}[/cyan]"
         )
-        process = _spawn(cmd, log_path)
+        process = _spawn(cmd, log_path, env=child_env)
         running[service] = process.pid
         console.print(f"[green]{service.title()} PID {process.pid}[/green]")
-    data = {**running, "port": port}
+    env_summary = {
+        key: child_env.get(key)
+        for key in ENV_SUMMARY_KEYS
+        if child_env.get(key) is not None
+    }
+    data: dict[str, object] = {**running, "port": port, "env": env_summary}
     _save_pid_file(data)
     open_dashboard(console)
     time.sleep(0.2)
@@ -294,7 +409,10 @@ def stop_psd(console: Console) -> None:
     }
     if remaining:
         port_value = data.get("port", _port_from_env())
-        updated = {**remaining, "port": port_value}
+        updated: dict[str, object] = {**remaining, "port": port_value}
+        env_info = data.get("env")
+        if isinstance(env_info, dict) and env_info:
+            updated["env"] = env_info
         _save_pid_file(updated)
         console.print("[yellow]Some services are still running; pid file updated.[/yellow]")
     elif PID_FILE.exists():
@@ -308,6 +426,7 @@ def _menu_panel() -> Panel:
         "[2] Stop PSD",
         "[3] Open Dashboard",
         "[4] Start PSD",
+        "[5] Tail Logs",
         "[q] Quit",
     ]
     lines = [escape(label) for label in labels]
@@ -329,8 +448,10 @@ def main() -> None:
             open_dashboard(console)
         elif choice == "4":
             start_psd(console)
+        elif choice == "5":
+            show_logs(console)
         else:
-            console.print("[red]Invalid selection. Choose 1-4 or q to quit.[/red]")
+            console.print("[red]Invalid selection. Choose 1-5 or q to quit.[/red]")
 
 
 if __name__ == "__main__":

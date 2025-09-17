@@ -19,6 +19,7 @@ import time
 import logging
 import csv
 import argparse
+import asyncio
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -320,6 +321,20 @@ PROXY_MAP = {
 
 YIELD_MAP = {"US2Y": "DGS2", "US10Y": "DGS10", "US20Y": "DGS20", "US30Y": "DGS30"}
 
+
+def _ensure_event_loop() -> asyncio.AbstractEventLoop:
+    """Ensure ib_insync can access a live asyncio loop before connecting."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
+
+
 # Index mapping for IBKR (futures removed; will fall back to yfinance)
 SYMBOL_MAP = {
     "VIX": (Index, dict(symbol="VIX", exchange="CBOE")),
@@ -406,6 +421,7 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     if not IB_AVAILABLE:
         return pd.DataFrame()
 
+    _ensure_event_loop()
     ib = IB()
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)
@@ -811,6 +827,7 @@ def run(
     opt_list, opt_under = ([], set())
     # Only include underlyings from live positions when explicitly requested.
     if include_positions and IB_AVAILABLE:
+        _ensure_event_loop()
         ib_tmp = IB()
         try:
             ib_tmp.connect(IB_HOST, IB_PORT, clientId=99, timeout=3)
@@ -852,6 +869,7 @@ def run(
     pct_map: dict[str, float] = {}
     df_pos = pd.DataFrame()
     if IB_AVAILABLE:
+        _ensure_event_loop()
         ib_live = IB()
         try:
             ib_live.connect(IB_HOST, IB_PORT, clientId=98, timeout=3)

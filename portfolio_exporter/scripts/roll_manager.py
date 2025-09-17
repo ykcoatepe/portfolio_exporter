@@ -158,7 +158,7 @@ def run(
 
         portfolio_greeks = _pg
 
-    pos_df = core_ui.run_with_spinner("Fetching positions…", portfolio_greeks._load_positions)
+    pos_df = core_ui.run_with_spinner("Fetching positions…", portfolio_greeks.load_positions_sync)
     if pos_df.empty:
         if return_df:
             return pd.DataFrame()
@@ -437,7 +437,7 @@ def cli(args: argparse.Namespace | None = None) -> dict:
         written: list[pathlib.Path] = []
         if not args.dry_run and any(formats.values()):
             with rl.time("write_outputs"):
-                pos_df = run_with_spinner("Fetching positions…", portfolio_greeks._load_positions)
+                pos_df = run_with_spinner("Fetching positions…", portfolio_greeks.load_positions_sync)
                 paths = _write_files(df, pos_df, outdir)
                 for k, p in paths.items():
                     outputs[k] = str(p)

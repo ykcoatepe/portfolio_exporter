@@ -43,8 +43,13 @@ def test_combo_butterfly(monkeypatch):
         ],
         index=[1, 2, 3],
     )
-    monkeypatch.setattr(portfolio_greeks, "_load_positions", lambda: df)
-    combos = combo.detect_combos(portfolio_greeks._load_positions(), mode="all")
+
+    async def fake_loader():
+        return df
+
+    monkeypatch.setattr(portfolio_greeks, "_load_positions", fake_loader)
+    monkeypatch.setattr(portfolio_greeks, "load_positions_sync", lambda: df)
+    combos = combo.detect_combos(portfolio_greeks.load_positions_sync(), mode="all")
     assert len(combos) == 1
     fly = combos.iloc[0]
     assert fly.structure == "Butterfly"
