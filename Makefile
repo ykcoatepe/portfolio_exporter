@@ -5,10 +5,13 @@ PY      := $(VENV_BIN)/python
 PIP     := $(VENV_BIN)/pip
 PYTEST  := $(VENV_BIN)/pytest
 
+URL ?= http://127.0.0.1:51127/stream
+THRESH ?= 3
+
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev test lint build ci-home memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
+.PHONY: setup dev test lint build ci-home run-menu sse-check memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
 .PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
@@ -41,6 +44,14 @@ test:
 
 build:
 	python -m build
+
+.PHONY: run-menu
+run-menu:
+	python -m psd.menus.ops
+
+.PHONY: sse-check
+sse-check:
+	tools/check_sse.sh $(URL) $(THRESH)
 
 # ------------------------------------------------------------------
 # Assistant memory helpers

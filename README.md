@@ -1274,12 +1274,35 @@ Troubleshooting
 This project is licensed under the [MIT License](LICENSE).
 ### Browser Dashboard (PSD)
 
+Quick start via the Rich ops menu - no manual process juggling required:
+
+```bash
+make run-menu
+# [4] Start PSD   -> ingestor + scanner + web start and the dashboard opens automatically
+# [1] Status      -> show running services and PIDs
+# [2] Stop PSD    -> graceful shutdown (SIGINT->SIGTERM->SIGKILL)
+```
+
+PID file lives at `run/psd-pids.json`; logs stream to `run/ingestor.log`, `run/scanner.log`, and `run/web.log`.
+
 - Access via TUI only: open the app and navigate to "Portfolio Sentinel". The dashboard auto-starts once per session (web + browser + loop).
 - Disable auto-start by setting `psd.auto.start_on_menu: false` in `config/rules.yaml`; then use the menu action `o = Open in browser` to trigger the starter on demand.
 - The server is a minimal FastAPI + WebSocket app; broadcasts are pushed from the in-process scheduler each iteration.
 - Prometheus scrape target: `http://localhost:51127/metrics` (see ingest tick histogram, data age gauge, event counters, and SSE stream gauges).
+- Readiness gate: `GET /ready` returns `{ "ok": true, "data_age_s": <float>, "threshold_s": <float> }` when a snapshot is available and the latest health row is newer than `PSD_READY_MAX_AGE` (default 15s). Missing or stale data yields `503` with `{ "ok": false, "reason": "...", "data_age_s": <float|null> }`.
+
+---
+
+Quick smoke (local):
+- `python -m psd.menus.ops` -> press **4** to start -> `run/psd-pids.json` appears and `run/*.log` fills.
+- Press **1** for status, **2** to stop; confirm the PID file updates or disappears accordingly.
 
 > **SSE Troubleshooting:** If events appear in bursts, check proxy buffering or ensure `X-Accel-Buffering: no` is not ignored by `proxy_ignore_headers`.
+
+#### SSE latency check
+
+- Local smoke: `make sse-check URL=https://your.domain/stream THRESH=3` runs `tools/check_sse.sh` and passes when median inter-arrival stays under the threshold (seconds).
+- CI dispatch: `.github/workflows/psd-smoke.yml` runs the same script against `${{ secrets.PSD_SSE_URL }}` when triggered via `workflow_dispatch`.
 
 #### WAL FAQ
 
