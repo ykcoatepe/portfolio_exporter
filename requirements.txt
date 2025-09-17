@@ -38,6 +38,8 @@ h11==0.16.0
     # via
     #   uvicorn
     #   wsproto
+httpx==0.27.2
+    # via -r requirements.in
 ib-insync==0.9.86
     # via -r requirements.in
 idna==3.10

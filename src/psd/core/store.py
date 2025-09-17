@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 _JSON_SEPARATORS = (",", ":")
 _VALID_CHECKPOINT_MODES = {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}
@@ -119,6 +120,69 @@ def latest_snapshot() -> dict[str, Any] | None:
     return json.loads(row["data"])
 
 
+
+def latest_health() -> dict[str, Any] | None:
+    """Return the most recent health row with connection state and data age."""
+    row = None
+    with _connect() as conn:
+        try:
+            row = conn.execute(
+                """
+                SELECT ts, ibkr_connected, data_age_s
+                FROM health
+                ORDER BY ts DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        except sqlite3.OperationalError:
+            try:
+                row = conn.execute(
+                    """
+                    SELECT strftime('%s', updated_at) AS ts, ibkr_connected, data_age_s
+                    FROM health
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """
+                ).fetchone()
+            except sqlite3.OperationalError:
+                return None
+    if not row:
+        return None
+
+    keys = row.keys() if hasattr(row, "keys") else []
+
+    def _get_value(name: str, index: int | None = None) -> Any:
+        if name in keys:
+            return row[name]
+        if index is not None:
+            try:
+                return row[index]
+            except (IndexError, KeyError, TypeError):
+                return None
+        return None
+
+    ts_raw = _get_value("ts", 0)
+    try:
+        ts_value = float(ts_raw) if ts_raw is not None else None
+    except (TypeError, ValueError):
+        ts_value = None
+
+    ibkr_raw = _get_value("ibkr_connected", 1)
+    ibkr_value = bool(ibkr_raw) if ibkr_raw is not None else False
+
+    data_age_raw = _get_value("data_age_s", 2)
+    try:
+        data_age_value = float(data_age_raw)
+    except (TypeError, ValueError):
+        return None
+
+    return {
+        "ts": ts_value,
+        "ibkr_connected": ibkr_value,
+        "data_age_s": data_age_value,
+    }
+
+
 def _json_dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, separators=_JSON_SEPARATORS, sort_keys=True)
 
@@ -168,6 +232,22 @@ def tail_events(last_id: int = 0, limit: int = 200) -> list[tuple[int, str, dict
             for row in rows
         ]
     return result
+
+
+def max_event_id() -> int:
+    """Return the current ledger head id (0 when empty).
+
+    The SSE stream uses this to resume strictly after the bootstrap snapshot so
+    reconnects never replay older snapshots.
+    """
+    with _connect() as conn:
+        row = conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()
+    if not row:
+        return 0
+    try:
+        return int(row[0])
+    except (TypeError, ValueError):  # pragma: no cover - defensive fallback
+        return 0
 
 
 def write_health(ibkr_connected: bool, data_age_s: float) -> None:

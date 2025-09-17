@@ -1,4 +1,5 @@
 fastapi
+httpx
 fpdf
 ib_insync
 numpy

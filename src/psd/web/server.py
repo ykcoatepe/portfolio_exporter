@@ -559,6 +559,7 @@ td.empty {
 """
 
 _clients: set[Any] = set()
+_sse_clients: set[Any] = set()
 
 
 def _html_page() -> str:
@@ -680,6 +681,16 @@ def start(host: str = "127.0.0.1", port: int = 8787, *, background: bool = True)
 def broadcast(dto: dict) -> None:
     """Best-effort broadcast to connected WebSocket clients."""
     payload = json.dumps(dto, separators=(",", ":"))
+    if _sse_clients:
+        for queue in list(_sse_clients):
+            try:
+                queue.put_nowait(payload)
+            except Exception:
+                try:
+                    _sse_clients.discard(queue)
+                except Exception:
+                    pass
+
     if not _clients:
         return
 
