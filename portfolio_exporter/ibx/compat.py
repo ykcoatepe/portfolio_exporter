@@ -4,7 +4,8 @@ import asyncio
 import contextlib
 import logging
 import os
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from ib_insync import IB
 
@@ -78,9 +79,7 @@ async def connect(host: str, port: int, client_id: int, timeout: float | None = 
                     try:
                         await ib.connectAsync(host, port, clientId=client_id, timeout=timeout_value)
                     except (RuntimeError, NotImplementedError) as exc:
-                        log.debug(
-                            "connectAsync not available here (%s), falling back to sync connect", exc
-                        )
+                        log.debug("connectAsync not available here (%s), falling back to sync connect", exc)
                         _mark_sync("connect")
                         await _to_thread(ib.connect, host, port, clientId=client_id, timeout=timeout_value)
                     return ib

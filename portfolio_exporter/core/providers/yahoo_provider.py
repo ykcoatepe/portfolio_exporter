@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
-from datetime import datetime
-import os
 import json
-import time
 import math
+import os
+import time
+from datetime import datetime
+from typing import Any
 
 
-def _ensure_online(cfg: Dict[str, Any]) -> None:
+def _ensure_online(cfg: dict[str, Any]) -> None:
     if cfg.get("data", {}).get("offline"):
         raise RuntimeError("Yahoo provider disabled in offline mode")
 
@@ -55,7 +55,7 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def _cache_cfg(cfg: Dict[str, Any]) -> tuple[bool, str, int]:
+def _cache_cfg(cfg: dict[str, Any]) -> tuple[bool, str, int]:
     d = cfg.get("data", {}).get("cache", {}) if isinstance(cfg.get("data", {}), dict) else {}
     enabled = bool(d.get("enabled", False))
     cdir = str(d.get("dir", "out/.cache"))
@@ -63,7 +63,7 @@ def _cache_cfg(cfg: Dict[str, Any]) -> tuple[bool, str, int]:
     return enabled, cdir, ttl
 
 
-def _ttl(cfg: Dict[str, Any]) -> int:
+def _ttl(cfg: dict[str, Any]) -> int:
     """Return cache TTL with env override.
 
     Environment variable MOMO_CACHE_TTL, when set to an integer, overrides
@@ -81,7 +81,7 @@ def _ttl(cfg: Dict[str, Any]) -> int:
         return 60
 
 
-def _cache_read(cfg: Dict[str, Any], key: str) -> Any | None:
+def _cache_read(cfg: dict[str, Any], key: str) -> Any | None:
     enabled, cdir, _ = _cache_cfg(cfg)
     if not enabled:
         return None
@@ -93,13 +93,13 @@ def _cache_read(cfg: Dict[str, Any], key: str) -> Any | None:
         ttl = _ttl(cfg)
         if ttl and age > ttl:
             return None
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             return json.load(fh)
     except Exception:
         return None
 
 
-def _cache_write(cfg: Dict[str, Any], key: str, obj: Any) -> None:
+def _cache_write(cfg: dict[str, Any], key: str, obj: Any) -> None:
     enabled, cdir, _ = _cache_cfg(cfg)
     if not enabled:
         return
@@ -112,7 +112,7 @@ def _cache_write(cfg: Dict[str, Any], key: str, obj: Any) -> None:
         pass
 
 
-def get_summary(symbol: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
+def get_summary(symbol: str, cfg: dict[str, Any]) -> dict[str, Any]:
     """Return float/short/avg vols and premarket if available.
     Real impl may use yfinance.Ticker; tests will monkeypatch.
     """
@@ -134,7 +134,8 @@ def get_summary(symbol: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
             "short_percent_float": info.get("short_percent_of_float"),
             "avg_vol_10d": info.get("ten_day_average_volume"),
             "avg_vol_3m": info.get("three_month_average_volume"),
-            "pre_market_price": getattr(t, "pre_market_price", None) or (pre_price if isinstance(pre_price, (int, float)) else None),
+            "pre_market_price": getattr(t, "pre_market_price", None)
+            or (pre_price if isinstance(pre_price, (int, float)) else None),
             "last": info.get("last_price") or info.get("last_trade_price") or None,
             "prev_close": info.get("previous_close") or None,
         }
@@ -144,7 +145,9 @@ def get_summary(symbol: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
         return {}
 
 
-def get_intraday_bars(symbol: str, cfg: Dict[str, Any], minutes: int = 60, prepost: bool = True) -> List[Dict[str, Any]]:
+def get_intraday_bars(
+    symbol: str, cfg: dict[str, Any], minutes: int = 60, prepost: bool = True
+) -> list[dict[str, Any]]:
     # Try cache first
     ck = f"bars_{symbol.upper()}_{minutes}_{1 if prepost else 0}"
     cached = _cache_read(cfg, ck)
@@ -168,7 +171,7 @@ def get_intraday_bars(symbol: str, cfg: Dict[str, Any], minutes: int = 60, prepo
         if df is None or len(df) == 0:
             return []
         # Normalize columns to lower-case keys and output list of dicts
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         # yfinance returns chronological ascending; take the last `minutes` rows
         tail = df.tail(minutes)
         for idx, r in tail.iterrows():
@@ -185,14 +188,21 @@ def get_intraday_bars(symbol: str, cfg: Dict[str, Any], minutes: int = 60, prepo
                 )
             except Exception:
                 continue
-        rows = [b for b in rows if not any(v is None or (isinstance(v, float) and math.isnan(v)) for v in (b["open"], b["high"], b["low"], b["close"]))]
+        rows = [
+            b
+            for b in rows
+            if not any(
+                v is None or (isinstance(v, float) and math.isnan(v))
+                for v in (b["open"], b["high"], b["low"], b["close"])
+            )
+        ]
         _cache_write(cfg, ck, rows)
         return rows
     except Exception:
         return []
 
 
-def get_option_chain(symbol: str, cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+def get_option_chain(symbol: str, cfg: dict[str, Any]) -> list[dict[str, Any]]:
     # Try cache first
     ck = f"chain_{symbol.upper()}"
     cached = _cache_read(cfg, ck)
@@ -214,7 +224,7 @@ def get_option_chain(symbol: str, cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
         except Exception:
             exp_yymmdd = expiry_iso.replace("-", "")
         oc = t.option_chain(expiry_iso)
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for side, df in (("C", getattr(oc, "calls", None)), ("P", getattr(oc, "puts", None))):
             if df is None or len(df) == 0:
                 continue

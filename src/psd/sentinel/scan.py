@@ -5,9 +5,9 @@ import importlib
 import logging
 import os
 import time
-from typing import Any, Callable, Iterable, List
+from collections.abc import Callable, Iterable
 
-from psd.core.store import init, tail_events, latest_snapshot, append_event
+from psd.core.store import append_event, init, latest_snapshot, tail_events
 
 log = logging.getLogger("psd.scan")
 RULES_FN_SPEC = os.getenv("PSD_RULES_FN", "").strip()  # e.g. "portfolio_exporter.psd_rules:evaluate"
@@ -44,7 +44,7 @@ async def run() -> None:
                 continue
             risk = snap.get("risk", {})
             try:
-                breaches: List[str] = list(EVALUATE_RULES(risk))
+                breaches: list[str] = list(EVALUATE_RULES(risk))
             except Exception as e:
                 log.warning("rules evaluation failed: %s", e, exc_info=False)
                 breaches = []

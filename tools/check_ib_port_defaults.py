@@ -4,12 +4,13 @@
 Flags any lingering 7497 defaults unless the surrounding context explicitly
 mentions paper/simulated/example usage.
 """
+
 from __future__ import annotations
 
 import pathlib
 import re
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 ALLOW_IF = re.compile(r"(paper|simulated|example)", re.IGNORECASE)
 CODE_PATTERNS: tuple[tuple[str, str], ...] = (
@@ -17,7 +18,7 @@ CODE_PATTERNS: tuple[tuple[str, str], ...] = (
     ('os.getenv("IB_PORT","7497")', "os.getenv default"),
     ("os.getenv('IB_PORT','7497')", "os.getenv default"),
     ("os.environ.get('IB_PORT','7497')", "os.environ default"),
-    ("os.environ.get(\"IB_PORT\",\"7497\")", "os.environ default"),
+    ('os.environ.get("IB_PORT","7497")', "os.environ default"),
 )
 
 SKIP_DIRS = {".git", "node_modules", ".venv", "dist", "build", "__pycache__", "iv_history", ".ruff_cache"}

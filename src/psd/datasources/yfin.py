@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List
+from typing import Any
 
 try:
     from portfolio_exporter.core.providers import yahoo_provider
@@ -61,7 +61,7 @@ def get_earnings_date(symbol: str, cfg: dict[str, Any] | None = None) -> str | N
     return None
 
 
-def fill_equity_marks_from_yf(symbols: List[str]) -> Dict[str, float | None]:
+def fill_equity_marks_from_yf(symbols: list[str]) -> dict[str, float | None]:
     """Best-effort Yahoo Finance fallback for missing equity marks.
 
     Returns a mapping of ``symbol`` → ``mark`` where ``mark`` is ``None`` when
@@ -76,13 +76,19 @@ def fill_equity_marks_from_yf(symbols: List[str]) -> Dict[str, float | None]:
     except Exception:
         return {sym: None for sym in unique}
 
-    out: Dict[str, float | None] = {sym: None for sym in unique}
+    out: dict[str, float | None] = {sym: None for sym in unique}
     for sym in unique:
         price: float | None = None
         try:
             ticker = yf.Ticker(sym)
             fast = getattr(ticker, "fast_info", {}) or {}
-            for key in ("last_price", "last_trade_price", "regular_market_price", "previous_close", "last_close"):
+            for key in (
+                "last_price",
+                "last_trade_price",
+                "regular_market_price",
+                "previous_close",
+                "last_close",
+            ):
                 val = fast.get(key)
                 if val is None:
                     continue

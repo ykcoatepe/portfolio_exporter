@@ -4,11 +4,12 @@
 
 from __future__ import annotations
 
+import importlib.resources as resources
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
-import importlib.resources as resources
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from ..combos.detector import OptionCombo, OptionLegSnapshot
 from ..rules import EvaluationResult, Rule, evaluate_rules
@@ -195,7 +196,9 @@ class RulesState:
         equities: Sequence[Mapping[str, Any]],
         now: datetime,
     ) -> list[dict[str, Any]]:
-        aggregates: dict[str, dict[str, float]] = defaultdict(lambda: {"delta_shares": 0.0, "gross_shares": 0.0})
+        aggregates: dict[str, dict[str, float]] = defaultdict(
+            lambda: {"delta_shares": 0.0, "gross_shares": 0.0}
+        )
         for combo in combos:
             entry = aggregates[combo.underlying]
             entry["delta_shares"] += _decimal_to_float(combo.sum_delta)
@@ -267,9 +270,11 @@ def _load_default_rules() -> list[Rule]:
         yaml = None  # type: ignore[assignment]
     if yaml is not None:
         try:
-            with resources.files("positions_engine.rules").joinpath("examples.yaml").open(
-                "r", encoding="utf-8"
-            ) as handle:
+            with (
+                resources.files("positions_engine.rules")
+                .joinpath("examples.yaml")
+                .open("r", encoding="utf-8") as handle
+            ):
                 loaded = yaml.safe_load(handle) or []
         except FileNotFoundError:  # pragma: no cover - defensive
             loaded = []

@@ -7,8 +7,7 @@ runtime-heavy imports and perform lightweight validation only.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Literal, Optional
-
+from typing import Any, Literal
 
 Sleeve = Literal["core", "momo", "alpha", "theta", "alts", "meme"]
 Severity = Literal["info", "warn", "action"]
@@ -80,7 +79,7 @@ class Alert:
     rule: str
     severity: Severity
     message: str
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -89,5 +88,5 @@ class Memo:
     uid: str
     rule: str
     severity: Severity
-    snapshot: Dict[str, Any]
-    suggestion: Optional[str] = None
+    snapshot: dict[str, Any]
+    suggestion: str | None = None

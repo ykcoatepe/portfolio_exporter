@@ -53,18 +53,14 @@ app.add_middleware(
 app.include_router(ready_router)
 
 STREAM_CLIENTS = Gauge("psd_stream_clients", "Connected SSE clients")
-STREAM_EVENTS = Counter(
-    "psd_stream_events_total", "SSE events sent", ["kind"]
-)
+STREAM_EVENTS = Counter("psd_stream_events_total", "SSE events sent", ["kind"])
 
 
 @app.get("/state")
 def state():
     snap = latest_snapshot()
     if not snap:
-        return JSONResponse(
-            {"ts": None, "positions": [], "quotes": {}, "risk": {}, "empty": True}
-        )
+        return JSONResponse({"ts": None, "positions": [], "quotes": {}, "risk": {}, "empty": True})
     return JSONResponse(snap)
 
 
@@ -73,11 +69,13 @@ def stats():
     snap = latest_snapshot()
     if not snap:
         payload = dict(_DEFAULT_STATS_EMPTY)
-        payload.update({
-            "empty": True,
-            "ts": None,
-            "quotes_count": 0,
-        })
+        payload.update(
+            {
+                "empty": True,
+                "ts": None,
+                "quotes_count": 0,
+            }
+        )
         return JSONResponse(payload)
 
     payload = compute_stats(snap)

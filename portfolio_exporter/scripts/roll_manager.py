@@ -14,18 +14,21 @@ from __future__ import annotations
 import argparse
 import calendar
 import datetime as dt
-import json
 import os
 import pathlib
-from typing import Any, List
+from typing import Any
 
 import pandas as pd
-from portfolio_exporter.core import cli as cli_helpers, io, json as json_helpers
-from portfolio_exporter.core.combo import detect_combos
+
+from portfolio_exporter.core import cli as cli_helpers
+from portfolio_exporter.core import io
+from portfolio_exporter.core import json as json_helpers
+from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.chain import fetch_chain
+from portfolio_exporter.core.combo import detect_combos
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core import ui as core_ui
+
 # Back-compat: expose run_with_spinner alias for tests to monkeypatch
 run_with_spinner = core_ui.run_with_spinner
 
@@ -74,7 +77,8 @@ def _write_files(
     combos_out = []
     for _, row in df.iterrows():
         legs_close = [
-            {"conId": int(l), "qty": int(pos_df.loc[l, "qty"])} for l in row.legs_old
+            {"conId": int(leg_id), "qty": int(pos_df.loc[leg_id, "qty"])}
+            for leg_id in row.legs_old
         ]
         legs_open = [
             {
@@ -177,6 +181,7 @@ def run(
     mask = combos_df["expiry"] <= today + dt.timedelta(days=days)
     soon = combos_df[mask]
     if tenor != "all":
+
         def _is_weekly(d: dt.date) -> bool:
             return d != _third_friday(d.year, d.month)
 
@@ -195,7 +200,7 @@ def run(
         from rich.table import Table
 
         console = Console(force_terminal=True)
-    rows: List[dict] = []
+    rows: list[dict] = []
     for cid, cmb in soon.iterrows():
         new_exp = _next_expiry(today, weekly)
         legs = cmb.legs
@@ -203,40 +208,30 @@ def run(
         rights = list(pos_df.loc[legs, "right"])
         qtys = list(pos_df.loc[legs, "qty"])
         mult = pos_df.loc[legs, "multiplier"].iloc[0] if "multiplier" in pos_df else 100
-        chain = run_with_spinner(
-            f"Pricing {cmb.underlying}", fetch_chain, cmb.underlying, new_exp, strikes
-        )
+        chain = run_with_spinner(f"Pricing {cmb.underlying}", fetch_chain, cmb.underlying, new_exp, strikes)
         new_legs = []
         new_delta = 0.0
         new_theta = 0.0
         new_gamma = 0.0
         new_vega = 0.0
         net_mid = 0.0
-        for strike, right, qty in zip(strikes, rights, qtys):
+        for strike, right, qty in zip(strikes, rights, qtys, strict=True):
             # --- ensure columns exist even if fetch_chain() set them as index ---
             if "strike" not in chain.columns:
                 chain = chain.reset_index(drop=False, names=["strike"])  # pandas ≥2
             if "right" not in chain.columns:
-                chain["right"] = (
-                    chain.index.get_level_values("right")
-                    if chain.index.nlevels > 1
-                    else pd.NA
-                )
+                chain["right"] = chain.index.get_level_values("right") if chain.index.nlevels > 1 else pd.NA
 
             # IB/YF chains often list strikes in 5‑pt increments; roll to the
             # *nearest* available strike within $0.25 of the original.
-            sel = chain[
-                (chain["right"] == right) & (abs(chain["strike"] - strike) < 0.25)
-            ]
+            sel = chain[(chain["right"] == right) & (abs(chain["strike"] - strike) < 0.25)]
             if sel.empty:
                 if console:
                     console.print(
                         f"[yellow]⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
                     )
                 else:
-                    print(
-                        f"⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
-                    )
+                    print(f"⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping.")
                 continue
             ch = sel.iloc[0]
             new_legs.append(
@@ -254,8 +249,16 @@ def run(
 
         old_delta = float((pos_df.loc[legs, "delta"] * pos_df.loc[legs, "qty"]).sum())
         old_theta = float((pos_df.loc[legs, "theta"] * pos_df.loc[legs, "qty"]).sum())
-        old_gamma = float((pos_df.loc[legs, "gamma"] * pos_df.loc[legs, "qty"]).sum()) if "gamma" in pos_df.columns else 0.0
-        old_vega = float((pos_df.loc[legs, "vega"] * pos_df.loc[legs, "qty"]).sum()) if "vega" in pos_df.columns else 0.0
+        old_gamma = (
+            float((pos_df.loc[legs, "gamma"] * pos_df.loc[legs, "qty"]).sum())
+            if "gamma" in pos_df.columns
+            else 0.0
+        )
+        old_vega = (
+            float((pos_df.loc[legs, "vega"] * pos_df.loc[legs, "qty"]).sum())
+            if "vega" in pos_df.columns
+            else 0.0
+        )
         band = slippage * sum(qtys)
         debit_credit = net_mid + band
         price_lo = net_mid - band

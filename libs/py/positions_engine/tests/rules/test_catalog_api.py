@@ -5,32 +5,26 @@ from __future__ import annotations
 import sys
 import threading
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, Tuple
 
 import pytest
 from starlette.testclient import TestClient
 
-try:
-    import yaml  # type: ignore[import]
-except ModuleNotFoundError:  # pragma: no cover - environment without PyYAML
-    HAS_YAML = False
-else:
-    HAS_YAML = True
-
-pytestmark = pytest.mark.skipif(not HAS_YAML, reason="PyYAML required for rules catalog tests")
+pytest.importorskip("yaml")
 
 ROOT = Path(__file__).resolve().parents[5]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from apps.api import main as api_main
 from positions_engine.service.rules_catalog_state import RulesCatalogState
 from positions_engine.service.rules_state import RulesState
 
+from apps.api import main as api_main
+
 
 @pytest.fixture
-def catalog_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Tuple[TestClient, Path]]:
+def catalog_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, Path]]:
     catalog_path = tmp_path / "catalog.yaml"
 
     original_rules_state = api_main._rules_state
@@ -49,7 +43,7 @@ def catalog_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[
     monkeypatch.setattr(api_main, "_catalog_state", original_catalog_state)
 
 
-def test_validate_catalog_success(catalog_client: Tuple[TestClient, Path]) -> None:
+def test_validate_catalog_success(catalog_client: tuple[TestClient, Path]) -> None:
     client, _path = catalog_client
     yaml_text = """
 rules:
@@ -75,7 +69,7 @@ rules:
     assert preview_payload["diff"]["removed"], "expected preview diff to include removed defaults"
 
 
-def test_validate_catalog_forbidden_ast(catalog_client: Tuple[TestClient, Path]) -> None:
+def test_validate_catalog_forbidden_ast(catalog_client: tuple[TestClient, Path]) -> None:
     client, _path = catalog_client
     yaml_text = """
 rules:
@@ -93,7 +87,7 @@ rules:
     assert payload["errors"], "expected validation errors for forbidden AST"
 
 
-def test_publish_catalog_updates_summary_and_disk(catalog_client: Tuple[TestClient, Path]) -> None:
+def test_publish_catalog_updates_summary_and_disk(catalog_client: tuple[TestClient, Path]) -> None:
     client, catalog_path = catalog_client
 
     baseline_summary = client.get("/rules/summary").json()
@@ -136,7 +130,7 @@ rules:
     assert summary["rules_total"] != baseline_total
 
 
-def test_atomic_write_prevents_partial_reads(catalog_client: Tuple[TestClient, Path]) -> None:
+def test_atomic_write_prevents_partial_reads(catalog_client: tuple[TestClient, Path]) -> None:
     client, catalog_path = catalog_client
 
     first_yaml = """

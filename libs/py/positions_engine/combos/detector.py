@@ -4,19 +4,19 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
-import hashlib
 from time import perf_counter
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from ..core.marks import MarkSettings, select_equity_mark
 from ..core.models import InstrumentType, Position, Quote
 from ..core.pnl import option_leg_pnl
 from .taxonomy import ComboStrategy
-
 
 ZERO = Decimal("0")
 
@@ -502,10 +502,17 @@ def _looks_like_condor(legs: Sequence[OptionLegSnapshot]) -> ComboStrategy | Non
     put_short, put_long = _pick_short_long(legs, "PUT")
     if None in (call_short, call_long, put_short, put_long):
         return None
-    quantities = {abs(call_short.quantity), abs(call_long.quantity), abs(put_short.quantity), abs(put_long.quantity)}
+    quantities = {
+        abs(call_short.quantity),
+        abs(call_long.quantity),
+        abs(put_short.quantity),
+        abs(put_long.quantity),
+    }
     if len(quantities) != 1:
         return None
-    return ComboStrategy.IRON_BUTTERFLY if call_short.strike == put_short.strike else ComboStrategy.IRON_CONDOR
+    return (
+        ComboStrategy.IRON_BUTTERFLY if call_short.strike == put_short.strike else ComboStrategy.IRON_CONDOR
+    )
 
 
 def _looks_like_vertical(legs: Sequence[OptionLegSnapshot]) -> bool:

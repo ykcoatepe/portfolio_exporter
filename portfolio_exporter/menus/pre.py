@@ -1,45 +1,52 @@
-from rich.table import Table
-import re
-from typing import Optional
-from rich.console import Console
-from portfolio_exporter.core.ui import StatusBar
-from portfolio_exporter.core.publish import (
-    publish_pack,
-    open_in_finder,
-    open_dashboard,
-)
-from portfolio_exporter.scripts import (
-    update_tickers,
-    historic_prices,
-    daily_pulse,
-    option_chain_snapshot,
-    net_liq_history_export,
-    orchestrate_dataset,
-    tech_scan,
-)
-from portfolio_exporter.scripts import micro_momo_dashboard as _dash
-import os, webbrowser
-from portfolio_exporter.scripts import micro_momo_analyzer
-from portfolio_exporter.core.memory import get_pref, set_pref
-from portfolio_exporter.core import ui as core_ui
-from portfolio_exporter.core.proc import (
-    start as sentinel_start,
-    stop as sentinel_stop,
-    status as sentinel_status,
-    start_module,
-    status_module,
-    start_module_logged,
-    stop_module,
-)
-from portfolio_exporter.core.fs_utils import find_latest_file, auto_chains_dir
-from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
-from portfolio_exporter.core.market_clock import rth_window_tr, pretty_tr
-import time, glob, shutil
-
 # custom input handler: support multi-line commands and respect main or builtins input monkeypatches
 import builtins
-from types import SimpleNamespace
+import glob
 import os
+import re
+import shutil
+import time
+import webbrowser
+from types import SimpleNamespace
+
+from rich.console import Console
+from rich.table import Table
+
+from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.fs_utils import auto_chains_dir, find_latest_file
+from portfolio_exporter.core.market_clock import pretty_tr, rth_window_tr
+from portfolio_exporter.core.memory import get_pref, set_pref
+from portfolio_exporter.core.proc import (
+    start as sentinel_start,
+)
+from portfolio_exporter.core.proc import (
+    start_module_logged,
+    status_module,
+    stop_module,
+)
+from portfolio_exporter.core.proc import (
+    status as sentinel_status,
+)
+from portfolio_exporter.core.proc import (
+    stop as sentinel_stop,
+)
+from portfolio_exporter.core.publish import (
+    open_dashboard,
+    open_in_finder,
+    publish_pack,
+)
+from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
+from portfolio_exporter.core.ui import StatusBar
+from portfolio_exporter.scripts import (
+    daily_pulse,
+    historic_prices,
+    micro_momo_analyzer,
+    net_liq_history_export,
+    option_chain_snapshot,
+    orchestrate_dataset,
+    tech_scan,
+    update_tickers,
+)
+from portfolio_exporter.scripts import micro_momo_dashboard as _dash
 
 _input_buffer: list[str] = []
 
@@ -83,14 +90,14 @@ def _ask_expiry(prompt: str = "Expiry (YYYY-MM-DD): ") -> str:
     return exp
 
 
-def _normalize_session(session: Optional[str]) -> str:
+def _normalize_session(session: str | None) -> str:
     if not session:
         return "auto"
     value = str(session).strip().lower()
     return value if value in {"auto", "rth", "premarket"} else "auto"
 
 
-def _pref_to_bool(value: Optional[str], default: bool = False) -> bool:
+def _pref_to_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
@@ -143,7 +150,6 @@ def launch(status: StatusBar, default_fmt: str):
         tickers = [t.strip().upper() for t in raw.split(",") if t.strip()]
         if status:
             status.update(f"Tech scan: {','.join(tickers)} …", "cyan")
-        from portfolio_exporter.scripts import tech_scan
 
         tech_scan.run(tickers=tickers, fmt=fmt)
         if status:
@@ -151,9 +157,9 @@ def launch(status: StatusBar, default_fmt: str):
 
     def _run_micro_momo_diag(
         local_console: Console,
-        session_mode: Optional[str] = None,
-        force_live: Optional[bool] = None,
-        out_dir: Optional[str] = None,
+        session_mode: str | None = None,
+        force_live: bool | None = None,
+        out_dir: str | None = None,
     ) -> None:
         target_out_dir = out_dir or os.getenv("MOMO_OUT") or "out"
         session_arg = _normalize_session(session_mode) if session_mode else _load_session_pref()
@@ -267,7 +273,7 @@ def _run_micro_momo(console: Console) -> None:
 
     def _tail_file(path: str, n: int = 20) -> list[str]:
         try:
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(path, encoding="utf-8", errors="ignore") as f:
                 lines = f.readlines()
             return lines[-n:]
         except Exception:
@@ -409,7 +415,9 @@ def _run_micro_momo(console: Console) -> None:
                 _toggle_force_live()
                 continue
             if choice == "d":
-                _run_micro_momo_diag(console, session_mode, force_live_default, out_dir)
+                _run_micro_momo_diag(  # noqa: F821
+                    console, session_mode, force_live_default, out_dir
+                )
                 continue
             if choice == "k":
                 _clear_yahoo_cache(out_dir, console)
@@ -425,7 +433,7 @@ def _run_micro_momo(console: Console) -> None:
                 st = status_module("momo_analyzer")
                 running = st.get("running", False)
                 console.print(
-                    f"Analyzer: {'[green]RUNNING[/]' if running else '[red]STOPPED[/]'}   PID: {st.get('pid','-')}"
+                    f"Analyzer: {'[green]RUNNING[/]' if running else '[red]STOPPED[/]'}   PID: {st.get('pid', '-')}"
                 )
                 try:
                     from pathlib import Path as _P
@@ -455,9 +463,7 @@ def _run_micro_momo(console: Console) -> None:
             if choice == "t":
                 res = stop_module("momo_analyzer")
                 console.print(
-                    f"[green]{res.get('msg', 'stopped')}[/]"
-                    if res.get("ok")
-                    else f"[yellow]{res.get('msg')}"
+                    f"[green]{res.get('msg', 'stopped')}[/]" if res.get("ok") else f"[yellow]{res.get('msg')}"
                 )
                 continue
             if choice == "o":
@@ -603,7 +609,11 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
 
         # Read menu toggles from memory (defaults: ON/10)
         try:
-            allow_aft = (get_pref("sentinel.allow_afternoon_rearm") or "true").lower() not in ("0", "false", "no")
+            allow_aft = (get_pref("sentinel.allow_afternoon_rearm") or "true").lower() not in (
+                "0",
+                "false",
+                "no",
+            )
         except Exception:
             allow_aft = True
         try:
@@ -611,7 +621,11 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
         except Exception:
             allow_halt = True
         try:
-            require_recross = (get_pref("sentinel.require_vwap_recross") or "true").lower() not in ("0", "false", "no")
+            require_recross = (get_pref("sentinel.require_vwap_recross") or "true").lower() not in (
+                "0",
+                "false",
+                "no",
+            )
         except Exception:
             require_recross = True
         try:
@@ -689,33 +703,25 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
                 args += ["--offline"]
             res = sentinel_start(args)
             console.print(
-                f"[green]Started[/] PID {res.get('pid')}"
-                if res.get("ok")
-                else f"[yellow]{res.get('msg')}"
+                f"[green]Started[/] PID {res.get('pid')}" if res.get("ok") else f"[yellow]{res.get('msg')}"
             )
         elif choice == "2":
             res = sentinel_stop()
             console.print(
-                f"[green]{res.get('msg', 'stopped')}[/]"
-                if res.get("ok")
-                else f"[yellow]{res.get('msg')}"
+                f"[green]{res.get('msg', 'stopped')}[/]" if res.get("ok") else f"[yellow]{res.get('msg')}"
             )
         elif choice == "3":
             _show_active_positions(console)
         elif choice == "4":
             try:
                 set_pref("sentinel.allow_afternoon_rearm", not allow_aft)
-                console.print(
-                    f"[green]Afternoon re-arm set to[/] {'ON' if not allow_aft else 'OFF'}"
-                )
+                console.print(f"[green]Afternoon re-arm set to[/] {'ON' if not allow_aft else 'OFF'}")
             except Exception as exc:
                 console.print(f"[yellow]Failed to update preference:[/] {exc}")
         elif choice == "5":
             try:
                 set_pref("sentinel.halt_rearm", not allow_halt)
-                console.print(
-                    f"[green]Post-halt re-arm set to[/] {'ON' if not allow_halt else 'OFF'}"
-                )
+                console.print(f"[green]Post-halt re-arm set to[/] {'ON' if not allow_halt else 'OFF'}")
             except Exception as exc:
                 console.print(f"[yellow]Failed to update preference:[/] {exc}")
         elif choice == "6":

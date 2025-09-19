@@ -7,7 +7,7 @@ module import time for fast startup.
 
 from __future__ import annotations
 
-from typing import Any, Tuple
+from typing import Any
 
 
 def load_auto_defaults() -> dict[str, Any]:
@@ -63,7 +63,7 @@ def load_auto_defaults() -> dict[str, Any]:
         return defaults
 
 
-def start_psd(*, loops: int | None = None, interval_override: float | None = None) -> Tuple[str, int]:
+def start_psd(*, loops: int | None = None, interval_override: float | None = None) -> tuple[str, int]:
     """One-step PSD starter: web + browser(optional) + IB probe + scheduler.
 
     - Starts the web server on a free port (when 0) in background.
@@ -76,8 +76,8 @@ def start_psd(*, loops: int | None = None, interval_override: float | None = Non
     # Lazy imports to keep import time snappy and avoid hard deps in environments
     # that only exercise the TUI text renderer.
     # Prefer already-imported modules in sys.modules so monkeypatching works
-    import sys as _sys
     import importlib as _importlib
+    import sys as _sys
 
     _sys_modules = _sys.modules
     if "psd.web.server" not in _sys_modules and "src.psd.web.server" in _sys_modules:
@@ -87,13 +87,19 @@ def start_psd(*, loops: int | None = None, interval_override: float | None = Non
     if "psd.datasources.ibkr" not in _sys_modules and "src.psd.datasources.ibkr" in _sys_modules:
         _sys_modules["psd.datasources.ibkr"] = _sys_modules["src.psd.datasources.ibkr"]
 
-    web = _importlib.import_module("psd.web.server" if "psd.web.server" in _sys_modules else "src.psd.web.server")
-    sched = _importlib.import_module("psd.sentinel.sched" if "psd.sentinel.sched" in _sys_modules else "src.psd.sentinel.sched")
+    web = _importlib.import_module(
+        "psd.web.server" if "psd.web.server" in _sys_modules else "src.psd.web.server"
+    )
+    sched = _importlib.import_module(
+        "psd.sentinel.sched" if "psd.sentinel.sched" in _sys_modules else "src.psd.sentinel.sched"
+    )
 
     # IBKR datasource is optional; tests will monkeypatch as needed
     ib_get_positions = None
     try:
-        ds_module = "psd.datasources.ibkr" if "psd.datasources.ibkr" in _sys_modules else "src.psd.datasources.ibkr"
+        ds_module = (
+            "psd.datasources.ibkr" if "psd.datasources.ibkr" in _sys_modules else "src.psd.datasources.ibkr"
+        )
         ib_mod = _importlib.import_module(ds_module)
         ib_get_positions = getattr(ib_mod, "get_positions", None)
     except Exception:

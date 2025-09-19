@@ -115,9 +115,7 @@ def _load_env_file(path: str = ".env") -> dict[str, str]:
 
 def _with_defaults(base: Mapping[str, str]) -> dict[str, str]:
     out = dict(base)
-    out.setdefault(
-        "PSD_SNAPSHOT_FN", "portfolio_exporter.psd_adapter:snapshot_once"
-    )
+    out.setdefault("PSD_SNAPSHOT_FN", "portfolio_exporter.psd_adapter:snapshot_once")
     out.setdefault("PSD_RULES_FN", "portfolio_exporter.psd_rules:evaluate")
     out.setdefault("IB_HOST", "127.0.0.1")
     out.setdefault("IB_PORT", "7496")
@@ -211,7 +209,6 @@ def _spawn(
             env=dict(env) if env else None,
         )
     return process
-
 
 
 def show_status(console: Console) -> None:
@@ -317,39 +314,26 @@ def start_psd(console: Console) -> None:
     for service in SERVICES:
         pid = state.get(service)
         if isinstance(pid, int) and _alive(pid):
-            console.print(
-                f"[yellow]{service.title()} already running (PID {pid}).[/yellow]"
-            )
+            console.print(f"[yellow]{service.title()} already running (PID {pid}).[/yellow]")
             running[service] = pid
     commands = {
-        name: (
-            [arg.format(port=port) for arg in cmd]
-            if name == "web"
-            else cmd
-        )
+        name: ([arg.format(port=port) for arg in cmd] if name == "web" else cmd)
         for name, cmd in _PROCESS_COMMANDS.items()
     }
     for service, cmd in commands.items():
         if service in running:
             continue
         log_path = RUN_DIR / _LOG_NAMES[service]
-        console.print(
-            f"[cyan]Starting {service} -> {' '.join(cmd)}[/cyan]"
-        )
+        console.print(f"[cyan]Starting {service} -> {' '.join(cmd)}[/cyan]")
         process = _spawn(cmd, log_path, env=child_env)
         running[service] = process.pid
         console.print(f"[green]{service.title()} PID {process.pid}[/green]")
-    env_summary = {
-        key: child_env.get(key)
-        for key in ENV_SUMMARY_KEYS
-        if child_env.get(key) is not None
-    }
+    env_summary = {key: child_env.get(key) for key in ENV_SUMMARY_KEYS if child_env.get(key) is not None}
     data: dict[str, object] = {**running, "port": port, "env": env_summary}
     _save_pid_file(data)
     open_dashboard(console)
     time.sleep(0.2)
     show_status(console)
-
 
 
 def _kill_with_sequence(pid: int, console: Console) -> bool:
@@ -365,16 +349,13 @@ def _kill_with_sequence(pid: int, console: Console) -> bool:
         except ProcessLookupError:
             return True
         except PermissionError:
-            console.print(
-                f"[red]Permission denied when sending {sig.name} to PID {pid}.[/red]"
-            )
+            console.print(f"[red]Permission denied when sending {sig.name} to PID {pid}.[/red]")
             return False
         if wait_time and _wait_for_exit(pid, wait_time):
             return True
         if not wait_time:
             return not _alive(pid)
     return not _alive(pid)
-
 
 
 def stop_psd(console: Console) -> None:

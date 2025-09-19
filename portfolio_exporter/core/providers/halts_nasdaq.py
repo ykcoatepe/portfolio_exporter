@@ -6,11 +6,11 @@ import json
 import os
 import time
 import urllib.request
-from typing import Any, Dict, List
+from typing import Any
 from zoneinfo import ZoneInfo
 
 
-def _cache_path(cfg: Dict[str, Any]) -> str:
+def _cache_path(cfg: dict[str, Any]) -> str:
     data = cfg.get("data", {})
     cache = data.get("cache", {})
     cdir = cache.get("dir") or os.path.join("out", ".cache")
@@ -18,11 +18,11 @@ def _cache_path(cfg: Dict[str, Any]) -> str:
     return os.path.join(cdir, "halts_nasdaq_today.json")
 
 
-def _cache_ttl(cfg: Dict[str, Any]) -> int:
+def _cache_ttl(cfg: dict[str, Any]) -> int:
     return int(cfg.get("data", {}).get("cache", {}).get("ttl_sec", 60))
 
 
-def get_halts_today(cfg: Dict[str, Any]) -> Dict[str, int]:
+def get_halts_today(cfg: dict[str, Any]) -> dict[str, int]:
     """Return ticker→count map. Offline returns {}.
     Tests will monkeypatch this function; real HTTP can be added later.
     """
@@ -33,13 +33,13 @@ def get_halts_today(cfg: Dict[str, Any]) -> Dict[str, int]:
     ttl = _cache_ttl(cfg)
     try:
         if os.path.exists(cpath) and (time.time() - os.path.getmtime(cpath) <= ttl):
-            with open(cpath, "r", encoding="utf-8") as f:
+            with open(cpath, encoding="utf-8") as f:
                 return json.load(f)
     except Exception:
         pass
 
     # Placeholder: no real fetch in library by default
-    data: Dict[str, int] = {}
+    data: dict[str, int] = {}
     try:
         with open(cpath, "w", encoding="utf-8") as f:
             json.dump(data, f)
@@ -52,7 +52,7 @@ def get_halts_today(cfg: Dict[str, Any]) -> Dict[str, int]:
 TZ_NY = ZoneInfo("America/New_York")
 
 
-def fetch_current_halts_csv(timeout: int = 5) -> List[Dict[str, str]]:
+def fetch_current_halts_csv(timeout: int = 5) -> list[dict[str, str]]:
     """Fetch Nasdaq Trader Current Trading Halts CSV and return list of dict rows.
 
     Source: https://www.nasdaqtrader.com/trader.aspx?id=tradehalts
@@ -64,12 +64,12 @@ def fetch_current_halts_csv(timeout: int = 5) -> List[Dict[str, str]]:
     return [dict(row) for row in reader]
 
 
-def parse_resume_events(rows: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+def parse_resume_events(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
     """Extract resumption events keyed by symbol.
 
     Returns: {SYM: {halt_time_et, resume_quote_et, resume_trade_et, reason}}
     """
-    out: Dict[str, Dict[str, str]] = {}
+    out: dict[str, dict[str, str]] = {}
     for d in rows:
         sym = (d.get("Issue Symbol") or d.get("Symbol") or "").strip().upper()
         if not sym:
@@ -84,4 +84,3 @@ def parse_resume_events(rows: List[Dict[str, str]]) -> Dict[str, Dict[str, str]]
                 "reason": (d.get("Reason Code") or "").strip(),
             }
     return out
-

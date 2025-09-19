@@ -3,9 +3,9 @@ import { useQuery, useQueryClient, type QueryClient, type UseQueryResult } from 
 
 import type { components } from "../lib/api";
 
-type RawRulesSummary = components["schemas"]["RulesSummaryResponse"];
-type RawRuleBreach = components["schemas"]["RuleBreach"];
-type RawCounters = components["schemas"]["RulesSummaryCounters"];
+type RawRulesSummary = components["schemas"]["RulesSummaryResponseModel"];
+type RawRuleBreach = components["schemas"]["RulesSummaryTopModel"];
+type RawBreaches = components["schemas"]["BreachCountsModel"];
 export type RuleSeverity = components["schemas"]["RuleSeverity"];
 
 export interface RuleBreachSummary {
@@ -27,7 +27,7 @@ export interface RuleCounters {
 
 export interface RulesSummaryResponse {
   as_of: string;
-  counters: RuleCounters;
+  breaches: RuleCounters;
   top: RuleBreachSummary[];
   focus_symbols?: string[];
   rules_total?: number;
@@ -125,15 +125,15 @@ const sanitizeBreach = (value: unknown): RuleBreachSummary | null => {
   };
 };
 
-const sanitizeCounters = (value: unknown): RuleCounters => {
+const sanitizeBreaches = (value: unknown): RuleCounters => {
   if (typeof value !== "object" || value === null) {
     return { total: 0, critical: 0, warning: 0, info: 0 };
   }
-  const record = value as Partial<RawCounters> & Record<string, unknown>;
+  const record = value as Partial<RawBreaches> & Record<string, unknown>;
   const critical = coerceNonNegativeInteger(record.critical, 0);
   const warning = coerceNonNegativeInteger(record.warning, 0);
   const info = coerceNonNegativeInteger(record.info, 0);
-  const total = coerceNonNegativeInteger(record.total, critical + warning + info);
+  const total = critical + warning + info;
   return { total, critical, warning, info };
 };
 
@@ -196,7 +196,7 @@ export async function fetchRulesSummary(baseUrl = ""): Promise<RulesSummaryRespo
   const top = topCandidates
     .map(sanitizeBreach)
     .filter((item): item is RuleBreachSummary => item !== null);
-  const counters = sanitizeCounters(record.counters);
+  const breaches = sanitizeBreaches(record.breaches);
   const asOf = coerceString(record.as_of, new Date().toISOString());
   const focusSymbols = Array.isArray(record.focus_symbols)
     ? record.focus_symbols.filter((symbol): symbol is string => typeof symbol === "string")
@@ -209,7 +209,7 @@ export async function fetchRulesSummary(baseUrl = ""): Promise<RulesSummaryRespo
   }
   return {
     as_of: asOf,
-    counters,
+    breaches,
     top,
     focus_symbols: focusSymbols,
     rules_total: typeof record.rules_total === "number" ? record.rules_total : undefined,

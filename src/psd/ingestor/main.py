@@ -22,15 +22,9 @@ log = logging.getLogger("psd.ingestor")
 HEARTBEAT_S = float(os.getenv("PSD_HEARTBEAT_S", "2.0"))
 DEFAULT_CHECKPOINT_EVERY = 300
 
-INGEST_TICK_SECONDS = Histogram(
-    "psd_ingest_tick_seconds", "Ingest loop tick duration (s)"
-)
-DATA_AGE_SECONDS = Gauge(
-    "psd_data_age_seconds", "Age of last good snapshot (s)"
-)
-EVENTS_WRITTEN = Counter(
-    "psd_events_total", "Events appended", ["kind"]
-)
+INGEST_TICK_SECONDS = Histogram("psd_ingest_tick_seconds", "Ingest loop tick duration (s)")
+DATA_AGE_SECONDS = Gauge("psd_data_age_seconds", "Age of last good snapshot (s)")
+EVENTS_WRITTEN = Counter("psd_events_total", "Events appended", ["kind"])
 
 
 def _checkpoint_interval() -> int:
@@ -95,9 +89,7 @@ async def run() -> None:
         os.getenv("IB_CLIENT_ID"),
     )
     if not snapshot_env:
-        log.error(
-            "PSD_SNAPSHOT_FN is not set. Falling back may yield empty snapshots."
-        )
+        log.error("PSD_SNAPSHOT_FN is not set. Falling back may yield empty snapshots.")
     checkpoint_every = _checkpoint_interval()
     last_ok_ts: float = 0.0
     tick_count = 0

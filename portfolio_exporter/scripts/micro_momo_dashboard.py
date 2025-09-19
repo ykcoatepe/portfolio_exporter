@@ -3,10 +3,9 @@ from __future__ import annotations
 import argparse
 import csv
 import html
-import os
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 CSS = (
     "body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px}"
@@ -19,12 +18,13 @@ CSS = (
     ".small{color:#666;font-size:12px}"
 )
 
-def _count_post_halt(triggers: List[Dict[str, Any]]) -> int:
+
+def _count_post_halt(triggers: list[dict[str, Any]]) -> int:
     return sum(1 for r in triggers if (str(r.get("event_type") or "").lower() == "post_halt"))
 
 
-def _count_tiers(rows: List[Dict[str, Any]]) -> Dict[str, int]:
-    out: Dict[str, int] = {"A": 0, "B": 0, "C": 0}
+def _count_tiers(rows: list[dict[str, Any]]) -> dict[str, int]:
+    out: dict[str, int] = {"A": 0, "B": 0, "C": 0}
     for r in rows:
         t = (r.get("tier") or "").strip()
         if t in out:
@@ -32,8 +32,8 @@ def _count_tiers(rows: List[Dict[str, Any]]) -> Dict[str, int]:
     return out
 
 
-def _count_provenance(rows: List[Dict[str, Any]], field: str = "src_vwap") -> Dict[str, int]:
-    out: Dict[str, int] = {"artifact": 0, "yahoo": 0, "csv": 0, "": 0}
+def _count_provenance(rows: list[dict[str, Any]], field: str = "src_vwap") -> dict[str, int]:
+    out: dict[str, int] = {"artifact": 0, "yahoo": 0, "csv": 0, "": 0}
     for r in rows:
         v = (r.get(field) or "").strip().lower()
         if v in out:
@@ -43,7 +43,7 @@ def _count_provenance(rows: List[Dict[str, Any]], field: str = "src_vwap") -> Di
     return out
 
 
-def _count_data_errors(rows: List[Dict[str, Any]]) -> Counter[str]:
+def _count_data_errors(rows: list[dict[str, Any]]) -> Counter[str]:
     counts: Counter[str] = Counter()
     for r in rows:
         raw = str(r.get("data_errors") or "")
@@ -56,7 +56,7 @@ def _count_data_errors(rows: List[Dict[str, Any]]) -> Counter[str]:
     return counts
 
 
-def _sum_concurrency(rows: List[Dict[str, Any]]) -> int:
+def _sum_concurrency(rows: list[dict[str, Any]]) -> int:
     s = 0
     for r in rows:
         try:
@@ -66,7 +66,7 @@ def _sum_concurrency(rows: List[Dict[str, Any]]) -> int:
     return s
 
 
-def _summary_block(scored: List[Dict[str, Any]]) -> str:
+def _summary_block(scored: list[dict[str, Any]]) -> str:
     tiers = _count_tiers(scored)
     prov = _count_provenance(scored, "src_vwap")
     guards = _sum_concurrency(scored)
@@ -98,21 +98,20 @@ def _summary_block(scored: List[Dict[str, Any]]) -> str:
     return "".join(html_parts)
 
 
-def _read_csv(path: Path) -> List[Dict[str, Any]]:
+def _read_csv(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     with path.open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
-
     # (Note: _summary_block replaces the older _summary implementation.)
 
 
-def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
+def _section(title: str, rows: list[dict[str, Any]], anchor: str) -> str:
     if not rows:
         return f"<h2 id='{html.escape(anchor)}'>{html.escape(title)}</h2><div class='small'>No data</div>"
     # build union of columns across all rows to avoid dropping sparse diagnostics
-    cols: List[str] = []
+    cols: list[str] = []
     seen_cols: set[str] = set()
     for row in rows:
         for col in row.keys():
@@ -141,9 +140,9 @@ def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
     seen = set(wanted)
     cols = wanted + [c for c in cols if c not in seen]
     head = "".join(f"<th>{html.escape(c)}</th>" for c in cols)
-    body_rows: List[str] = []
+    body_rows: list[str] = []
     for r in rows:
-        tds: List[str] = []
+        tds: list[str] = []
         for c in cols:
             val = r.get(c, "")
             if c == "tier" and val:
@@ -155,7 +154,7 @@ def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
     return f"<h2 id='{html.escape(anchor)}'>{html.escape(title)}</h2>" + table
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("micro-momo-dashboard")
     ap.add_argument("--out_dir", default="out")
     args = ap.parse_args(argv)

@@ -4,26 +4,24 @@ daily_pulse.py – Yordam's pre‑market overview
 Run at 07:00 Europe/Istanbul. Produces an Excel workbook in iCloud/Downloads.
 """
 
-import os
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-import pandas as pd
-import yfinance as yf  # pip install yfinance
-
 import asyncio
 import csv
 import logging
 import warnings
-import io
-import contextlib
-from portfolio_exporter.core.config import settings
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pandas as pd
+import yfinance as yf  # pip install yfinance
+
 from portfolio_exporter.core import io
-from utils.progress import iter_progress
 from portfolio_exporter.core import ui as core_ui
+from utils.progress import iter_progress
+
 run_with_spinner = core_ui.run_with_spinner
-from reportlab.lib.pagesizes import letter, landscape  # PDF output (landscape added)
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, letter  # PDF output (landscape added)
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 
 # ── Silence noisy libraries ────────────────────────────────────────────────
 logging.getLogger("ib_insync").setLevel(logging.CRITICAL)
@@ -32,16 +30,14 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # --- Interactive Brokers live API ---
 # pip install ib_insync (requires TWS or IB Gateway running with API enabled)
-from ib_insync import IB, util
+from ib_insync import IB
 
 # --------------------------------------------------------------------------- #
 # CONFIG – edit these two blocks only                                         #
 # --------------------------------------------------------------------------- #
 
 # 1.  Where your *latest* IB CSV lives (auto‑export or manual upload).
-IB_CSV = Path(
-    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/IB/Latest/"
-)
+IB_CSV = Path("/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/IB/Latest/")
 
 # 2.  Macro/technical watch‑list & indicators
 MARKET_OVERVIEW = {
@@ -108,16 +104,13 @@ def load_ib_positions_ib(
         # suppress per‑contract error spam from IB
         ib.errorEvent += lambda *a, **k: None
     except Exception as e:
-        raise ConnectionError(
-            f"❌ Cannot connect to IB API at {host}:{port}  →  {e}"
-        ) from e
+        raise ConnectionError(f"❌ Cannot connect to IB API at {host}:{port}  →  {e}") from e
 
     positions = ib.positions()
     if not positions:
         ib.disconnect()
         raise RuntimeError(
-            "API returned no positions. Confirm account is logged in and the "
-            "API user has permissions."
+            "API returned no positions. Confirm account is logged in and the API user has permissions."
         )
 
     contracts = [p.contract for p in positions]
@@ -165,7 +158,7 @@ def load_ib_positions_ib(
 
 def fetch_ohlc(tickers, days_back=60) -> pd.DataFrame:
     """Download daily OHLCV plus today’s pre‑market quote."""
-    end = datetime.now(timezone.utc)
+    end = datetime.now(UTC)
     start = end - timedelta(days=days_back)
     data = yf.download(
         tickers,
@@ -215,9 +208,7 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
         .join((df["low"] - grp["close"].shift()).abs().to_frame("lc"))
         .max(axis=1)
     )
-    df["atr14"] = grp.apply(
-        lambda g: tr.loc[g.index].rolling(14).mean(), include_groups=False
-    )
+    df["atr14"] = grp.apply(lambda g: tr.loc[g.index].rolling(14).mean(), include_groups=False)
 
     # Bollinger
     m20 = df["sma20"]
@@ -225,14 +216,12 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["bb_upper"] = m20 + 2 * std20
     df["bb_lower"] = m20 - 2 * std20
 
-    df["vwap"] = (df["close"] * df["volume"]).groupby(df["ticker"]).cumsum() / df[
-        "volume"
-    ].groupby(df["ticker"]).cumsum()
+    df["vwap"] = (df["close"] * df["volume"]).groupby(df["ticker"]).cumsum() / df["volume"].groupby(
+        df["ticker"]
+    ).cumsum()
 
     # Realised vol 30d
-    df["real_vol_30"] = grp["pct_change"].transform(
-        lambda s: s.rolling(30).std() * (252**0.5)
-    )
+    df["real_vol_30"] = grp["pct_change"].transform(lambda s: s.rolling(30).std() * (252**0.5))
     return df
 
 
@@ -242,12 +231,7 @@ def last_row(df: pd.DataFrame) -> pd.DataFrame:
 
 def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> None:
     """Write the latest metrics for each ticker to ``output_path``."""
-    latest = (
-        df.sort_values("date")
-        .groupby("ticker", as_index=False)
-        .tail(1)
-        .set_index("ticker", drop=True)
-    )
+    latest = df.sort_values("date").groupby("ticker", as_index=False).tail(1).set_index("ticker", drop=True)
 
     cols = [
         "close",
@@ -268,18 +252,12 @@ def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> Non
     latest = latest[cols].round(3)
 
     if fmt == "excel":
-        with pd.ExcelWriter(
-            output_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
-        ) as writer:
-            latest.reset_index().to_excel(
-                writer, sheet_name="Pulse", index=False, float_format="%.3f"
-            )
+        with pd.ExcelWriter(output_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd") as writer:
+            latest.reset_index().to_excel(writer, sheet_name="Pulse", index=False, float_format="%.3f")
     elif fmt == "pdf":
         if SimpleDocTemplate is None:
             raise RuntimeError("reportlab is required for PDF output")
-        rows = [
-            latest.reset_index().columns.tolist()
-        ] + latest.reset_index().values.tolist()
+        rows = [latest.reset_index().columns.tolist()] + latest.reset_index().values.tolist()
         doc = SimpleDocTemplate(
             output_path,
             pagesize=landscape(letter),
@@ -312,9 +290,6 @@ def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> Non
 
 
 def run(fmt: str = "csv") -> None:
-    tz_tr = timezone(timedelta(hours=3))
-    stamp = datetime.now(tz_tr).strftime("%Y%m%d_%H%M")
-
     filetype = fmt if fmt in {"xlsx", "csv", "flatcsv", "pdf", "txt"} else "csv"
 
     # 1. positions

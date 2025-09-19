@@ -178,6 +178,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BreachCountsModel */
+        BreachCountsModel: {
+            /**
+             * Critical
+             * @default 0
+             */
+            critical: number;
+            /**
+             * Warning
+             * @default 0
+             */
+            warning: number;
+            /**
+             * Info
+             * @default 0
+             */
+            info: number;
+        };
         /** CatalogDiffModel */
         CatalogDiffModel: {
             /** Added */
@@ -263,42 +281,23 @@ export interface components {
             /** Errors */
             errors: string[];
         };
-        /** RulesSummaryCountersModel */
-        RulesSummaryCountersModel: {
-            /**
-             * Total
-             * @default 0
-             */
-            total: number;
-            /**
-             * Critical
-             * @default 0
-             */
-            critical: number;
-            /**
-             * Warning
-             * @default 0
-             */
-            warning: number;
-            /**
-             * Info
-             * @default 0
-             */
-            info: number;
-        };
         /** RulesSummaryResponseModel */
         RulesSummaryResponseModel: {
             /** As Of */
             as_of: string;
-            counters: components["schemas"]["RulesSummaryCountersModel"];
-            /** Top */
-            top: components["schemas"]["RulesSummaryTopModel"][];
-            /** Focus Symbols */
-            focus_symbols: string[];
             /** Rules Total */
             rules_total: number;
+            breaches?: components["schemas"]["BreachCountsModel"];
+            /** Top */
+            top?: components["schemas"]["RulesSummaryTopModel"][];
+            /** Focus Symbols */
+            focus_symbols?: string[];
             /** Evaluation Ms */
             evaluation_ms: number;
+            /** Fundamentals */
+            fundamentals?: {
+                [key: string]: unknown;
+            };
         };
         /** RulesSummaryTopModel */
         RulesSummaryTopModel: {

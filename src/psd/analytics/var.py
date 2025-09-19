@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Sequence
 import math
+from collections.abc import Sequence
 
 
 def var95_1d_from_closes(closes: Sequence[float], nav_exposed: float) -> float:

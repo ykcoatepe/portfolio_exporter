@@ -5,10 +5,10 @@ This keeps a single source of truth for snapshot behavior, including
 retry/fallback logic and proxy mappings.
 """
 
-from typing import Sequence, Dict, Callable, Any
+from collections.abc import Callable, Sequence
 
 
-def snapshot(tickers: Sequence[str]) -> Dict[str, float]:
+def snapshot(tickers: Sequence[str]) -> dict[str, float]:
     """
     Fetch snapshot quotes for the given tickers and return a
     mapping of {symbol: last_price}.
@@ -18,8 +18,8 @@ def snapshot(tickers: Sequence[str]) -> Dict[str, float]:
     """
     # Backward-compatible test hook: if local helpers are monkeypatched,
     # honor the old IBKR→YF fallback path used in tests.
-    ib_fn: Callable[[Sequence[str]], Dict[str, float]] | None = globals().get("_ibkr_quotes")  # type: ignore[assignment]
-    yf_fn: Callable[[Sequence[str]], Dict[str, float]] | None = globals().get("_yf_quotes")  # type: ignore[assignment]
+    ib_fn: Callable[[Sequence[str]], dict[str, float]] | None = globals().get("_ibkr_quotes")  # type: ignore[assignment]
+    yf_fn: Callable[[Sequence[str]], dict[str, float]] | None = globals().get("_yf_quotes")  # type: ignore[assignment]
     if callable(ib_fn) and callable(yf_fn):
         try:
             return ib_fn(tickers)
@@ -35,16 +35,16 @@ def snapshot(tickers: Sequence[str]) -> Dict[str, float]:
     # live_feed returns columns: symbol, price
     return {
         str(sym): float(val) if val is not None else float("nan")
-        for sym, val in zip(df["symbol"], df["price"])
+        for sym, val in zip(df["symbol"], df["price"], strict=True)
     }
 
 
 # Placeholders for test monkeypatching compatibility.
 # These are not used in normal execution but allow tests to attach fakes
 # without AttributeError on setattr.
-def _ibkr_quotes(_tickers: Sequence[str]) -> Dict[str, float]:  # pragma: no cover - test hook
+def _ibkr_quotes(_tickers: Sequence[str]) -> dict[str, float]:  # pragma: no cover - test hook
     raise ConnectionError("IBKR not available in core.quotes stub")
 
 
-def _yf_quotes(_tickers: Sequence[str]) -> Dict[str, float]:  # pragma: no cover - test hook
+def _yf_quotes(_tickers: Sequence[str]) -> dict[str, float]:  # pragma: no cover - test hook
     return {}

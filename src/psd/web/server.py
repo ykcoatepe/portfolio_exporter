@@ -3,6 +3,7 @@
 The server serves the single-page dashboard at `/` and reuses
 `psd.web.app` for stateful JSON endpoints and the SSE stream.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -684,7 +685,7 @@ def start(host: str = "127.0.0.1", port: int = 8787, *, background: bool = True)
 
     import os as _os
 
-    ws_env = (_os.getenv("PSD_UVICORN_WS", "").strip().lower() or "auto")
+    ws_env = _os.getenv("PSD_UVICORN_WS", "").strip().lower() or "auto"
 
     def _run_with_ws(ws_value: str | None) -> None:
         try:

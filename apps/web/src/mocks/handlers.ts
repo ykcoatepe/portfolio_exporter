@@ -7,7 +7,7 @@ const minutesAgo = (anchor: Date, minutes: number) =>
   new Date(anchor.getTime() - minutes * 60_000).toISOString();
 
 interface RulesSummaryCounters {
-  total: number;
+  total?: number;
   critical: number;
   warning: number;
   info: number;
@@ -26,7 +26,7 @@ interface RuleBreachFixture {
 
 interface RulesSummaryFixture {
   as_of: string;
-  counters: RulesSummaryCounters;
+  breaches: RulesSummaryCounters;
   top: RuleBreachFixture[];
   focus_symbols: string[];
   rules_total?: number;
@@ -443,8 +443,7 @@ export const buildRulesSummaryResponse = (
     },
   ];
 
-  const counters: RulesSummaryCounters = {
-    total: top.length,
+  const breachesCounts: RulesSummaryCounters = {
     critical: top.filter((item) => item.severity === "critical").length,
     warning: top.filter((item) => item.severity === "warning").length,
     info: top.filter((item) => item.severity === "info").length,
@@ -452,7 +451,7 @@ export const buildRulesSummaryResponse = (
 
   const base: RulesSummaryFixture = {
     as_of: now.toISOString(),
-    counters,
+    breaches: breachesCounts,
     top,
     focus_symbols: ["SPX", "TSLA", "AAPL", "MSFT", "GLD"],
     rules_total: overrides.rules_total ?? 32,
@@ -462,7 +461,7 @@ export const buildRulesSummaryResponse = (
 
   return {
     as_of: overrides.as_of ?? base.as_of,
-    counters: overrides.counters ?? base.counters,
+    breaches: overrides.breaches ?? base.breaches,
     top: overrides.top ?? base.top,
     focus_symbols: overrides.focus_symbols ?? base.focus_symbols,
     rules_total: overrides.rules_total ?? base.rules_total,

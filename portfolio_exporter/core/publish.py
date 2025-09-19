@@ -56,4 +56,3 @@ def open_dashboard(path_dir: str) -> None:
             subprocess.run(["open", str(dash)], check=False)
         except Exception:
             webbrowser.open(dash.absolute().as_uri(), new=2)
-

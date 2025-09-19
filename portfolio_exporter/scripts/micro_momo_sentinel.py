@@ -4,24 +4,24 @@ import argparse
 import csv
 import os
 import time
-from typing import Any, Dict, List, Optional
 from datetime import time as dt_time
+from typing import Any
 
 from ..core.alerts import emit_alerts
-from ..core.journal import update_journal
-from ..core.providers import ib_provider
-from ..core.market_clock import rth_window_tr, is_after, pretty_tr, TZ_TR
-from ..core.market_calendar import infer_close_et
 from ..core.config_overlay import overlay_sentinel
+from ..core.journal import update_journal
+from ..core.market_calendar import infer_close_et
+from ..core.market_clock import TZ_TR, is_after, pretty_tr, rth_window_tr
 from ..core.memory import load_memory
+from ..core.providers import ib_provider
 
 
-def _load_scored(path: str) -> List[Dict[str, Any]]:
+def _load_scored(path: str) -> list[dict[str, Any]]:
     with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
-def _append_log(path: str, rows: List[Dict[str, Any]]) -> None:
+def _append_log(path: str, rows: list[dict[str, Any]]) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     write_header = not os.path.exists(path)
     with open(path, "a", newline="", encoding="utf-8") as f:
@@ -52,7 +52,7 @@ def _side_vs_vwap(last_price: float | None, vwap: float | None) -> str | None:
         return None
 
 
-def _load_sentinel_cfg(cfg_path: Optional[str]) -> dict:
+def _load_sentinel_cfg(cfg_path: str | None) -> dict:
     import json
     import os
 
@@ -71,7 +71,7 @@ def _load_sentinel_cfg(cfg_path: Optional[str]) -> dict:
     if cfg_path and os.path.exists(cfg_path):
         try:
             data = json.loads(open(cfg_path, encoding="utf-8").read())
-            base.update((data.get("sentinel") or {}))
+            base.update(data.get("sentinel") or {})
         except Exception:
             pass
     return base
@@ -82,7 +82,7 @@ def _parse_hhmm(s: str) -> dt_time:
     return dt_time(int(hh), int(mm))
 
 
-def _check_trigger_long(snapshot: Dict[str, Any], confirm_rvol: float, levels: Dict[str, Any]) -> bool:
+def _check_trigger_long(snapshot: dict[str, Any], confirm_rvol: float, levels: dict[str, Any]) -> bool:
     # Simplified stateless check
     p = snapshot.get("last")
     vwap = levels.get("vwap")
@@ -93,7 +93,7 @@ def _check_trigger_long(snapshot: Dict[str, Any], confirm_rvol: float, levels: D
     return False
 
 
-def _check_trigger_short(snapshot: Dict[str, Any], confirm_rvol: float, levels: Dict[str, Any]) -> bool:
+def _check_trigger_short(snapshot: dict[str, Any], confirm_rvol: float, levels: dict[str, Any]) -> bool:
     p = snapshot.get("last")
     vwap = levels.get("vwap")
     rvol = float(snapshot.get("rvol", 0.0) or 0.0)
@@ -102,7 +102,7 @@ def _check_trigger_short(snapshot: Dict[str, Any], confirm_rvol: float, levels: 
     return False
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("micro-momo-sentinel")
     ap.add_argument("--scored-csv", required=True)
     ap.add_argument("--cfg")
@@ -119,13 +119,15 @@ def main(argv: List[str] | None = None) -> int:
     mem = {}
     try:
         m = load_memory()
-        mem = (m.get("preferences", {}).get("sentinel", {}) or {})
+        mem = m.get("preferences", {}).get("sentinel", {}) or {}
     except Exception:
         mem = {}
     cfg_sen = overlay_sentinel(cfg_sen_file, mem)
     # Early close adjustment (ET), convert to TR via schedule builder
     dates_json = os.getenv("MOMO_SEN_EARLY_CLOSE_JSON") or (
-        cfg_sen.get("early_close_dates_json") if isinstance(cfg_sen.get("early_close_dates_json"), str) else None
+        cfg_sen.get("early_close_dates_json")
+        if isinstance(cfg_sen.get("early_close_dates_json"), str)
+        else None
     )
     et_close_time = infer_close_et(dates_json=dates_json)
     et_rearm = _parse_hhmm(cfg_sen.get("et_afternoon_rearm", "13:30"))
@@ -154,24 +156,23 @@ def main(argv: List[str] | None = None) -> int:
     except Exception:
         pass
 
-    fired: Dict[str, bool] = {}
-    cooldown: Dict[str, int] = {}
+    fired: dict[str, bool] = {}
     # Per-symbol runtime state
-    state: Dict[str, Dict[str, Any]] = {}
+    state: dict[str, dict[str, Any]] = {}
     for row in scored:
         sym0 = row.get("symbol")
         if sym0:
             state[sym0] = {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None}
     # Post-halt single re-arm trackers
-    post_halt_used: Dict[str, bool] = {row.get("symbol"): False for row in scored if row.get("symbol")}
-    halts_seen: Dict[str, int] = {row.get("symbol"): 0 for row in scored if row.get("symbol")}
+    post_halt_used: dict[str, bool] = {row.get("symbol"): False for row in scored if row.get("symbol")}
+    halts_seen: dict[str, int] = {row.get("symbol"): 0 for row in scored if row.get("symbol")}
     last_halts_check = 0.0
     HALTS_POLL_SEC = 30
     armed_afternoon = False  # optional single re-arm flip in the afternoon
     while True:
-        logs: List[Dict[str, Any]] = []
-        alerts: List[Dict[str, Any]] = []
-        updates: Dict[str, Dict[str, Any]] = {}
+        logs: list[dict[str, Any]] = []
+        alerts: list[dict[str, Any]] = []
+        updates: dict[str, dict[str, Any]] = {}
         # Time-based gates (TR-local)
         allow_new = True
         if schedule.no_new_signals_after_tr and is_after(schedule.no_new_signals_after_tr):
@@ -193,8 +194,8 @@ def main(argv: List[str] | None = None) -> int:
                 def _et_to_tr(et_hhmmss: str):
                     if not et_hhmmss:
                         return None
-                    from zoneinfo import ZoneInfo
                     from datetime import datetime
+                    from zoneinfo import ZoneInfo
 
                     now_ny = datetime.now(ZoneInfo("America/New_York"))
                     y, m, d = now_ny.year, now_ny.month, now_ny.day
@@ -230,9 +231,7 @@ def main(argv: List[str] | None = None) -> int:
                     st["halt_rearm_not_before"] = rq_tr.timestamp() + int(
                         cfg_sen.get("halt_rearm_grace_sec", 45)
                     )
-                    st["halt_mini_orb_bars_target"] = int(
-                        cfg_sen.get("halt_mini_orb_minutes", 3)
-                    )
+                    st["halt_mini_orb_bars_target"] = int(cfg_sen.get("halt_mini_orb_minutes", 3))
                     st["halt_mini_orb_bars"] = 0
                     halts_seen[sym] = halts_seen.get(sym, 0) + 1
             except Exception:
@@ -260,12 +259,14 @@ def main(argv: List[str] | None = None) -> int:
                 continue
             # snapshot via IB (tests can monkeypatch)
             snap = {"last": None, "rvol": 0.0}
-            bars: List[Dict[str, Any]] = []
+            bars: list[dict[str, Any]] = []
             if not args.offline:
                 try:
                     q = ib_provider.get_quote(sym, {"data": {"offline": False}})
                     snap["last"] = q.get("last")
-                    bars = ib_provider.get_intraday_bars(sym, {"data": {"offline": False}}, minutes=5, prepost=True)
+                    bars = ib_provider.get_intraday_bars(
+                        sym, {"data": {"offline": False}}, minutes=5, prepost=True
+                    )
                     vol = sum(b.get("volume", 0) for b in bars[-5:])
                     avg = max(1, sum(b.get("volume", 1) for b in bars[-25:]) / 25)
                     snap["rvol"] = vol / avg
@@ -276,7 +277,9 @@ def main(argv: List[str] | None = None) -> int:
             orb = float(row.get("orb_high") or 0) or None
             levels = {"vwap": vwap, "orb_high": orb}
             # Cooldown + VWAP recross gating
-            st = state.setdefault(sym, {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None})
+            st = state.setdefault(
+                sym, {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None}
+            )
             # Decrement cooldown only on a new bar; also track mini-ORB bar accrual
             last_ts = None
             if bars:
@@ -318,7 +321,11 @@ def main(argv: List[str] | None = None) -> int:
                     st["last_side"] = side_now
                 elif side_now is None or side_now == prev_side:
                     continue
-            ok = _check_trigger_long(snap, confirm, levels) if direction.startswith("long") else _check_trigger_short(snap, confirm, levels)
+            ok = (
+                _check_trigger_long(snap, confirm, levels)
+                if direction.startswith("long")
+                else _check_trigger_short(snap, confirm, levels)
+            )
             # Remember the side evaluated on
             st["last_side"] = side_now
             if ok:
@@ -345,7 +352,13 @@ def main(argv: List[str] | None = None) -> int:
                     }
                 )
                 alerts.append(
-                    {"symbol": sym, "direction": direction, "trigger": "Signal fired", "rvol_confirm": confirm, "levels": levels}
+                    {
+                        "symbol": sym,
+                        "direction": direction,
+                        "trigger": "Signal fired",
+                        "rvol_confirm": confirm,
+                        "levels": levels,
+                    }
                 )
                 updates[sym] = {"status": "Triggered", "status_ts": time.strftime("%Y-%m-%d %H:%M:%S")}
             else:

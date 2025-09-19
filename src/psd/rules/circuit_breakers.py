@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
 
-
-def evaluate(daily_return: float, var_change: float) -> Dict[str, bool]:
+def evaluate(daily_return: float, var_change: float) -> dict[str, bool]:
     """Return breaker states using v0.1 defaults.
 
     - soft_pre at -1.0%
@@ -18,7 +16,9 @@ def evaluate(daily_return: float, var_change: float) -> Dict[str, bool]:
     return {"soft_pre": soft_pre, "freeze_1d": freeze_1d, "cut_var": cut_var}
 
 
-def derive_state(day_pl: float, month_pl: float, thresholds: Dict[str, float] | None = None) -> Dict[str, str]:
+def derive_state(
+    day_pl: float, month_pl: float, thresholds: dict[str, float] | None = None
+) -> dict[str, str]:
     """Derive breaker state from day/month P&L (fractions).
 
     thresholds: {soft_pre: -0.010, freeze_1d: -0.015, cut_var: -0.025}
@@ -34,7 +34,7 @@ def derive_state(day_pl: float, month_pl: float, thresholds: Dict[str, float] | 
     return {"state": "ok", "reason": ""}
 
 
-def produce_actions(risk_snapshot: Dict[str, object], top_frac: float = 0.15) -> List[str]:
+def produce_actions(risk_snapshot: dict[str, object], top_frac: float = 0.15) -> list[str]:
     """Produce suggested trims under cut_var: top-15% VaR names.
 
     risk_snapshot may contain key 'by_symbol_var' -> list of {symbol, var}.
@@ -47,7 +47,11 @@ def produce_actions(risk_snapshot: Dict[str, object], top_frac: float = 0.15) ->
         rows = []
     if not rows:
         return []
-    xs = sorted([r for r in rows if isinstance(r, dict) and "symbol" in r and "var" in r], key=lambda r: float(r.get("var", 0.0)), reverse=True)
+    xs = sorted(
+        [r for r in rows if isinstance(r, dict) and "symbol" in r and "var" in r],
+        key=lambda r: float(r.get("var", 0.0)),
+        reverse=True,
+    )
     if not xs:
         return []
     n = max(1, int(len(xs) * max(0.0, min(top_frac, 1.0))))

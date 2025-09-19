@@ -12,24 +12,26 @@ Columns:
     timestamp · ticker · last · bid · ask · open · high · low · prev_close · volume · unrealized_pnl · unrealized_pnl_pct · source
 """
 
-import os
-from portfolio_exporter.core.config import settings
-import sys
-import time
-import logging
-import csv
 import argparse
 import asyncio
+import csv
+import logging
+import os
+import time
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
-from typing import List, Dict, Any
+
 from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+
 run_with_spinner = core_ui.run_with_spinner
-import numpy as np
 import math
+
+import numpy as np
 
 
 # ------------------------------------------------------------------
@@ -58,9 +60,7 @@ try:
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=frozenset(["GET", "HEAD"]),
     )
-    _yf_adapter = HTTPAdapter(
-        max_retries=_yf_retries, pool_connections=10, pool_maxsize=10
-    )
+    _yf_adapter = HTTPAdapter(max_retries=_yf_retries, pool_connections=10, pool_maxsize=10)
     _yf_session.mount("https://", _yf_adapter)
     _yf_session.mount("http://", _yf_adapter)
     try:
@@ -91,8 +91,8 @@ def _first_valid(*vals):
 def _yf_resolve_last_price(
     yf_symbol: str,
     label: str | None = None,
-    info: Dict[str, Any] | None = None,
-    fast: Dict[str, Any] | None = None,
+    info: dict[str, Any] | None = None,
+    fast: dict[str, Any] | None = None,
 ) -> float:
     """
     Best-effort ladder to resolve a last price from Yahoo Finance.
@@ -204,8 +204,8 @@ def _yf_resolve_last_price(
 
 # optional PDF dependencies
 try:
-    from reportlab.lib.pagesizes import letter, landscape
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import landscape, letter
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
@@ -230,7 +230,7 @@ except ImportError:
 # Try to import ib_insync; if unavailable we’ll silently skip
 # ----------------------------------------------------------
 try:
-    from ib_insync import IB, Stock, Index, Future, Option
+    from ib_insync import IB, Index, Option, Stock
 
     IB_AVAILABLE = True
 except ImportError:
@@ -266,6 +266,7 @@ now_tr = datetime.now(TR_TZ)
 DATE_TAG = now_tr.strftime("%Y%m%d")
 TIME_TAG = now_tr.strftime("%H%M")
 
+
 def _resolve_output_dir() -> str:
     """Resolve a writable output directory with env overrides and fallback.
 
@@ -289,7 +290,11 @@ def _resolve_output_dir() -> str:
             p.mkdir(parents=True, exist_ok=True)
             return str(p)
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
+
 IB_CID = _cid("live_feed", default=2)  # separate clientId
 IB_TIMEOUT = 4.0  # seconds to wait per batch
 
@@ -371,8 +376,7 @@ def load_tickers() -> list[str]:
     Preference: files under ``settings.output_dir``; then current directory.
     """
     candidates = [
-        os.path.join(os.path.expanduser(settings.output_dir), name)
-        for name in PORTFOLIO_FILES
+        os.path.join(os.path.expanduser(settings.output_dir), name) for name in PORTFOLIO_FILES
     ] + PORTFOLIO_FILES
     p = next((f for f in candidates if os.path.exists(f)), None)
     if not p:
@@ -470,48 +474,23 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     ib.sleep(IB_TIMEOUT)
 
     for key, md in reqs.items():
-        last_price = _clean_price(
-            md.last
-            if md.last is not None
-            else md.close  # fallback to close if last missing
-        )
+        raw_last = md.last if md.last is not None else md.close
+        clean_last = _clean_price(raw_last)
         combined_rows.append(
             {
                 "ticker": key,
                 "last": (
-                    md.last / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.last
-                    else md.last
+                    clean_last / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and clean_last is not None
+                    else clean_last
                 ),
-                "bid": (
-                    md.bid / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid
-                    else md.bid
-                ),
-                "ask": (
-                    md.ask / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask
-                    else md.ask
-                ),
-                "open": (
-                    md.open / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open
-                    else md.open
-                ),
-                "high": (
-                    md.high / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high
-                    else md.high
-                ),
-                "low": (
-                    md.low / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low
-                    else md.low
-                ),
+                "bid": (md.bid / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid else md.bid),
+                "ask": (md.ask / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask else md.ask),
+                "open": (md.open / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open else md.open),
+                "high": (md.high / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high else md.high),
+                "low": (md.low / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low else md.low),
                 "prev_close": (
-                    md.close / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close
-                    else md.close
+                    md.close / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close else md.close
                 ),
                 "volume": md.volume,
                 "source": "IB",
@@ -531,7 +510,6 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
 
 def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
     rows = []
-    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     iterable = iter_progress(tickers, "yfinance") if PROGRESS else tickers
     for t in iterable:
         if t in YIELD_MAP:
@@ -551,9 +529,7 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
                 fast.get("previousClose"),
                 info.get("previousClose"),
             )
-            vol = _first_valid(
-                fast.get("last_volume"), fast.get("volume"), info.get("volume")
-            )
+            vol = _first_valid(fast.get("last_volume"), fast.get("volume"), info.get("volume"))
         except Exception as e:
             logging.warning("yfinance info fail %s: %s", t, e)
             bid = ask = day_high = day_low = vol = np.nan
@@ -562,7 +538,7 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
         # Yahoo yields like ^TNX return 10× the percentage; rescale
         if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and price is not None:
             price = price / 10.0
-        
+
         rows.append(
             {
                 "ticker": t,
@@ -596,6 +572,7 @@ def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
             val = web.DataReader(series, "fred").iloc[-1].values[0]
             rows.append(
                 {
+                    "timestamp": ts,
                     "ticker": t,
                     "last": val,
                     "bid": np.nan,
@@ -628,7 +605,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
         logging.warning("IB positions() failed: %s", e)
         return pd.DataFrame()
 
-    rows: List[Dict] = []
+    rows: list[dict] = []
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
 
     # --- simple combo heuristic -----------------------------------------
@@ -666,9 +643,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
     ib.sleep(IB_TIMEOUT)  # allow quotes to update
 
     for conId, (con, md, avg_cost, qty) in md_reqs.items():
-        raw_last = (
-            _clean_price(md.last) if md.last is not None else _clean_price(md.close)
-        )
+        raw_last = _clean_price(md.last) if md.last is not None else _clean_price(md.close)
         last = raw_last
         mult = int(con.multiplier) if con.multiplier else 1
         cost_basis = avg_cost * qty * mult
@@ -681,16 +656,12 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
             from ib_insync import Contract
 
             for leg in con.comboLegs:
-                leg_contract = ib.qualifyContracts(
-                    Contract(conId=leg.conId, exchange=leg.exchange)
-                )[0]
+                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
                 combo_legs_data.append(
                     {
                         "symbol": leg_contract.symbol,
                         "sec_type": leg_contract.secType,
-                        "expiry": getattr(
-                            leg_contract, "lastTradeDateOrContractMonth", None
-                        ),
+                        "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
                         "strike": getattr(leg_contract, "strike", None),
                         "right": getattr(leg_contract, "right", None),
                         "ratio": leg.ratio,
@@ -761,9 +732,7 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
     display_df = df.copy()
     num_cols = display_df.select_dtypes(include=["number"]).columns
     for col in num_cols:
-        display_df[col] = display_df[col].apply(
-            lambda x: "—" if pd.isna(x) else f"{x:,.2f}"
-        )
+        display_df[col] = display_df[col].apply(lambda x: "—" if pd.isna(x) else f"{x:,.2f}")
     rows_data = [display_df.columns.tolist()] + display_df.values.tolist()
     doc = SimpleDocTemplate(
         path,
@@ -835,6 +804,7 @@ def run(
             ib_tmp.disconnect()
         except Exception:
             pass
+
     def _baseline_indices() -> list[str]:
         # Minimal baseline set used in tests
         return ["SPY", "QQQ", "IWM", "DIA", "VIX"]
@@ -878,10 +848,7 @@ def run(
             if not df_pos.empty:
                 pnl_map = df_pos.groupby("ticker")["unrealized_pnl"].sum().to_dict()
                 cost_map = df_pos.groupby("ticker")["cost_basis"].sum().to_dict()
-                pct_map = {
-                    s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan
-                    for s in pnl_map
-                }
+                pct_map = {s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan for s in pnl_map}
         except Exception as e:
             logging.warning("Live position snapshot failed: %s", e)
 
@@ -929,9 +896,7 @@ def run(
         df.to_csv(out_q, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
         if not df_pos.empty:
             out_p = base_pos + ".csv"
-            df_pos.to_csv(
-                out_p, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f"
-            )
+            df_pos.to_csv(out_p, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
         logging.info("Saved live snapshot → %s", out_q)
 
 

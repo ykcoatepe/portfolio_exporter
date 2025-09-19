@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-import os
-from portfolio_exporter.core.ib_config import HOST as _IB_HOST, PORT as _IB_PORT, client_id as _client_id
 import math
 import threading
-from typing import Any, Dict
+from typing import Any
 
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.ib_config import HOST as _IB_HOST
+from portfolio_exporter.core.ib_config import PORT as _IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _client_id
 
 _IB_CID = _client_id("core", default=29)
 
@@ -40,9 +41,7 @@ def _ib():
 
     async def _try_connect():
         try:
-            await _ib_singleton.connectAsync(
-                _IB_HOST, _IB_PORT, clientId=_IB_CID, timeout=2
-            )
+            await _ib_singleton.connectAsync(_IB_HOST, _IB_PORT, clientId=_IB_CID, timeout=2)
         except Exception:
             pass
 
@@ -54,7 +53,7 @@ def _ib():
     return _ib_singleton
 
 
-def quote_stock(symbol: str) -> Dict[str, Any]:
+def quote_stock(symbol: str) -> dict[str, Any]:
     """Fetch snapshot quote for a stock.
 
     Attempts IBKR first and falls back to yfinance.
@@ -69,7 +68,9 @@ def quote_stock(symbol: str) -> Dict[str, Any]:
         ticker = ib.reqMktData(stk, "", snapshot=True) if stk else None
         ib.sleep(0.3)
         mid = (
-            (ticker.bid + ticker.ask) / 2 if ticker and ticker.bid and ticker.ask else (ticker.last if ticker else None)
+            (ticker.bid + ticker.ask) / 2
+            if ticker and ticker.bid and ticker.ask
+            else (ticker.last if ticker else None)
         )
         # IB can return blanks outside RTH; if so, fall back to yfinance
         if mid is None or (isinstance(mid, float) and math.isnan(mid)):
@@ -88,7 +89,7 @@ def quote_stock(symbol: str) -> Dict[str, Any]:
     return {"mid": price, "bid": price, "ask": price}
 
 
-def quote_option(symbol: str, expiry: str, strike: float, right: str) -> Dict[str, Any]:
+def quote_option(symbol: str, expiry: str, strike: float, right: str) -> dict[str, Any]:
     """Return price and greeks for an option contract.
 
     Args:
@@ -112,7 +113,9 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> Dict[st
         ticker = ib.reqMktData(opt, "", snapshot=True) if opt else None
         ib.sleep(0.3)
         mid = (
-            (ticker.bid + ticker.ask) / 2 if ticker and ticker.bid and ticker.ask else (ticker.last if ticker else None)
+            (ticker.bid + ticker.ask) / 2
+            if ticker and ticker.bid and ticker.ask
+            else (ticker.last if ticker else None)
         )
         if mid is None or (isinstance(mid, float) and math.isnan(mid)):
             # empty snapshot → disconnect so we hit the fallback below
@@ -157,10 +160,7 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> Dict[st
         "iv": iv,
     }
     if (
-        (
-            q["delta"] is None
-            or (isinstance(q["delta"], float) and math.isnan(q["delta"]))
-        )
+        (q["delta"] is None or (isinstance(q["delta"], float) and math.isnan(q["delta"])))
         and iv
         and not math.isnan(iv)
     ):
@@ -188,7 +188,6 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> Dict[st
 
 def net_liq() -> float:
     """Return current NetLiquidation or NaN if unavailable."""
-    import math as _math
 
     ib = _ib()
     if not ib.isConnected():

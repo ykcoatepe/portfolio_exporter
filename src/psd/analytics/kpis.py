@@ -11,7 +11,7 @@ Inputs: list of memo-like dicts with optional keys:
   - nav: float (optional for cost%)
 """
 
-from typing import Dict, Iterable, Tuple
+from collections.abc import Iterable
 
 
 def _safe_float(x) -> float:
@@ -21,10 +21,10 @@ def _safe_float(x) -> float:
         return 0.0
 
 
-def per_sleeve_kpis(memos: Iterable[dict]) -> Dict[str, Dict[str, float]]:
-    out: Dict[str, Dict[str, float]] = {}
-    agg: Dict[str, Dict[str, float]] = {}
-    cnt: Dict[str, Dict[str, int]] = {}
+def per_sleeve_kpis(memos: Iterable[dict]) -> dict[str, dict[str, float]]:
+    out: dict[str, dict[str, float]] = {}
+    agg: dict[str, dict[str, float]] = {}
+    cnt: dict[str, dict[str, int]] = {}
     for m in memos:
         s = str(m.get("sleeve", "")).strip() or "unknown"
         a = agg.setdefault(s, {"R_sum": 0.0, "theta_roc_sum": 0.0, "cost_sum": 0.0, "nav_sum": 0.0})
@@ -45,4 +45,3 @@ def per_sleeve_kpis(memos: Iterable[dict]) -> Dict[str, Dict[str, float]]:
         costs_pct = (agg[s]["cost_sum"] / agg[s]["nav_sum"]) if agg[s]["nav_sum"] > 0 else 0.0
         out[s] = {"win_rate": win_rate, "avg_R": avg_R, "theta_ROC": theta_ROC, "costs_pct": costs_pct}
     return out
-

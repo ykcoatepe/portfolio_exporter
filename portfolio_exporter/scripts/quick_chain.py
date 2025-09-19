@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
-from typing import Iterable, List, Literal, Tuple
+from typing import Literal
 
 try:
     import dateparser  # type: ignore
@@ -30,16 +29,16 @@ from rich.table import Table
 from portfolio_exporter.core import chain as core_chain
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
-from portfolio_exporter.core.config import settings
-from portfolio_exporter.core import io as core_io
-from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core.io import save as io_save
 from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.io import save as io_save
+from portfolio_exporter.core.runlog import RunLog
+
 render_chain = core_ui.render_chain
 run_with_spinner = core_ui.run_with_spinner
 
 
-def _calc_strikes(symbol: str, width: int) -> List[float]:
+def _calc_strikes(symbol: str, width: int) -> list[float]:
     """Return a list of strikes around ATM using 5-point increments."""
     try:
         from portfolio_exporter.core.ib import quote_stock
@@ -53,7 +52,7 @@ def _calc_strikes(symbol: str, width: int) -> List[float]:
 def run(
     symbol: str | None = None,
     expiry: str | None = None,
-    strikes: List[float] | None = None,
+    strikes: list[float] | None = None,
     width: int = 5,
 ) -> None:
     """Interactive Rich-based option-chain browser with natural-language expiry parsing."""
@@ -74,9 +73,7 @@ def run(
     # ── natural‑language expiry parsing ──────────────────────────────
     if not expiry:
         exp_raw = (
-            input(
-                f"Expiry (YYYY-MM-DD, 'Aug 15', '+30d', etc.) [{default_expiry}]: "
-            ).strip()
+            input(f"Expiry (YYYY-MM-DD, 'Aug 15', '+30d', etc.) [{default_expiry}]: ").strip()
             or default_expiry
         )
     else:
@@ -124,9 +121,7 @@ def run(
 
     def _fetch(cur_width: int, cur_expiry: str) -> pd.DataFrame:
         exp = _nearest(cur_expiry) if normalize_exps else cur_expiry
-        use_strikes = (
-            strikes if strikes is not None else _calc_strikes(symbol, cur_width)
-        )
+        use_strikes = strikes if strikes is not None else _calc_strikes(symbol, cur_width)
         df = run_with_spinner(
             f"Fetching {symbol} {exp} …",
             core_chain.fetch_chain,
@@ -139,9 +134,7 @@ def run(
             # Same directory convention as the other scripts
             out_dir = os.getenv("PE_OUTPUT_DIR", settings.output_dir)
             os.makedirs(out_dir, exist_ok=True)
-            csv_path = os.path.join(
-                out_dir, f"chain_{symbol}_{exp.replace('-', '')}.csv"
-            )
+            csv_path = os.path.join(out_dir, f"chain_{symbol}_{exp.replace('-', '')}.csv")
             df.to_csv(csv_path, index=False)
             console.print(f"[green]CSV saved → {csv_path}")
         return df
@@ -152,9 +145,7 @@ def run(
         calls = df[df["right"] == "C"].sort_values("strike").reset_index(drop=True)
         puts = df[df["right"] == "P"].sort_values("strike").reset_index(drop=True)
         grid = Table.grid(expand=True)
-        grid.add_row(
-            render_chain(calls, console, width), render_chain(puts, console, width)
-        )
+        grid.add_row(render_chain(calls, console, width), render_chain(puts, console, width))
         return grid
 
     interactive = sys.stdin.isatty() or bool(os.environ.get("PYTEST_CURRENT_TEST"))
@@ -189,14 +180,10 @@ def run(
                 width += 2
                 df = _fetch(width, expiry)
             elif cmd == ">":
-                expiry = (
-                    (pd.to_datetime(expiry) + pd.Timedelta(weeks=1)).date().isoformat()
-                )
+                expiry = (pd.to_datetime(expiry) + pd.Timedelta(weeks=1)).date().isoformat()
                 df = _fetch(width, expiry)
             elif cmd == "<":
-                expiry = (
-                    (pd.to_datetime(expiry) - pd.Timedelta(weeks=1)).date().isoformat()
-                )
+                expiry = (pd.to_datetime(expiry) - pd.Timedelta(weeks=1)).date().isoformat()
                 df = _fetch(width, expiry)
             elif cmd == " ":
                 if cursor not in marked:
@@ -329,7 +316,9 @@ def _same_delta_by_expiry(
                 best = calls.loc[calls["dist"].idxmin()]
                 out.loc[g.index, "call_same_delta_strike"] = best.get("strike")
                 out.loc[g.index, "call_same_delta_delta"] = best.get("delta")
-                out.loc[g.index, "call_same_delta_mid"] = best.get("mid") if "mid" in best else best.get("last")
+                out.loc[g.index, "call_same_delta_mid"] = (
+                    best.get("mid") if "mid" in best else best.get("last")
+                )
                 out.loc[g.index, "call_same_delta_iv"] = best.get("iv")
         if side in {"put", "both"}:
             puts = g[g["right"].astype(str).str.upper() == "P"]
@@ -338,7 +327,9 @@ def _same_delta_by_expiry(
                 best = puts.loc[puts["dist"].idxmin()]
                 out.loc[g.index, "put_same_delta_strike"] = best.get("strike")
                 out.loc[g.index, "put_same_delta_delta"] = best.get("delta")
-                out.loc[g.index, "put_same_delta_mid"] = best.get("mid") if "mid" in best else best.get("last")
+                out.loc[g.index, "put_same_delta_mid"] = (
+                    best.get("mid") if "mid" in best else best.get("last")
+                )
                 out.loc[g.index, "put_same_delta_iv"] = best.get("iv")
 
     for exp, grp in d.groupby("expiry"):
@@ -356,8 +347,6 @@ def _filter_tenor(df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]) 
         return d.loc[kinds == "monthly"].copy()
     else:
         return d.loc[kinds == "weekly"].copy()
-
-
 
 
 def _run_cli_v3() -> int:
@@ -412,9 +401,7 @@ def _run_cli_v3() -> int:
                         frames.append(df_sym)
                     except Exception:
                         continue
-                df = (
-                    pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
-                )
+                df = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
 
             if df is None or df.empty:
                 print("⚠ No chain data available")
@@ -476,13 +463,10 @@ def _run_cli_v3() -> int:
 
         meta = {
             "underlyings": [
-                str(u)
-                for u in df_out.get("underlying", pd.Series(dtype=str)).dropna().unique().tolist()
+                str(u) for u in df_out.get("underlying", pd.Series(dtype=str)).dropna().unique().tolist()
             ],
             "tenor": args.tenor or "",
-            "target_delta": float(args.target_delta)
-            if args.target_delta is not None
-            else None,
+            "target_delta": float(args.target_delta) if args.target_delta is not None else None,
             "side": args.side or "",
         }
         if args.debug_timings:

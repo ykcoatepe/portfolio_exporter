@@ -1,39 +1,44 @@
 from __future__ import annotations
 
-from __future__ import annotations
-
 import builtins as _builtins
+import io
+import json
 import os
 from contextlib import contextmanager
 from pathlib import Path
-
-import json
 
 try:
     from rich.console import Console
     from rich.table import Table
 except Exception:  # pragma: no cover - fallback for constrained test envs
+
     class Console:  # type: ignore
         def print(self, *a, **_k):
             try:
                 print(*a)
             except Exception:
                 pass
+
     class Table:  # type: ignore
         def __init__(self, *a, **k):
             pass
+
         def add_column(self, *a, **k):
             pass
+
         def add_row(self, *a, **k):
             pass
 
+
 from portfolio_exporter.core import ui as core_ui
+
 # Back-compat: allow tests to monkeypatch prompt_input on this module
 prompt_input = core_ui.prompt_input
 import datetime as _dt
 
 # Speed up previews in CI/test mode
 import os as _os
+
 TEST_MODE = bool(_os.getenv("PE_TEST_MODE"))
 
 
@@ -56,6 +61,7 @@ def _build_synth_chain():
     """Return a minimal chain DataFrame based on latest positions CSV."""
 
     import pandas as pd
+
     from portfolio_exporter.core.io import latest_file
 
     path = latest_file("portfolio_greeks_positions")
@@ -199,6 +205,7 @@ def _copy_to_clipboard(text: str) -> bool:
         return False
     return True
 
+
 # Menu for trade-related utilities
 
 
@@ -241,6 +248,7 @@ def launch(status, default_fmt):
         os.environ["DISABLE_PANDERA_IMPORT_WARNING"] = "TRUE"
         try:
             import sys as _sys
+
             _daily = _sys.modules.get("portfolio_exporter.scripts.daily_report")
             if _daily is None:
                 from portfolio_exporter.scripts import daily_report as _daily
@@ -257,13 +265,14 @@ def launch(status, default_fmt):
                 console.print("[yellow]Inputs missing; auto-generating Portfolio Greeks …")
                 try:
                     from portfolio_exporter.scripts import portfolio_greeks as _pg
+
                     # Write fresh CSVs to configured OUTPUT_DIR
                     _pg.main(["--output-dir", str(_settings.output_dir), "--json"])  # quiet via PE_QUIET
                 except Exception as exc:
                     console.print(f"[red]Auto-generation failed:[/] {exc}")
                 else:
                     # Re-run preflight
-                    summary = _daily.main(["--preflight", "--json", "--no-files"]) 
+                    summary = _daily.main(["--preflight", "--json", "--no-files"])
         except Exception as exc:  # pragma: no cover - defensive
             console.print(f"[red]Preflight failed:[/] {exc}")
         else:
@@ -305,6 +314,7 @@ def launch(status, default_fmt):
 
     def _run_roll_manager(args: list[str]) -> dict | None:
         import sys as _sys
+
         _stub = _sys.modules.get("portfolio_exporter.scripts.roll_manager")
         if _stub is not None and not hasattr(_stub, "__file__") and hasattr(_stub, "main"):
             try:
@@ -327,6 +337,7 @@ def launch(status, default_fmt):
                 pass
         # Build a minimal argparse-like object for real CLI entry
         import types as _types
+
         ns = _types.SimpleNamespace(
             include_cal=False,
             days=None,
@@ -371,11 +382,13 @@ def launch(status, default_fmt):
                 dte_txt = ""
                 try:
                     if exp:
-                        dte = ( _dt.date.fromisoformat(str(exp)) - _dt.date.today() ).days
+                        dte = (_dt.date.fromisoformat(str(exp)) - _dt.date.today()).days
                         dte_txt = f" {exp} ({dte}D)"
                 except Exception:
                     dte_txt = ""
-                console.print(f"{c.get('underlying')} Δ{c.get('delta', 0):+0.2f} {c.get('debit_credit', 0):+0.2f}{dte_txt}")
+                console.print(
+                    f"{c.get('underlying')} Δ{c.get('delta', 0):+0.2f} {c.get('debit_credit', 0):+0.2f}{dte_txt}"
+                )
             for w in summary.get("warnings", []):
                 console.print(f"[yellow]{w}")
         finally:
@@ -390,7 +403,9 @@ def launch(status, default_fmt):
         from portfolio_exporter.core.io import latest_file
 
         if not latest_file("portfolio_greeks_positions"):
-            console.print("[yellow]Missing positions; run: portfolio-greeks (hint: PE_POSITIONS_MAX_AGE_SEC controls freshness)")
+            console.print(
+                "[yellow]Missing positions; run: portfolio-greeks (hint: PE_POSITIONS_MAX_AGE_SEC controls freshness)"
+            )
             if orig_quiet is None:
                 os.environ.pop("PE_QUIET", None)
             else:
@@ -452,6 +467,7 @@ def launch(status, default_fmt):
 
             def _trades_report() -> None:
                 from portfolio_exporter.scripts import trades_report as _tr
+
                 # Generate report in selected format
                 df = _tr.run(fmt=current_fmt, show_actions=True, return_df=True)
                 try:
@@ -462,11 +478,13 @@ def launch(status, default_fmt):
                 try:
                     buf = io.StringIO()
                     import contextlib as _ctx
+
                     # Use default prior positions from memory if present
                     args = ["--summary-only", "--json", "--no-files"]
                     if not TEST_MODE:
                         try:
                             from pathlib import Path as _Path
+
                             _pf = _Path(".codex/memory.json")
                             if _pf.exists():
                                 _data = json.loads(_pf.read_text())
@@ -484,40 +502,54 @@ def launch(status, default_fmt):
                     # Print high-level counts
                     if rows:
                         console.print(
-                            f"Intent: Open={rows.get('Open',0)} Close={rows.get('Close',0)} Roll={rows.get('Roll',0)} Mixed={rows.get('Mixed',0)} Unknown={rows.get('Unknown',0)}"
+                            f"Intent: Open={rows.get('Open', 0)} Close={rows.get('Close', 0)} Roll={rows.get('Roll', 0)} Mixed={rows.get('Mixed', 0)} Unknown={rows.get('Unknown', 0)}"
                         )
                     # Print top few underlyings by activity with their dominant effect
                     if by_und:
                         try:
                             top = by_und[:5]
-                            txt = ", ".join(f"{r.get('underlying')}: {r.get('position_effect')}" for r in top if r.get('underlying'))
+                            txt = ", ".join(
+                                f"{r.get('underlying')}: {r.get('position_effect')}"
+                                for r in top
+                                if r.get("underlying")
+                            )
                             if txt:
                                 console.print(f"By underlying: {txt}")
                         except Exception:
                             pass
                     # If Unknown ratio is high or prior snapshot warning present, offer override
                     try:
-                        unk = int(rows.get('Unknown', 0))
-                        total = sum(int(rows.get(k, 0)) for k in ['Open','Close','Roll','Mixed','Unknown']) or 1
-                        warnings = summary.get('warnings', []) or []
-                        need_prior = (unk / total) > 0.3 or any('prior positions snapshot' in str(w).lower() for w in warnings)
+                        unk = int(rows.get("Unknown", 0))
+                        total = (
+                            sum(int(rows.get(k, 0)) for k in ["Open", "Close", "Roll", "Mixed", "Unknown"])
+                            or 1
+                        )
+                        warnings = summary.get("warnings", []) or []
+                        need_prior = (unk / total) > 0.3 or any(
+                            "prior positions snapshot" in str(w).lower() for w in warnings
+                        )
                     except Exception:
                         need_prior = False
                     if need_prior:
-                        path = core_ui.prompt_input("Prior positions CSV path to improve intent (Enter to skip): ").strip()
+                        path = core_ui.prompt_input(
+                            "Prior positions CSV path to improve intent (Enter to skip): "
+                        ).strip()
                         if path:
                             buf2 = io.StringIO()
                             with _ctx.redirect_stdout(buf2):
-                                _tr.main(["--summary-only", "--json", "--no-files", "--prior-positions-csv", path])
+                                _tr.main(
+                                    ["--summary-only", "--json", "--no-files", "--prior-positions-csv", path]
+                                )
                             s2 = json.loads(buf2.getvalue().strip() or "{}")
                             rows2 = ((s2.get("meta", {}) or {}).get("intent", {}) or {}).get("rows", {}) or {}
                             if rows2:
                                 console.print(
-                                    f"Updated intent with prior: Open={rows2.get('Open',0)} Close={rows2.get('Close',0)} Roll={rows2.get('Roll',0)} Mixed={rows2.get('Mixed',0)} Unknown={rows2.get('Unknown',0)}"
+                                    f"Updated intent with prior: Open={rows2.get('Open', 0)} Close={rows2.get('Close', 0)} Roll={rows2.get('Roll', 0)} Mixed={rows2.get('Mixed', 0)} Unknown={rows2.get('Unknown', 0)}"
                                 )
                             # Persist for future runs
                             try:
                                 from pathlib import Path as _Path
+
                                 _pf = _Path(".codex/memory.json")
                                 data = {}
                                 if _pf.exists():
@@ -534,6 +566,7 @@ def launch(status, default_fmt):
                 # Top combos by realized P&L (from clustered executions)
                 try:
                     import pandas as _pd  # local import to avoid heavy deps at import time
+
                     if isinstance(df, _pd.DataFrame) and not df.empty:
                         execs = df[df.get("exec_id").notna()] if "exec_id" in df.columns else df
                         clusters, _dbg = _tr._cluster_executions(execs)
@@ -549,34 +582,44 @@ def launch(status, default_fmt):
                             prior_override = None
                             try:
                                 from pathlib import Path as _Path
+
                                 _pf = _Path(".codex/memory.json")
                                 if _pf.exists():
                                     _data = json.loads(_pf.read_text())
-                                    prior_override = (_data.get("preferences", {}) or {}).get("trades_prior_positions", "") or None
+                                    prior_override = (_data.get("preferences", {}) or {}).get(
+                                        "trades_prior_positions", ""
+                                    ) or None
                             except Exception:
                                 prior_override = None
                             prior_df = None
                             try:
                                 from portfolio_exporter.core.config import settings as _settings
+
                                 search_dirs = []
                                 try:
                                     from pathlib import Path as _P
+
                                     search_dirs = [_P(str(_settings.output_dir))]
                                     td = _P("tests/data")
                                     if td.exists():
                                         search_dirs.append(td)
                                 except Exception:
                                     search_dirs = []
-                                prior_df, _prior_path = _tr._ensure_prev_positions_quiet(earliest, _settings.output_dir, prior_override, search_dirs)
+                                prior_df, _prior_path = _tr._ensure_prev_positions_quiet(
+                                    earliest, _settings.output_dir, prior_override, search_dirs
+                                )
                             except Exception:
                                 prior_df = None
-                            combos_df = _tr._detect_and_enrich_trades_combos(execs, None, prev_positions_df=prior_df)
+                            combos_df = _tr._detect_and_enrich_trades_combos(
+                                execs, None, prev_positions_df=prior_df
+                            )
                             try:
                                 session["combos_df"] = combos_df
                                 session["prior_df"] = prior_df
                             except Exception:
                                 pass
                             if isinstance(combos_df, _pd.DataFrame) and not combos_df.empty:
+
                                 def _to_set(s: object) -> set[int]:
                                     vals = set()
                                     for tok in str(s or "").replace("/", ",").split(","):
@@ -588,6 +631,7 @@ def launch(status, default_fmt):
                                         except Exception:
                                             pass
                                     return vals
+
                                 for _, r in combos_df.iterrows():
                                     ids = _to_set(r.get("order_ids", ""))
                                     eff = str(r.get("position_effect", "Unknown"))
@@ -595,7 +639,11 @@ def launch(status, default_fmt):
                                         effect_map.append((ids, eff))
                         except Exception:
                             effect_map = []
-                        if isinstance(clusters, _pd.DataFrame) and not clusters.empty and "pnl" in clusters.columns:
+                        if (
+                            isinstance(clusters, _pd.DataFrame)
+                            and not clusters.empty
+                            and "pnl" in clusters.columns
+                        ):
                             try:
                                 session["clusters_df"] = clusters
                             except Exception:
@@ -647,9 +695,12 @@ def launch(status, default_fmt):
                     pass
 
             def _order_builder() -> None:
-                from portfolio_exporter.scripts import order_builder as _ob
+                import contextlib
+                import io
+                import json
+
                 from portfolio_exporter.core.io import save as io_save
-                import json, io, contextlib
+                from portfolio_exporter.scripts import order_builder as _ob
 
                 while True:
                     tbl = Table(title="Stage Order")
@@ -688,6 +739,7 @@ def launch(status, default_fmt):
                     # Prefill symbol/expiry defaults from Pre-Market menu cache
                     try:
                         from portfolio_exporter.menus import pre as _pre_menu
+
                         _last_sym = _pre_menu.last_symbol.get()
                         _last_exp = _pre_menu.last_expiry.get()
                     except Exception:
@@ -711,29 +763,44 @@ def launch(status, default_fmt):
                     qty = core_ui.prompt_input("Qty [1]: ").strip() or "1"
 
                     # Optional: auto-select strikes for supported presets using live data
-                    if preset in {"bull_put", "bear_call", "bull_call", "bear_put", "iron_condor", "butterfly", "calendar"}:
-                        auto = core_ui.prompt_input("Auto-select strikes from live data? (Y/n) [Y]: ").strip().lower()
+                    if preset in {
+                        "bull_put",
+                        "bear_call",
+                        "bull_call",
+                        "bear_put",
+                        "iron_condor",
+                        "butterfly",
+                        "calendar",
+                    }:
+                        auto = (
+                            core_ui.prompt_input("Auto-select strikes from live data? (Y/n) [Y]: ")
+                            .strip()
+                            .lower()
+                        )
                         if auto in {"", "y"}:
                             from portfolio_exporter.core.preset_engine import (
+                                LiquidityRules,
+                                suggest_butterfly,
+                                suggest_calendar,
                                 suggest_credit_vertical,
                                 suggest_debit_vertical,
                                 suggest_iron_condor,
-                                suggest_butterfly,
-                                suggest_calendar,
-                                LiquidityRules,
                             )
-                            from portfolio_exporter.scripts.order_builder import _normalize_expiry as _norm_exp
+                            from portfolio_exporter.scripts.order_builder import (
+                                _normalize_expiry as _norm_exp,
+                            )
+
                             # Load wizard defaults from repo memory if present
                             _prefs_mem = {}
                             try:
                                 import json as _json
                                 from pathlib import Path as _Path
+
                                 p = _Path(".codex/memory.json")
                                 if p.exists():
                                     _data = _json.loads(p.read_text())
                                     _prefs_mem = (
-                                        _data.get("preferences", {}).get("order_builder_wizard", {})
-                                        or {}
+                                        _data.get("preferences", {}).get("order_builder_wizard", {}) or {}
                                     )
                             except Exception:
                                 _prefs_mem = {}
@@ -749,22 +816,26 @@ def launch(status, default_fmt):
                             )
                             avoid_def = "Y" if bool(_prefs_mem.get("avoid_earnings", True)) else "N"
                             avoid_e = (
-                                core_ui.prompt_input(
-                                    f"Avoid earnings within 7 days? (Y/n) [{avoid_def}]: "
-                                )
+                                core_ui.prompt_input(f"Avoid earnings within 7 days? (Y/n) [{avoid_def}]: ")
                                 .strip()
                                 .lower()
                             )
-                            avoid_e_bool = (avoid_e in {"", "y"})
+                            avoid_e_bool = avoid_e in {"", "y"}
                             # Liquidity thresholds (prefilled)
                             min_oi_def = str(_prefs_mem.get("min_oi", 200))
                             min_volume_def = str(_prefs_mem.get("min_volume", 50))
                             max_spread_def = str(_prefs_mem.get("max_spread_pct", 0.02))
                             min_oi_in = core_ui.prompt_input(f"Min OI [{min_oi_def}]: ").strip() or min_oi_def
-                            min_vol_in = core_ui.prompt_input(f"Min Volume [{min_volume_def}]: ").strip() or min_volume_def
-                            max_spread_in = core_ui.prompt_input(
-                                f"Max spread fraction of mid [{max_spread_def}]: "
-                            ).strip() or max_spread_def
+                            min_vol_in = (
+                                core_ui.prompt_input(f"Min Volume [{min_volume_def}]: ").strip()
+                                or min_volume_def
+                            )
+                            max_spread_in = (
+                                core_ui.prompt_input(
+                                    f"Max spread fraction of mid [{max_spread_def}]: "
+                                ).strip()
+                                or max_spread_def
+                            )
                             try:
                                 rules = LiquidityRules(
                                     min_oi=int(min_oi_in),
@@ -777,15 +848,19 @@ def launch(status, default_fmt):
                             dte_or_exp = expiry
                             if dte_or_exp.isdigit():
                                 import datetime as _dt
+
                                 d = _dt.date.today() + _dt.timedelta(days=int(dte_or_exp))
                                 expiry = d.isoformat()
                             expiry = _norm_exp(symbol, expiry)
                             # Include risk budget pct for suggested qty
                             rb_def_val = _prefs_mem.get("risk_budget_pct", 2)
                             rb_def = str(rb_def_val)
-                            rb = core_ui.prompt_input(
-                                f"Risk budget % of NetLiq for sizing [{rb_def}]: "
-                            ).strip() or rb_def
+                            rb = (
+                                core_ui.prompt_input(
+                                    f"Risk budget % of NetLiq for sizing [{rb_def}]: "
+                                ).strip()
+                                or rb_def
+                            )
                             try:
                                 rb_pct = float(rb) / 100.0
                             except Exception:
@@ -840,7 +915,9 @@ def launch(status, default_fmt):
                                 )
                             else:  # calendar
                                 # Ask optional diagonal offset steps (0 = calendar)
-                                so = core_ui.prompt_input("Diagonal far strike offset steps (0=calendar) [0]: ").strip()
+                                so = core_ui.prompt_input(
+                                    "Diagonal far strike offset steps (0=calendar) [0]: "
+                                ).strip()
                                 try:
                                     strike_offset = int(so) if so else 0
                                 except Exception:
@@ -856,7 +933,9 @@ def launch(status, default_fmt):
                                     strike_offset=strike_offset,
                                 )
                             if not cands:
-                                console.print("[yellow]No candidates met liquidity/selection criteria; falling back to manual width.[/yellow]")
+                                console.print(
+                                    "[yellow]No candidates met liquidity/selection criteria; falling back to manual width.[/yellow]"
+                                )
                             else:
                                 resolved_exp = cands[0].get("expiry", expiry)
                                 tbl = Table(title=f"{preset} candidates ({symbol} {resolved_exp})")
@@ -886,18 +965,25 @@ def launch(status, default_fmt):
                                         nf_hint = ""
                                         try:
                                             import datetime as _dt
+
                                             n = c.get("near") or (c.get("legs", [{}])[0].get("expiry"))
                                             f = c.get("far") or c.get("expiry")
                                             if n and f:
-                                                dn = max(0, ( _dt.date.fromisoformat(str(n)) - _dt.date.today()).days )
-                                                df = max(0, ( _dt.date.fromisoformat(str(f)) - _dt.date.today()).days )
+                                                dn = max(
+                                                    0,
+                                                    (_dt.date.fromisoformat(str(n)) - _dt.date.today()).days,
+                                                )
+                                                df = max(
+                                                    0,
+                                                    (_dt.date.fromisoformat(str(f)) - _dt.date.today()).days,
+                                                )
                                                 nf_hint = f"n/f {dn}/{df}"
                                         except Exception:
                                             nf_hint = ""
                                         # diagonal offset hint using the offset we asked for
                                         diag_hint = ""
                                         try:
-                                            if 'strike_offset' in locals():
+                                            if "strike_offset" in locals():
                                                 off = int(strike_offset)
                                             else:
                                                 off = 0
@@ -914,10 +1000,10 @@ def launch(status, default_fmt):
                                         strikes_txt,
                                         typ,
                                         f"{price:.2f}",
-                                        f"{c.get('width',0):.2f}",
+                                        f"{c.get('width', 0):.2f}",
                                         f"{risk:.2f}",
-                                        f"{c.get('pop_proxy',0):.2f}",
-                                        str(c.get('suggested_qty','')),
+                                        f"{c.get('pop_proxy', 0):.2f}",
+                                        str(c.get("suggested_qty", "")),
                                     )
                                 console.print(tbl)
                                 sel = core_ui.prompt_input("Select candidate # (or Enter to skip): ").strip()
@@ -927,82 +1013,131 @@ def launch(status, default_fmt):
                                     expiry = pick.get("expiry", expiry)
                                     # Suggested qty handling if user asked for auto previously
                                     eff_qty = qty
-                                    if (qty.strip().lower() in {"", "a", "auto"}) and pick.get("suggested_qty"):
+                                    if (qty.strip().lower() in {"", "a", "auto"}) and pick.get(
+                                        "suggested_qty"
+                                    ):
                                         eff_qty = str(int(pick.get("suggested_qty")))
-                                        use_auto = core_ui.prompt_input(f"Use suggested qty {eff_qty}? (Y/n) [Y]: ").strip().lower()
+                                        use_auto = (
+                                            core_ui.prompt_input(f"Use suggested qty {eff_qty}? (Y/n) [Y]: ")
+                                            .strip()
+                                            .lower()
+                                        )
                                         if use_auto == "n":
                                             eff_qty = core_ui.prompt_input("Qty: ").strip() or eff_qty
                                     # Build via strategy based on preset
-                                    if preset in {"bull_put"} and len(ks)>=2:
+                                    if preset in {"bull_put"} and len(ks) >= 2:
                                         args = [
-                                            "--strategy", "vertical",
-                                            "--symbol", symbol,
-                                            "--expiry", expiry,
-                                            "--right", "P",
+                                            "--strategy",
+                                            "vertical",
+                                            "--symbol",
+                                            symbol,
+                                            "--expiry",
+                                            expiry,
+                                            "--right",
+                                            "P",
                                             "--credit",
-                                            "--strikes", f"{ks[0]},{ks[1]}",
-                                            "--qty", eff_qty,
-                                            "--json", "--no-files",
+                                            "--strikes",
+                                            f"{ks[0]},{ks[1]}",
+                                            "--qty",
+                                            eff_qty,
+                                            "--json",
+                                            "--no-files",
                                         ]
-                                    elif preset in {"bull_call"} and len(ks)>=2:
+                                    elif preset in {"bull_call"} and len(ks) >= 2:
                                         args = [
-                                            "--strategy", "vertical",
-                                            "--symbol", symbol,
-                                            "--expiry", expiry,
-                                            "--right", "C",
+                                            "--strategy",
+                                            "vertical",
+                                            "--symbol",
+                                            symbol,
+                                            "--expiry",
+                                            expiry,
+                                            "--right",
+                                            "C",
                                             "--debit",
-                                            "--strikes", f"{ks[0]},{ks[1]}",
-                                            "--qty", eff_qty,
-                                            "--json", "--no-files",
+                                            "--strikes",
+                                            f"{ks[0]},{ks[1]}",
+                                            "--qty",
+                                            eff_qty,
+                                            "--json",
+                                            "--no-files",
                                         ]
-                                    elif preset in {"bear_put"} and len(ks)>=2:
+                                    elif preset in {"bear_put"} and len(ks) >= 2:
                                         args = [
-                                            "--strategy", "vertical",
-                                            "--symbol", symbol,
-                                            "--expiry", expiry,
-                                            "--right", "P",
+                                            "--strategy",
+                                            "vertical",
+                                            "--symbol",
+                                            symbol,
+                                            "--expiry",
+                                            expiry,
+                                            "--right",
+                                            "P",
                                             "--debit",
-                                            "--strikes", f"{ks[0]},{ks[1]}",
-                                            "--qty", eff_qty,
-                                            "--json", "--no-files",
+                                            "--strikes",
+                                            f"{ks[0]},{ks[1]}",
+                                            "--qty",
+                                            eff_qty,
+                                            "--json",
+                                            "--no-files",
                                         ]
-                                    elif preset in {"iron_condor"} and len(ks)>=4:
+                                    elif preset in {"iron_condor"} and len(ks) >= 4:
                                         args = [
-                                            "--strategy", "iron_condor",
-                                            "--symbol", symbol,
-                                            "--expiry", expiry,
-                                            "--strikes", ",".join(str(k) for k in sorted(ks)),
-                                            "--qty", eff_qty,
-                                            "--json", "--no-files",
+                                            "--strategy",
+                                            "iron_condor",
+                                            "--symbol",
+                                            symbol,
+                                            "--expiry",
+                                            expiry,
+                                            "--strikes",
+                                            ",".join(str(k) for k in sorted(ks)),
+                                            "--qty",
+                                            eff_qty,
+                                            "--json",
+                                            "--no-files",
                                         ]
-                                    
-                                    elif preset in {"butterfly"} and len(ks)>=3:
+
+                                    elif preset in {"butterfly"} and len(ks) >= 3:
                                         # Build butterfly with selected right
                                         args = [
-                                            "--strategy", "butterfly",
-                                            "--symbol", symbol,
-                                            "--expiry", expiry,
-                                            "--right", (right or "C"),
-                                            "--strikes", ",".join(str(k) for k in sorted(ks)[:3]),
-                                            "--qty", eff_qty,
-                                            "--json", "--no-files",
+                                            "--strategy",
+                                            "butterfly",
+                                            "--symbol",
+                                            symbol,
+                                            "--expiry",
+                                            expiry,
+                                            "--right",
+                                            (right or "C"),
+                                            "--strikes",
+                                            ",".join(str(k) for k in sorted(ks)[:3]),
+                                            "--qty",
+                                            eff_qty,
+                                            "--json",
+                                            "--no-files",
                                         ]
-                                    elif preset in {"calendar"} and len(ks)>=1:
+                                    elif preset in {"calendar"} and len(ks) >= 1:
                                         # Prefer wizard pick to support diagonal if strikes differ
                                         near = pick.get("near") or pick.get("legs", [{}])[0].get("expiry")
                                         far = pick.get("far") or pick.get("expiry", expiry)
                                         # Use wizard auto pick path to emit consistent ticket JSON
                                         args = [
-                                            "--wizard", "--auto",
-                                            "--strategy", "calendar",
-                                            "--right", (right or "C"),
-                                            "--symbol", symbol,
-                                            "--expiry", expiry,
-                                            "--pick", str(int(sel)),
-                                            "--json", "--no-files",
+                                            "--wizard",
+                                            "--auto",
+                                            "--strategy",
+                                            "calendar",
+                                            "--right",
+                                            (right or "C"),
+                                            "--symbol",
+                                            symbol,
+                                            "--expiry",
+                                            expiry,
+                                            "--pick",
+                                            str(int(sel)),
+                                            "--json",
+                                            "--no-files",
                                         ]
                                     else:
-                                        console.print("[yellow]Automatic ticket build not supported for this selection; please use manual.")
+                                        console.print(
+                                            "[yellow]Automatic ticket build not supported for this selection; please use manual."
+                                        )
                                         continue
                                     buf = io.StringIO()
                                     with contextlib.redirect_stdout(buf):
@@ -1018,13 +1153,17 @@ def launch(status, default_fmt):
                                     if risk:
                                         console.print(risk)
                                     if ticket:
-                                        save = core_ui.prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
+                                        save = (
+                                            core_ui.prompt_input("Save ticket? (Y/n) [Y]: ").strip().lower()
+                                        )
                                         if save in {"", "y"}:
                                             io_save(ticket, "order_ticket", fmt="json")
                                             # Copy JSON to clipboard in interactive mode
                                             if os.getenv("PE_QUIET") in (None, "", "0"):
                                                 try:
-                                                    if _copy_to_clipboard(json.dumps(ticket, separators=(",", ":"))):
+                                                    if _copy_to_clipboard(
+                                                        json.dumps(ticket, separators=(",", ":"))
+                                                    ):
                                                         console.print("Copied ticket JSON to clipboard")
                                                 except Exception:
                                                     pass
@@ -1111,6 +1250,7 @@ def launch(status, default_fmt):
 
             def _open_last_ticket() -> None:
                 from portfolio_exporter.core.io import latest_file
+
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
                 path = latest_file("order_ticket", "json")
                 if not path:
@@ -1128,9 +1268,11 @@ def launch(status, default_fmt):
             def _save_filtered() -> None:
                 quiet = os.getenv("PE_QUIET") not in (None, "", "0")
                 from portfolio_exporter.core.config import settings
+
                 # Prefill from Pre-Market cache and memory
                 try:
                     from portfolio_exporter.menus import pre as _pre_menu
+
                     _last_sym = _pre_menu.last_symbol.get()
                 except Exception:
                     _last_sym = ""
@@ -1138,6 +1280,7 @@ def launch(status, default_fmt):
                 _mem = {}
                 try:
                     from pathlib import Path as _Path
+
                     _p = _Path(".codex/memory.json")
                     if _p.exists():
                         _mem = json.loads(_p.read_text()).get("preferences", {}).get("trades_filters", {})
@@ -1148,9 +1291,16 @@ def launch(status, default_fmt):
                 defv_str = _mem.get("structure") or ""
                 defv_top = str(_mem.get("top_n", "")) if _mem.get("top_n") is not None else ""
 
-                symbols = (core_ui.prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym) or None
-                effect = (core_ui.prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff) or None
-                structure = (core_ui.prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip() or defv_str) or None
+                symbols = (
+                    core_ui.prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym
+                ) or None
+                effect = (
+                    core_ui.prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff
+                ) or None
+                structure = (
+                    core_ui.prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip()
+                    or defv_str
+                ) or None
                 top_n = core_ui.prompt_input(f"Top N (optional) [{defv_top}]: ").strip() or defv_top
                 top = int(top_n) if str(top_n).strip().isdigit() else None
                 summary = _quick_save_filtered(
@@ -1173,6 +1323,7 @@ def launch(status, default_fmt):
                 # Persist prefs back to memory (best effort, atomic replace)
                 try:
                     from pathlib import Path as _Path
+
                     _pf = _Path(".codex/memory.json")
                     data = {}
                     if _pf.exists():
@@ -1195,12 +1346,14 @@ def launch(status, default_fmt):
                 # Prefill from memory and Pre menu
                 try:
                     from portfolio_exporter.menus import pre as _pre_menu
+
                     _last_sym = _pre_menu.last_symbol.get()
                 except Exception:
                     _last_sym = ""
                 _mem = {}
                 try:
                     from pathlib import Path as _Path
+
                     _p = _Path(".codex/memory.json")
                     if _p.exists():
                         _mem = json.loads(_p.read_text()).get("preferences", {}).get("trades_filters", {})
@@ -1211,12 +1364,21 @@ def launch(status, default_fmt):
                 defv_str = _mem.get("structure") or ""
                 defv_top = str(_mem.get("top_n", "")) if _mem.get("top_n") is not None else ""
 
-                symbols = (core_ui.prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym) or None
-                effect = (core_ui.prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff) or None
-                structure = (core_ui.prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip() or defv_str) or None
+                symbols = (
+                    core_ui.prompt_input(f"Symbols (comma-separated) [{defv_sym}]: ").strip() or defv_sym
+                ) or None
+                effect = (
+                    core_ui.prompt_input(f"Effect (Open/Close/Roll) [{defv_eff}]: ").strip() or defv_eff
+                ) or None
+                structure = (
+                    core_ui.prompt_input(f"Structure (e.g., vertical, iron_condor) [{defv_str}]: ").strip()
+                    or defv_str
+                ) or None
                 top_n = core_ui.prompt_input(f"Top N (optional) [{defv_top}]: ").strip() or defv_top
                 top = int(top_n) if str(top_n).strip().isdigit() else None
-                txt = _preview_trades_json(symbols=symbols, effect_in=effect, structure_in=structure, top_n=top)
+                txt = _preview_trades_json(
+                    symbols=symbols, effect_in=effect, structure_in=structure, top_n=top
+                )
                 if quiet:
                     import tempfile
 
@@ -1231,6 +1393,7 @@ def launch(status, default_fmt):
                 # Persist selections
                 try:
                     from pathlib import Path as _Path
+
                     _pf = _Path(".codex/memory.json")
                     data = {}
                     if _pf.exists():
@@ -1250,9 +1413,11 @@ def launch(status, default_fmt):
 
             def _preview_combos_mtm() -> None:
                 """Compute MTM P&L for detected combos using mid quotes; JSON-only."""
-                from portfolio_exporter.scripts import trades_report as _tr
-                from portfolio_exporter.core.ib import quote_option, quote_stock
                 import time as _time
+
+                from portfolio_exporter.core.ib import quote_option, quote_stock
+                from portfolio_exporter.scripts import trades_report as _tr
+
                 try:
                     execs = session.get("execs_df")
                     if execs is None or not hasattr(execs, "empty"):
@@ -1279,10 +1444,11 @@ def launch(status, default_fmt):
                     return
                 # Build conId -> attrs map
                 import pandas as _pd
+
                 id_map = {}
                 try:
                     p = pos_like.copy()
-                    for c in ("conId","strike","qty","multiplier"):
+                    for c in ("conId", "strike", "qty", "multiplier"):
                         if c in p.columns:
                             p[c] = _pd.to_numeric(p[c], errors="coerce")
                     if "right" in p.columns:
@@ -1306,6 +1472,7 @@ def launch(status, default_fmt):
                 except Exception:
                     pass
                 import ast
+
                 rows: list[dict] = []
                 # Lightweight in-memory quote cache with TTL and overall budget
                 _qcache: dict[tuple, tuple[float, float]] = {}
@@ -1313,11 +1480,18 @@ def launch(status, default_fmt):
                 _BUDGET_SEC = 8.0
                 _t0 = _time.time()
 
-                def _get_mid(sym: str, exp: str | None, strike: float | None, right: str | None) -> float | None:
+                def _get_mid(
+                    sym: str, exp: str | None, strike: float | None, right: str | None
+                ) -> float | None:
                     now = _time.time()
                     if now - _t0 > _BUDGET_SEC:
                         return None
-                    key = (sym, exp or "", float(strike) if strike is not None else float("nan"), (right or "").upper())
+                    key = (
+                        sym,
+                        exp or "",
+                        float(strike) if strike is not None else float("nan"),
+                        (right or "").upper(),
+                    )
                     hit = _qcache.get(key)
                     if hit and (now - hit[0] <= _TTL_SEC):
                         return hit[1]
@@ -1334,17 +1508,20 @@ def launch(status, default_fmt):
                     # cache even None with timestamp to avoid hammering
                     _qcache[key] = (now, mid if mid is not None else float("nan"))
                     return mid
+
                 for _, row in combos.iterrows():
                     legs_val = row.get("legs")
                     try:
-                        leg_ids = ast.literal_eval(legs_val) if isinstance(legs_val, str) else (legs_val or [])
+                        leg_ids = (
+                            ast.literal_eval(legs_val) if isinstance(legs_val, str) else (legs_val or [])
+                        )
                     except Exception:
                         leg_ids = []
                     net_cd = float(row.get("net_credit_debit", 0.0) or 0.0)
                     cur_val = 0.0
                     quoted = 0
                     total_legs = len(leg_ids or [])
-                    for cid in (leg_ids or []):
+                    for cid in leg_ids or []:
                         attrs = id_map.get(int(cid))
                         if not attrs:
                             continue
@@ -1357,19 +1534,25 @@ def launch(status, default_fmt):
                         cur_val += mid * qty * mult
                         quoted += 1
                     mtm = net_cd - cur_val
-                    rows.append({
-                        "underlying": row.get("underlying"),
-                        "structure": row.get("structure"),
-                        "legs_n": int(row.get("legs_n", 0) or 0),
-                        "net_credit_debit": net_cd,
-                        "current_value": cur_val,
-                        "mtm_pnl": mtm,
-                        "quoted_legs": quoted,
-                        "total_legs": total_legs,
-                        "quoted_ratio": (f"{quoted}/{total_legs}" if total_legs else "0/0"),
-                        "when": str(row.get("when")),
-                    })
-                out = {"ok": True, "combos_mtm": rows, "meta": {"schema_id": "combos_mtm_preview", "schema_version": "1"}}
+                    rows.append(
+                        {
+                            "underlying": row.get("underlying"),
+                            "structure": row.get("structure"),
+                            "legs_n": int(row.get("legs_n", 0) or 0),
+                            "net_credit_debit": net_cd,
+                            "current_value": cur_val,
+                            "mtm_pnl": mtm,
+                            "quoted_legs": quoted,
+                            "total_legs": total_legs,
+                            "quoted_ratio": (f"{quoted}/{total_legs}" if total_legs else "0/0"),
+                            "when": str(row.get("when")),
+                        }
+                    )
+                out = {
+                    "ok": True,
+                    "combos_mtm": rows,
+                    "meta": {"schema_id": "combos_mtm_preview", "schema_version": "1"},
+                }
                 txt = json.dumps(out, separators=(",", ":"))
                 if os.getenv("PE_QUIET") not in (None, "", "0"):
                     console.print(txt)

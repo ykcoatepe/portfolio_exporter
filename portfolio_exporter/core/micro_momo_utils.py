@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 
 def clamp(x: float, lo: float, hi: float) -> float:
     if lo > hi:
@@ -37,11 +35,10 @@ def safe_float(x: object, default: float = 0.0) -> float:
         return default
 
 
-def spread_pct(bid: float, ask: float) -> Optional[float]:
+def spread_pct(bid: float, ask: float) -> float | None:
     if bid <= 0 or ask <= 0:
         return None
     mid = (bid + ask) / 2
     if mid <= 0:
         return None
     return (ask - bid) / mid
-

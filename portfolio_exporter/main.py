@@ -15,10 +15,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional
-
 
 SCRIPTS_PACKAGE_DIR = Path(__file__).parent / "scripts"
 DEFAULT_MEMORY_PATH = Path(".codex/memory.json")
@@ -70,11 +69,7 @@ def read_workflow(memory_path: Path, workflow_name: str) -> list[str]:
         return []
 
     # Expected shape: { "workflows": { "submenu_queue": { "<name>": ["task", ...] } } }
-    wf = (
-        data.get("workflows", {})
-        .get("submenu_queue", {})
-        .get(workflow_name, [])
-    )
+    wf = data.get("workflows", {}).get("submenu_queue", {}).get(workflow_name, [])
     if isinstance(wf, list):
         return [str(x) for x in wf]
     return []
@@ -148,9 +143,7 @@ def _print_registry(tasks: list[Task]) -> None:
         print(f"  {i:>2}. {t.name}  ({t.module})")
 
 
-def _resolve_queue(
-    registry: list[Task], requested: list[str]
-) -> list[Task]:
+def _resolve_queue(registry: list[Task], requested: list[str]) -> list[Task]:
     reg_by_name = {t.name: t for t in registry}
     queue: list[Task] = []
     for name in requested:
@@ -210,7 +203,7 @@ def _print_plan(queue: list[Task]) -> None:
     print(f"Total tasks: {len(queue)}")
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -218,13 +211,14 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Custom tasks registry (functions executed in-process)
     def micro_momo() -> None:
-        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
-        import datetime as _dt
         import pathlib
-        # Import lazily to keep CLI startup fast
-        from tools.logbook import logbook_on_success
+
         # Lightweight import; used only when symbols provided
         from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
+        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
+
+        # Import lazily to keep CLI startup fast
+        from tools.logbook import logbook_on_success
 
         pe_test = os.getenv("PE_TEST_MODE")
         cfg_env = os.getenv("MOMO_CFG")
@@ -319,8 +313,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
 
     def micro_momo_go() -> None:
-        from portfolio_exporter.scripts import micro_momo_go as _go
         import os as _os
+
+        from portfolio_exporter.scripts import micro_momo_go as _go
 
         argv: list[str] = []
         pe_test = _os.getenv("PE_TEST_MODE")
@@ -388,7 +383,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         _go.main(argv)
 
-    CUSTOM_TASKS: Dict[str, Callable[[], None]] = {
+    CUSTOM_TASKS: dict[str, Callable[[], None]] = {
         "micro-momo": micro_momo,
         "momo": micro_momo,
         "micro-momo-go": micro_momo_go,
@@ -398,7 +393,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Optional bootstrap of memory file
     if args.bootstrap_memory:
         try:
-            import subprocess, sys
+            import subprocess
+            import sys
 
             cmd = [
                 sys.executable,

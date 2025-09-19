@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-
 from positions_engine.rules import Rule, evaluate_rules
 from positions_engine.rules.eval import RuleParseError
 

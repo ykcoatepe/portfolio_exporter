@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
 
-
-def pick_by_vix(vix: float) -> Dict[str, float]:
+def pick_by_vix(vix: float) -> dict[str, float]:
     """Return dte/tp capture band by VIX regime."""
     if vix < 15:
         return {"dte_min": 45, "dte_max": 60, "tp_min": 0.50, "tp_max": 0.70}
@@ -14,7 +12,7 @@ def pick_by_vix(vix: float) -> Dict[str, float]:
     return {"dte_min": 14, "dte_max": 30, "tp_min": 0.30, "tp_max": 0.50}
 
 
-def enforce(vix: float, dte: int, credit: float, debit_now: float) -> Tuple[str, str]:
+def enforce(vix: float, dte: int, credit: float, debit_now: float) -> tuple[str, str]:
     """Return (severity, reason) based on regime window and capture percent.
 
     severity: 'action' (take profit), 'warn' (out-of-template), 'info' otherwise.

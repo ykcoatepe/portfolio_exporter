@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import time
-from typing import Any, Dict, Optional
 import sys
 import threading
+import time
+from typing import Any
 
 from rich.console import Console
 from rich.live import Live
@@ -12,7 +12,7 @@ from rich.table import Table
 from portfolio_exporter.scripts import risk_watch
 
 
-def _render(metrics: Dict[str, Any]) -> Table:
+def _render(metrics: dict[str, Any]) -> Table:
     table = Table(title="Risk Dashboard")
     table.add_column("Metric")
     table.add_column("Value", justify="right")
@@ -21,7 +21,7 @@ def _render(metrics: Dict[str, Any]) -> Table:
     return table
 
 
-def _spawn_back_listener(stop_event: threading.Event) -> Optional[threading.Thread]:
+def _spawn_back_listener(stop_event: threading.Event) -> threading.Thread | None:
     """Spawn a background line-input listener that sets stop_event on 'b'.
 
     Returns the Thread if created, else None. Only starts when stdin is a TTY.
@@ -57,7 +57,7 @@ def _spawn_back_listener(stop_event: threading.Event) -> Optional[threading.Thre
 
 def run(
     refresh: float = 5.0,
-    iterations: Optional[int] = None,
+    iterations: int | None = None,
     enable_back_key: bool = True,
 ) -> None:
     """Display risk metrics in real-time using Rich.
@@ -79,7 +79,7 @@ def run(
     console.print(hint)
 
     stop_event: threading.Event = threading.Event()
-    listener: Optional[threading.Thread] = None
+    listener: threading.Thread | None = None
     if enable_back_key:
         listener = _spawn_back_listener(stop_event)
 

@@ -2,11 +2,13 @@
 """Update tickers_live.txt from current IBKR portfolio."""
 
 from __future__ import annotations
-import os
-from typing import List
+
 from pathlib import Path
+
 from portfolio_exporter.core.config import settings
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
 
 try:
     from ib_insync import IB
@@ -18,7 +20,7 @@ PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}
 TICKERS_FILE = "tickers_live.txt"
 
 
-def fetch_ib_tickers() -> List[str]:
+def fetch_ib_tickers() -> list[str]:
     """Return stock tickers from current IBKR positions."""
     if IB is None:
         return []
@@ -29,15 +31,11 @@ def fetch_ib_tickers() -> List[str]:
         return []
     positions = ib.positions()
     ib.disconnect()
-    tickers = {
-        p.contract.symbol.upper()
-        for p in positions
-        if getattr(p.contract, "secType", "") == "STK"
-    }
+    tickers = {p.contract.symbol.upper() for p in positions if getattr(p.contract, "secType", "") == "STK"}
     return sorted(tickers)
 
 
-def save_tickers(tickers: List[str], path: str = TICKERS_FILE) -> None:
+def save_tickers(tickers: list[str], path: str = TICKERS_FILE) -> None:
     """Write tickers to a text file in the configured output directory.
 
     If a relative path is provided, it is resolved under ``settings.output_dir``.

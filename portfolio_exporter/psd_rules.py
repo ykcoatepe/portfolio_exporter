@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, List
+from typing import Any
 
 
 def _env_float(key: str, default: float) -> float:
@@ -14,7 +14,7 @@ def _env_float(key: str, default: float) -> float:
         return default
 
 
-def evaluate(risk: dict[str, Any] | None) -> List[str]:
+def evaluate(risk: dict[str, Any] | None) -> list[str]:
     """Return human-readable breach codes derived from the ``risk`` payload."""
     if not isinstance(risk, dict):
         risk = {}
@@ -23,7 +23,7 @@ def evaluate(risk: dict[str, Any] | None) -> List[str]:
     var_max = _env_float("PSD_RULE_VAR95_1D_MAX", 0.03)
     margin_max = _env_float("PSD_RULE_MARGIN_MAX", 0.35)
 
-    breaches: List[str] = []
+    breaches: list[str] = []
     beta = float(risk.get("beta", risk.get("delta_beta", 0.0)) or 0.0)
     if abs(beta) < beta_min:
         breaches.append("beta_low")

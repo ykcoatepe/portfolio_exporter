@@ -2,10 +2,10 @@ from __future__ import annotations
 
 """Budget checks for theta and hedges (v0.3)."""
 
-from typing import Dict
 
-
-def theta_weekly_fees(nav: float, fees_week_to_date: float, threshold: float | None = None) -> Dict[str, float | bool]:
+def theta_weekly_fees(
+    nav: float, fees_week_to_date: float, threshold: float | None = None
+) -> dict[str, float | bool]:
     """Warn when weekly theta fees exceed threshold fraction of NAV.
 
     threshold: fraction (e.g., 0.001 for 0.10%). Defaults to 0.001.
@@ -16,7 +16,9 @@ def theta_weekly_fees(nav: float, fees_week_to_date: float, threshold: float | N
     return {"warn": burn > thr, "burn": burn}
 
 
-def hedge_monthly_carry(nav: float, hedge_cost_mtd: float, cap: float | None = None) -> Dict[str, float | bool]:
+def hedge_monthly_carry(
+    nav: float, hedge_cost_mtd: float, cap: float | None = None
+) -> dict[str, float | bool]:
     """Warn when monthly hedge carry exceeds cap fraction of NAV.
 
     cap: fraction (e.g., 0.0035 for 0.35%). Defaults to 0.0035.
@@ -27,7 +29,9 @@ def hedge_monthly_carry(nav: float, hedge_cost_mtd: float, cap: float | None = N
     return {"warn": burn > limit, "burn": burn}
 
 
-def footer_dto(nav: float, fees_wtd: float, hedge_mtd: float, thresholds: Dict[str, float] | None = None) -> Dict[str, object]:
+def footer_dto(
+    nav: float, fees_wtd: float, hedge_mtd: float, thresholds: dict[str, float] | None = None
+) -> dict[str, object]:
     t = thresholds or {}
     th = theta_weekly_fees(nav, fees_wtd, t.get("theta_weekly"))
     hc = hedge_monthly_carry(nav, hedge_mtd, t.get("hedge_monthly"))
@@ -35,4 +39,3 @@ def footer_dto(nav: float, fees_wtd: float, hedge_mtd: float, thresholds: Dict[s
         "theta": th,
         "hedge": hc,
     }
-

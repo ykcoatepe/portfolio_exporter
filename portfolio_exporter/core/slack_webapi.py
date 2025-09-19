@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import urllib.request
-from typing import Any, Dict
+from typing import Any
 
 
-def post_message(token: str, channel: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def post_message(token: str, channel: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Minimal Slack Web API client for chat.postMessage.
 
     Expects `payload` with at least 'channel' and either 'text' or 'blocks'.
@@ -29,4 +29,3 @@ def post_message(token: str, channel: str, payload: Dict[str, Any]) -> Dict[str,
         return json.loads(raw.decode("utf-8"))
     except Exception:
         return {"ok": False, "error": "invalid_json"}
-

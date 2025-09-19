@@ -9,7 +9,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-
 Severity = Literal["INFO", "WARNING", "CRITICAL"]
 Scope = Literal["PORT", "UL", "COMBO", "LEG"]
 BreachStatus = Literal["OPEN", "ACKNOWLEDGED", "RESOLVED"]

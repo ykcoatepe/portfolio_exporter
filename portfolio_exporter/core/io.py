@@ -1,8 +1,10 @@
-from pathlib import Path
+import json
 import os
 import sqlite3
-import json
+from pathlib import Path
+
 import pandas as pd
+
 from .config import settings
 
 
@@ -90,9 +92,7 @@ def save(
     return fname
 
 
-def latest_file(
-    name: str, fmt: str = "csv", outdir: str | Path | None = None
-) -> Path | None:
+def latest_file(name: str, fmt: str = "csv", outdir: str | Path | None = None) -> Path | None:
     """Return most recent file for *name* and *fmt* in *outdir*.
 
     Parameters

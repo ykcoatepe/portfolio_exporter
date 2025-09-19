@@ -3,18 +3,18 @@ from __future__ import annotations
 import argparse
 import csv
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 from ..core.journal import update_journal
 from ..core.providers import ib_provider
 
 
-def _load_journal(path: str) -> List[Dict[str, Any]]:
+def _load_journal(path: str) -> list[dict[str, Any]]:
     with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
-def _write_summary(path: str, rows: List[Dict[str, Any]]) -> None:
+def _write_summary(path: str, rows: list[dict[str, Any]]) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     wheader = ["symbol", "status", "result_R", "exit_price", "exit_reason", "notes"]
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -33,7 +33,7 @@ def _price_close(symbol: str, offline: bool) -> float | None:
         return None
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("micro-momo-eod")
     ap.add_argument("--journal", required=True)
     ap.add_argument("--out_dir", default="out")
@@ -41,8 +41,8 @@ def main(argv: List[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     journal = _load_journal(args.journal)
-    updates: Dict[str, Dict[str, Any]] = {}
-    summary: List[Dict[str, Any]] = []
+    updates: dict[str, dict[str, Any]] = {}
+    summary: list[dict[str, Any]] = []
 
     for row in journal:
         sym = row["symbol"]
@@ -90,7 +90,9 @@ def main(argv: List[str] | None = None) -> int:
                     exit_price = sl
                     result_R = "-1.0"
                 else:
-                    r = (entry_price - px) / max(1e-9, (entry_price - (tp if tp is not None else entry_price - 1)))
+                    r = (entry_price - px) / max(
+                        1e-9, (entry_price - (tp if tp is not None else entry_price - 1))
+                    )
                     result_R = f"{r:.2f}"
 
         updates[sym] = {
@@ -117,4 +119,3 @@ def main(argv: List[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
-

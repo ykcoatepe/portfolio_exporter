@@ -11,9 +11,10 @@ from __future__ import annotations
 import logging
 import math
 import time
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterable, List, Literal, Sequence
+from typing import Any, Literal
 
 from . import yfin
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 MarketDataMode = Literal["live", "delayed", "auto"]
 
-_MARKET_DATA_MODES: Dict[str, int] = {"live": 1, "delayed": 4}
+_MARKET_DATA_MODES: dict[str, int] = {"live": 1, "delayed": 4}
 _ENTITLEMENT_CODES = {10167, 354, 162, 200}
 _LAST_MARKET_MODE: str | None = None
 _MARK_BACKFILLS: set[str] = set()
@@ -29,7 +30,7 @@ _GREEKS_WARNED: set[str] = set()
 
 
 @lru_cache(maxsize=1)
-def _rules_cfg() -> Dict[str, Any]:
+def _rules_cfg() -> dict[str, Any]:
     try:
         import yaml  # type: ignore
 
@@ -188,7 +189,7 @@ def set_market_data_mode(
     return effective
 
 
-def consume_mark_backfills() -> List[str]:
+def consume_mark_backfills() -> list[str]:
     """Return and clear the list of symbols whose marks were backfilled."""
     global _MARK_BACKFILLS
     symbols = sorted(_MARK_BACKFILLS)
@@ -196,10 +197,10 @@ def consume_mark_backfills() -> List[str]:
     return symbols
 
 
-def _resolve_cfg(cfg: Dict[str, Any] | None) -> tuple[Dict[str, Any], Dict[str, Any]]:
+def _resolve_cfg(cfg: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
     base = _rules_cfg()
-    ibkr_cfg: Dict[str, Any] = {}
-    fill_cfg: Dict[str, Any] = {}
+    ibkr_cfg: dict[str, Any] = {}
+    fill_cfg: dict[str, Any] = {}
     if isinstance(base.get("ibkr"), dict):
         ibkr_cfg.update(base["ibkr"])
     if isinstance(base.get("fill"), dict):
@@ -221,13 +222,17 @@ def _iter_rows(df: Any) -> Iterable[Any]:
 
 
 def get_positions(
-    cfg: Dict[str, Any] | None = None,
+    cfg: dict[str, Any] | None = None,
     *,
     mode: MarketDataMode | None = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Return PSD position dicts sourced from ``portfolio_greeks`` snapshots."""
     ibkr_cfg, fill_cfg = _resolve_cfg(cfg or {})
-    market_mode = str(mode or (cfg or {}).get("market_data_mode") or ibkr_cfg.get("market_data_mode", "auto")).strip().lower()
+    market_mode = (
+        str(mode or (cfg or {}).get("market_data_mode") or ibkr_cfg.get("market_data_mode", "auto"))
+        .strip()
+        .lower()
+    )
     if market_mode not in ("live", "delayed", "auto"):
         market_mode = "auto"
     timeout_sec = float(ibkr_cfg.get("mktdata_timeout_sec", 2.0) or 0.0)
@@ -246,7 +251,6 @@ def get_positions(
 
     try:
         from portfolio_exporter.scripts import portfolio_greeks as pg  # type: ignore
-        import pandas as pd  # type: ignore
     except Exception:
         return []
 
@@ -270,8 +274,8 @@ def get_positions(
         if col not in df.columns:
             df[col] = None
 
-    positions: List[Dict[str, Any]] = []
-    missing_equity_marks: List[tuple[int, str]] = []
+    positions: list[dict[str, Any]] = []
+    missing_equity_marks: list[tuple[int, str]] = []
     missing_greeks: set[str] = set()
 
     try:
@@ -308,7 +312,7 @@ def get_positions(
     if not opt_df.empty:
         from ..models import OptionLeg
 
-        grouped: Dict[str, Dict[str, Any]] = {}
+        grouped: dict[str, dict[str, Any]] = {}
         for _, row in _iter_rows(opt_df):
             sym = str(row.get("underlying") or row.get("symbol") or "").upper()
             if not sym:
@@ -383,7 +387,9 @@ def get_positions(
     for sym in sorted(missing_greeks):
         if sym in _GREEKS_WARNED:
             continue
-        logger.warning("Greeks unavailable for %s within %.1fs; leaving legs with null values.", sym, greeks_timeout)
+        logger.warning(
+            "Greeks unavailable for %s within %.1fs; leaving legs with null values.", sym, greeks_timeout
+        )
         _GREEKS_WARNED.add(sym)
 
     return positions
@@ -391,16 +397,16 @@ def get_positions(
 
 def fetch_marks(
     symbols: Sequence[str],
-    cfg: Dict[str, Any] | None = None,
+    cfg: dict[str, Any] | None = None,
     *,
     mode: MarketDataMode | None = None,
-) -> Dict[str, float | None]:
+) -> dict[str, float | None]:
     """Return the latest marks for ``symbols`` using ``get_positions``."""
     wanted = {s.strip().upper() for s in symbols if s}
     if not wanted:
         return {}
     data = get_positions(cfg, mode=mode)
-    marks: Dict[str, float | None] = {}
+    marks: dict[str, float | None] = {}
     for row in data:
         if row.get("kind") != "equity":
             continue
@@ -412,16 +418,16 @@ def fetch_marks(
 
 def fetch_greeks(
     symbols: Sequence[str],
-    cfg: Dict[str, Any] | None = None,
+    cfg: dict[str, Any] | None = None,
     *,
     mode: MarketDataMode | None = None,
-) -> Dict[str, list[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     """Return lightweight per-leg greek snapshots for ``symbols``."""
     wanted = {s.strip().upper() for s in symbols if s}
     if not wanted:
         return {}
     data = get_positions(cfg, mode=mode)
-    out: Dict[str, list[Dict[str, Any]]] = {}
+    out: dict[str, list[dict[str, Any]]] = {}
     for row in data:
         if row.get("kind") != "option":
             continue

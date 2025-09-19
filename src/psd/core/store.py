@@ -112,13 +112,10 @@ def init() -> None:
 def latest_snapshot() -> dict[str, Any] | None:
     """Return the most recent snapshot payload, if any."""
     with _connect() as conn:
-        row = conn.execute(
-            "SELECT data FROM snapshots ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        row = conn.execute("SELECT data FROM snapshots ORDER BY id DESC LIMIT 1").fetchone()
     if row is None:
         return None
     return json.loads(row["data"])
-
 
 
 def latest_health() -> dict[str, Any] | None:
@@ -227,10 +224,7 @@ def tail_events(last_id: int = 0, limit: int = 200) -> list[tuple[int, str, dict
             """,
             (last_id, limit),
         )
-        result = [
-            (int(row["id"]), row["kind"], json.loads(row["payload"]))
-            for row in rows
-        ]
+        result = [(int(row["id"]), row["kind"], json.loads(row["payload"])) for row in rows]
     return result
 
 

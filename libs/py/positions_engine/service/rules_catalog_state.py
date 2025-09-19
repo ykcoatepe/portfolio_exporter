@@ -4,10 +4,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from ..rules import Rule
 from ..rules.catalog import (
@@ -15,7 +16,6 @@ from ..rules.catalog import (
     CatalogError,
     CatalogValidationError,
     RulesCatalog,
-    RulesCatalogDraft,
     atomic_write,
     dump_catalog,
     load_catalog,
@@ -63,26 +63,20 @@ class RulesCatalogState:
     def validate_catalog_text(self, text: str) -> CatalogValidationResult:
         if self._yaml_error is not None:
             message = str(self._yaml_error)
-            return CatalogValidationResult(
-                ok=False, counters={}, top=[], errors=[message], rules=[]
-            )
+            return CatalogValidationResult(ok=False, counters={}, top=[], errors=[message], rules=[])
 
         errors: list[str] = []
         try:
             draft = parse_catalog(text)
         except (CatalogValidationError, CatalogError) as exc:
             errors.append(str(exc))
-            return CatalogValidationResult(
-                ok=False, counters={}, top=[], errors=errors, rules=[]
-            )
+            return CatalogValidationResult(ok=False, counters={}, top=[], errors=errors, rules=[])
 
         try:
             summary, _evaluation = self._summary_for_rules(draft.rules)
         except (RuleParseError, RuleEvaluationError) as exc:
             errors.append(str(exc))
-            return CatalogValidationResult(
-                ok=False, counters={}, top=[], errors=errors, rules=draft.rules
-            )
+            return CatalogValidationResult(ok=False, counters={}, top=[], errors=errors, rules=draft.rules)
 
         counters = _normalize_counters(summary.get("breaches", {}))
         top = summary.get("top", []) if isinstance(summary, dict) else []

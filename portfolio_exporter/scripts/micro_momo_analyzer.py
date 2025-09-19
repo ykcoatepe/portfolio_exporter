@@ -3,10 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from datetime import datetime, timedelta
 from dataclasses import asdict
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Any
 
+from ..core.alerts import emit_alerts
+from ..core.fs_utils import find_latest_chain_for_symbol
+from ..core.ib_export import export_ib_basket, export_ib_notes
+from ..core.market_clock import TZ_TR, premarket_window_tr, pretty_tr, rth_window_tr
 from ..core.micro_momo import (
     entry_trigger,
     passes_filters,
@@ -22,14 +26,9 @@ from ..core.micro_momo_sources import (
     load_scan_csv,
 )
 from ..core.micro_momo_types import ResultRow, ScanRow, Structure
-from ..core.market_clock import rth_window_tr, premarket_window_tr, pretty_tr, TZ_TR
-from ..core.alerts import emit_alerts
-from ..core.ib_export import export_ib_basket, export_ib_notes
-from ..core.fs_utils import find_latest_chain_for_symbol
 from ..core.symbols import load_alias_map, normalize_symbols
 
-
-DEFAULT_CFG: Dict[str, Any] = {
+DEFAULT_CFG: dict[str, Any] = {
     "filters": {
         "price_bounds": {"min": 5.0, "max": 500.0},
         "float_max_millions": 2000.0,
@@ -90,10 +89,10 @@ def _count_active_journal(out_dir: str) -> int:
         return 0
 
 
-def _read_cfg(path: Optional[str]) -> Dict[str, Any]:
+def _read_cfg(path: str | None) -> dict[str, Any]:
     if not path:
         return DEFAULT_CFG
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     # shallow-merge into defaults so callers can specify partials
     cfg = json.loads(json.dumps(DEFAULT_CFG))  # deep copy
@@ -105,7 +104,7 @@ def _read_cfg(path: Optional[str]) -> Dict[str, Any]:
     return cfg
 
 
-def _write_csv(path: str, rows: List[Dict[str, Any]], header: List[str]) -> None:
+def _write_csv(path: str, rows: list[dict[str, Any]], header: list[str]) -> None:
     import csv
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -117,57 +116,58 @@ def _write_csv(path: str, rows: List[Dict[str, Any]], header: List[str]) -> None
 
 
 def run(
-    cfg_path: Optional[str],
-    input_csv: Optional[str],
-    chains_dir: Optional[str],
+    cfg_path: str | None,
+    input_csv: str | None,
+    chains_dir: str | None,
     out_dir: str,
     emit_json: bool,
     no_files: bool,
     data_mode: str,
-    providers: List[str],
+    providers: list[str],
     offline: bool,
-    halts_source: Optional[str],
+    halts_source: str | None,
     auto_producers: bool = False,
     upstream_timeout_sec: int = 30,
-    webhook: Optional[str] = None,
+    webhook: str | None = None,
     alerts_json_only: bool = False,
-    ib_basket_out: Optional[str] = None,
+    ib_basket_out: str | None = None,
     journal_template: bool = False,
-    prebuilt_scans: Optional[List[ScanRow]] = None,
+    prebuilt_scans: list[ScanRow] | None = None,
     force_live_flag: bool = False,
     session_mode: str = "auto",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     cfg = _read_cfg(cfg_path)
     # Merge runtime data config
     cfg.setdefault("data", {})
-    cfg["data"].update({
-        "mode": data_mode or cfg["data"].get("mode", "enrich"),
-        "providers": providers or cfg["data"].get("providers", ["ib", "yahoo"]),
-        "offline": bool(offline),
-        "halts_source": halts_source or cfg["data"].get("halts_source", "nasdaq"),
-        "cache": cfg["data"].get("cache", {"enabled": True, "dir": os.path.join(out_dir, ".cache"), "ttl_sec": 60}),
-        # new: expose artifact/chains dirs and auto‑producers toggle to sources
-        "artifact_dirs": list(
-            dict.fromkeys(
-                [
-                    os.path.join(out_dir, ".cache"),
-                    out_dir,
-                ]
-            )
-        ),
-        "chains_dir": chains_dir,
-        "auto_producers": bool(cfg["data"].get("auto_producers", False)) or bool(auto_producers),
-        "upstream_timeout_sec": int(cfg["data"].get("upstream_timeout_sec", upstream_timeout_sec)),
-    })
+    cfg["data"].update(
+        {
+            "mode": data_mode or cfg["data"].get("mode", "enrich"),
+            "providers": providers or cfg["data"].get("providers", ["ib", "yahoo"]),
+            "offline": bool(offline),
+            "halts_source": halts_source or cfg["data"].get("halts_source", "nasdaq"),
+            "cache": cfg["data"].get(
+                "cache", {"enabled": True, "dir": os.path.join(out_dir, ".cache"), "ttl_sec": 60}
+            ),
+            # new: expose artifact/chains dirs and auto‑producers toggle to sources
+            "artifact_dirs": list(
+                dict.fromkeys(
+                    [
+                        os.path.join(out_dir, ".cache"),
+                        out_dir,
+                    ]
+                )
+            ),
+            "chains_dir": chains_dir,
+            "auto_producers": bool(cfg["data"].get("auto_producers", False)) or bool(auto_producers),
+            "upstream_timeout_sec": int(cfg["data"].get("upstream_timeout_sec", upstream_timeout_sec)),
+        }
+    )
     # ENV/flag overlay for live refresh
     env_force = str(os.getenv("MOMO_FORCE_LIVE", "")).lower() in ("1", "true", "yes")
     force_live = bool(env_force or force_live_flag)
     if force_live:
         # Force fetch with TTL=0 and offline disabled; preserve providers if already set
-        cache_dir = (
-            cfg.get("data", {}).get("cache", {}).get("dir")
-            or os.path.join(out_dir, ".cache")
-        )
+        cache_dir = cfg.get("data", {}).get("cache", {}).get("dir") or os.path.join(out_dir, ".cache")
         cfg.setdefault("data", {}).update(
             {
                 "mode": "fetch",
@@ -180,7 +180,7 @@ def run(
     if session_effective not in {"auto", "rth", "premarket"}:
         session_effective = "auto"
     # Build scans list either from symbols (synthesized) or from CSV
-    scans: List[ScanRow]
+    scans: list[ScanRow]
     if prebuilt_scans is not None:
         scans = list(prebuilt_scans)
     elif isinstance(input_csv, str) and input_csv:
@@ -190,9 +190,10 @@ def run(
         scans = []
     enrich_inplace(scans, cfg)  # v1 no-op
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     base_active = _count_active_journal(out_dir)
     max_concurrent = int(cfg.get("max_concurrent", 5))
+
     def _neutral_structure() -> Structure:
         return Structure(
             template="Template",
@@ -212,8 +213,8 @@ def run(
         comps, raw = score_components(scan, cfg)
         tier, direction = tier_and_dir(scan, raw, cfg)
 
-        chain_rows: List[Dict[str, Any]] | List[ScanRow] = []
-        chain_file: Optional[str] = None
+        chain_rows: list[dict[str, Any]] | list[ScanRow] = []
+        chain_file: str | None = None
         if chains_dir:
             best = find_latest_chain_for_symbol(chains_dir, scan.symbol)
             if best:
@@ -253,12 +254,18 @@ def run(
         )
 
         no_intraday = (
-            getattr(scan, "vwap", None) is None
-        ) and not (getattr(scan, "rvol_1m", 0) or 0) and not (getattr(scan, "rvol_5m", 0) or 0)
+            (getattr(scan, "vwap", None) is None)
+            and not (getattr(scan, "rvol_1m", 0) or 0)
+            and not (getattr(scan, "rvol_5m", 0) or 0)
+        )
 
         # sync direction to the structure we actually chose
         direction = _direction_from_structure(struct.template, direction)
-        session_state = "rth" if market_window else ("premarket" if allow_premarket and premarket_window_active else "closed")
+        session_state = (
+            "rth"
+            if market_window
+            else ("premarket" if allow_premarket and premarket_window_active else "closed")
+        )
 
         if market_window:
             if no_intraday:
@@ -275,7 +282,7 @@ def run(
                 elif within_grace:
                     # no force-live, but still inside grace window — be gentle
                     trig = (
-                        f"Warming up (grace {int(open_grace.total_seconds()/60)}m). ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
+                        f"Warming up (grace {int(open_grace.total_seconds() / 60)}m). ORB→VWAP reclaim (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)}); "
                         f"levels: orb=NA, vwap=NA"
                     )
                     struct = _neutral_structure()
@@ -294,19 +301,13 @@ def run(
         elif allow_premarket and premarket_window_active:
             if no_intraday:
                 if force_live:
-                    trig = (
-                        f"Pre-market force-live — waiting for first prints before open {pretty_tr(sch.open_tr)}."
-                    )
+                    trig = f"Pre-market force-live — waiting for first prints before open {pretty_tr(sch.open_tr)}."
                 else:
-                    trig = (
-                        f"Pre-market — waiting for first prints before open {pretty_tr(sch.open_tr)}."
-                    )
+                    trig = f"Pre-market — waiting for first prints before open {pretty_tr(sch.open_tr)}."
                 struct = _neutral_structure()
                 contracts, tp, sl = (0, None, None)
             else:
-                trig = (
-                    f"Pre-market setup — plan ORB at {pretty_tr(sch.open_tr)} (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)})."
-                )
+                trig = f"Pre-market setup — plan ORB at {pretty_tr(sch.open_tr)} (RVOL ≥ {cfg.get('rvol_confirm_entry', 1.5)})."
         else:
             # outside RTH: keep neutral preview
             trig = (
@@ -320,6 +321,7 @@ def run(
         # Guards
         nav = float(cfg.get("sizing", {}).get("nav", 100000.0))  # type: ignore[union-attr]
         from ..core.micro_momo import _risk_proxy  # local import to avoid surface
+
         risk_value = _risk_proxy(struct, contracts)
         cap_breach = 1 if risk_value > 0.03 * nav else 0
         # mark overflow when admitting this row would exceed batch cap
@@ -342,7 +344,9 @@ def run(
             debit_or_credit=struct.debit_or_credit,
             width=struct.width,
             per_leg_oi_ok=struct.per_leg_oi_ok,
-            per_leg_spread_pct=(round(struct.per_leg_spread_pct, 4) if struct.per_leg_spread_pct is not None else None),
+            per_leg_spread_pct=(
+                round(struct.per_leg_spread_pct, 4) if struct.per_leg_spread_pct is not None else None
+            ),
             needs_chain=struct.needs_chain,
         )
         base = asdict(res)
@@ -369,20 +373,22 @@ def run(
         print(json.dumps(results, indent=2))
 
     # Build alerts
-    alerts: List[Dict[str, Any]] = []
+    alerts: list[dict[str, Any]] = []
     for r in results:
         levels = {
             "orb_high": r.get("orb_high"),
             "vwap": r.get("vwap"),
             "stop": (r.get("vwap") * 0.97 if isinstance(r.get("vwap"), (int, float)) else None),
         }
-        alerts.append({
-            "symbol": r["symbol"],
-            "direction": r["direction"],
-            "trigger": r["entry_trigger"],
-            "rvol_confirm": cfg.get("rvol_confirm_entry", 1.5),
-            "levels": levels,
-        })
+        alerts.append(
+            {
+                "symbol": r["symbol"],
+                "direction": r["direction"],
+                "trigger": r["entry_trigger"],
+                "rvol_confirm": cfg.get("rvol_confirm_entry", 1.5),
+                "levels": levels,
+            }
+        )
 
     # Always write alerts JSON
     os.makedirs(out_dir, exist_ok=True)
@@ -433,7 +439,7 @@ def run(
         _write_csv(os.path.join(out_dir, "micro_momo_scored.csv"), results, scored_cols)
 
         # Write order CSV
-        orders: List[Dict[str, Any]] = []
+        orders: list[dict[str, Any]] = []
         for r in results:
             rr = ResultRow(
                 symbol=r["symbol"],
@@ -519,19 +525,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Force live refresh: data-mode=fetch, TTL=0, offline=False (ignores stale cache)",
     )
     # auto-producers (chains/bars before providers)
-    p.add_argument("--auto-producers", action="store_true", help="Attempt to generate missing local artifacts (bars/chains) via in-repo scripts before using providers")
+    p.add_argument(
+        "--auto-producers",
+        action="store_true",
+        help="Attempt to generate missing local artifacts (bars/chains) via in-repo scripts before using providers",
+    )
     # legacy compatibility (treat as same)
     p.add_argument("--auto-upstream", action="store_true", help=argparse.SUPPRESS)
     # v1.2 outputs
     p.add_argument("--webhook", help="Webhook URL for alerts (e.g., Slack)")
     p.add_argument("--alerts-json-only", action="store_true", help="Build alerts JSON but do not POST")
-    p.add_argument("--ib-basket-out", help="Path to write IB Basket CSV; notes saved alongside with _ib_notes.txt suffix")
+    p.add_argument(
+        "--ib-basket-out", help="Path to write IB Basket CSV; notes saved alongside with _ib_notes.txt suffix"
+    )
     # v1.3 journal
-    p.add_argument("--journal-template", action="store_true", help="Write a journal template CSV (Pending rows)")
+    p.add_argument(
+        "--journal-template", action="store_true", help="Write a journal template CSV (Pending rows)"
+    )
     return p
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     session_mode = (args.session or os.getenv("MOMO_SESSION") or "auto").lower()
     if session_mode not in {"auto", "rth", "premarket"}:
@@ -565,7 +579,7 @@ def main(argv: List[str] | None = None) -> int:
                 return 2
     # Build scans from --symbols when provided; otherwise, keep CSV behavior.
     # Note: when both --input and --symbols are present, --symbols takes precedence.
-    scans: List[ScanRow] = []
+    scans: list[ScanRow] = []
     if getattr(args, "symbols", None):
         alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])  # env-provided path has priority
         syms = normalize_symbols([s for s in str(args.symbols).split(",") if s.strip()], alias_map)
@@ -592,7 +606,7 @@ def main(argv: List[str] | None = None) -> int:
         # Inject: temporarily monkeypatch load_scan_csv to return our scans.
         _orig = load_scan_csv
 
-        def _fake_load_scan_csv(_path: str) -> List[ScanRow]:  # pragma: no cover (tiny shim)
+        def _fake_load_scan_csv(_path: str) -> list[ScanRow]:  # pragma: no cover (tiny shim)
             return list(scans)
 
         try:

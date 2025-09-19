@@ -10,10 +10,10 @@ Tests can monkeypatch these functions to simulate successful generation and
 to materialize tiny CSV artifacts for bars/chains.
 """
 
-from typing import Iterable
+import shlex
 import subprocess
 import sys
-import shlex
+from collections.abc import Iterable
 
 
 def _run(cmd: str, timeout: int) -> bool:
@@ -69,4 +69,3 @@ def run_tech_scan(symbols: Iterable[str], timeout: int = 30) -> bool:
         return True
     except Exception:
         return False
-

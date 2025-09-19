@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, time
-from typing import Optional, Set
 from zoneinfo import ZoneInfo
 
 TZ_NY = ZoneInfo("America/New_York")
@@ -13,7 +12,7 @@ def _ny_today() -> datetime:
     return datetime.now(TZ_NY)
 
 
-def load_early_close_set(path: Optional[str]) -> Set[str]:
+def load_early_close_set(path: str | None) -> set[str]:
     """
     Load a JSON list of YYYY-MM-DD (ET/NY date) that are 1:00pm ET early-close days.
     Returns empty set if path missing. Example file:
@@ -31,7 +30,7 @@ def load_early_close_set(path: Optional[str]) -> Set[str]:
 def infer_close_et(
     default_close: time = time(16, 0),
     early_close_time: time = time(13, 0),
-    dates_json: Optional[str] = None,
+    dates_json: str | None = None,
 ) -> time:
     """
     Returns the ET close time for TODAY IN NY.
@@ -45,4 +44,3 @@ def infer_close_et(
     ec = load_early_close_set(dates_json)
     ymd = _ny_today().date().isoformat()
     return early_close_time if ymd in ec else default_close
-

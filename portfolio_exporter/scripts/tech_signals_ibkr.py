@@ -9,18 +9,17 @@ Columns:
     · beta_SPY · ADV30 · next_earnings · OI_near_ATM
 """
 
+import logging
 import os
 import sys
-import time
-import logging
-import csv
-import argparse
-from math import log, sqrt, erf
 from datetime import datetime
+from math import erf, log, sqrt
 from zoneinfo import ZoneInfo
-from portfolio_exporter.core.config import settings
+
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+
 run_with_spinner = core_ui.run_with_spinner
 
 TR_TZ = ZoneInfo("Europe/Istanbul")
@@ -28,10 +27,10 @@ TR_TZ = ZoneInfo("Europe/Istanbul")
 # Additional import for yfinance fallback
 import numpy as np
 import pandas as pd
-from ib_insync import IB, Stock, Option, util
 
 # Additional import for yfinance fallback
 import yfinance as yf
+from ib_insync import IB, Option, Stock, util
 
 # optional progress bar
 try:
@@ -41,7 +40,7 @@ try:
 except Exception:  # pragma: no cover - optional
     PROGRESS = False
 # Symbol → (Contract class, kwargs) for non‑stock underlyings
-from ib_insync import Index, Future  # already imported IB, Stock, Option, util
+from ib_insync import Future, Index  # already imported IB, Stock, Option, util
 
 SYMBOL_MAP = {
     "VIX": (Index, dict(symbol="VIX", exchange="CBOE")),
@@ -97,7 +96,10 @@ RISK_FREE_RATE = 0.01
 # Store IV history alongside other outputs
 DATA_DIR = os.path.join(OUTPUT_DIR, "iv_history")
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
+
 IB_CID = _cid("tech_signals", default=1)  # tweak if needed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -122,15 +124,14 @@ def _bs_delta(S, K, T, r, sigma, call=True):
 
 def load_tickers():
     candidates = [
-        os.path.join(os.path.expanduser(settings.output_dir), name)
-        for name in PORTFOLIO_FILES
+        os.path.join(os.path.expanduser(settings.output_dir), name) for name in PORTFOLIO_FILES
     ] + PORTFOLIO_FILES
     p = next((f for f in candidates if os.path.exists(f)), None)
     if not p:
         logging.error("Portfolio file not found; aborting.")
         sys.exit(1)
     with open(p) as f:
-        return [l.strip().upper() for l in f if l.strip()]
+        return [line.strip().upper() for line in f if line.strip()]
 
 
 # Helper to robustly parse IBKR lastTradeDateOrContractMonth and fetch nearest active future
@@ -151,9 +152,7 @@ def _parse_ib_month(dt_str: str) -> datetime:
 
 
 # ──────────────────────────── Option expiry validation ─────────────────────────────
-def _first_valid_expiry(
-    symbol: str, expirations: list[str], spot: float, root_tc: str
-) -> str:
+def _first_valid_expiry(symbol: str, expirations: list[str], spot: float, root_tc: str) -> str:
     """
     Return the first expiry whose chain has a *valid* ATM contract.
     Falls back to earliest expiry if none validate.
@@ -184,9 +183,7 @@ def front_future(root: str, exch: str) -> Future:
     if not details:
         raise ValueError("no contract details")
     # sort by maturity and return first future that hasn't expired
-    for det in sorted(
-        details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)
-    ):
+    for det in sorted(details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)):
         dt = _parse_ib_month(det.contract.lastTradeDateOrContractMonth)
         if dt > datetime.utcnow():
             return det.contract
@@ -222,9 +219,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
 
     ib.errorEvent += _quiet_error_handler
     try:
-        run_with_spinner(
-            "Connecting to IBKR…", ib.connect, IB_HOST, IB_PORT, clientId=IB_CID
-        )
+        run_with_spinner("Connecting to IBKR…", ib.connect, IB_HOST, IB_PORT, clientId=IB_CID)
         USE_IB = True
     except Exception:
         logging.warning("IBKR Gateway not reachable – using yfinance only.")
@@ -258,16 +253,10 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
                 spy_ret = _df["close"].pct_change().dropna()
     else:
         try:
-            spy_df = yf.download(
-                "SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False
-            )
+            spy_df = yf.download("SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False)
             spy_df.rename(columns=str.lower, inplace=True)
             spy_df.index = pd.to_datetime(spy_df.index).tz_localize(None)
-            spy_ret = (
-                spy_df["close"].pct_change().dropna()
-                if not spy_df.empty
-                else pd.Series(dtype=float)
-            )
+            spy_ret = spy_df["close"].pct_change().dropna() if not spy_df.empty else pd.Series(dtype=float)
         except Exception as e:
             logging.warning("yfinance hist error SPY: %s", e)
             spy_ret = pd.Series(dtype=float)
@@ -275,9 +264,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
     # If IB was used but spy_ret is still empty, fallback to yfinance
     if spy_ret.empty:
         try:
-            spy_df = yf.download(
-                "SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False
-            )
+            spy_df = yf.download("SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False)
             if not spy_df.empty:
                 spy_df.rename(columns=str.lower, inplace=True)
                 spy_ret = spy_df["close"].pct_change().dropna()
@@ -339,9 +326,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
             # If IB failed, try yfinance
             if df.empty:
                 try:
-                    yf_df = yf.download(
-                        tk, period=f"{HIST_DAYS}d", interval="1d", progress=False
-                    )
+                    yf_df = yf.download(tk, period=f"{HIST_DAYS}d", interval="1d", progress=False)
                     yf_df.rename(columns=str.lower, inplace=True)  # align column names
                     yf_df.reset_index(inplace=True)
                     yf_df.rename(columns={"date": "date"}, inplace=True)
@@ -352,9 +337,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
                     continue
         else:
             try:
-                yf_df = yf.download(
-                    tk, period=f"{HIST_DAYS}d", interval="1d", progress=False
-                )
+                yf_df = yf.download(tk, period=f"{HIST_DAYS}d", interval="1d", progress=False)
                 yf_df.rename(columns=str.lower, inplace=True)
                 yf_df.reset_index(inplace=True)
                 yf_df.rename(columns={"date": "date"}, inplace=True)
@@ -368,8 +351,8 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
         df.set_index("date", inplace=True)
         # drop timezone info so date intersections succeed
         df.index = pd.to_datetime(df.index).tz_localize(None)
-        c, h, l = df["close"], df["high"], df["low"]
-        c_ff = c.ffill()  # forward‑fill so today’s partial bar isn’t NaN
+        close_series, high_series, low_series = df["close"], df["high"], df["low"]
+        c_ff = close_series.ffill()  # forward‑fill so today’s partial bar isn’t NaN
 
         sma20 = float(c_ff.rolling(20, min_periods=1).mean().iloc[-1])
         sma50 = float(c_ff.rolling(50, min_periods=1).mean().iloc[-1])
@@ -379,11 +362,20 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
         loss = (-delta.clip(upper=0)).rolling(14, min_periods=1).mean()
         rsi14 = 100 - 100 / (1 + gain / (loss + 1e-9))
         tr = pd.concat(
-            [h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1
+            [
+                high_series - low_series,
+                (high_series - close_series.shift()).abs(),
+                (low_series - close_series.shift()).abs(),
+            ],
+            axis=1,
         ).max(axis=1)
         atr14 = tr.rolling(14).mean().iloc[-1]
-        plus_dm = (h.diff()).where((h.diff() > l.diff().abs()) & (h.diff() > 0), 0)
-        minus_dm = (l.diff()).where((l.diff() > h.diff().abs()) & (l.diff() > 0), 0)
+        plus_dm = (high_series.diff()).where(
+            (high_series.diff() > low_series.diff().abs()) & (high_series.diff() > 0), 0
+        )
+        minus_dm = (low_series.diff()).where(
+            (low_series.diff() > high_series.diff().abs()) & (low_series.diff() > 0), 0
+        )
         tr14 = tr.rolling(14).sum()
         pdi = 100 * plus_dm.rolling(14).sum() / tr14
         mdi = 100 * minus_dm.rolling(14).sum() / tr14
@@ -426,8 +418,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
 
                 # Generate symmetric ladder around ATM
                 candidate_strikes = [
-                    round(atm + i * tick, 2)
-                    for i in range(-N_ATM_STRIKES, N_ATM_STRIKES + 1)
+                    round(atm + i * tick, 2) for i in range(-N_ATM_STRIKES, N_ATM_STRIKES + 1)
                 ]
 
                 # Retain only strikes IB actually lists
@@ -464,14 +455,10 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
                 for con in qual:
                     try:
                         # openInterest only arrives on streaming market data → snapshot must be False
-                        ib.reqMktData(
-                            con, "101,106", False, False
-                        )  # 101=openInt,106=impVol
+                        ib.reqMktData(con, "101,106", False, False)  # 101=openInt,106=impVol
                     except Exception:
                         continue  # silently skip rejects
-                ib.sleep(
-                    1.0
-                )  # give snapshots ~1 s to populate while allowing the event loop to run
+                ib.sleep(1.0)  # give snapshots ~1 s to populate while allowing the event loop to run
                 # Cancel streaming to avoid dangling subscriptions
                 for con in qual:
                     ib.cancelMktData(con)
@@ -498,9 +485,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
                     diff = abs(con.strike - spot)
                     if con.right == "C" and diff < min_diff:
                         min_diff, iv_now = diff, iv_
-                    delta = _bs_delta(
-                        spot, con.strike, T, RISK_FREE_RATE, iv_, con.right == "C"
-                    )
+                    delta = _bs_delta(spot, con.strike, T, RISK_FREE_RATE, iv_, con.right == "C")
                     if abs(delta) <= ATM_DELTA_BAND:
                         oi_sum += oi_
                 oi_near = oi_sum
@@ -513,36 +498,27 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
                 # iv_now, oi_near, earn_dt remain NaN
 
             # ---------- yfinance fallback for OI / IV ----------
-            if (
-                np.isnan(oi_near) or oi_near == 0 or np.isnan(iv_now)
-            ) and stk is not None:
+            if (np.isnan(oi_near) or oi_near == 0 or np.isnan(iv_now)) and stk is not None:
                 try:
                     yft = yf.Ticker(tk)
                     # pick the expiry that is nearest in time
                     if yft.options:
                         yf_expiry = min(
                             yft.options,
-                            key=lambda d: abs(
-                                (pd.to_datetime(d) - pd.to_datetime("today")).days
-                            ),
+                            key=lambda d: abs((pd.to_datetime(d) - pd.to_datetime("today")).days),
                         )
                         oc = yft.option_chain(yf_expiry)
 
                         spot = c_ff.iloc[-1]
 
                         def _near(df):
-                            return df.loc[
-                                (df["strike"] - spot).abs() / spot <= SPAN_PCT
-                            ]
+                            return df.loc[(df["strike"] - spot).abs() / spot <= SPAN_PCT]
 
                         calls, puts = _near(oc.calls), _near(oc.puts)
 
-                        if (np.isnan(oi_near) or oi_near == 0) and (
-                            not calls.empty or not puts.empty
-                        ):
+                        if (np.isnan(oi_near) or oi_near == 0) and (not calls.empty or not puts.empty):
                             oi_near = (
-                                calls["openInterest"].fillna(0).sum()
-                                + puts["openInterest"].fillna(0).sum()
+                                calls["openInterest"].fillna(0).sum() + puts["openInterest"].fillna(0).sum()
                             )
 
                         # If IV is still missing, grab the ATM call IV from yfinance
@@ -566,9 +542,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
                 fn, mode="a", header=not os.path.exists(fn), index=False
             )
         iv_hist = (
-            pd.read_csv(fn).drop_duplicates("date").tail(252)["iv"]
-            if os.path.exists(fn)
-            else pd.Series()
+            pd.read_csv(fn).drop_duplicates("date").tail(252)["iv"] if os.path.exists(fn) else pd.Series()
         )
         iv_rank = (
             np.nan
@@ -582,21 +556,14 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
             ret = c_ff.pct_change().dropna()
             common = spy_ret.index.intersection(ret.index)
             if len(common) > 10:  # need some overlap
-                beta = (
-                    np.cov(ret.loc[common], spy_ret.loc[common])[0, 1]
-                    / spy_ret.loc[common].var()
-                )
+                beta = np.cov(ret.loc[common], spy_ret.loc[common])[0, 1] / spy_ret.loc[common].var()
 
         # Fallback: pull next earnings date from yfinance if still NaN
         if earn_dt is np.nan or pd.isna(earn_dt):
             try:
                 ed_df = yf.Ticker(tk).get_earnings_dates(limit=1)
                 if not ed_df.empty:
-                    earn_dt = (
-                        pd.to_datetime(ed_df["Earnings Date"].iloc[0])
-                        .date()
-                        .isoformat()
-                    )
+                    earn_dt = pd.to_datetime(ed_df["Earnings Date"].iloc[0]).date().isoformat()
             except Exception:
                 # final fallback: use calendar attribute if available
                 try:

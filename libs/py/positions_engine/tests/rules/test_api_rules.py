@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
-import sys
 
 import pytest
 from starlette.testclient import TestClient
@@ -13,9 +13,10 @@ ROOT = Path(__file__).resolve().parents[5]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from apps.api import main as api_main
 from positions_engine.rules import Rule
 from positions_engine.service.rules_state import RulesState
+
+from apps.api import main as api_main
 
 
 @pytest.fixture
@@ -126,7 +127,8 @@ def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch,
         payload = response.json()
 
         assert payload["rules_total"] == 5
-        assert payload["counters"] == {"total": 5, "critical": 2, "warning": 2, "info": 1}
+        assert payload["breaches"] == {"critical": 2, "warning": 2, "info": 1}
+        assert sum(payload["breaches"].values()) == 5
         assert 0 < len(payload["top"]) <= 5
         top_rules = {item["rule"] for item in payload["top"]}
         assert top_rules == {"High premium combo", "IV missing", "Stale mark", "Underlying delta", "Net theta"}

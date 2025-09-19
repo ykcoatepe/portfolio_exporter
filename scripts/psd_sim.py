@@ -5,22 +5,38 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import Any, Callable, Dict, Iterable, List, Tuple
-root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")); sys.path.insert(0, root) if root not in sys.path else None
-from src.psd.sentinel.sched import HistoricalLimiter, TokenBucket, run_loop  # noqa: E402
+from collections.abc import Callable, Iterable
+from typing import Any
+
+root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, root) if root not in sys.path else None
 from src.psd.datasources import ibkr as ib_src  # noqa: E402
+from src.psd.sentinel.sched import HistoricalLimiter, TokenBucket, run_loop  # noqa: E402
 
 
 class Sim429(Exception):
-    def __init__(self) -> None: super().__init__("Too Many Requests"); self.status_code = 429
+    def __init__(self) -> None:
+        super().__init__("Too Many Requests")
+        self.status_code = 429
 
 
-def run_sim(loops: int = 80, interval: float = 0.25, positions_n: int = 100) -> Dict[str, Any]:
-    positions = [{"uid": f"SYM{i:03d}-eq", "symbol": f"SYM{i:03d}", "sleeve": "theta", "kind": "equity", "qty": 1, "mark": 100.0} for i in range(1, positions_n + 1)]
+def run_sim(loops: int = 80, interval: float = 0.25, positions_n: int = 100) -> dict[str, Any]:
+    positions = [
+        {
+            "uid": f"SYM{i:03d}-eq",
+            "symbol": f"SYM{i:03d}",
+            "sleeve": "theta",
+            "kind": "equity",
+            "qty": 1,
+            "mark": 100.0,
+        }
+        for i in range(1, positions_n + 1)
+    ]
 
     # Monkeypatch IBKR positions
-    def _get_positions(_cfg: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:  # type: ignore[override]
+    def _get_positions(_cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:  # type: ignore[override]
         return positions
+
     ib_src.get_positions = _get_positions  # type: ignore[assignment]
 
     # Instrumented io_request wrapper
@@ -30,7 +46,15 @@ def run_sim(loops: int = 80, interval: float = 0.25, positions_n: int = 100) -> 
     counters = {"hist_calls": 0, "web_calls": 0, "deduped": 0, "burst_suppressed": 0, "backoffs": 0}
     call_index = {"historical": 0, "web": 0}
 
-    def _io(kind: str, key: str, func: Callable[[], Any], *, small_bar_key: Tuple[str, str, str] | None = None, max_retries: int = 5, **_kwargs: Any) -> Any:
+    def _io(
+        kind: str,
+        key: str,
+        func: Callable[[], Any],
+        *,
+        small_bar_key: tuple[str, str, str] | None = None,
+        max_retries: int = 5,
+        **_kwargs: Any,
+    ) -> Any:
         # Dedupe/burst via scheduler limiter
         allowed = True
         if kind == "historical":
@@ -52,7 +76,8 @@ def run_sim(loops: int = 80, interval: float = 0.25, positions_n: int = 100) -> 
             attempt += 1
             inject = attempt == 1 and (call_index[kind] % 7 == 0)
             try:
-                if inject: raise Sim429()
+                if inject:
+                    raise Sim429()
                 res = func()
                 if kind == "historical":
                     counters["hist_calls"] += 1
@@ -90,14 +115,14 @@ def run_sim(loops: int = 80, interval: float = 0.25, positions_n: int = 100) -> 
     for _i in range(8):
         _ = _io("historical", key=f"sb:{_i}", func=lambda: None, small_bar_key=sbk)
 
-
     # Run the sentinel loop with inert fetchers (they do nothing but are paced/backed off via _io)
     def _marks(_syms: Iterable[str]) -> None:  # noqa: ARG001
         return None
+
     def _greeks(_syms: Iterable[str]) -> None:  # noqa: ARG001
         return None
 
-    cfg: Dict[str, Any] = {"fetch_marks": _marks, "fetch_greeks": _greeks}
+    cfg: dict[str, Any] = {"fetch_marks": _marks, "fetch_greeks": _greeks}
 
     # Pre-seed greeks batch key to dedupe the very first historical call in run_loop
     try:
@@ -108,7 +133,9 @@ def run_sim(loops: int = 80, interval: float = 0.25, positions_n: int = 100) -> 
     except Exception:
         pass
 
-    t0 = time.monotonic(); run_loop(interval=interval, cfg=cfg, loops=loops); elapsed = max(1e-6, time.monotonic() - t0)
+    t0 = time.monotonic()
+    run_loop(interval=interval, cfg=cfg, loops=loops)
+    elapsed = max(1e-6, time.monotonic() - t0)
 
     changed = 0
     proj_rate = (counters["hist_calls"] / elapsed) * 600.0

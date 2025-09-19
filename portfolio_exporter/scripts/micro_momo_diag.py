@@ -3,11 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
-
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from portfolio_exporter.core.fs_utils import (
@@ -16,7 +16,12 @@ from portfolio_exporter.core.fs_utils import (
     find_latest_chain_for_symbol,
     find_latest_file,
 )
-from portfolio_exporter.core.market_clock import TZ_TR, pretty_tr, rth_window_tr, premarket_window_tr
+from portfolio_exporter.core.market_clock import (
+    TZ_TR,
+    premarket_window_tr,
+    pretty_tr,
+    rth_window_tr,
+)
 from portfolio_exporter.core.micro_momo_sources import (
     find_chain_file_for_symbol,
     load_chain_csv,
@@ -36,20 +41,20 @@ TZ_UTC = ZoneInfo("UTC")
 class SymbolDiagnostics:
     symbol: str
     bars_count: int
-    last_bar_ts: Optional[str]
-    vwap: Optional[float]
+    last_bar_ts: str | None
+    vwap: float | None
     rvol_1m: float
     rvol_5m: float
     chain_rows: int
     near_money_oi: int
     guard_reason: str
-    bars_source: Optional[str]
-    chain_source: Optional[str]
+    bars_source: str | None
+    chain_source: str | None
     session_state: str
-    notes: List[str]
+    notes: list[str]
 
 
-def _load_memory() -> Dict[str, Any]:
+def _load_memory() -> dict[str, Any]:
     path = Path(".codex/memory.json")
     if not path.exists():
         return {}
@@ -59,7 +64,7 @@ def _load_memory() -> Dict[str, Any]:
         return {}
 
 
-def _get_pref(path: str, default: Optional[str] = None) -> Optional[str]:
+def _get_pref(path: str, default: str | None = None) -> str | None:
     cur: Any = _load_memory().get("preferences", {})
     for key in path.split("."):
         if not isinstance(cur, dict) or key not in cur:
@@ -70,13 +75,13 @@ def _get_pref(path: str, default: Optional[str] = None) -> Optional[str]:
     return default
 
 
-def _env_true(value: Optional[str]) -> bool:
+def _env_true(value: str | None) -> bool:
     if value is None:
         return False
     return value.lower() in {"1", "true", "yes", "on"}
 
 
-def _resolve_cfg(path_arg: Optional[str], pe_test: bool) -> str:
+def _resolve_cfg(path_arg: str | None, pe_test: bool) -> str:
     if path_arg:
         return path_arg
     env_cfg = os.getenv("MOMO_CFG")
@@ -94,15 +99,15 @@ def _resolve_cfg(path_arg: Optional[str], pe_test: bool) -> str:
     return "tests/data/micro_momo_config.json" if pe_test else "micro_momo_config.json"
 
 
-def _resolve_input(path_arg: Optional[str], pe_test: bool) -> Optional[str]:
-    candidates: List[Optional[str]] = [
+def _resolve_input(path_arg: str | None, pe_test: bool) -> str | None:
+    candidates: list[str | None] = [
         path_arg,
         os.getenv("MOMO_INPUT"),
     ]
     for cand in candidates:
         if cand:
             return cand
-    search_dirs: List[Optional[str]] = [
+    search_dirs: list[str | None] = [
         os.getenv("MOMO_INPUT_DIR"),
         ".",
         "./data",
@@ -119,7 +124,7 @@ def _resolve_input(path_arg: Optional[str], pe_test: bool) -> Optional[str]:
     return None
 
 
-def _resolve_symbols(args: argparse.Namespace, alias_map: Dict[str, str]) -> Tuple[List[str], Optional[str]]:
+def _resolve_symbols(args: argparse.Namespace, alias_map: dict[str, str]) -> tuple[list[str], str | None]:
     if args.symbols:
         raw = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
         return normalize_symbols(raw, alias_map), None
@@ -147,13 +152,13 @@ def _ensure_cache_dir(out_dir: str) -> Path:
     return cache_dir
 
 
-def _cache_info(out_dir: str) -> Tuple[int, List[str]]:
+def _cache_info(out_dir: str) -> tuple[int, list[str]]:
     cache_dir = _ensure_cache_dir(out_dir)
     entries = sorted(str(p) for p in cache_dir.glob("yahoo_*") if p.exists())
     return len(entries), entries[:8]
 
 
-def _format_ts(ts: Any) -> Optional[str]:
+def _format_ts(ts: Any) -> str | None:
     if ts is None:
         return None
     try:
@@ -161,7 +166,9 @@ def _format_ts(ts: Any) -> Optional[str]:
             return datetime.fromtimestamp(float(ts), TZ_UTC).astimezone(TZ_TR).strftime("%Y-%m-%d %H:%M:%S")
         if isinstance(ts, str):
             if ts.isdigit():
-                return datetime.fromtimestamp(float(ts), TZ_UTC).astimezone(TZ_TR).strftime("%Y-%m-%d %H:%M:%S")
+                return (
+                    datetime.fromtimestamp(float(ts), TZ_UTC).astimezone(TZ_TR).strftime("%Y-%m-%d %H:%M:%S")
+                )
             # Attempt ISO parse
             try:
                 dt = datetime.fromisoformat(ts)
@@ -174,17 +181,17 @@ def _format_ts(ts: Any) -> Optional[str]:
 
 
 def _build_effective_cfg(
-    cfg_path: Optional[str],
+    cfg_path: str | None,
     out_dir: str,
-    chains_dir: Optional[str],
-    data_mode_arg: Optional[str],
-    providers_arg: Optional[str],
+    chains_dir: str | None,
+    data_mode_arg: str | None,
+    providers_arg: str | None,
     offline_flag: bool,
     auto_producers_flag: bool,
     upstream_timeout: int,
     force_live_flag: bool,
     session_mode: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     cfg_missing = bool(cfg_path and not Path(cfg_path).expanduser().exists())
     cfg = analyzer._read_cfg(None if cfg_missing else cfg_path)
     if cfg_missing:
@@ -195,18 +202,33 @@ def _build_effective_cfg(
     if isinstance(existing, (list, tuple)):
         existing_artifacts = [str(x) for x in existing if x]
     artifact_dirs = list(dict.fromkeys(list(existing_artifacts) + [os.path.join(out_dir, ".cache"), out_dir]))
-    providers = [s for s in (providers_arg or os.getenv("MOMO_PROVIDERS") or ",".join(data_cfg.get("providers", [])) or "ib,yahoo").split(",") if s]
-    halts_source = None if offline_flag else (os.getenv("MOMO_HALTS_SOURCE") or data_cfg.get("halts_source") or "nasdaq")
+    providers = [
+        s
+        for s in (
+            providers_arg
+            or os.getenv("MOMO_PROVIDERS")
+            or ",".join(data_cfg.get("providers", []))
+            or "ib,yahoo"
+        ).split(",")
+        if s
+    ]
+    halts_source = (
+        None if offline_flag else (os.getenv("MOMO_HALTS_SOURCE") or data_cfg.get("halts_source") or "nasdaq")
+    )
     data_cfg.update(
         {
             "mode": data_mode_arg or os.getenv("MOMO_DATA_MODE") or data_cfg.get("mode", "enrich"),
             "providers": providers,
-            "offline": offline_flag or _env_true(os.getenv("MOMO_OFFLINE")) or bool(data_cfg.get("offline", False)),
+            "offline": offline_flag
+            or _env_true(os.getenv("MOMO_OFFLINE"))
+            or bool(data_cfg.get("offline", False)),
             "halts_source": halts_source,
             "artifact_dirs": artifact_dirs,
             "chains_dir": chains_dir or data_cfg.get("chains_dir"),
             "auto_producers": bool(data_cfg.get("auto_producers", False)) or auto_producers_flag,
-            "upstream_timeout_sec": int(os.getenv("MOMO_UPSTREAM_TIMEOUT") or data_cfg.get("upstream_timeout_sec", upstream_timeout)),
+            "upstream_timeout_sec": int(
+                os.getenv("MOMO_UPSTREAM_TIMEOUT") or data_cfg.get("upstream_timeout_sec", upstream_timeout)
+            ),
         }
     )
     cache_cfg = data_cfg.get("cache") or {}
@@ -231,7 +253,7 @@ def _build_effective_cfg(
 
 def _vwap_guard(
     now_tr: datetime,
-    vwap: Optional[float],
+    vwap: float | None,
     rvol1: float,
     rvol5: float,
     force_live: bool,
@@ -242,9 +264,7 @@ def _vwap_guard(
     market_window = sched.open_tr <= now_tr <= sched.close_tr
     grace = sched.open_tr <= now_tr <= (sched.open_tr + timedelta(minutes=3))
     premarket_window_active = pre_window.start_tr <= now_tr < sched.open_tr
-    allow_premarket = session_mode == "premarket" or (
-        session_mode == "auto" and premarket_window_active
-    )
+    allow_premarket = session_mode == "premarket" or (session_mode == "auto" and premarket_window_active)
     no_intraday = (vwap is None) and (rvol1 == 0.0) and (rvol5 == 0.0)
     if market_window:
         if not no_intraday:
@@ -263,10 +283,12 @@ def _vwap_guard(
     return "outside_RTH"
 
 
-def _gather_bars(symbol: str, cfg: Dict[str, Any], notes: List[str]) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+def _gather_bars(
+    symbol: str, cfg: dict[str, Any], notes: list[str]
+) -> tuple[list[dict[str, Any]], str | None]:
     data_cfg = cfg.get("data", {})
     artifact_dirs = data_cfg.get("artifact_dirs", []) or []
-    bars: List[Dict[str, Any]] = []
+    bars: list[dict[str, Any]] = []
     try:
         bars = load_minute_bars(symbol, artifact_dirs)
         if bars:
@@ -281,7 +303,7 @@ def _gather_bars(symbol: str, cfg: Dict[str, Any], notes: List[str]) -> Tuple[Li
         notes.append("offline_true")
         return [], None
     for prov in data_cfg.get("providers", []) or []:
-        candidate: List[Dict[str, Any]] = []
+        candidate: list[dict[str, Any]] = []
         if prov == "ib":
             try:
                 candidate = ib_provider.get_intraday_bars(symbol, cfg)
@@ -297,8 +319,8 @@ def _gather_bars(symbol: str, cfg: Dict[str, Any], notes: List[str]) -> Tuple[Li
     return [], None
 
 
-def _chain_from_dataclass(rows: Sequence[ChainRow]) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
+def _chain_from_dataclass(rows: Sequence[ChainRow]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
     for row in rows:
         out.append(
             {
@@ -314,13 +336,13 @@ def _chain_from_dataclass(rows: Sequence[ChainRow]) -> List[Dict[str, Any]]:
 
 def _gather_chain(
     symbol: str,
-    cfg: Dict[str, Any],
-    spot: Optional[float],
-    chains_dir: Optional[str],
-    notes: List[str],
-) -> Tuple[int, int, Optional[str]]:
-    rows: List[Dict[str, Any]] = []
-    source: Optional[str] = None
+    cfg: dict[str, Any],
+    spot: float | None,
+    chains_dir: str | None,
+    notes: list[str],
+) -> tuple[int, int, str | None]:
+    rows: list[dict[str, Any]] = []
+    source: str | None = None
     if chains_dir:
         latest = find_latest_chain_for_symbol(chains_dir, symbol)
         if not latest:
@@ -374,7 +396,7 @@ def _gather_chain(
     return total, near_oi, source
 
 
-def _summarize_rth() -> Dict[str, str]:
+def _summarize_rth() -> dict[str, str]:
     sched = rth_window_tr()
     return {
         "open_tr": pretty_tr(sched.open_tr),
@@ -388,7 +410,7 @@ def _print_header(title: str) -> None:
     print(f"\n=== {title} ===")
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser("micro-momo-diag")
     parser.add_argument("--symbols", help="Comma-separated symbols", default="")
     parser.add_argument("--cfg", help="Config path (defaults to auto-discovery)", default="")
@@ -400,19 +422,25 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--auto-producers", action="store_true")
     parser.add_argument("--force-live", action="store_true")
-    parser.add_argument("--session", choices=["auto", "rth", "premarket"], help="Session guard for diagnostics")
+    parser.add_argument(
+        "--session", choices=["auto", "rth", "premarket"], help="Session guard for diagnostics"
+    )
     args = parser.parse_args(argv)
 
     pe_test = bool(os.getenv("PE_TEST_MODE"))
     out_dir = args.out_dir
     cfg_path = _resolve_cfg(args.cfg, pe_test)
-    chains_dir = args.chains_dir or os.getenv("MOMO_CHAINS_DIR") or auto_chains_dir(
-        [
-            "./option_chains",
-            "./chains",
-            "./data/chains",
-            "tests/data" if pe_test else None,
-        ]
+    chains_dir = (
+        args.chains_dir
+        or os.getenv("MOMO_CHAINS_DIR")
+        or auto_chains_dir(
+            [
+                "./option_chains",
+                "./chains",
+                "./data/chains",
+                "tests/data" if pe_test else None,
+            ]
+        )
     )
 
     alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])
@@ -453,7 +481,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "input_csv": input_csv,
     }
     print(json.dumps(printable_cfg, indent=2, default=str))
-    print(f"cache_dir: {str(Path(out_dir)/'.cache')}")
+    print(f"cache_dir: {str(Path(out_dir) / '.cache')}")
     print(f"cache_entries: {cache_count}")
     if cache_sample:
         print("cache_sample:")
@@ -479,12 +507,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     _print_header("SYMBOLS")
     print(",".join(symbols))
 
-    results: List[SymbolDiagnostics] = []
+    results: list[SymbolDiagnostics] = []
     now_tr = datetime.now(TZ_TR)
     force_live_eff = bool(args.force_live or cfg.get("_force_live", False))
 
     for sym in symbols:
-        notes: List[str] = []
+        notes: list[str] = []
         bars, bars_source = _gather_bars(sym, cfg, notes)
         patterns = compute_patterns(bars) if bars else {}
         vwap = patterns.get("vwap") if isinstance(patterns, dict) else None
@@ -502,10 +530,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         pre_window = premarket_window_tr()
         market_window = sch.open_tr <= now_tr <= sch.close_tr
         premarket_window_active = pre_window.start_tr <= now_tr < sch.open_tr
-        allow_premarket = session_mode == "premarket" or (
-            session_mode == "auto" and premarket_window_active
+        allow_premarket = session_mode == "premarket" or (session_mode == "auto" and premarket_window_active)
+        session_state = (
+            "rth"
+            if market_window
+            else ("premarket" if allow_premarket and premarket_window_active else "closed")
         )
-        session_state = "rth" if market_window else ("premarket" if allow_premarket and premarket_window_active else "closed")
         guard = _vwap_guard(
             now_tr,
             vwap if isinstance(vwap, float) else None,

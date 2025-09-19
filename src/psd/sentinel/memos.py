@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict
+from typing import Any
 
 
-def write_jsonl(path: str, obj: Dict[str, Any]) -> None:
+def write_jsonl(path: str, obj: dict[str, Any]) -> None:
     if not path:
         return
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -16,6 +16,6 @@ def write_jsonl(path: str, obj: Dict[str, Any]) -> None:
         fh.write(line + "\n")
 
 
-def write_digest(path: str, kind: str, payload: Dict[str, Any]) -> None:
+def write_digest(path: str, kind: str, payload: dict[str, Any]) -> None:
     obj = {"type": kind, **payload}
     write_jsonl(path, obj)

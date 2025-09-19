@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 LOGBOOK = Path("LOGBOOK.md")
@@ -32,7 +32,7 @@ def _append_logbook(md: str) -> None:
 
 
 def cmd_add(args: argparse.Namespace) -> int:
-    now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    now = datetime.now(UTC).astimezone().isoformat(timespec="seconds")
     files = [s.strip() for s in (args.files or "").split(",") if s.strip()]
     interfaces_raw = [s.strip() for s in (args.interfaces or "").split(",") if s.strip()]
     interfaces: dict[str, str] = {}
@@ -91,15 +91,11 @@ def logbook_on_success(
     if str(os.getenv("LOGBOOK_AUTO", "")).lower() not in ("1", "true", "yes"):
         return
     try:
-        branch = subprocess.check_output(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
-        ).strip()
+        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
     except Exception:
         branch = ""
     try:
-        commit = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], text=True
-        ).strip()
+        commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
     except Exception:
         commit = ""
     files_str = ",".join(files or [])
@@ -123,9 +119,7 @@ def logbook_on_success(
 def cmd_list(_args: argparse.Namespace) -> int:
     mem = _load_mem()
     for w in mem.get("worklog", [])[-10:]:
-        print(
-            f"{w.get('date')}  {w.get('task')}  {w.get('status')}  {w.get('commit')}"
-        )
+        print(f"{w.get('date')}  {w.get('task')}  {w.get('status')}  {w.get('commit')}")
     return 0
 
 

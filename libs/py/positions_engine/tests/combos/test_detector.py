@@ -8,7 +8,6 @@ from positions_engine.core.marks import MarkSettings
 from positions_engine.core.models import Instrument, InstrumentType, Position, Quote, TradingSession
 from positions_engine.service.state import PositionsState
 
-
 NOW = datetime(2024, 1, 5, 15, 30, tzinfo=UTC)
 MARK_SETTINGS = MarkSettings()
 

@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 
-def _env_bool(name: str, default: Optional[bool] = None) -> Optional[bool]:
+def _env_bool(name: str, default: bool | None = None) -> bool | None:
     v = os.getenv(name)
     if v is None:
         return default
     return str(v).lower() in ("1", "true", "yes", "on")
 
 
-def _env_int(name: str, default: Optional[int] = None) -> Optional[int]:
+def _env_int(name: str, default: int | None = None) -> int | None:
     v = os.getenv(name)
     if v is None:
         return default
@@ -21,7 +21,7 @@ def _env_int(name: str, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
-def overlay_sentinel(base: Dict[str, Any], memory: Dict[str, Any]) -> Dict[str, Any]:
+def overlay_sentinel(base: dict[str, Any], memory: dict[str, Any]) -> dict[str, Any]:
     """
     Build effective sentinel config.
 

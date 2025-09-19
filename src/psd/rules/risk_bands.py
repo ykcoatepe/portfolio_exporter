@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
 
-
-def evaluate(vix: float, delta_beta: float, var95_1d: float, margin_used: float) -> Tuple[str, Dict[str, bool]]:
+def evaluate(
+    vix: float, delta_beta: float, var95_1d: float, margin_used: float
+) -> tuple[str, dict[str, bool]]:
     """Return band key and breach flags for delta-beta, VaR, and margin.
 
     Bands per config/rules.yaml v0.1 defaults.

@@ -1,12 +1,15 @@
 try:
     from pydantic import BaseModel  # type: ignore
 except Exception:  # lightweight fallback
+
     class BaseModel:  # type: ignore
         pass
+
 
 try:
     from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore
 except Exception:  # lightweight fallback for test environments without deps
+
     class BaseSettings:  # type: ignore
         def __init__(self, **kwargs):
             for k, v in kwargs.items():

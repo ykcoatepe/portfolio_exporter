@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import ast
 import hashlib
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from .schema import Breach, Rule, Scope
 
@@ -80,6 +81,49 @@ _ALLOWED_CMPOPS = (
     ast.In,
     ast.NotIn,
 )
+
+# Default values for optional identifiers so expressions can evaluate even when
+# a particular snapshot does not expose the metric. These defaults skew toward
+# the "no breach" side for protective rules and ensure filters short‑circuit
+# cleanly without tripping `Unknown identifier` errors during catalog
+# validation.
+_DEFAULT_IDENTIFIER_VALUES: dict[str, Any] = {
+    "all_legs_present": False,
+    "ask": 0.0,
+    "baseline_size_pct": 1.0,
+    "bid": 0.0,
+    "bucket": "",
+    "day_pnl_nav_pct": -100.0,
+    "delta_beta": 0.0,
+    "float_millions": 1000.0,
+    "has_macro_event_tag": False,
+    "has_naked_short": False,
+    "has_stop": False,
+    "has_target": False,
+    "is_borrowable": False,
+    "is_defined_risk": False,
+    "iv": None,
+    "liquidity_nav_pct": 0.0,
+    "margin_used_pct": 100.0,
+    "microcap_nav_pct": 999.0,
+    "month_dd_nav_pct": -100.0,
+    "naked_short_hedged": False,
+    "new_risk_halted": False,
+    "next_earnings_within_dte": False,
+    "opened_within_days": 999,
+    "options_theta_nav_pct": 999.0,
+    "pct_cut_top_var": 0.0,
+    "position_size_pct": 999.0,
+    "premarket_gap_pct": 0.0,
+    "rvol": 0.0,
+    "strategy": "",
+    "sum_delta": 0.0,
+    "trade_nav_pct": 999.0,
+    "trading_frozen_1d": False,
+    "ul_nav_pct": 999.0,
+    "var95_1d_pct": 1.0,
+    "vix": 999.0,
+}
 
 
 @dataclass(slots=True)
@@ -245,11 +289,11 @@ def _evaluate(node: ast.AST, context: Mapping[str, Any]) -> Any:
         if isinstance(op, ast.Mod):
             return left % right
         if isinstance(op, ast.Pow):
-            return left ** right
+            return left**right
         raise RuleEvaluationError("Unsupported binary operator")
     if isinstance(node, ast.Compare):
         left = _evaluate(node.left, context)
-        for operator, comparator in zip(node.ops, node.comparators):
+        for operator, comparator in zip(node.ops, node.comparators, strict=True):
             right = _evaluate(comparator, context)
             matched = _compare(operator, left, right)
             if not matched:
@@ -257,13 +301,15 @@ def _evaluate(node: ast.AST, context: Mapping[str, Any]) -> Any:
             left = right
         return True
     if isinstance(node, ast.Name):
-        if node.id == "True":
+        if node.id in {"True", "true"}:
             return True
-        if node.id == "False":
+        if node.id in {"False", "false"}:
             return False
-        if node.id == "None":
+        if node.id in {"None", "null"}:
             return None
         if node.id not in context:
+            if node.id in _DEFAULT_IDENTIFIER_VALUES:
+                return _DEFAULT_IDENTIFIER_VALUES[node.id]
             raise RuleEvaluationError(f"Unknown identifier: {node.id}")
         return context[node.id]
     if isinstance(node, ast.Constant):
@@ -308,7 +354,7 @@ def _to_bool(value: Any) -> bool:
 
 
 def _build_context(row: Mapping[str, Any]) -> dict[str, Any]:
-    context: dict[str, Any] = {}
+    context: dict[str, Any] = dict(_DEFAULT_IDENTIFIER_VALUES)
     for key, value in row.items():
         if isinstance(key, str) and key.isidentifier() and not key.startswith("__"):
             context[key] = value
@@ -331,7 +377,6 @@ def _extract_value(row: Mapping[str, Any]) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         raise RuleEvaluationError("Value must be numeric if provided") from None
-
 
 
 def _extract_notes(row: Mapping[str, Any]) -> str | None:

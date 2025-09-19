@@ -5,7 +5,7 @@ import { MatchersV3, PactV3 } from "@pact-foundation/pact";
 
 import { fetchRulesSummary } from "../../src/hooks/useRules";
 
-const { datetime, eachLike, like, regex } = MatchersV3;
+const { atLeastLike, datetime, eachLike, like, regex } = MatchersV3;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,7 +38,7 @@ describe("contracts: /rules/summary", () => {
         },
         body: like({
           as_of: datetime("yyyy-MM-dd'T'HH:mm:ssxxx", "2024-10-18T14:10:00Z"),
-          counters: like({
+          breaches: like({
             total: like(5),
             critical: like(2),
             warning: like(2),
@@ -64,7 +64,7 @@ describe("contracts: /rules/summary", () => {
     await provider.executeTest(async (mockServer) => {
       const response = await fetchRulesSummary(mockServer.url);
       expect(response.as_of).toBeDefined();
-      expect(response.counters.total).toBeGreaterThan(0);
+      expect(response.breaches.total).toBeGreaterThan(0);
       expect(Array.isArray(response.top)).toBe(true);
       expect(response.top.every((entry) => Boolean(entry.rule))).toBe(true);
       expect(response.top.every((entry) => ["critical", "warning", "info"].includes(entry.severity))).toBe(
@@ -101,7 +101,7 @@ describe("contracts: /rules/summary", () => {
               scope: like("COMBO"),
               expr: like("annualized_premium_pct >= 30"),
             },
-            { min: 1 },
+            1,
           ),
         }),
       },
@@ -207,15 +207,29 @@ describe("contracts: /rules/summary", () => {
           ),
           errors: like([]),
           diff: like({
-            added: eachLike(
-              like({ rule_id: like("combo__risk_budget"), severity: like("WARNING") }),
-              { min: 0 },
+            added: atLeastLike(
+              {
+                rule_id: like("combo__risk_budget"),
+                severity: like("WARNING"),
+              },
+              0,
+              1,
             ),
-            changed: eachLike(
-              like({ rule_id: like("port__theta_negative"), changes: like({ severity: like({ old: "INFO", new: "WARNING" }) }) }),
-              { min: 0 },
+            changed: atLeastLike(
+              {
+                rule_id: like("port__theta_negative"),
+                changes: like({ severity: like({ old: "INFO", new: "WARNING" }) }),
+              },
+              0,
+              1,
             ),
-            removed: eachLike(like({ rule_id: like("combo__old_rule") }), { min: 0 }),
+            removed: atLeastLike(
+              {
+                rule_id: like("combo__old_rule"),
+              },
+              0,
+              1,
+            ),
           }),
         }),
       },
@@ -298,7 +312,7 @@ describe("contracts: /rules/summary", () => {
           version: like(12),
           updated_at: datetime("yyyy-MM-dd'T'HH:mm:ssxxx", "2024-10-18T14:00:00Z"),
           updated_by: like("ops-admin"),
-          rules: eachLike(like({ rule_id: like("combo__annualized_premium_high") }), { min: 1 }),
+          rules: eachLike(like({ rule_id: like("combo__annualized_premium_high") }), 1),
         }),
       },
     });

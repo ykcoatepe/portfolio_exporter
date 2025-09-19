@@ -8,7 +8,7 @@ import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -39,11 +39,14 @@ _DATA_ROOT = Path(os.getenv("POSITIONS_ENGINE_DATA_DIR", "var")).expanduser()
 _AUTO_REFRESH = os.getenv("POSITIONS_ENGINE_AUTO_REFRESH", "0") == "1"
 
 
-class RulesSummaryCountersModel(BaseModel):
-    total: int = Field(0, ge=0)
+class BreachCountsModel(BaseModel):
     critical: int = Field(0, ge=0)
     warning: int = Field(0, ge=0)
     info: int = Field(0, ge=0)
+
+    @property
+    def total(self) -> int:
+        return self.critical + self.warning + self.info
 
 
 class RulesSummaryTopModel(BaseModel):
@@ -59,11 +62,12 @@ class RulesSummaryTopModel(BaseModel):
 
 class RulesSummaryResponseModel(BaseModel):
     as_of: str
-    counters: RulesSummaryCountersModel
-    top: List[RulesSummaryTopModel]
-    focus_symbols: List[str]
     rules_total: int
+    breaches: BreachCountsModel = Field(default_factory=BreachCountsModel)
+    top: list[RulesSummaryTopModel] = Field(default_factory=list)
+    focus_symbols: list[str] = Field(default_factory=list)
     evaluation_ms: float
+    fundamentals: dict[str, Any] = Field(default_factory=dict)
 
 
 class CatalogTextRequest(BaseModel):
@@ -78,20 +82,20 @@ class RulesCatalogResponseModel(BaseModel):
     version: int
     updated_at: str
     updated_by: str | None = None
-    rules: List[dict[str, Any]]
+    rules: list[dict[str, Any]]
 
 
 class CatalogDiffModel(BaseModel):
-    added: List[dict[str, Any]]
-    removed: List[dict[str, Any]]
-    changed: List[dict[str, Any]]
+    added: list[dict[str, Any]]
+    removed: list[dict[str, Any]]
+    changed: list[dict[str, Any]]
 
 
 class RulesCatalogValidationResponseModel(BaseModel):
     ok: bool
     counters: dict[str, int]
-    top: List[dict[str, Any]]
-    errors: List[str]
+    top: list[dict[str, Any]]
+    errors: list[str]
 
 
 class RulesCatalogPreviewResponseModel(RulesCatalogValidationResponseModel):
@@ -141,15 +145,9 @@ def _refresh_from_disk() -> None:
     positions_df = load_latest_positions(_DATA_ROOT)
     quotes_df = load_latest_quotes(_DATA_ROOT)
     positions = (
-        positions_from_records(positions_df.to_dict("records"))
-        if hasattr(positions_df, "to_dict")
-        else []
+        positions_from_records(positions_df.to_dict("records")) if hasattr(positions_df, "to_dict") else []
     )
-    quotes = (
-        quotes_from_records(quotes_df.to_dict("records"))
-        if hasattr(quotes_df, "to_dict")
-        else []
-    )
+    quotes = quotes_from_records(quotes_df.to_dict("records")) if hasattr(quotes_df, "to_dict") else []
     _state.refresh(positions=positions, quotes=_guard_quotes(quotes))
 
 
@@ -177,12 +175,11 @@ def rules_summary() -> RulesSummaryResponseModel:
     if _AUTO_REFRESH:
         _refresh_from_disk()
     summary, evaluation = _rules_state.summary()
-    counters = summary.get("breaches", {}) if isinstance(summary, dict) else {}
-    counters_model = RulesSummaryCountersModel(
-        total=int(sum(int(counters.get(key, 0)) for key in ("critical", "warning", "info"))),
-        critical=int(counters.get("critical", 0) or 0),
-        warning=int(counters.get("warning", 0) or 0),
-        info=int(counters.get("info", 0) or 0),
+    breaches_raw = summary.get("breaches", {}) if isinstance(summary, dict) else {}
+    breaches_model = BreachCountsModel(
+        critical=int(breaches_raw.get("critical", 0) or 0),
+        warning=int(breaches_raw.get("warning", 0) or 0),
+        info=int(breaches_raw.get("info", 0) or 0),
     )
 
     rules_index = {rule.rule_id: rule for rule in _rules_state.rules}
@@ -220,13 +217,18 @@ def rules_summary() -> RulesSummaryResponseModel:
             focus_symbols_list = sorted(
                 {str(symbol) for symbol in fallback_symbols if isinstance(symbol, str) and symbol}
             )
+    fundamentals_raw = summary.get("fundamentals", {}) if isinstance(summary, dict) else {}
+    fundamentals_map = fundamentals_raw if isinstance(fundamentals_raw, dict) else {}
     return RulesSummaryResponseModel(
         as_of=str(summary.get("as_of")) if isinstance(summary, dict) else datetime.now(tz=UTC).isoformat(),
-        counters=counters_model,
+        rules_total=int(summary.get("rules_total", len(_rules_state.rules)))
+        if isinstance(summary, dict)
+        else len(_rules_state.rules),
+        breaches=breaches_model,
         top=top_payload,
         focus_symbols=focus_symbols_list,
-        rules_total=int(summary.get("rules_total", len(_rules_state.rules))) if isinstance(summary, dict) else len(_rules_state.rules),
         evaluation_ms=float(evaluation.duration_ms),
+        fundamentals=fundamentals_map,
     )
 
 

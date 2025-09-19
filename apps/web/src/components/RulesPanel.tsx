@@ -545,7 +545,7 @@ export function RulesPanel(): JSX.Element {
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Rules</p>
               <p className="mt-2 text-4xl font-semibold text-slate-100">
-                {summary.counters.total}
+                {summary.breaches.total}
               </p>
             </div>
             <dl className="space-y-3">
@@ -553,7 +553,7 @@ export function RulesPanel(): JSX.Element {
                 <div key={level} className="flex items-center justify-between">
                   <dt className="text-sm text-slate-400">{severityLabel[level]}</dt>
                   <dd className="text-sm font-medium text-slate-100">
-                    {summary.counters[level]}
+                    {summary.breaches[level]}
                   </dd>
                 </div>
               ))}

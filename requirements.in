@@ -8,6 +8,7 @@ prompt_toolkit
 prometheus-client
 pydantic
 pydantic-settings
+pyyaml
 pypdf
 reportlab
 rich

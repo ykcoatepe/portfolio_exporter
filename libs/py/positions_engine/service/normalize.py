@@ -4,11 +4,11 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-import json
 
 from ..core.models import Instrument, InstrumentType, Position, Quote, TradingSession
 

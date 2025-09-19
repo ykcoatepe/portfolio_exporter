@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from typing import Final
 
-
 _TRUE_VALUES: Final = {"1", "true", "yes", "on"}
 _FALSE_VALUES: Final = {"0", "false", "no", "off"}
 

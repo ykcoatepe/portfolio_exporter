@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, Tuple
 
 try:  # optional SciPy; provide lightweight fallbacks
     from scipy.stats import norm  # type: ignore
+
     _cdf = norm.cdf
     _pdf = norm.pdf
 except Exception:
@@ -37,7 +37,7 @@ except Exception:
         return (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * x * x)
 
 
-def _d1_d2(s: float, k: float, t: float, r: float, vol: float) -> Tuple[float, float]:
+def _d1_d2(s: float, k: float, t: float, r: float, vol: float) -> tuple[float, float]:
     """Return the ``d1`` and ``d2`` terms of the Black-Scholes formula."""
 
     d1 = (math.log(s / k) + (r + 0.5 * vol**2) * t) / (vol * math.sqrt(t))
@@ -54,7 +54,7 @@ def bs_greeks(
     *,
     call: bool = True,
     multiplier: int = 100,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Return Delta, Gamma, Theta and Vega for a vanilla option.
 
     Values are per contract using ``multiplier`` (typically 100).
@@ -63,14 +63,10 @@ def bs_greeks(
     d1, d2 = _d1_d2(s, k, t, r, vol)
     if call:
         delta = _cdf(d1)
-        theta = -s * _pdf(d1) * vol / (2 * math.sqrt(t)) - r * k * math.exp(
-            -r * t
-        ) * _cdf(d2)
+        theta = -s * _pdf(d1) * vol / (2 * math.sqrt(t)) - r * k * math.exp(-r * t) * _cdf(d2)
     else:
         delta = -_cdf(-d1)
-        theta = -s * _pdf(d1) * vol / (2 * math.sqrt(t)) + r * k * math.exp(
-            -r * t
-        ) * _cdf(-d2)
+        theta = -s * _pdf(d1) * vol / (2 * math.sqrt(t)) + r * k * math.exp(-r * t) * _cdf(-d2)
 
     gamma = _pdf(d1) / (s * vol * math.sqrt(t))
     vega = s * _pdf(d1) * math.sqrt(t)

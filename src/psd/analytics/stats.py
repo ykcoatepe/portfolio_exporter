@@ -3,7 +3,8 @@ from __future__ import annotations
 import math
 import os
 import time
-from typing import Any, Iterable, cast
+from collections.abc import Iterable
+from typing import Any, cast
 
 from psd.analytics.combos import recognize
 from psd.models import Kind, OptionLeg, Position, Sleeve
@@ -54,9 +55,10 @@ def compute_stats(
         quotes = {}
     ts = snapshot.get("ts")
 
-    threshold = _coerce_positive_float(
-        DEFAULT_STALE_THRESHOLD if stale_threshold is None else stale_threshold
-    ) or DEFAULT_STALE_THRESHOLD
+    threshold = (
+        _coerce_positive_float(DEFAULT_STALE_THRESHOLD if stale_threshold is None else stale_threshold)
+        or DEFAULT_STALE_THRESHOLD
+    )
 
     now_ts = _coerce_timestamp(now)
     if now_ts is None:
@@ -257,10 +259,7 @@ def _count_stale_quotes(quotes: dict[str, Any], now_ts: float, threshold: float)
 
 def _is_stale_quote(value: Any, now_ts: float, threshold: float) -> bool:
     if isinstance(value, dict):
-        if any(
-            bool(value.get(key))
-            for key in ("stale", "is_stale", "stale_flag", "delayed", "isDelayed")
-        ):
+        if any(bool(value.get(key)) for key in ("stale", "is_stale", "stale_flag", "delayed", "isDelayed")):
             return True
 
         age = _coerce_float(
@@ -279,7 +278,15 @@ def _is_stale_quote(value: Any, now_ts: float, threshold: float) -> bool:
             return True
 
         ts = None
-        for key in ("ts", "timestamp", "quote_ts", "last_updated", "last_update", "updated_at", "quoteTimestamp"):
+        for key in (
+            "ts",
+            "timestamp",
+            "quote_ts",
+            "last_updated",
+            "last_update",
+            "updated_at",
+            "quoteTimestamp",
+        ):
             ts = _coerce_timestamp(value.get(key)) if key in value else None
             if ts is not None:
                 break

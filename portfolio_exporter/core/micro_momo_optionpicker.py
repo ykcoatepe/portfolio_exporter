@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from collections.abc import Iterable
 from datetime import date, datetime
+from typing import Any
 
 from .micro_momo_types import ChainRow, ScanRow, Structure
 from .micro_momo_utils import spread_pct
 
 
-def _calls_by_strike(chain: Iterable[Any]) -> Dict[float, Any]:
-    out: Dict[float, ChainRow] = {}
+def _calls_by_strike(chain: Iterable[Any]) -> dict[float, Any]:
+    out: dict[float, ChainRow] = {}
     for r in chain:
         right = _get(r, "right", "").upper()
         if right == "C":
@@ -16,7 +17,7 @@ def _calls_by_strike(chain: Iterable[Any]) -> Dict[float, Any]:
     return dict(sorted(out.items()))
 
 
-def _pick_expiry(chain: List[Any]) -> Optional[str]:
+def _pick_expiry(chain: list[Any]) -> str | None:
     if not chain:
         return None
     # v1: single-file chain often has one expiry; just pick the first by sort
@@ -39,7 +40,7 @@ def _is_friday(expiry_yyyymmdd: str) -> bool:
         return False
 
 
-def _near_money_oi(chain: List[Any], spot: float, expiry: str, pct: float = 3.0) -> int:
+def _near_money_oi(chain: list[Any], spot: float, expiry: str, pct: float = 3.0) -> int:
     lo = spot * (1.0 - pct / 100.0)
     hi = spot * (1.0 + pct / 100.0)
     tot = 0
@@ -53,16 +54,16 @@ def _near_money_oi(chain: List[Any], spot: float, expiry: str, pct: float = 3.0)
 
 
 def _pick_expiry_by_dte(
-    chain: List[Any],
+    chain: list[Any],
     spot: float,
     dte_min: int,
     dte_max: int,
-    today: Optional[date] = None,
-) -> Optional[str]:
+    today: date | None = None,
+) -> str | None:
     if not chain:
         return None
     today = today or date.today()
-    expiries = sorted({_get(r, "expiry") for r in chain if _get(r, "expiry")} )
+    expiries = sorted({_get(r, "expiry") for r in chain if _get(r, "expiry")})
     if not expiries:
         return None
 
@@ -80,7 +81,7 @@ def _pick_expiry_by_dte(
     above = [(e, d) for e, d in ex_d if d > dte_max and (d - dte_max) <= 7]
     if above:
         # Prefer Friday expiries, then smallest DTE above max, then OI
-        def key_fn(t: Tuple[str, int]):
+        def key_fn(t: tuple[str, int]):
             e, d = t
             return (
                 0 if _is_friday(e) else 1,
@@ -97,7 +98,7 @@ def _pick_expiry_by_dte(
     return best_any
 
 
-def _nearest_otm_call(price: float, calls: Dict[float, ChainRow]) -> Optional[ChainRow]:
+def _nearest_otm_call(price: float, calls: dict[float, ChainRow]) -> ChainRow | None:
     for strike, row in calls.items():
         if strike >= price:
             return row
@@ -107,7 +108,7 @@ def _nearest_otm_call(price: float, calls: Dict[float, ChainRow]) -> Optional[Ch
     return None
 
 
-def _call_at_strike(strike: float, calls: Dict[float, ChainRow]) -> Optional[ChainRow]:
+def _call_at_strike(strike: float, calls: dict[float, ChainRow]) -> ChainRow | None:
     return calls.get(strike)
 
 
@@ -136,9 +137,9 @@ def _mid(r: Any) -> float:
 
 def pick_bull_put_credit(
     spot: float,
-    chain: List[Any],
-    expiry: Optional[str],
-    cfg: Dict[str, object],
+    chain: list[Any],
+    expiry: str | None,
+    cfg: dict[str, object],
 ) -> Structure:
     if not chain or not expiry or spot <= 0:
         return Structure(
@@ -159,7 +160,7 @@ def pick_bull_put_credit(
 
     # Filter puts roughly near delta 0.2-0.25; if no delta, fallback to 5-15% OTM
     puts = [r for r in chain if str(_get(r, "right", "")).upper().startswith("P")]
-    candidates: List[Tuple[float, Any]] = []
+    candidates: list[tuple[float, Any]] = []
     for r in puts:
         strike = float(_get(r, "strike", 0.0))
         delta = _get(r, "delta", None)
@@ -187,7 +188,7 @@ def pick_bull_put_credit(
     short_put = candidates[0][1]
     # Long put 3-8% lower
     long_target = float(_get(short_put, "strike", 0.0)) * 0.95
-    lp: Optional[Any] = None
+    lp: Any | None = None
     distance = float("inf")
     for r in puts:
         st = float(_get(r, "strike", 0.0))
@@ -218,7 +219,11 @@ def pick_bull_put_credit(
     oi_ok = int(_get(short_put, "oi", 0)) >= min_oi and int(_get(lp, "oi", 0)) >= min_oi
     spread_ok = per_leg_spread is not None and per_leg_spread <= max_spread
 
-    credit = max(0.01, float(_get(short_put, "mid", (_get(short_put, "bid", 0.0) + _get(short_put, "ask", 0.0)) / 2)) - float(_get(lp, "mid", (_get(lp, "bid", 0.0) + _get(lp, "ask", 0.0)) / 2)))
+    credit = max(
+        0.01,
+        float(_get(short_put, "mid", (_get(short_put, "bid", 0.0) + _get(short_put, "ask", 0.0)) / 2))
+        - float(_get(lp, "mid", (_get(lp, "bid", 0.0) + _get(lp, "ask", 0.0)) / 2)),
+    )
     width = abs(float(_get(short_put, "strike", 0.0)) - float(_get(lp, "strike", 0.0)))
     credit_ok = credit >= credit_ratio * width
 
@@ -238,16 +243,18 @@ def pick_bull_put_credit(
 
 def pick_structure(
     scan: ScanRow,
-    chain: List[Any],
+    chain: list[Any],
     direction: str,  # "long" | "short"
-    cfg: Dict[str, object],
-    tier: Optional[str] = None,
+    cfg: dict[str, object],
+    tier: str | None = None,
 ) -> Structure:
     # Choose expiry using DTE smart selection
     d_min = int(cfg.get("options", {}).get("dte_min", 3))  # type: ignore[union-attr]
     d_max = int(cfg.get("options", {}).get("dte_max", 10))  # type: ignore[union-attr]
     expiry = _pick_expiry_by_dte(chain, scan.price, d_min, d_max)
-    calls = _calls_by_strike([r for r in chain if hasattr(r, "right") or (isinstance(r, dict) and r.get("right"))])
+    calls = _calls_by_strike(
+        [r for r in chain if hasattr(r, "right") or (isinstance(r, dict) and r.get("right"))]
+    )
 
     min_width = float(cfg.get("options", {}).get("min_width", 5.0))  # type: ignore[union-attr]
     min_oi = int(cfg.get("liquidity", {}).get("min_oi", 50))  # type: ignore[union-attr]

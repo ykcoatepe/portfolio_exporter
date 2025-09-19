@@ -1,2 +1,1 @@
 """Rules for PSD (placeholder)."""
-

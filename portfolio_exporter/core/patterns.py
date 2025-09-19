@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 
 def _safe_float(x: Any, default: float = 0.0) -> float:
@@ -10,7 +10,7 @@ def _safe_float(x: Any, default: float = 0.0) -> float:
         return default
 
 
-def _vwap(bars: List[Dict[str, Any]]) -> Optional[float]:
+def _vwap(bars: list[dict[str, Any]]) -> float | None:
     pv = 0.0
     tv = 0.0
     for b in bars:
@@ -23,7 +23,7 @@ def _vwap(bars: List[Dict[str, Any]]) -> Optional[float]:
     return pv / tv
 
 
-def _rvol(series: List[int | float]) -> float:
+def _rvol(series: list[int | float]) -> float:
     if not series:
         return 0.0
     mean_vol = (sum(series) / max(1, len(series))) if series else 0.0
@@ -36,13 +36,13 @@ def _rvol(series: List[int | float]) -> float:
     return max(0.0, float(r1)), max(0.0, float(r5))  # type: ignore[return-value]
 
 
-def compute_patterns(bars: List[Dict[str, Any]]) -> Dict[str, Any]:
+def compute_patterns(bars: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute VWAP/ORB/HOD-LOD based intraday signals from 1-min bars.
 
     Input bars are expected in chronological order. Each bar is a dict with keys:
     close, high, low, volume (others ignored).
     """
-    out: Dict[str, Any] = {
+    out: dict[str, Any] = {
         "vwap": None,
         "rvol_1m": 0.0,
         "rvol_5m": 0.0,
@@ -108,7 +108,9 @@ def compute_patterns(bars: List[Dict[str, Any]]) -> Dict[str, Any]:
         first_n = bars[:n]
         below_cnt = sum(1 for b in first_n if _safe_float(b.get("close", 0.0)) < vwap_f * (1.0 - eps))
         mostly_below = below_cnt >= max(1, int(0.6 * n))
-        rising_tail = len(bars) >= 3 and (_safe_float(bars[-3].get("close")) < _safe_float(bars[-2].get("close")) < last_close)
+        rising_tail = len(bars) >= 3 and (
+            _safe_float(bars[-3].get("close")) < _safe_float(bars[-2].get("close")) < last_close
+        )
         if mostly_below and last_close >= vwap_f * (1.0 - eps) and rising_tail:
             patt = "VWAP Reclaim"
         elif prev_close >= vwap_f * (1.0 - eps) and last_close <= vwap_f * (1.0 + eps):
@@ -128,7 +130,13 @@ def compute_patterns(bars: List[Dict[str, Any]]) -> Dict[str, Any]:
             patt = "LOD Break"
 
     # Fail if last close below VWAP after attempting above
-    if not patt and isinstance(vwap, (int, float)) and vwap and prev_close > float(vwap) and last_close < float(vwap):
+    if (
+        not patt
+        and isinstance(vwap, (int, float))
+        and vwap
+        and prev_close > float(vwap)
+        and last_close < float(vwap)
+    ):
         patt = "Fail"
 
     out["pattern_signal"] = patt

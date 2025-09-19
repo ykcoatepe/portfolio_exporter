@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
-from .micro_momo_types import ResultRow, ScanRow, Structure
-from .micro_momo_utils import clamp, inv_scale, scale, to_bool
+from .micro_momo_types import ScanRow, Structure
+from .micro_momo_utils import clamp, inv_scale, scale
 
 
 def _get(row: Any, name: str, default: float | int | str | None = None) -> Any:
@@ -13,7 +13,7 @@ def _get(row: Any, name: str, default: float | int | str | None = None) -> Any:
     return getattr(row, name, default)
 
 
-def passes_filters(row: ScanRow, cfg: Dict[str, object]) -> bool:
+def passes_filters(row: ScanRow, cfg: dict[str, object]) -> bool:
     f = cfg.get("filters", {})  # type: ignore[assignment]
 
     # price bounds
@@ -89,7 +89,7 @@ def passes_filters(row: ScanRow, cfg: Dict[str, object]) -> bool:
     return True
 
 
-def score_components(row: ScanRow, cfg: Dict[str, object]) -> Tuple[Dict[str, float], float]:
+def score_components(row: ScanRow, cfg: dict[str, object]) -> tuple[dict[str, float], float]:
     w = cfg.get("weights", {})  # type: ignore[assignment]
 
     # gap: 0→20% mapped to 0→100
@@ -176,7 +176,7 @@ def score_components(row: ScanRow, cfg: Dict[str, object]) -> Tuple[Dict[str, fl
     return comps, raw
 
 
-def tier_and_dir(row: ScanRow, raw_score: float, cfg: Dict[str, object]) -> Tuple[str, str]:
+def tier_and_dir(row: ScanRow, raw_score: float, cfg: dict[str, object]) -> tuple[str, str]:
     # Tiering
     t_cfg = cfg.get("tiers", {})  # type: ignore[assignment]
     a_thr = float(t_cfg.get("A_tier", 75.0))  # type: ignore[union-attr]
@@ -201,7 +201,7 @@ def tier_and_dir(row: ScanRow, raw_score: float, cfg: Dict[str, object]) -> Tupl
     return tier, direction
 
 
-def size_and_targets(struct: Structure, row: ScanRow, cfg: Dict[str, object]) -> Tuple[int, float, float]:
+def size_and_targets(struct: Structure, row: ScanRow, cfg: dict[str, object]) -> tuple[int, float, float]:
     s_cfg = cfg.get("sizing", {})  # type: ignore[assignment]
     risk_budget = float(s_cfg.get("risk_budget", 250.0))  # type: ignore[union-attr]
     max_contracts = int(s_cfg.get("max_contracts", 5))  # type: ignore[union-attr]
@@ -235,7 +235,7 @@ def _risk_proxy(struct: Structure, contracts: int) -> float:
     return 0.0
 
 
-def entry_trigger(direction: str, row: ScanRow, cfg: Dict[str, object]) -> str | float:
+def entry_trigger(direction: str, row: ScanRow, cfg: dict[str, object]) -> str | float:
     confirm = cfg.get("rvol_confirm_entry", 1.5)  # type: ignore[assignment]
     vwap = _get(row, "vwap", "NA")
     orb_high = _get(row, "orb_high", "NA")
@@ -243,6 +243,4 @@ def entry_trigger(direction: str, row: ScanRow, cfg: Dict[str, object]) -> str |
         return (
             f"ORB break → pullback to VWAP → reclaim (RVOL ≥ {confirm}); levels: orb={orb_high}, vwap={vwap}"
         )
-    return (
-        f"Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ {confirm}); levels: vwap={vwap}"
-    )
+    return f"Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ {confirm}); levels: vwap={vwap}"

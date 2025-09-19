@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, date, time
-from typing import Optional
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 TZ_NY = ZoneInfo("America/New_York")
@@ -14,9 +13,9 @@ class RTHWindowTR:
     open_tr: datetime
     close_tr: datetime
     # convenience “afternoon re-arm anchor” as an ET time converted to TR
-    afternoon_rearm_tr: Optional[datetime] = None
+    afternoon_rearm_tr: datetime | None = None
     # time after which new signals are not started (TR)
-    no_new_signals_after_tr: Optional[datetime] = None
+    no_new_signals_after_tr: datetime | None = None
 
 
 @dataclass
@@ -30,11 +29,11 @@ def _combine(d: date, hh: int, mm: int, tz: ZoneInfo) -> datetime:
 
 
 def rth_window_tr(
-    today_tr: Optional[date] = None,
+    today_tr: date | None = None,
     et_open: time = time(9, 30),
     et_close: time = time(16, 0),
-    et_afternoon_rearm: Optional[time] = time(13, 30),
-    et_no_new_after: Optional[time] = time(15, 30),
+    et_afternoon_rearm: time | None = time(13, 30),
+    et_no_new_after: time | None = time(15, 30),
 ) -> RTHWindowTR:
     """
     Returns the RTH open/close and optional anchors expressed in Europe/Istanbul for
@@ -79,11 +78,10 @@ def premarket_window_tr(
     return SessionWindowTR(start_tr=start_tr, end_tr=end_tr)
 
 
-def is_after(dt_tr: datetime, now_tr: Optional[datetime] = None) -> bool:
+def is_after(dt_tr: datetime, now_tr: datetime | None = None) -> bool:
     now_tr = now_tr or datetime.now(TZ_TR)
     return now_tr >= dt_tr
 
 
-def pretty_tr(dt_tr: Optional[datetime]) -> str:
+def pretty_tr(dt_tr: datetime | None) -> str:
     return dt_tr.astimezone(TZ_TR).strftime("%Y-%m-%d %H:%M") if dt_tr else "-"
-

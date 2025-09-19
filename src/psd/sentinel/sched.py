@@ -23,13 +23,14 @@ from __future__ import annotations
 import random
 import threading
 import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple
+from typing import Any
 
 # Lazy import to keep CLI startup fast and allow test monkeypatching
 try:  # pragma: no cover - exercised via scripts
-    from .engine import scan_once
     from ..datasources import ibkr as ib_src
+    from .engine import scan_once
 except Exception:  # pragma: no cover - minimal envs
     scan_once = None  # type: ignore
     ib_src = None  # type: ignore
@@ -84,9 +85,9 @@ class HistoricalLimiter:
         rate = capacity / float(window_sec)
         self.bucket = TokenBucket(capacity=float(capacity), refill_rate_per_sec=rate)
         self.dedupe_window = dedupe_window
-        self._last_seen: Dict[str, float] = {}
+        self._last_seen: dict[str, float] = {}
         self._burst_window = 2.0
-        self._burst_key_times: Dict[Tuple[str, str, str], list[float]] = {}
+        self._burst_key_times: dict[tuple[str, str, str], list[float]] = {}
         self.lock = threading.Lock()
 
     def _cleanup(self, now: float) -> None:
@@ -100,7 +101,7 @@ class HistoricalLimiter:
             if not self._burst_key_times[k]:
                 del self._burst_key_times[k]
 
-    def allow(self, key: str, small_bar_key: Tuple[str, str, str] | None = None) -> bool:
+    def allow(self, key: str, small_bar_key: tuple[str, str, str] | None = None) -> bool:
         now = time.monotonic()
         with self.lock:
             self._cleanup(now)
@@ -134,9 +135,9 @@ def io_request(
     key: str,
     func: Callable[[], Any],
     *,
-    hist_limiter: Optional[HistoricalLimiter] = None,
-    web_bucket: Optional[TokenBucket] = None,
-    small_bar_key: Tuple[str, str, str] | None = None,
+    hist_limiter: HistoricalLimiter | None = None,
+    web_bucket: TokenBucket | None = None,
+    small_bar_key: tuple[str, str, str] | None = None,
     max_retries: int = 5,
 ) -> Any:
     """Run a paced IO request with backoff.
@@ -177,7 +178,7 @@ def io_request(
 
 def run_loop(
     interval: int = 60,
-    cfg: Optional[Dict[str, Any]] = None,
+    cfg: dict[str, Any] | None = None,
     *,
     loops: int | None = None,
     web_broadcast: Callable[[dict], None] | None = None,
@@ -196,7 +197,7 @@ def run_loop(
     hist = HistoricalLimiter()  # 60 per 10min
     web = TokenBucket(capacity=10.0, refill_rate_per_sec=10.0)
 
-    last_marks: Dict[str, float] = {}
+    last_marks: dict[str, float] = {}
 
     # Support bounded iterations for simulators/tests while keeping default infinite loop
     def _iter_range() -> Iterable[int]:
@@ -204,20 +205,22 @@ def run_loop(
             while True:
                 yield 1
         else:
-            for i in range(loops):
-                yield i
+            yield from range(loops)
 
     for _ in _iter_range():
         t0 = time.monotonic()
 
         # Optionally fetch or wrap positions to control pacing.
         # If IB datasource is available, wrap via io_request; otherwise rely on engine.
-        positions: Iterable[Dict[str, Any]] | None = None
+        positions: Iterable[dict[str, Any]] | None = None
         if ib_src is not None and hasattr(ib_src, "get_positions"):
+
             def _get_pos() -> Any:
                 return ib_src.get_positions(cfg)
 
-            positions = io_request("web", key="ibkr:get_positions", func=_get_pos, hist_limiter=hist, web_bucket=web)
+            positions = io_request(
+                "web", key="ibkr:get_positions", func=_get_pos, hist_limiter=hist, web_bucket=web
+            )
             if positions is None:
                 positions = []
             # Provide positions to engine via cfg if supported; engine reads ib_src directly by default
@@ -241,7 +244,11 @@ def run_loop(
         # Last-mark cache: collect simple marks per underlying symbol
         try:
             rows = positions if positions is not None else []
-            current_marks: Dict[str, float] = {str(p.get("symbol")): float(p.get("mark", 0.0)) for p in rows if isinstance(p, dict) and p.get("symbol")}
+            current_marks: dict[str, float] = {
+                str(p.get("symbol")): float(p.get("mark", 0.0))
+                for p in rows
+                if isinstance(p, dict) and p.get("symbol")
+            }
         except Exception:
             current_marks = {}
 
@@ -249,14 +256,26 @@ def run_loop(
         if changed_syms:
             # Optional extra IO for greeks/marks only for changed underlyings
             # Users/tests can plug real callables via cfg keys
-            fetch_marks: Optional[Callable[[Iterable[str]], Any]] = cfg.get("fetch_marks")  # type: ignore
-            fetch_greeks: Optional[Callable[[Iterable[str]], Any]] = cfg.get("fetch_greeks")  # type: ignore
+            fetch_marks: Callable[[Iterable[str]], Any] | None = cfg.get("fetch_marks")  # type: ignore
+            fetch_greeks: Callable[[Iterable[str]], Any] | None = cfg.get("fetch_greeks")  # type: ignore
 
             if fetch_marks is not None:
-                io_request("web", key=f"marks:{hash(tuple(sorted(changed_syms)))}", func=lambda: fetch_marks(changed_syms), hist_limiter=hist, web_bucket=web)
+                io_request(
+                    "web",
+                    key=f"marks:{hash(tuple(sorted(changed_syms)))}",
+                    func=lambda: fetch_marks(changed_syms),
+                    hist_limiter=hist,
+                    web_bucket=web,
+                )
             if fetch_greeks is not None:
                 # Greeks often rely on historical/snapshot data – use historical limiter keying per symbol batch
-                io_request("historical", key=f"greeks:{hash(tuple(sorted(changed_syms)))}", func=lambda: fetch_greeks(changed_syms), hist_limiter=hist, web_bucket=web)
+                io_request(
+                    "historical",
+                    key=f"greeks:{hash(tuple(sorted(changed_syms)))}",
+                    func=lambda: fetch_greeks(changed_syms),
+                    hist_limiter=hist,
+                    web_bucket=web,
+                )
 
         last_marks = current_marks or last_marks
 

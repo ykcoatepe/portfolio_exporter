@@ -4,11 +4,12 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import os
-from pathlib import Path
 import tempfile
-from typing import Any, Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 try:
     import yaml  # type: ignore[import]
@@ -56,6 +57,8 @@ class RulesCatalogDraft(BaseModel):
     updated_by: str | None = None
 
     model_config = ConfigDict(extra="forbid")
+
+
 def load_catalog(path: Path = CATALOG_PATH) -> RulesCatalog:
     """Load the catalog from disk and validate it with Pydantic models."""
 
@@ -100,9 +103,7 @@ def atomic_write(text: str, path: Path = CATALOG_PATH) -> None:
     tmp_fd: int | None = None
     tmp_path: str | None = None
     try:
-        with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", dir=str(path.parent), delete=False
-        ) as handle:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=str(path.parent), delete=False) as handle:
             tmp_fd = handle.fileno()
             tmp_path = handle.name
             handle.write(text)

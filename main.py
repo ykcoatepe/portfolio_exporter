@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import builtins
 import json
 import os
 import re
 import sys
 from pathlib import Path
 
-import builtins
 from rich.console import Console
 from rich.table import Table
 
@@ -55,24 +55,16 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         add_help=False, epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument(
-        "-q", "--quiet", action="store_true", help="suppress banner & status output"
-    )
+    parser.add_argument("-q", "--quiet", action="store_true", help="suppress banner & status output")
     parser.add_argument(
         "--format",
         choices=["csv", "excel", "pdf"],
         default="csv",
         help="default output format",
     )
-    parser.add_argument(
-        "--json", action="store_true", help="emit JSON output for planning commands"
-    )
-    parser.add_argument(
-        "--list-tasks", action="store_true", help="list available tasks and aliases"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="show execution plan without running tasks"
-    )
+    parser.add_argument("--json", action="store_true", help="emit JSON output for planning commands")
+    parser.add_argument("--list-tasks", action="store_true", help="list available tasks and aliases")
+    parser.add_argument("--dry-run", action="store_true", help="show execution plan without running tasks")
     parser.add_argument("--workflow", help="expand a named workflow from memory")
     # Queue support: allow multiple --task flags or a single comma-separated --tasks
     parser.add_argument(
@@ -95,6 +87,7 @@ def parse_args() -> argparse.Namespace:
         help="Stop the queued run at first failure",
     )
     return parser.parse_known_args()[0]
+
 
 def task_registry(fmt: str) -> dict[str, callable]:
     def snapshot_quotes() -> None:
@@ -175,6 +168,7 @@ def task_registry(fmt: str) -> dict[str, callable]:
     def netliq_export() -> None:
         from portfolio_exporter.scripts import net_liq_history_export as _netliq
         from tools.logbook import logbook_on_success as _lb
+
         try:
             _netliq.run(fmt=fmt, plot=True)
         except Exception:
@@ -188,28 +182,35 @@ def task_registry(fmt: str) -> dict[str, callable]:
 
     def micro_momo() -> None:
         # CSV-only defaults unless env provides paths; JSON-only in PE_TEST_MODE
-        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
         from portfolio_exporter.core.fs_utils import (
-            find_latest_file,
-            auto_config,
             auto_chains_dir,
+            auto_config,
+            find_latest_file,
         )
+        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
+
         # Lazy import to avoid startup cost unless needed
         try:
             from portfolio_exporter.core.memory import get_pref as _get_pref  # type: ignore
         except Exception:
+
             def _get_pref(key: str, default: str | None = None) -> str | None:  # type: ignore
                 return default
+
         from tools.logbook import logbook_on_success
 
         pe_test = os.getenv("PE_TEST_MODE")
-        cfg = os.getenv("MOMO_CFG") or auto_config(
-            [
-                "micro_momo_config.json",
-                "config/micro_momo_config.json",
-                "tests/data/micro_momo_config.json" if pe_test else None,
-            ]
-        ) or ("tests/data/micro_momo_config.json" if pe_test else "micro_momo_config.json")
+        cfg = (
+            os.getenv("MOMO_CFG")
+            or auto_config(
+                [
+                    "micro_momo_config.json",
+                    "config/micro_momo_config.json",
+                    "tests/data/micro_momo_config.json" if pe_test else None,
+                ]
+            )
+            or ("tests/data/micro_momo_config.json" if pe_test else "micro_momo_config.json")
+        )
 
         if os.getenv("MOMO_INPUT"):
             inp = os.getenv("MOMO_INPUT")
@@ -260,6 +261,7 @@ def task_registry(fmt: str) -> dict[str, callable]:
 
     def micro_momo_sentinel() -> None:
         from portfolio_exporter.scripts import micro_momo_sentinel as _sent
+
         scored = os.getenv("MOMO_SCORED") or "out/micro_momo_scored.csv"
         cfg = os.getenv("MOMO_CFG") or (
             "tests/data/micro_momo_config.json" if os.getenv("PE_TEST_MODE") else "micro_momo_config.json"
@@ -281,6 +283,7 @@ def task_registry(fmt: str) -> dict[str, callable]:
         if os.getenv("MOMO_WEBHOOK"):
             argv += ["--webhook", os.getenv("MOMO_WEBHOOK")]
         from tools.logbook import logbook_on_success as _lb
+
         try:
             _sent.main(argv)
         except Exception:
@@ -294,12 +297,14 @@ def task_registry(fmt: str) -> dict[str, callable]:
 
     def micro_momo_eod() -> None:
         from portfolio_exporter.scripts import micro_momo_eod as _eod
+
         j = os.getenv("MOMO_JOURNAL") or "out/micro_momo_journal.csv"
         out_dir = os.getenv("MOMO_OUT") or "out"
         argv = ["--journal", j, "--out_dir", out_dir]
         if os.getenv("MOMO_OFFLINE") in ("1", "true", "yes"):
             argv += ["--offline"]
         from tools.logbook import logbook_on_success as _lb
+
         try:
             _eod.main(argv)
         except Exception:
@@ -313,8 +318,10 @@ def task_registry(fmt: str) -> dict[str, callable]:
 
     def micro_momo_dashboard() -> None:
         from portfolio_exporter.scripts import micro_momo_dashboard as _dash
+
         out_dir = os.getenv("MOMO_OUT") or "out"
         from tools.logbook import logbook_on_success as _lb
+
         try:
             _dash.main(["--out_dir", out_dir])
         except Exception:
@@ -326,7 +333,9 @@ def task_registry(fmt: str) -> dict[str, callable]:
                 files=["portfolio_exporter/scripts/micro_momo_dashboard.py"],
             )
         try:
-            import webbrowser as _wb, os as _os
+            import os as _os
+            import webbrowser as _wb
+
             path = _os.path.join(out_dir, "micro_momo_dashboard.html")
             if _os.path.exists(path):
                 _wb.open(f"file://{_os.path.abspath(path)}", new=2)
@@ -345,7 +354,7 @@ def task_registry(fmt: str) -> dict[str, callable]:
         if os.getenv("MOMO_OUT"):
             argv += ["--out_dir", os.getenv("MOMO_OUT", "out")]
         if os.getenv("MOMO_PROVIDERS"):
-            argv += ["--providers", os.getenv("MOMO_PROVIDERS", "")] 
+            argv += ["--providers", os.getenv("MOMO_PROVIDERS", "")]
         if os.getenv("MOMO_DATA_MODE"):
             argv += ["--data-mode", os.getenv("MOMO_DATA_MODE", "")]
         if os.getenv("MOMO_WEBHOOK"):
@@ -482,7 +491,7 @@ def _main_impl(args) -> None:
 
         if failures:
             console.print(f"[yellow]Completed with {len(failures)} failure(s): {failures}")
-            
+
         return
 
     if os.getenv("PE_TEST_MODE"):
@@ -502,7 +511,9 @@ def _main_impl(args) -> None:
             outdir = (
                 Path(outdir).expanduser()
                 if outdir
-                else Path(os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or "./tmp_test_run").expanduser()
+                else Path(
+                    os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or "./tmp_test_run"
+                ).expanduser()
             )
             try:
                 outdir.mkdir(parents=True, exist_ok=True)
@@ -511,6 +522,7 @@ def _main_impl(args) -> None:
             # Build tiny dataframe: AAPL always; VIX optional
             from datetime import datetime
             from zoneinfo import ZoneInfo
+
             import pandas as _pd
 
             ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))
@@ -539,10 +551,7 @@ def _main_impl(args) -> None:
                 )
             df = _pd.DataFrame(rows)
             totals = (
-                df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
-                .sum()
-                .to_frame()
-                .T
+                df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]].sum().to_frame().T
             )
             totals.insert(0, "timestamp", ts_iso)
             totals.index = ["PORTFOLIO_TOTAL"]
@@ -608,20 +617,23 @@ def _main_impl(args) -> None:
     # resolve even when run from the temporary working directory.
     try:
         from pathlib import Path as _Path
+
         cwd = _Path.cwd()
         repo_root = _Path(__file__).resolve().parent
         if cwd != repo_root:
             shim_dir = cwd / "portfolio_exporter" / "scripts"
             shim_dir.mkdir(parents=True, exist_ok=True)
+
             def _write_shim(name: str, module: str):
                 p = shim_dir / name
                 p.write_text(
                     "#!/usr/bin/env python3\n"
-                    "from portfolio_exporter.scripts import {mod} as _m\n"
+                    f"from portfolio_exporter.scripts import {module} as _m\n"
                     "import sys\n"
                     "if __name__ == '__main__':\n"
-                    "    sys.exit(_m.main())\n".format(mod=module)
+                    "    sys.exit(_m.main())\n"
                 )
+
             _write_shim("trades_report.py", "trades_report")
             _write_shim("trades_dashboard.py", "trades_dashboard")
     except Exception:
@@ -631,6 +643,7 @@ def _main_impl(args) -> None:
 def main() -> None:
     args = parse_args()
     from pathlib import Path as _Path
+
     _repo_root = str(_Path(__file__).resolve().parent)
     try:
         _main_impl(args)

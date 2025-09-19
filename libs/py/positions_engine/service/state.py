@@ -101,9 +101,7 @@ class PositionsState:
             )
         return rows, stale
 
-    def _ensure_options_detection(
-        self, now: datetime | None
-    ) -> tuple[ComboDetection, datetime]:
+    def _ensure_options_detection(self, now: datetime | None) -> tuple[ComboDetection, datetime]:
         now = _ensure_aware(now)
         cache = self._options_cache or {}
         cache_day = now.date()

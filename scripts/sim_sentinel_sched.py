@@ -13,12 +13,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import random
-import time
-from typing import Any, Dict, Iterable, List, Tuple
-
 import os
+import random
 import sys
+import time
+from collections.abc import Iterable
+from typing import Any
 
 # Ensure project root is on sys.path so 'src' package is resolvable when
 # running this script directly.
@@ -26,9 +26,9 @@ _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+from src.psd.datasources import ibkr as ib_src
 from src.psd.sentinel.engine import scan_once
 from src.psd.sentinel.sched import HistoricalLimiter, TokenBucket, io_request
-from src.psd.datasources import ibkr as ib_src
 
 
 class Sim429(Exception):
@@ -37,8 +37,8 @@ class Sim429(Exception):
         self.status_code = 429
 
 
-def _mk_positions(n: int) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
+def _mk_positions(n: int) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
     for i in range(1, n + 1):
         sym = f"SYM{i:03d}"
         out.append(
@@ -54,7 +54,7 @@ def _mk_positions(n: int) -> List[Dict[str, Any]]:
     return out
 
 
-def _jitter_marks(rows: List[Dict[str, Any]], change_ratio: float = 0.2) -> None:
+def _jitter_marks(rows: list[dict[str, Any]], change_ratio: float = 0.2) -> None:
     k = max(1, int(len(rows) * change_ratio))
     for p in random.sample(rows, k=k):
         delta = random.uniform(-0.5, 0.5)
@@ -66,14 +66,16 @@ def main() -> None:
     ap.add_argument("--loops", type=int, default=5, help="Number of iterations")
     ap.add_argument("--interval", type=float, default=1.0, help="Seconds per iteration")
     ap.add_argument("--positions", type=int, default=100, help="Synthetic positions count")
-    ap.add_argument("--change-ratio", type=float, default=0.2, help="Fraction of symbols that change each loop")
+    ap.add_argument(
+        "--change-ratio", type=float, default=0.2, help="Fraction of symbols that change each loop"
+    )
     args = ap.parse_args()
 
     positions = _mk_positions(args.positions)
-    last_marks: Dict[str, float] = {}
+    last_marks: dict[str, float] = {}
 
     # Monkeypatch get_positions
-    def _get_positions(_cfg: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
+    def _get_positions(_cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         return positions
 
     ib_src.get_positions = _get_positions  # type: ignore
@@ -98,7 +100,7 @@ def main() -> None:
             raise Sim429()
         time.sleep(0.02)
 
-    cfg: Dict[str, Any] = {"fetch_marks": fetch_marks, "fetch_greeks": fetch_greeks}
+    cfg: dict[str, Any] = {"fetch_marks": fetch_marks, "fetch_greeks": fetch_greeks}
 
     for i in range(1, args.loops + 1):
         t0 = time.monotonic()
@@ -111,15 +113,27 @@ def main() -> None:
         _ = dto.get("alerts", [])
 
         # Collect current marks from synthetic positions
-        current_marks: Dict[str, float] = {p["symbol"]: float(p["mark"]) for p in positions}
+        current_marks: dict[str, float] = {p["symbol"]: float(p["mark"]) for p in positions}
         changed_syms = [s for s, m in current_marks.items() if last_marks.get(s) != m]
 
         if changed_syms:
-            io_request("web", key=f"marks:{hash(tuple(sorted(changed_syms)))}", func=lambda: fetch_marks(changed_syms), hist_limiter=hist, web_bucket=web)
-            io_request("historical", key=f"greeks:{hash(tuple(sorted(changed_syms)))}", func=lambda: fetch_greeks(changed_syms), hist_limiter=hist, web_bucket=web)
+            io_request(
+                "web",
+                key=f"marks:{hash(tuple(sorted(changed_syms)))}",
+                func=lambda: fetch_marks(changed_syms),
+                hist_limiter=hist,
+                web_bucket=web,
+            )
+            io_request(
+                "historical",
+                key=f"greeks:{hash(tuple(sorted(changed_syms)))}",
+                func=lambda: fetch_greeks(changed_syms),
+                hist_limiter=hist,
+                web_bucket=web,
+            )
 
         # Explicit historical duplicate to demonstrate 15s dedupe
-        r1 = io_request("historical", key="dup-test", func=lambda: None, hist_limiter=hist, web_bucket=web)
+        _ = io_request("historical", key="dup-test", func=lambda: None, hist_limiter=hist, web_bucket=web)
         r2 = io_request("historical", key="dup-test", func=lambda: None, hist_limiter=hist, web_bucket=web)
         if r2 is None:
             counters["dup_hist_skips"] += 1

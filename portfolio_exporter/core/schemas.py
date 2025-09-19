@@ -1,7 +1,6 @@
 """Optional Pandera schemas for CSV preflight checks."""
-from __future__ import annotations
 
-from typing import List
+from __future__ import annotations
 
 import pandas as pd
 
@@ -43,7 +42,7 @@ if pa:  # pragma: no branch
         "trades": TradesSchema.to_schema(),
     }
 
-    def check_headers(name: str, df: pd.DataFrame) -> List[str]:
+    def check_headers(name: str, df: pd.DataFrame) -> list[str]:
         schema = SCHEMAS.get(name)
         if schema is None:
             return []
@@ -54,5 +53,5 @@ if pa:  # pragma: no branch
 
 else:  # pandera not installed
 
-    def check_headers(name: str, df: pd.DataFrame) -> List[str]:  # type: ignore[override]
+    def check_headers(name: str, df: pd.DataFrame) -> list[str]:  # type: ignore[override]
         return ["pandera not installed"]

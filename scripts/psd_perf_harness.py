@@ -5,7 +5,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from psd.analytics.stats import compute_stats
 
@@ -43,7 +43,7 @@ def run_benchmark(
     snapshot = _load_snapshot(path)
 
     durations_ms: list[float] = []
-    latest_stats: Optional[Dict[str, Any]] = None
+    latest_stats: dict[str, Any] | None = None
 
     count = max(1, int(iterations))
     for _ in range(count):
@@ -83,25 +83,16 @@ def main(argv: list[str] | None = None) -> int:
     option_legs = int(stats.get("option_legs_count") or 0)
 
     print(
-        (
-            "[psd-perf] fixture=%s iterations=%d avg=%.2fms p95=%.2fms "
-            "option_legs=%d combos=%d stale_quotes=%d"
-        )
-        % (
-            result.get("fixture"),
-            result["iterations"],
-            result["avg_ms"],
-            result["p95_ms"],
-            option_legs,
-            combos,
-            stale_quotes,
-        )
+        "[psd-perf] fixture="
+        f"{result.get('fixture')} iterations={result['iterations']} "
+        f"avg={result['avg_ms']:.2f}ms p95={result['p95_ms']:.2f}ms "
+        f"option_legs={option_legs} combos={combos} stale_quotes={stale_quotes}"
     )
 
     threshold = args.threshold_ms or DEFAULT_THRESHOLD_MS
     if result["p95_ms"] > threshold:
         print(
-            "[psd-perf] ALERT: p95 %.2f ms exceeded %.2f ms threshold" % (result["p95_ms"], threshold),
+            f"[psd-perf] ALERT: p95 {result['p95_ms']:.2f} ms exceeded {threshold:.2f} ms threshold",
             file=sys.stderr,
         )
     return 0

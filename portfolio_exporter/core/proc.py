@@ -7,8 +7,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 # PID files under out/.pid (created on import for convenience)
 PID_DIR = Path("out/.pid")
@@ -61,7 +60,7 @@ def is_running(pid: int) -> bool:
         return False
 
 
-def status() -> Dict[str, Any]:
+def status() -> dict[str, Any]:
     """Return current sentinel status with pid/meta if present."""
     if not PID.exists():
         return {"running": False, "reason": "pidfile missing"}
@@ -70,7 +69,7 @@ def status() -> Dict[str, Any]:
     except Exception:
         return {"running": False, "reason": "invalid pidfile"}
     running = is_running(pid)
-    meta: Dict[str, Any] = {}
+    meta: dict[str, Any] = {}
     if META.exists():
         try:
             meta = json.loads(META.read_text(encoding="utf-8"))
@@ -79,7 +78,7 @@ def status() -> Dict[str, Any]:
     return {"running": running, "pid": pid, **meta}
 
 
-def start(argv: list[str]) -> Dict[str, Any]:
+def start(argv: list[str]) -> dict[str, Any]:
     """Start the Micro‑MOMO sentinel as a detached background process.
 
     Returns {ok, pid} on success or {ok: False, msg} if already running.
@@ -105,7 +104,7 @@ def start(argv: list[str]) -> Dict[str, Any]:
     return {"ok": True, "pid": proc.pid}
 
 
-def stop(grace_seconds: int = 5) -> Dict[str, Any]:
+def stop(grace_seconds: int = 5) -> dict[str, Any]:
     """Stop the sentinel gracefully (SIGTERM), then force kill if needed."""
     if not PID.exists():
         return {"ok": False, "msg": "not running"}
@@ -148,7 +147,7 @@ def _cleanup() -> None:
 # --------------------------
 # Generic module proc helpers
 # --------------------------
-def start_module(pid_base: str, module: str, argv: list[str]) -> Dict[str, Any]:
+def start_module(pid_base: str, module: str, argv: list[str]) -> dict[str, Any]:
     """Start a python -m <module> with argv as a detached/background proc and write PID/meta.
 
     Uses per-module pid/meta files under out/.pid as <pid_base>.pid and <pid_base>.meta.json.
@@ -195,7 +194,7 @@ def start_module(pid_base: str, module: str, argv: list[str]) -> Dict[str, Any]:
     return {"ok": True, "pid": proc.pid}
 
 
-def status_module(pid_base: str) -> Dict[str, Any]:
+def status_module(pid_base: str) -> dict[str, Any]:
     """Return running status and meta for a generic module started via start_module."""
     pid_path = PID_DIR / f"{pid_base}.pid"
     meta_path = PID_DIR / f"{pid_base}.meta.json"
@@ -206,7 +205,7 @@ def status_module(pid_base: str) -> Dict[str, Any]:
     except Exception:
         return {"running": False, "reason": "invalid pidfile"}
     running = is_running(pid)
-    meta: Dict[str, Any] = {}
+    meta: dict[str, Any] = {}
     if meta_path.exists():
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -215,7 +214,7 @@ def status_module(pid_base: str) -> Dict[str, Any]:
     return {"running": running, "pid": pid, **meta}
 
 
-def start_module_logged(pid_base: str, module: str, argv: list[str], log_path: str) -> Dict[str, Any]:
+def start_module_logged(pid_base: str, module: str, argv: list[str], log_path: str) -> dict[str, Any]:
     """Start python -m <module> with argv; pipe stdout/stderr to log_path; write PID/meta.
 
     Writes pid/meta to out/.pid and ensures the log directory exists. Returns
@@ -269,7 +268,7 @@ def start_module_logged(pid_base: str, module: str, argv: list[str], log_path: s
     return {"ok": True, "pid": proc.pid, "log": str(lp)}
 
 
-def stop_module(pid_base: str, grace_seconds: int = 5) -> Dict[str, Any]:
+def stop_module(pid_base: str, grace_seconds: int = 5) -> dict[str, Any]:
     """Stop a generic background module started via start_module/start_module_logged.
 
     Attempts graceful terminate, then force kill, and removes that module's pid/meta files.

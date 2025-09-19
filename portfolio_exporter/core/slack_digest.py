@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 
-def _top_a(scored: List[Dict[str, Any]], n: int = 6) -> List[Dict[str, Any]]:
+def _top_a(scored: list[dict[str, Any]], n: int = 6) -> list[dict[str, Any]]:
     a = [r for r in scored if (r.get("tier") == "A")]
     try:
         a.sort(key=lambda r: float(r.get("raw_score") or 0), reverse=True)
@@ -13,14 +13,14 @@ def _top_a(scored: List[Dict[str, Any]], n: int = 6) -> List[Dict[str, Any]]:
     return a[:n]
 
 
-def build_blocks(scored: List[Dict[str, Any]], published_dir: str) -> Dict[str, Any]:
+def build_blocks(scored: list[dict[str, Any]], published_dir: str) -> dict[str, Any]:
     tiers = {"A": 0, "B": 0, "C": 0}
     for r in scored:
         t = (r.get("tier") or "").strip()
         if t in tiers:
             tiers[t] += 1
     title = f"Micro-MOMO — {tiers['A']} A  /  {tiers['B']} B  /  {tiers['C']} C"
-    rows: List[str] = []
+    rows: list[str] = []
     for r in _top_a(scored):
         sym = r.get("symbol", "?")
         scr = r.get("raw_score", "")
@@ -42,4 +42,3 @@ def build_blocks(scored: List[Dict[str, Any]], published_dir: str) -> Dict[str, 
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*Top A-tier*\n{tbl}"}},
     ]
     return {"blocks": blocks}
-

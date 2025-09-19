@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+
 try:
     # Python 3.9+ exposes BooleanOptionalAction for --flag/--no-flag pairs
     from argparse import BooleanOptionalAction  # noqa: F401
@@ -11,10 +12,9 @@ except Exception:  # pragma: no cover - fallback for <3.9
     _HAS_BOA = False
 
 from pathlib import Path
-from typing import List
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("micro-momo-go")
     ap.add_argument("--symbols", help="comma list (optional)")
     ap.add_argument("--cfg", default="micro_momo_config.json")
@@ -55,15 +55,16 @@ def main(argv: List[str] | None = None) -> int:
 
     from portfolio_exporter.scripts import micro_momo_analyzer as ana
     from portfolio_exporter.scripts import micro_momo_dashboard as dash
-    from ..core.publish import publish_pack, open_dashboard
-    from ..core.slack_digest import build_blocks
+
     from ..core.alerts import emit_alerts
     from ..core.memory import get_pref, set_pref
+    from ..core.publish import open_dashboard, publish_pack
+    from ..core.slack_digest import build_blocks
 
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
 
     # 1) Analyze (+journal + basket + optional webhook to let you know run started)
-    argv_ana: List[str] = [
+    argv_ana: list[str] = [
         "--out_dir",
         args.out_dir,
         "--data-mode",
@@ -128,7 +129,7 @@ def main(argv: List[str] | None = None) -> int:
     if args.start_sentinel:
         from portfolio_exporter.scripts import micro_momo_sentinel as sen
 
-        argv_sen: List[str] = [
+        argv_sen: list[str] = [
             "--scored-csv",
             os.path.join(args.out_dir, "micro_momo_scored.csv"),
             "--cfg",

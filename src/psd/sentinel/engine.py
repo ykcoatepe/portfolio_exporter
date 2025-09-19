@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
-from ..models import Alert, Position, RiskSnapshot, OptionLeg
-from ..analytics.exposure import delta_beta_exposure
-from ..analytics.var import var95_1d_from_closes
 from ..analytics.combos import recognize
-from ..datasources import ibkr as ib_src, yfin as yf_src
-from ..rules import risk_bands, circuit_breakers, theta_templates, universal
-from ..rules import budgets as budget_rules
+from ..analytics.exposure import delta_beta_exposure
 from ..analytics.kpis import per_sleeve_kpis
-from .memos import write_jsonl, write_digest
+from ..analytics.var import var95_1d_from_closes
+from ..datasources import ibkr as ib_src
+from ..datasources import yfin as yf_src
+from ..models import Alert, OptionLeg, Position, RiskSnapshot
+from ..rules import budgets as budget_rules
+from ..rules import circuit_breakers, risk_bands, theta_templates
+from .memos import write_digest, write_jsonl
 
 
 def _now_ts() -> int:
@@ -21,8 +22,8 @@ def _now_ts() -> int:
 
 
 # In-memory alert quieting state (per process)
-_last_alert_ts: Dict[Tuple[str, str], int] = {}
-_snooze_until: Dict[Tuple[str, str], int] = {}
+_last_alert_ts: dict[tuple[str, str], int] = {}
+_snooze_until: dict[tuple[str, str], int] = {}
 _state_loaded: bool = False
 
 
@@ -35,9 +36,10 @@ def _rebuild_state_from_memos(memo_path: str) -> None:
     global _state_loaded
     try:
         import json
+
         if not memo_path:
             return
-        with open(memo_path, "r", encoding="utf-8") as fh:
+        with open(memo_path, encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line:
@@ -69,8 +71,8 @@ def _rebuild_state_from_memos(memo_path: str) -> None:
         _state_loaded = True
 
 
-def _load_positions(cfg: Dict[str, Any]) -> List[Position]:
-    positions: List[Position] = []
+def _load_positions(cfg: dict[str, Any]) -> list[Position]:
+    positions: list[Position] = []
     src_positions = cfg.get("positions_override")
     if src_positions is None:
         src_positions = ib_src.get_positions(cfg)
@@ -99,10 +101,10 @@ def _load_positions(cfg: Dict[str, Any]) -> List[Position]:
 
 
 def _risk_context(
-    positions: List[Position],
-    cfg: Dict[str, Any],
+    positions: list[Position],
+    cfg: dict[str, Any],
     nav: float,
-) -> Tuple[RiskSnapshot, str, Dict[str, bool], Dict[str, bool], Dict[str, str]]:
+) -> tuple[RiskSnapshot, str, dict[str, bool], dict[str, bool], dict[str, str]]:
     vix = yf_src.get_vix(cfg) or 20.0
     d_beta = delta_beta_exposure(positions, nav)
     closes = yf_src.get_closes("SPY", 60, cfg)
@@ -113,11 +115,13 @@ def _risk_context(
     daily_ret = float(cfg.get("daily_return", 0.0))
     var_change = float(cfg.get("var_change", 0.0))
     breakers = circuit_breakers.evaluate(daily_ret, var_change)
-    breaker_state = circuit_breakers.derive_state(float(cfg.get("day_pl", daily_ret)), float(cfg.get("month_pl", 0.0)))
+    breaker_state = circuit_breakers.derive_state(
+        float(cfg.get("day_pl", daily_ret)), float(cfg.get("month_pl", 0.0))
+    )
     return snapshot, band_key, breaches, breakers, breaker_state
 
 
-def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
     """Run a single scan and return a DTO for CLI rendering.
 
     The result contains: snapshot, alerts, rows (for CLI table).
@@ -145,15 +149,26 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
             minutes = int(it.get("minutes", 0)) if it.get("minutes") is not None else 0
             until = int(it.get("until", 0)) if it.get("until") is not None else 0
             if until <= now:
-                until = now + (minutes if minutes > 0 else int(cfg.get("alerts", {}).get("snooze_default_min", 30))) * 60
+                until = (
+                    now
+                    + (minutes if minutes > 0 else int(cfg.get("alerts", {}).get("snooze_default_min", 30)))
+                    * 60
+                )
             _snooze_until[(uid, rule)] = until
             write_jsonl(
                 memo_path,
-                {"ts": now, "type": "snooze", "uid": uid, "rule": rule, "until": until, "minutes": minutes or None},
+                {
+                    "ts": now,
+                    "type": "snooze",
+                    "uid": uid,
+                    "rule": rule,
+                    "until": until,
+                    "minutes": minutes or None,
+                },
             )
 
     positions = _load_positions(cfg)
-    mark_backfills: List[str] = []
+    mark_backfills: list[str] = []
     if hasattr(ib_src, "consume_mark_backfills"):
         try:
             mark_backfills = ib_src.consume_mark_backfills()  # type: ignore[attr-defined]
@@ -168,10 +183,12 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
     margin_used = snapshot.margin_used or 0.0
 
     # Build alerts and rows
-    alerts: List[Alert] = []
-    rows: List[Dict[str, Any]] = []
+    alerts: list[Alert] = []
+    rows: list[dict[str, Any]] = []
     # Leg-level alerts suppressed; evaluate at combo-level
-    combo_debits: Dict[str, float] = cfg.get("combo_debits", {}) if isinstance(cfg.get("combo_debits"), dict) else {}
+    combo_debits: dict[str, float] = (
+        cfg.get("combo_debits", {}) if isinstance(cfg.get("combo_debits"), dict) else {}
+    )
     now_ts = _now_ts()
     debounce_min = 0
     try:
@@ -179,7 +196,7 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
     except Exception:
         debounce_min = 5
     debounce_sec = max(0, debounce_min) * 60
-    suppressed_now: set[Tuple[str, str]] = set()
+    suppressed_now: set[tuple[str, str]] = set()
     for c in combos:
         uid = f"{c.symbol}-{c.expiry}-{c.kind}"
         debit_now = float(combo_debits.get(uid, max(0.0, c.credit * 0.5)))
@@ -269,22 +286,59 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
                 memo_path,
                 {"ts": now_ts, "type": "snoozed", "uid": uid, "rule": "orphan", "next": until},
             )
-            rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": None, "alert": (o.get("reason", "") + " [SNOOZED]")})
+            rows.append(
+                {
+                    "uid": uid,
+                    "sleeve": "theta",
+                    "kind": "orphan",
+                    "R": 0,
+                    "stop": "-",
+                    "target": "-",
+                    "mark": None,
+                    "alert": (o.get("reason", "") + " [SNOOZED]"),
+                }
+            )
         else:
             last = _last_alert_ts.get(key, 0)
             if last and (now_ts - last) < debounce_sec:
                 nxt = last + debounce_sec
-                write_jsonl(memo_path, {"ts": now_ts, "type": "suppressed", "uid": uid, "rule": "orphan", "next": nxt})
-                rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": None, "alert": (o.get("reason", "") + " (debounced)")})
+                write_jsonl(
+                    memo_path, {"ts": now_ts, "type": "suppressed", "uid": uid, "rule": "orphan", "next": nxt}
+                )
+                rows.append(
+                    {
+                        "uid": uid,
+                        "sleeve": "theta",
+                        "kind": "orphan",
+                        "R": 0,
+                        "stop": "-",
+                        "target": "-",
+                        "mark": None,
+                        "alert": (o.get("reason", "") + " (debounced)"),
+                    }
+                )
             else:
-                alerts.append(Alert(uid=uid, rule="orphan", severity="warn", message=o.get("reason", "orphan-risk")))
-                rows.append({"uid": uid, "sleeve": "theta", "kind": "orphan", "R": 0, "stop": "-", "target": "-", "mark": None, "alert": o.get("reason", "")})
+                alerts.append(
+                    Alert(uid=uid, rule="orphan", severity="warn", message=o.get("reason", "orphan-risk"))
+                )
+                rows.append(
+                    {
+                        "uid": uid,
+                        "sleeve": "theta",
+                        "kind": "orphan",
+                        "R": 0,
+                        "stop": "-",
+                        "target": "-",
+                        "mark": None,
+                        "alert": o.get("reason", ""),
+                    }
+                )
                 _last_alert_ts[key] = now_ts
 
     # Budgets footer
     fees_wtd = float(cfg.get("theta_fees_wtd", 0.0))
     hedge_mtd = float(cfg.get("hedge_cost_mtd", 0.0))
-    thresholds = (cfg.get("budgets") if isinstance(cfg.get("budgets"), dict) else {})
+    thresholds = cfg.get("budgets") if isinstance(cfg.get("budgets"), dict) else {}
     budgets_dto = budget_rules.footer_dto(nav, fees_wtd, hedge_mtd, thresholds)
 
     # Write memos
@@ -353,12 +407,15 @@ def scan_once(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "margin_used": margin_used,
         },
         "budgets": budgets_dto,
-        "alerts": [{"uid": a.uid, "rule": a.rule, "severity": a.severity, "message": a.message, "data": a.data} for a in alerts],
+        "alerts": [
+            {"uid": a.uid, "rule": a.rule, "severity": a.severity, "message": a.message, "data": a.data}
+            for a in alerts
+        ],
         "rows": rows,
     }
 
 
-def compute_snapshot(cfg: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def compute_snapshot(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
     """Lightweight helper returning risk snapshot context without memo side-effects."""
     cfg = cfg or {}
     nav = float(cfg.get("nav", 100_000.0))
