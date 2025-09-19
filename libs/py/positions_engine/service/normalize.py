@@ -126,6 +126,10 @@ def _extract_metadata(row: dict[str, Any], inst_type: InstrumentType) -> dict[st
         if value is not None:
             metadata[greek] = _to_decimal(value)
 
+    iv_value = _get_value("iv", "IV", "implied_vol", "implied_volatility")
+    if iv_value is not None:
+        metadata["iv"] = _to_decimal(iv_value)
+
     combo_legs = _get_value("combo_legs")
     if combo_legs is not None:
         parsed = _parse_combo_legs(combo_legs)

@@ -45,6 +45,7 @@ class OptionLegSnapshot:
     gamma: Decimal | None
     theta: Decimal | None
     vega: Decimal | None
+    iv: Decimal | None
     day_pnl: Decimal
     total_pnl: Decimal
     day_basis: Decimal | None
@@ -83,6 +84,7 @@ class OptionLegSnapshot:
             "gamma": _to_float(self.gamma),
             "theta": _to_float(self.theta),
             "vega": _to_float(self.vega),
+            "iv": _to_float(self.iv),
             "day_pnl": _to_float(self.day_pnl),
             "total_pnl": _to_float(self.total_pnl),
             "day_basis": _to_float(self.day_basis),
@@ -160,6 +162,7 @@ class _NormalizedMetadata:
     gamma: Decimal | None
     theta: Decimal | None
     vega: Decimal | None
+    iv: Decimal | None
     feed_strategy_id: str | None
     feed_combo_id: str | None
     notes: tuple[str, ...]
@@ -218,6 +221,7 @@ def build_option_leg_snapshot(
         gamma=normalized.gamma,
         theta=normalized.theta,
         vega=normalized.vega,
+        iv=normalized.iv,
         day_pnl=pnl.day,
         total_pnl=pnl.total,
         day_basis=day_basis,
@@ -317,6 +321,7 @@ def _normalize_option_metadata(position: Position, now: datetime) -> _Normalized
     gamma = _maybe_decimal(metadata.get("gamma"))
     theta = _maybe_decimal(metadata.get("theta"))
     vega = _maybe_decimal(metadata.get("vega"))
+    iv = _maybe_decimal(metadata.get("iv"))
 
     feed_strategy_id = metadata.get("strategy_id")
     feed_combo_id = metadata.get("combo_id")
@@ -336,6 +341,7 @@ def _normalize_option_metadata(position: Position, now: datetime) -> _Normalized
         gamma=gamma,
         theta=theta,
         vega=vega,
+        iv=iv,
         feed_strategy_id=str(feed_strategy_id).strip() if feed_strategy_id else None,
         feed_combo_id=str(feed_combo_id).strip() if feed_combo_id else None,
         notes=normalized_notes,

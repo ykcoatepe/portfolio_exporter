@@ -1,26 +1,7 @@
 import CombosTable from "../components/CombosTable";
 import OptionLegsTable from "../components/OptionLegsTable";
+import RulesPanel from "../components/RulesPanel";
 import StocksTable from "../components/StocksTable";
-
-const PlaceholderCard = ({
-  title,
-  description,
-  bullets,
-}: {
-  title: string;
-  description: string;
-  bullets: string[];
-}) => (
-  <div className="rounded-2xl border border-dashed border-slate-800/70 bg-slate-950/40 p-6 shadow-inner shadow-slate-950/30">
-    <h3 className="text-base font-semibold text-slate-100">{title}</h3>
-    <p className="mt-3 max-w-2xl text-sm text-slate-400">{description}</p>
-    <ul className="mt-4 list-disc space-y-2 pl-6 text-sm text-slate-400">
-      {bullets.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  </div>
-);
 
 const PSDPage = () => (
   <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -64,15 +45,7 @@ const PSDPage = () => (
         tabIndex={0}
         className="rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
       >
-        <PlaceholderCard
-          title="Rules & Fundamentals"
-          description="Placeholder for breach counters, alert timelines, and fundamentals mini-tiles once the services land."
-          bullets={[
-            "Critical and warning breach badges with relative timestamps",
-            "Top rule breaches prioritized for escalation",
-            "Fundamentals mini-grid (market cap, PE, earnings, dividend)",
-          ]}
-        />
+        <RulesPanel />
       </section>
     </main>
   </div>

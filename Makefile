@@ -65,11 +65,7 @@ contract-sync:
 	cd apps/web && npx openapi-typescript http://127.0.0.1:8000/openapi.json -o src/lib/api.d.ts
 
 typegen-local:
-	python - <<'PY' > apps/web/openapi.json
-from apps.api.main import app
-import json, sys
-sys.stdout.write(json.dumps(app.openapi()))
-PY
+	python -c 'from apps.api.main import app; import json, sys; sys.stdout.write(json.dumps(app.openapi()))' > apps/web/openapi.json
 	cd apps/web && npx --yes openapi-typescript ./openapi.json -o src/lib/api.d.ts
 
 ui-test:

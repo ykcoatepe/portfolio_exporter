@@ -52,6 +52,10 @@ class PositionsState:
             "legs": [leg.to_payload() for leg in detection.orphans],
         }
 
+    def options_detection(self, now: datetime | None = None) -> ComboDetection:
+        detection, _ = self._ensure_options_detection(now)
+        return detection
+
     def stats(self, now: datetime | None = None) -> dict[str, int | float]:
         rows, stale = self._rows(now)
         detection, _ = self._ensure_options_detection(now)
