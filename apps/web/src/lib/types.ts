@@ -147,3 +147,94 @@ export interface OptionLegRow extends OptionGreekSummary {
   totalPnlPercent: number | null;
   isOrphan: boolean;
 }
+
+export interface PortfolioStatsApiResponse {
+  equity_count?: number | null;
+  quote_count?: number | null;
+  option_legs_count?: number | null;
+  combos_matched?: number | null;
+  stale_quotes_count?: number | null;
+  rules_count?: number | null;
+  breaches_count?: number | null;
+  rules_eval_ms?: number | null;
+  combos_detection_ms?: number | null;
+  trades_prior_positions?: boolean | null;
+  net_liq?: number | null;
+  netLiq?: number | null;
+  var95?: number | null;
+  var_95?: number | null;
+  var95_1d_pct?: number | null;
+  margin_pct?: number | null;
+  marginPct?: number | null;
+  margin_used_pct?: number | null;
+  updated_at?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface PortfolioStatsCounts {
+  equities: number;
+  quotes: number;
+  optionLegs: number;
+  combos: number;
+  staleQuotes: number;
+  rules?: number;
+  breaches?: number;
+}
+
+export interface PortfolioStats {
+  netLiq: number | null;
+  var95: number | null;
+  marginPct: number | null;
+  updatedAt: string | null;
+  counts: PortfolioStatsCounts;
+  rulesEvalMs: number | null;
+  tradesPriorPositions: boolean;
+}
+
+export type PSDGreeks = {
+  delta?: number;
+  gamma?: number;
+  theta?: number;
+};
+
+export type PSDLeg = {
+  secType: "STK" | "OPT" | "FOP";
+  symbol: string;
+  qty: number;
+  avg_cost: number;
+  multiplier?: number;
+  mark: number;
+  price_source: string;
+  stale_s: number;
+  pnl_intraday: number;
+  greeks?: PSDGreeks;
+  right?: string;
+  strike?: number;
+  expiry?: string;
+  conId?: number;
+};
+
+export type PSDCombo = {
+  combo_id: string;
+  name: string;
+  underlier?: string;
+  legs: PSDLeg[];
+  pnl_intraday: number;
+  greeks_agg?: PSDGreeks;
+};
+
+export type PSDPositionsView = {
+  single_stocks: PSDLeg[];
+  option_combos: PSDCombo[];
+  single_options: PSDLeg[];
+};
+
+export type PSDSnapshot = {
+  ts?: number | null;
+  session: "RTH" | "EXT" | "CLOSED";
+  positions?: unknown[];
+  positions_view?: PSDPositionsView;
+  quotes?: Record<string, unknown>;
+  risk?: Record<string, unknown>;
+  [key: string]: unknown;
+};

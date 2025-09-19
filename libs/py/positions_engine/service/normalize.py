@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -55,11 +56,46 @@ def quotes_from_records(records: Iterable[dict[str, Any]]) -> list[Quote]:
                 last=_to_decimal(row.get("last", row.get("close"))),
                 previous_close=_to_decimal(row.get("previous_close", row.get("priorClose"))),
                 session=_safe_session(str(row.get("session", TradingSession.CLOSED.value))),
-                updated_at=_parse_timestamp(row.get("updated_at")),
+                updated_at=_extract_quote_timestamp(row),
                 extended_last=_to_decimal(row.get("extended_last")),
             )
         )
     return out
+
+
+def _extract_quote_timestamp(row: dict[str, Any]) -> datetime | None:
+    candidates = (
+        "updated_at",
+        "updatedAt",
+        "quote_ts",
+        "quote_timestamp",
+        "quoteTimestamp",
+        "timestamp",
+        "ts",
+        "last_update",
+        "last_updated",
+        "lastUpdate",
+        "lastUpdated",
+        "as_of",
+        "asOf",
+    )
+
+    for key in candidates:
+        if key in row:
+            ts = _parse_timestamp(row.get(key))
+            if ts is not None:
+                return ts
+
+    for nested_key in ("tick", "quote", "mark"):
+        nested = row.get(nested_key)
+        if not isinstance(nested, dict):
+            continue
+        for key in ("updated_at", "timestamp", "ts", "quote_ts"):
+            ts = _parse_timestamp(nested.get(key))
+            if ts is not None:
+                return ts
+
+    return None
 
 
 def _resolve_symbol(row: dict[str, Any]) -> str | None:
@@ -189,12 +225,44 @@ def _to_decimal(value: Any) -> Decimal | None:
 def _parse_timestamp(value: Any) -> datetime | None:
     if value in (None, ""):
         return None
+
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
-    if isinstance(value, int | float):
-        return datetime.fromtimestamp(float(value), tz=UTC)
+
+    seconds: float | None = None
+
+    if isinstance(value, (int, float)):
+        seconds = float(value)
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.endswith("Z") or text.endswith("z"):
+            text = text[:-1] + "+00:00"
+        try:
+            seconds = float(text)
+        except (TypeError, ValueError):
+            seconds = None
+        else:
+            if math.isnan(seconds):
+                seconds = None
+    if seconds is not None:
+        if seconds > 1e12:
+            seconds /= 1000.0
+        try:
+            return datetime.fromtimestamp(seconds, tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            return None
+
+    if not isinstance(value, str):
+        value = str(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z") or text.endswith("z"):
+        text = text[:-1] + "+00:00"
     try:
-        parsed = datetime.fromisoformat(str(value))
+        parsed = datetime.fromisoformat(text)
     except ValueError:
         return None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)

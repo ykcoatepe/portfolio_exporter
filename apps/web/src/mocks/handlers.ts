@@ -1,6 +1,12 @@
 import { http, HttpResponse } from "msw";
 
-import type { OptionsApiResponse, OptionComboLegApi, StocksApiResponse } from "../lib/types";
+import type {
+  OptionsApiResponse,
+  OptionComboLegApi,
+  PortfolioStatsApiResponse,
+  PSDSnapshot,
+  StocksApiResponse,
+} from "../lib/types";
 import fundamentalsFixture from "./data/fundamentals.json";
 
 const minutesAgo = (anchor: Date, minutes: number) =>
@@ -384,6 +390,134 @@ export const buildOptionsResponse = (
   };
 };
 
+export const buildStatsResponse = (
+  overrides: Partial<PortfolioStatsApiResponse> = {},
+): PortfolioStatsApiResponse => {
+  const nowIso = new Date().toISOString();
+  const base: PortfolioStatsApiResponse = {
+    equity_count: 24,
+    option_legs_count: 68,
+    combos_matched: 12,
+    stale_quotes_count: 1,
+    net_liq: 1_245_320.54,
+    var95_1d_pct: 58_320.12,
+    margin_used_pct: 0.37,
+    updated_at: nowIso,
+  };
+
+  return {
+    equity_count: overrides.equity_count ?? base.equity_count,
+    option_legs_count: overrides.option_legs_count ?? base.option_legs_count,
+    combos_matched: overrides.combos_matched ?? base.combos_matched,
+    stale_quotes_count: overrides.stale_quotes_count ?? base.stale_quotes_count,
+    net_liq: overrides.net_liq ?? overrides.netLiq ?? base.net_liq,
+    var95_1d_pct:
+      overrides.var95_1d_pct ?? overrides.var95 ?? overrides.var_95 ?? base.var95_1d_pct,
+    margin_used_pct:
+      overrides.margin_used_pct ?? overrides.margin_pct ?? overrides.marginPct ?? base.margin_used_pct,
+    margin_pct: overrides.margin_pct ?? overrides.marginPct ?? base.margin_used_pct,
+    updated_at: overrides.updated_at ?? overrides.updatedAt ?? base.updated_at,
+  };
+};
+
+export const buildPsdSnapshot = (overrides: Partial<PSDSnapshot> = {}): PSDSnapshot => {
+  const now = Date.now();
+  const baseView = {
+    single_stocks: [
+      {
+        secType: "STK" as const,
+        symbol: "AAPL",
+        qty: 120,
+        avg_cost: 150,
+        multiplier: 1,
+        mark: 152.34,
+        price_source: "last",
+        stale_s: 25,
+        pnl_intraday: 280.8,
+        greeks: { delta: 120 },
+        conId: 101,
+      },
+    ],
+    option_combos: [
+      {
+        combo_id: "combo-aapl-call-spread",
+        name: "AAPL CALL SPREAD",
+        underlier: "AAPL",
+        pnl_intraday: 420.0,
+        greeks_agg: { delta: 0.22, gamma: 0.08, theta: -0.05 },
+        legs: [
+          {
+            secType: "OPT" as const,
+            symbol: "AAPL",
+            qty: 1,
+            avg_cost: 5,
+            multiplier: 100,
+            mark: 6.4,
+            price_source: "mid",
+            stale_s: 40,
+            pnl_intraday: 140,
+            greeks: { delta: 0.4, gamma: 0.02, theta: -0.08 },
+            right: "CALL",
+            strike: 180,
+            expiry: "20240119",
+            conId: 2001,
+          },
+          {
+            secType: "OPT" as const,
+            symbol: "AAPL",
+            qty: -1,
+            avg_cost: 3,
+            multiplier: 100,
+            mark: 2.2,
+            price_source: "mid",
+            stale_s: 44,
+            pnl_intraday: 280,
+            greeks: { delta: -0.18, gamma: -0.01, theta: -0.02 },
+            right: "CALL",
+            strike: 190,
+            expiry: "20240119",
+            conId: 2002,
+          },
+        ],
+      },
+    ],
+    single_options: [
+      {
+        secType: "OPT" as const,
+        symbol: "MSFT",
+        qty: 1,
+        avg_cost: 2,
+        multiplier: 100,
+        mark: 2.6,
+        price_source: "mid",
+        stale_s: 35,
+        pnl_intraday: 60,
+        greeks: { delta: -0.4, theta: -0.02 },
+        right: "PUT",
+        strike: 300,
+        expiry: "20240216",
+        conId: 3001,
+      },
+    ],
+  } satisfies PSDSnapshot["positions_view"];
+
+  const mergedView = {
+    single_stocks: overrides.positions_view?.single_stocks ?? baseView.single_stocks,
+    option_combos: overrides.positions_view?.option_combos ?? baseView.option_combos,
+    single_options: overrides.positions_view?.single_options ?? baseView.single_options,
+  };
+
+  return {
+    ts: overrides.ts ?? now,
+    session: (overrides.session as PSDSnapshot["session"]) ?? "RTH",
+    positions: overrides.positions ?? [],
+    quotes: overrides.quotes ?? {},
+    risk: overrides.risk ?? {},
+    ...overrides,
+    positions_view: mergedView,
+  };
+};
+
 export const buildRulesSummaryResponse = (
   overrides: Partial<RulesSummaryFixture> = {},
 ): RulesSummaryFixture => {
@@ -550,6 +684,7 @@ export const buildRulesCatalogValidationResponse = (
 };
 
 export const handlers = [
+  http.get("*/state", () => HttpResponse.json(buildPsdSnapshot())),
   http.get("*/rules/catalog", () => HttpResponse.json(buildRulesCatalogResponse())),
   http.post("*/rules/validate", async ({ request }) => {
     const body = (await request.json().catch(() => ({}))) as { catalog_text?: string };
@@ -589,6 +724,7 @@ export const handlers = [
   http.post("*/rules/reload", () => HttpResponse.json(buildRulesCatalogResponse())),
   http.get("*/positions/stocks", () => HttpResponse.json(buildStocksResponse())),
   http.get("*/positions/options", () => HttpResponse.json(buildOptionsResponse())),
+  http.get("*/stats", () => HttpResponse.json(buildStatsResponse())),
   http.get("*/rules/summary", () => HttpResponse.json(buildRulesSummaryResponse())),
   http.get("*/fundamentals.json", () => HttpResponse.json(fundamentalsFixture)),
 ];

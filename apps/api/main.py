@@ -108,6 +108,26 @@ class RulesCatalogPublishResponseModel(BaseModel):
     updated_by: str | None = None
 
 
+class StatsResponse(BaseModel):
+    equity_count: int
+    quote_count: int | None = None
+    option_legs_count: int
+    combos_matched: int
+    stale_quotes_count: int
+    rules_count: int | None = None
+    breaches_count: int | None = None
+    rules_eval_ms: float | None = None
+    combos_detection_ms: float | None = None
+    net_liq: float | None = None
+    var95_1d_pct: float | None = None
+    margin_used_pct: float | None = None
+    updated_at: datetime | None = None
+    trades_prior_positions: bool | None = None
+
+    class Config:
+        extra = "allow"
+
+
 @app.on_event("startup")
 async def _on_startup() -> None:  # pragma: no cover - exercised by integration tests
     _refresh_from_disk()
@@ -125,17 +145,30 @@ def equities() -> list[dict[str, Any]]:
     return _state.equities_payload()
 
 
-@app.get("/stats", tags=["positions"])
-def stats() -> dict[str, Any]:
+@app.get(
+    "/stats",
+    tags=["positions"],
+    response_model=StatsResponse,
+    response_model_exclude_none=True,
+)
+def stats() -> StatsResponse:
     if _AUTO_REFRESH:
         _refresh_from_disk()
-    payload = _state.stats()
+    payload: dict[str, Any] = dict(_state.stats())
     evaluation = _rules_state.evaluate()
     payload["rules_count"] = len(_rules_state.rules)
     payload["breaches_count"] = len(evaluation.breaches)
     payload["rules_eval_ms"] = round(evaluation.duration_ms, 3)
     payload.setdefault("trades_prior_positions", bool(_load_prior_positions_hint()))
-    return payload
+    payload.setdefault("net_liq", None)
+    payload.setdefault("var95_1d_pct", None)
+    payload.setdefault("margin_used_pct", None)
+
+    snapshot_at = _state.snapshot_updated_at()
+    if snapshot_at is not None and not payload.get("updated_at"):
+        payload["updated_at"] = snapshot_at
+
+    return StatsResponse(**payload)
 
 
 def _refresh_from_disk() -> None:
@@ -147,8 +180,20 @@ def _refresh_from_disk() -> None:
     positions = (
         positions_from_records(positions_df.to_dict("records")) if hasattr(positions_df, "to_dict") else []
     )
-    quotes = quotes_from_records(quotes_df.to_dict("records")) if hasattr(quotes_df, "to_dict") else []
-    _state.refresh(positions=positions, quotes=_guard_quotes(quotes))
+    quotes_raw = quotes_from_records(quotes_df.to_dict("records")) if hasattr(quotes_df, "to_dict") else []
+    quotes = _guard_quotes(quotes_raw)
+
+    snapshot_at: datetime | None = None
+    for quote in quotes:
+        ts = quote.updated_at
+        if ts is None:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)
+        if snapshot_at is None or ts > snapshot_at:
+            snapshot_at = ts
+
+    _state.refresh(positions=positions, quotes=quotes, snapshot_at=snapshot_at)
 
 
 def _guard_quotes(quotes: list[Quote]) -> list[Quote]:

@@ -379,7 +379,7 @@ export function StocksTable(): JSX.Element {
                 </button>
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-right">
-                Total P&amp;L
+                Unrealized P&amp;L
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-right">
                 Staleness

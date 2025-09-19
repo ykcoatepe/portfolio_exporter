@@ -27,15 +27,21 @@ def test_snapshot_once_roundtrip(monkeypatch):
         assert greeks is fake_greeks
         return fake_risk
 
+    fake_positions_view = {"single_stocks": [], "option_combos": [], "single_options": []}
+
     monkeypatch.setattr(psd_adapter, "load_positions", _positions)
     monkeypatch.setattr(psd_adapter, "get_marks", _marks)
     monkeypatch.setattr(psd_adapter, "compute_greeks", _greeks)
     monkeypatch.setattr(psd_adapter, "compute_risk", _risk)
+    monkeypatch.setattr(psd_adapter, "split_positions", lambda _pos, _session: fake_positions_view)
+    monkeypatch.setattr(psd_adapter, "_resolve_session", lambda: "EXT")
 
     snap = asyncio.run(psd_adapter.snapshot_once())
-    assert set(snap.keys()) == {"ts", "positions", "quotes", "risk"}
+    assert set(snap.keys()) == {"ts", "session", "positions", "positions_view", "quotes", "risk"}
     assert isinstance(snap["ts"], float)
+    assert snap["session"] == "EXT"
     assert snap["positions"] is fake_positions
+    assert snap["positions_view"] is fake_positions_view
     assert snap["quotes"] is fake_marks
     assert snap["risk"] is fake_risk
 
@@ -60,7 +66,11 @@ def test_snapshot_with_delayed_marks(monkeypatch):
     monkeypatch.setattr(psd_adapter, "get_marks", _marks)
     monkeypatch.setattr(psd_adapter, "compute_greeks", _greeks)
     monkeypatch.setattr(psd_adapter, "compute_risk", _risk)
+    monkeypatch.setattr(psd_adapter, "split_positions", lambda _pos, _session: {"single_stocks": [], "option_combos": [], "single_options": []})
+    monkeypatch.setattr(psd_adapter, "_resolve_session", lambda: "EXT")
 
     snap = asyncio.run(psd_adapter.snapshot_once())
     assert snap["quotes"]["MSFT"]["source"] == "delayed"
     assert snap["risk"]["notional"] == 0.0
+    assert snap["session"] == "EXT"
+    assert snap["positions_view"] == {"single_stocks": [], "option_combos": [], "single_options": []}

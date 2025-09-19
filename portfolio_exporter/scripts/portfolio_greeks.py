@@ -655,10 +655,10 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
     doc.build(elements)
 
 
-# ─────────────────────────── MAIN ──────────────────────────
+# ─────────────────────────── LEGACY CLI (deprecated) ──────────────────────────
 
 
-def main() -> None:
+def main_cli() -> None:
     parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
     parser.add_argument(
         "--output-dir",

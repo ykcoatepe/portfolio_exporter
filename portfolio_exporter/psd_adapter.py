@@ -3,11 +3,37 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import os
 import time
 from collections.abc import Iterable
-from typing import Any
+from datetime import datetime
+from typing import Any, cast
+from zoneinfo import ZoneInfo
+
+from psd.core.mark_router import Session
+from psd.ingestor.normalize import split_positions
 
 logger = logging.getLogger("portfolio_exporter.psd_adapter")
+
+
+_ALLOWED_SESSIONS: set[str] = {"RTH", "EXT", "CLOSED"}
+
+
+def _infer_session_from_clock(now: datetime | None = None) -> Session:
+    tz = ZoneInfo("America/New_York")
+    reference = now.astimezone(tz) if now else datetime.now(tz)
+    if reference.weekday() >= 5:
+        return "CLOSED"
+    start = reference.replace(hour=9, minute=30, second=0, microsecond=0)
+    end = reference.replace(hour=16, minute=0, second=0, microsecond=0)
+    return "RTH" if start <= reference <= end else "EXT"
+
+
+def _resolve_session() -> Session:
+    override = os.getenv("PSD_SESSION", "").strip().upper()
+    if override in _ALLOWED_SESSIONS:
+        return cast(Session, override)
+    return _infer_session_from_clock()
 
 
 async def load_positions() -> list[dict[str, Any]]:
@@ -168,9 +194,18 @@ async def snapshot_once() -> dict[str, Any]:
     if not isinstance(risk, dict):
         raise TypeError("risk must be a dict")
 
+    session = _resolve_session()
+    try:
+        positions_view = split_positions(positions, session)
+    except Exception as exc:
+        logger.warning("snapshot positions_view failed: %s", exc)
+        positions_view = {"single_stocks": [], "option_combos": [], "single_options": []}
+
     return {
         "ts": ts,
+        "session": session,
         "positions": positions,
+        "positions_view": positions_view,
         "quotes": marks,
         "risk": risk,
     }

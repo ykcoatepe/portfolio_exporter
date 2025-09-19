@@ -25,11 +25,13 @@ class PositionsState:
         self._positions_version = 0
         self._quotes_version = 0
         self._options_cache: dict[str, Any] | None = None
+        self._snapshot_override: datetime | None = None
 
     def refresh(
         self,
         positions: Iterable[Position] | None = None,
         quotes: Iterable[Quote] | None = None,
+        snapshot_at: datetime | None = None,
     ) -> None:
         if positions is not None:
             self._positions_version += 1
@@ -39,6 +41,25 @@ class PositionsState:
             self._quotes = {q.symbol: q for q in quotes}
         if positions is not None or quotes is not None:
             self._options_cache = None
+        if snapshot_at is not None:
+            self._snapshot_override = _ensure_aware(snapshot_at)
+        elif quotes is not None:
+            self._snapshot_override = None
+
+    def snapshot_updated_at(self) -> datetime | None:
+        """Return the freshest quote timestamp available, if any."""
+
+        if self._snapshot_override is not None:
+            return self._snapshot_override
+
+        latest: datetime | None = None
+        for quote in self._quotes.values():
+            if quote.updated_at is None:
+                continue
+            candidate = _ensure_aware(quote.updated_at)
+            if latest is None or candidate > latest:
+                latest = candidate
+        return latest
 
     def equities_payload(self, now: datetime | None = None) -> list[dict[str, Any]]:
         rows, _ = self._rows(now)

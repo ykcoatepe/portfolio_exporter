@@ -80,7 +80,7 @@ function ComboLegsDetail({ legs }: { legs: OptionComboLegRow[] }) {
               Day P&amp;L
             </th>
             <th scope="col" className="px-3 py-2 text-left">
-              Total P&amp;L
+              Unrealized P&amp;L
             </th>
           </tr>
         </thead>
@@ -455,7 +455,7 @@ export function CombosTable(): JSX.Element {
                 ΣΔ/Γ/Θ/ν
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-left">
-                Day/Total P&amp;L
+                Day/Unrealized P&amp;L
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-left">
                 Mark

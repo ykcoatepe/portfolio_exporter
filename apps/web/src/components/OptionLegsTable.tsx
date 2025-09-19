@@ -508,7 +508,7 @@ export function OptionLegsTable(): JSX.Element {
                 IV
               </th>
               <th scope="col" role="columnheader" className="px-3 py-3 text-left">
-                Day/Total P&amp;L
+                Day/Unrealized P&amp;L
               </th>
               <th scope="col" role="columnheader" className="px-3 py-3 text-left">
                 Staleness
