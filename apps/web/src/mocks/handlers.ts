@@ -1,9 +1,38 @@
 import { http, HttpResponse } from "msw";
 
 import type { OptionsApiResponse, OptionComboLegApi, StocksApiResponse } from "../lib/types";
+import fundamentalsFixture from "./data/fundamentals.json";
 
 const minutesAgo = (anchor: Date, minutes: number) =>
   new Date(anchor.getTime() - minutes * 60_000).toISOString();
+
+interface RulesSummaryCounters {
+  total: number;
+  critical: number;
+  warning: number;
+  info: number;
+}
+
+interface RuleBreachFixture {
+  id: string;
+  rule: string;
+  severity: "critical" | "warning" | "info";
+  subject: string;
+  symbol?: string | null;
+  occurred_at: string;
+  description?: string | null;
+  status?: string | null;
+}
+
+interface RulesSummaryFixture {
+  as_of: string;
+  counters: RulesSummaryCounters;
+  top: RuleBreachFixture[];
+  focus_symbols: string[];
+  rules_total?: number;
+  evaluation_ms?: number;
+  fundamentals?: typeof fundamentalsFixture;
+}
 
 export const buildStocksResponse = (
   overrides: Partial<StocksApiResponse> = {},
@@ -302,7 +331,96 @@ export const buildOptionsResponse = (
   };
 };
 
+export const buildRulesSummaryResponse = (
+  overrides: Partial<RulesSummaryFixture> = {},
+): RulesSummaryFixture => {
+  const now = new Date();
+  const minutesAgoFromNow = (minutes: number) => minutesAgo(now, minutes);
+
+  const top: RuleBreachFixture[] = [
+    {
+      id: "breach-portfolio-var",
+      rule: "Portfolio VaR Limit",
+      severity: "critical",
+      subject: "Aggregate VaR",
+      symbol: "SPX",
+      occurred_at: minutesAgoFromNow(3),
+      description: "Portfolio level VaR exceeded the configured 2.0% limit.",
+      status: "OPEN",
+    },
+    {
+      id: "breach-tsla-delta",
+      rule: "Single Name Delta",
+      severity: "critical",
+      subject: "TSLA Delta Exposure",
+      symbol: "TSLA",
+      occurred_at: minutesAgoFromNow(5),
+      description: "TSLA directional delta drifted beyond the configured band.",
+      status: "OPEN",
+    },
+    {
+      id: "breach-aapl-theta",
+      rule: "Theta Budget",
+      severity: "warning",
+      subject: "AAPL Short Theta",
+      symbol: "AAPL",
+      occurred_at: minutesAgoFromNow(12),
+      description: "Short theta pacing is outside plan for the overnight window.",
+      status: "OPEN",
+    },
+    {
+      id: "breach-msft-vol",
+      rule: "Implied Vol Spike",
+      severity: "warning",
+      subject: "MSFT Earnings Run-up",
+      symbol: "MSFT",
+      occurred_at: minutesAgoFromNow(18),
+      description: "MSFT implied volatility spiked ahead of next earnings.",
+      status: "OPEN",
+    },
+    {
+      id: "breach-gld-roll",
+      rule: "Roll Reminder",
+      severity: "info",
+      subject: "GLD Hedge Roll",
+      symbol: "GLD",
+      occurred_at: minutesAgoFromNow(25),
+      description: "Reminder to roll GLD hedge to maintain target duration.",
+      status: "OPEN",
+    },
+  ];
+
+  const counters: RulesSummaryCounters = {
+    total: top.length,
+    critical: top.filter((item) => item.severity === "critical").length,
+    warning: top.filter((item) => item.severity === "warning").length,
+    info: top.filter((item) => item.severity === "info").length,
+  };
+
+  const base: RulesSummaryFixture = {
+    as_of: now.toISOString(),
+    counters,
+    top,
+    focus_symbols: ["SPX", "TSLA", "AAPL", "MSFT", "GLD"],
+    rules_total: overrides.rules_total ?? 32,
+    evaluation_ms: overrides.evaluation_ms ?? 4.2,
+    fundamentals: overrides.fundamentals ?? fundamentalsFixture,
+  };
+
+  return {
+    as_of: overrides.as_of ?? base.as_of,
+    counters: overrides.counters ?? base.counters,
+    top: overrides.top ?? base.top,
+    focus_symbols: overrides.focus_symbols ?? base.focus_symbols,
+    rules_total: overrides.rules_total ?? base.rules_total,
+    evaluation_ms: overrides.evaluation_ms ?? base.evaluation_ms,
+    fundamentals: overrides.fundamentals ?? base.fundamentals,
+  };
+};
+
 export const handlers = [
   http.get("*/positions/stocks", () => HttpResponse.json(buildStocksResponse())),
   http.get("*/positions/options", () => HttpResponse.json(buildOptionsResponse())),
+  http.get("*/rules/summary", () => HttpResponse.json(buildRulesSummaryResponse())),
+  http.get("*/fundamentals.json", () => HttpResponse.json(fundamentalsFixture)),
 ];

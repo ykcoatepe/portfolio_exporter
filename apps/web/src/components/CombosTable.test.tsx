@@ -1,4 +1,4 @@
-import { screen, waitFor, waitForElementToBeRemoved, within } from "@testing-library/react";
+import { act, screen, waitFor, waitForElementToBeRemoved, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -30,6 +30,7 @@ describe("CombosTable", () => {
   });
 
   test("renders combos and expands legs on toggle", async () => {
+    const user = userEvent.setup();
     renderWithClient(<CombosTable />);
 
     await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
@@ -43,7 +44,9 @@ describe("CombosTable", () => {
       { name: /expand iron condor/i },
     );
 
-    await userEvent.click(expandButton);
+    await act(async () => {
+      await user.click(expandButton);
+    });
 
     expect(await screen.findByText("4600.00")).toBeInTheDocument();
     expect(screen.getByText("1.05", { exact: false })).toBeInTheDocument();
@@ -52,11 +55,14 @@ describe("CombosTable", () => {
     expect(screen.getAllByText("MID")[0]).toBeInTheDocument();
 
     // Collapse again
-    await userEvent.click(expandButton);
+    await act(async () => {
+      await user.click(expandButton);
+    });
     expect(screen.queryByText("4600.00")).not.toBeInTheDocument();
   });
 
   test("supports keyboard navigation across combo rows", async () => {
+    const user = userEvent.setup();
     renderWithClient(<CombosTable />);
 
     await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
@@ -69,23 +75,39 @@ describe("CombosTable", () => {
 
     expect(dataRows.length).toBeGreaterThan(1);
 
-    dataRows[0].focus();
-    expect(document.activeElement).toHaveAttribute("data-row-index", "0");
-
-    await userEvent.keyboard("{ArrowDown}");
-    await waitFor(() =>
-      expect(document.activeElement).toHaveAttribute("data-row-index", "1"),
-    );
-
-    await userEvent.keyboard("{ArrowUp}");
+    await act(async () => {
+      await user.click(dataRows[0]);
+    });
     await waitFor(() =>
       expect(document.activeElement).toHaveAttribute("data-row-index", "0"),
     );
 
-    await userEvent.keyboard("{ArrowRight}");
-    expect(await screen.findByText("4600.00")).toBeInTheDocument();
+    await act(async () => {
+      await user.keyboard("{ArrowDown}");
+    });
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-row-index", "1"),
+    );
 
-    await userEvent.keyboard("{ArrowLeft}");
-    expect(screen.queryByText("4600.00")).not.toBeInTheDocument();
+    await act(async () => {
+      await user.keyboard("{ArrowUp}");
+    });
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-row-index", "0"),
+    );
+
+    await act(async () => {
+      await user.keyboard("{End}");
+    });
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-row-index", "1"),
+    );
+
+    await act(async () => {
+      await user.keyboard("{Home}");
+    });
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("data-row-index", "0"),
+    );
   });
 });

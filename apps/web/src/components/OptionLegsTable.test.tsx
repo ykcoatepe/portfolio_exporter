@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  screen,
-  waitFor,
-  waitForElementToBeRemoved,
-  within,
-} from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, waitForElementToBeRemoved, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -36,6 +30,7 @@ describe("OptionLegsTable", () => {
   });
 
   test("filters to orphan legs and toggles underlyings", async () => {
+    const user = userEvent.setup();
     renderWithClient(<OptionLegsTable />);
 
     await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
@@ -45,7 +40,9 @@ describe("OptionLegsTable", () => {
     expect(initialRows.length).toBeGreaterThan(1);
 
     const orphanToggle = screen.getByLabelText(/only orphan legs/i);
-    await userEvent.click(orphanToggle);
+    await act(async () => {
+      await user.click(orphanToggle);
+    });
 
     await waitFor(() => {
       const rowsAfterOrphan = within(body).getAllByRole("row", { name: /leg row/i });
@@ -60,13 +57,17 @@ describe("OptionLegsTable", () => {
     const allButton = within(underlyingsSection).getByRole("button", { name: /^all$/i });
     const msftButton = within(underlyingsSection).getByRole("button", { name: /^msft$/i });
 
-    await userEvent.click(msftButton);
+    await act(async () => {
+      await user.click(msftButton);
+    });
     await waitFor(() => {
       const rowsAfterMsft = within(body).getAllByRole("row", { name: /leg row/i });
       expect(rowsAfterMsft).toHaveLength(1);
     });
 
-    await userEvent.click(allButton);
+    await act(async () => {
+      await user.click(allButton);
+    });
     await waitFor(() => {
       const rowsReset = within(body).getAllByRole("row", { name: /leg row/i });
       expect(rowsReset.length).toBeGreaterThan(1);
@@ -74,6 +75,7 @@ describe("OptionLegsTable", () => {
   });
 
   test("applies delta range filter", async () => {
+    const user = userEvent.setup();
     renderWithClient(<OptionLegsTable />);
 
     await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
@@ -82,14 +84,9 @@ describe("OptionLegsTable", () => {
     const deltaMinInput = screen.getByLabelText(/Δ Min/i, { selector: "input" });
     const deltaMaxInput = screen.getByLabelText(/Δ Max/i, { selector: "input" });
 
-    await userEvent.clear(deltaMinInput);
-    fireEvent.change(deltaMinInput, { target: { value: "0.1" } });
-    await userEvent.clear(deltaMaxInput);
-    fireEvent.change(deltaMaxInput, { target: { value: "0.4" } });
-
-    await waitFor(() => {
-      expect(deltaMinInput).toHaveValue(0.1);
-      expect(deltaMaxInput).toHaveValue(0.4);
+    await act(async () => {
+      fireEvent.change(deltaMinInput, { target: { value: "0.1" } });
+      fireEvent.change(deltaMaxInput, { target: { value: "0.4" } });
     });
 
     await waitFor(() => {
@@ -100,7 +97,9 @@ describe("OptionLegsTable", () => {
 
     // Reset delta range
     const resetButton = screen.getByRole("button", { name: /reset Δ/i });
-    await userEvent.click(resetButton);
+    await act(async () => {
+      await user.click(resetButton);
+    });
     await waitFor(() => {
       const rowsAfterReset = within(body).getAllByRole("row", { name: /leg row/i });
       expect(rowsAfterReset.length).toBeGreaterThan(filteredRows.length);

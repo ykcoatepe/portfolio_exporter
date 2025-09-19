@@ -62,8 +62,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Options Placeholder */
-        get: operations["options_placeholder_positions_options_get"];
+        /** Options */
+        get: operations["options_positions_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rules/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rules Summary */
+        get: operations["rules_summary_rules_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -75,7 +92,64 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /** RulesSummaryCountersModel */
+        RulesSummaryCountersModel: {
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Critical
+             * @default 0
+             */
+            critical: number;
+            /**
+             * Warning
+             * @default 0
+             */
+            warning: number;
+            /**
+             * Info
+             * @default 0
+             */
+            info: number;
+        };
+        /** RulesSummaryResponseModel */
+        RulesSummaryResponseModel: {
+            /** As Of */
+            as_of: string;
+            counters: components["schemas"]["RulesSummaryCountersModel"];
+            /** Top */
+            top: components["schemas"]["RulesSummaryTopModel"][];
+            /** Focus Symbols */
+            focus_symbols: string[];
+            /** Rules Total */
+            rules_total: number;
+            /** Evaluation Ms */
+            evaluation_ms: number;
+        };
+        /** RulesSummaryTopModel */
+        RulesSummaryTopModel: {
+            /** Id */
+            id: string;
+            /** Rule */
+            rule: string;
+            /** Severity */
+            severity: string;
+            /** Subject */
+            subject: string;
+            /** Symbol */
+            symbol?: string | null;
+            /** Occurred At */
+            occurred_at: string;
+            /** Description */
+            description?: string | null;
+            /** Status */
+            status?: string | null;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -150,7 +224,7 @@ export interface operations {
             };
         };
     };
-    options_placeholder_positions_options_get: {
+    options_positions_options_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -166,8 +240,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        [key: string]: unknown[];
+                        [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    rules_summary_rules_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesSummaryResponseModel"];
                 };
             };
         };

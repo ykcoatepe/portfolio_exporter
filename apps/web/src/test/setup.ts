@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { afterAll, afterEach, beforeAll } from "vitest";
+import { afterAll, afterEach, beforeAll, vi } from "vitest";
 
 import { server } from "../mocks/server";
 
@@ -11,6 +11,35 @@ declare global {
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+if (!globalThis.requestAnimationFrame) {
+  globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+    return setTimeout(() => callback(Date.now()), 16) as unknown as number;
+  }) as typeof globalThis.requestAnimationFrame;
+}
+
+if (!globalThis.cancelAnimationFrame) {
+  globalThis.cancelAnimationFrame = ((handle: number): void => {
+    clearTimeout(handle);
+  }) as typeof globalThis.cancelAnimationFrame;
+}
+
+const rafSpy = vi
+  .spyOn(globalThis, "requestAnimationFrame")
+  .mockImplementation((callback: FrameRequestCallback): number => {
+    callback(Date.now());
+    return 0;
+  });
+
+const cafSpy = vi
+  .spyOn(globalThis, "cancelAnimationFrame")
+  .mockImplementation(() => {
+    /* no-op */
+  });
+
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+afterAll(() => {
+  rafSpy.mockRestore();
+  cafSpy.mockRestore();
+  server.close();
+});
