@@ -59,10 +59,18 @@ serve-api:
 # ------------------------------------------------------------------
 # Web & API helpers
 # ------------------------------------------------------------------
-.PHONY: contract-sync ui-test ui-test-contracts ui-dev api-test api-serve perf-check
+.PHONY: contract-sync typegen-local ui-test ui-test-contracts ui-dev api-test api-serve perf-check
 
 contract-sync:
 	cd apps/web && npx openapi-typescript http://127.0.0.1:8000/openapi.json -o src/lib/api.d.ts
+
+typegen-local:
+	python - <<'PY' > apps/web/openapi.json
+from apps.api.main import app
+import json, sys
+sys.stdout.write(json.dumps(app.openapi()))
+PY
+	cd apps/web && npx --yes openapi-typescript ./openapi.json -o src/lib/api.d.ts
 
 ui-test:
 	cd apps/web && npm run test:unit
