@@ -89,10 +89,180 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/rules/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rules Catalog */
+        get: operations["rules_catalog_rules_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rules/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rules Validate */
+        post: operations["rules_validate_rules_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rules Preview */
+        post: operations["rules_preview_rules_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rules/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rules Publish */
+        post: operations["rules_publish_rules_publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rules/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rules Reload */
+        post: operations["rules_reload_rules_reload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CatalogDiffModel */
+        CatalogDiffModel: {
+            /** Added */
+            added: {
+                [key: string]: unknown;
+            }[];
+            /** Removed */
+            removed: {
+                [key: string]: unknown;
+            }[];
+            /** Changed */
+            changed: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** CatalogPublishRequest */
+        CatalogPublishRequest: {
+            /** Catalog Text */
+            catalog_text: string;
+            /** Author */
+            author?: string | null;
+        };
+        /** CatalogTextRequest */
+        CatalogTextRequest: {
+            /** Catalog Text */
+            catalog_text: string;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
+        /** RulesCatalogPreviewResponseModel */
+        RulesCatalogPreviewResponseModel: {
+            /** Ok */
+            ok: boolean;
+            /** Counters */
+            counters: {
+                [key: string]: number;
+            };
+            /** Top */
+            top: {
+                [key: string]: unknown;
+            }[];
+            /** Errors */
+            errors: string[];
+            diff: components["schemas"]["CatalogDiffModel"];
+        };
+        /** RulesCatalogPublishResponseModel */
+        RulesCatalogPublishResponseModel: {
+            /** Version */
+            version: number;
+            /** Updated At */
+            updated_at: string;
+            /** Updated By */
+            updated_by?: string | null;
+        };
+        /** RulesCatalogResponseModel */
+        RulesCatalogResponseModel: {
+            /** Version */
+            version: number;
+            /** Updated At */
+            updated_at: string;
+            /** Updated By */
+            updated_by?: string | null;
+            /** Rules */
+            rules: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** RulesCatalogValidationResponseModel */
+        RulesCatalogValidationResponseModel: {
+            /** Ok */
+            ok: boolean;
+            /** Counters */
+            counters: {
+                [key: string]: number;
+            };
+            /** Top */
+            top: {
+                [key: string]: unknown;
+            }[];
+            /** Errors */
+            errors: string[];
+        };
         /** RulesSummaryCountersModel */
         RulesSummaryCountersModel: {
             /**
@@ -148,6 +318,15 @@ export interface components {
             description?: string | null;
             /** Status */
             status?: string | null;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
         };
     };
     responses: never;
@@ -262,6 +441,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RulesSummaryResponseModel"];
+                };
+            };
+        };
+    };
+    rules_catalog_rules_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCatalogResponseModel"];
+                };
+            };
+        };
+    };
+    rules_validate_rules_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogTextRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCatalogValidationResponseModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rules_preview_rules_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogTextRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCatalogPreviewResponseModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rules_publish_rules_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCatalogPublishResponseModel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rules_reload_rules_reload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCatalogResponseModel"];
                 };
             };
         };

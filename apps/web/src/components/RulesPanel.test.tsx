@@ -4,9 +4,13 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, test } from "vitest";
 
 import { RulesPanel } from "./RulesPanel";
-import { buildRulesSummaryResponse } from "../mocks/handlers";
+import { buildRulesSummaryResponse, resetCatalogState } from "../mocks/handlers";
 import { server } from "../mocks/server";
 import { renderWithClient } from "../test/queryClient";
+
+beforeEach(() => {
+  resetCatalogState();
+});
 
 describe("RulesPanel", () => {
   test("renders counters, top breaches, and fundamentals tiles", async () => {
@@ -24,6 +28,10 @@ describe("RulesPanel", () => {
 
     expect(screen.getByText(/portfolio var limit/i)).toBeInTheDocument();
     expect(screen.getByText(/tsla delta exposure/i)).toBeInTheDocument();
+
+    expect(screen.getByText(/Rules v12/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reload/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Validate & Publish/i })).toBeInTheDocument();
 
     const tiles = await screen.findAllByRole("group", { name: /fundamentals for/i });
     expect(tiles).toHaveLength(5);
@@ -57,6 +65,34 @@ describe("RulesPanel", () => {
       await user.keyboard("{Home}");
     });
     await waitFor(() => expect(listItems[0]).toHaveFocus());
+  });
+
+  test("validates and publishes catalog updates", async () => {
+    const user = userEvent.setup();
+    renderWithClient(<RulesPanel />);
+
+    await screen.findByText(/Rules v12/i);
+
+    await user.click(screen.getByRole("button", { name: /Validate & Publish/i }));
+
+    const textarea = await screen.findByLabelText(/Catalog YAML/i);
+    await user.type(textarea, "rules: []");
+
+    await user.click(screen.getByRole("button", { name: /^Validate$/i }));
+
+    await screen.findByText(/Validation passed/i);
+    expect(screen.getByText(/Catalog diff/i)).toBeInTheDocument();
+
+    const publishButton = screen.getByRole("button", { name: /^Publish$/i });
+    expect(publishButton).not.toBeDisabled();
+
+    await user.click(publishButton);
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText(/Catalog YAML/i)).not.toBeInTheDocument();
+    });
+
+    await screen.findByText(/Rules v13/i);
   });
 
   test("renders empty state when no breaches are present", async () => {

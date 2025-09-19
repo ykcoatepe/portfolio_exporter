@@ -8,6 +8,14 @@ import {
   useFundamentals,
   useRulesSummary,
 } from "../hooks/useRules";
+import {
+  type RuleCatalogValidationResult,
+  usePreviewRules,
+  usePublishRules,
+  useRuleCatalog,
+  useReloadRules,
+  useValidateRules,
+} from "../hooks/useRuleCatalog";
 
 const severityStyles: Record<RuleSeverity, string> = {
   critical:
@@ -118,6 +126,18 @@ export function RulesPanel(): JSX.Element {
     refetch,
   } = useRulesSummary();
 
+  const catalogQuery = useRuleCatalog();
+  const reloadMutation = useReloadRules();
+  const validateMutation = useValidateRules();
+  const previewMutation = usePreviewRules();
+  const publishMutation = usePublishRules();
+
+  const [isCatalogPanelOpen, setCatalogPanelOpen] = useState(false);
+  const [catalogText, setCatalogText] = useState("");
+  const [lastValidation, setLastValidation] = useState<RuleCatalogValidationResult | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationTimestamp, setValidationTimestamp] = useState<string | null>(null);
+
   const topBreaches = useMemo(() => (summary?.top ?? []).slice(0, 5), [summary?.top]);
   const focusSymbols = useMemo(() => {
     const fromSummary = Array.isArray(summary?.focus_symbols)
@@ -225,6 +245,88 @@ export function RulesPanel(): JSX.Element {
     </div>
   );
 
+  const catalogData = catalogQuery.data ?? null;
+  const catalogVersionLabel = catalogData ? `v${catalogData.version}` : "v0";
+  const catalogUpdatedLabel = catalogData?.updatedAt ? formatRelativeTime(catalogData.updatedAt) : null;
+  const catalogUpdatedBy = catalogData?.updatedBy ?? null;
+  const catalogRulesCount = catalogData?.rulesCount ?? 0;
+  const catalogRulesLabel = catalogData ? `${catalogRulesCount} rules` : "— rules";
+
+  const isValidationPending = validateMutation.isPending || previewMutation.isPending;
+  const isPublishPending = publishMutation.isPending;
+  const validationTop = lastValidation?.top ?? [];
+  const validationCounters = lastValidation?.counters ?? null;
+  const validationDiff = lastValidation?.diff ?? null;
+  const catalogErrorMessage =
+    catalogQuery.isError && catalogQuery.error instanceof Error ? catalogQuery.error.message : null;
+  const reloadErrorMessage =
+    reloadMutation.isError && reloadMutation.error instanceof Error ? reloadMutation.error.message : null;
+
+  const resetValidationState = () => {
+    setLastValidation(null);
+    setValidationError(null);
+    setValidationTimestamp(null);
+  };
+
+  const handleCatalogPanelToggle = () => {
+    setCatalogPanelOpen((current) => {
+      const nextOpen = !current;
+      if (!nextOpen) {
+        resetValidationState();
+      }
+      return nextOpen;
+    });
+  };
+
+  const handleValidateSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = catalogText.trim();
+    if (!trimmed) {
+      setValidationError("Catalog YAML is required before validation.");
+      setLastValidation(null);
+      return;
+    }
+    setValidationError(null);
+    setLastValidation(null);
+    setValidationTimestamp(null);
+    try {
+      const baseResult = await validateMutation.mutateAsync({ catalogText: trimmed });
+      let result: RuleCatalogValidationResult = baseResult;
+      if (baseResult.ok) {
+        try {
+          result = await previewMutation.mutateAsync({ catalogText: trimmed });
+        } catch (previewError) {
+          setValidationError((previewError as Error).message);
+        }
+      }
+      setLastValidation(result);
+      setValidationTimestamp(new Date().toISOString());
+    } catch (err) {
+      setValidationError((err as Error).message);
+    }
+  };
+
+  const handlePublish = async () => {
+    const trimmed = catalogText.trim();
+    if (!trimmed) {
+      setValidationError("Catalog YAML is required before publishing.");
+      return;
+    }
+    if (!lastValidation?.ok) {
+      setValidationError("Validate the catalog before publishing.");
+      return;
+    }
+    setValidationError(null);
+    try {
+      await publishMutation.mutateAsync({ catalogText: trimmed });
+      setCatalogPanelOpen(false);
+      setCatalogText("");
+      resetValidationState();
+    } catch (err) {
+      setValidationError((err as Error).message);
+    }
+  };
+
   const isInitialLoading = isLoading || (isFetching && !summary);
 
   if (isInitialLoading) {
@@ -276,6 +378,167 @@ export function RulesPanel(): JSX.Element {
       aria-label="Rules summary"
       className="rounded-3xl border border-slate-900/80 bg-slate-950/60 shadow-inner shadow-slate-950/40"
     >
+      <div className="flex flex-col gap-4 border-b border-slate-900/70 px-6 py-6 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Rules Catalog</p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-3 text-slate-100">
+              <span className="text-2xl font-semibold text-slate-100">Rules {catalogVersionLabel}</span>
+              {catalogUpdatedLabel ? (
+                <span className="text-xs text-slate-400">Updated {catalogUpdatedLabel}</span>
+              ) : (
+                <span className="text-xs text-slate-500">Updated —</span>
+              )}
+              {catalogUpdatedBy ? (
+                <span className="text-xs text-slate-500">by {catalogUpdatedBy}</span>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <span>{catalogRulesLabel}</span>
+            {catalogQuery.isFetching ? <span className="text-slate-400">Refreshing…</span> : null}
+            {catalogErrorMessage ? <span className="text-rose-300">{catalogErrorMessage}</span> : null}
+            {reloadErrorMessage ? <span className="text-rose-300">{reloadErrorMessage}</span> : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => reloadMutation.mutate()}
+            disabled={reloadMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-700/70 bg-slate-900/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-slate-500/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {reloadMutation.isPending ? "Reloading…" : "Reload"}
+          </button>
+          <button
+            type="button"
+            onClick={handleCatalogPanelToggle}
+            className="inline-flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-sky-200 transition hover:border-sky-400/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          >
+            {isCatalogPanelOpen ? "Hide Validator" : "Validate & Publish"}
+          </button>
+        </div>
+      </div>
+      {isCatalogPanelOpen ? (
+        <div className="border-b border-slate-900/70 bg-slate-950/40 px-6 py-6">
+          <form className="space-y-4" onSubmit={handleValidateSubmit}>
+            <div className="space-y-2">
+              <label htmlFor="rules-catalog-text" className="text-xs uppercase tracking-wide text-slate-400">
+                Catalog YAML
+              </label>
+              <textarea
+                id="rules-catalog-text"
+                value={catalogText}
+                onChange={(event) => {
+                  setCatalogText(event.target.value);
+                  if (validationError) {
+                    setValidationError(null);
+                  }
+                }}
+                rows={6}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                placeholder="Paste updated rules.yaml content here…"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={isValidationPending}
+                className="inline-flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-sky-200 transition hover:border-sky-400/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isValidationPending ? "Validating…" : "Validate"}
+              </button>
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={isPublishPending || !lastValidation?.ok}
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-200 transition hover:border-emerald-400/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPublishPending ? "Publishing…" : "Publish"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCatalogPanelToggle}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-800 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-300 transition hover:border-slate-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+              >
+                Close
+              </button>
+            </div>
+            {validationError ? <p className="text-sm text-rose-300">{validationError}</p> : null}
+            {lastValidation ? (
+              <div className="space-y-4 rounded-2xl border border-slate-900/70 bg-slate-950/50 p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span
+                    className={clsx(
+                      "text-sm font-semibold",
+                      lastValidation.ok ? "text-emerald-300" : "text-rose-300",
+                    )}
+                  >
+                    {lastValidation.ok ? "Validation passed" : "Validation failed"}
+                  </span>
+                  {validationTimestamp ? (
+                    <span className="text-xs text-slate-500">as of {formatRelativeTime(validationTimestamp)}</span>
+                  ) : null}
+                </div>
+                {validationCounters ? (
+                  <div className="flex flex-wrap gap-4 text-xs text-slate-300">
+                    <span>
+                      Critical: <span className="font-semibold text-rose-200">{validationCounters.critical}</span>
+                    </span>
+                    <span>
+                      Warning: <span className="font-semibold text-amber-200">{validationCounters.warning}</span>
+                    </span>
+                    <span>
+                      Info: <span className="font-semibold text-sky-200">{validationCounters.info}</span>
+                    </span>
+                    <span>
+                      Total: <span className="font-semibold text-slate-200">{validationCounters.total}</span>
+                    </span>
+                  </div>
+                ) : null}
+                {validationDiff && (validationDiff.added.length || validationDiff.changed.length || validationDiff.removed.length) ? (
+                  <div className="space-y-2 text-xs text-slate-400">
+                    <p className="font-semibold text-slate-300">Catalog diff</p>
+                    <div className="flex flex-wrap gap-4">
+                      <span>Added {validationDiff.added.length}</span>
+                      <span>Changed {validationDiff.changed.length}</span>
+                      <span>Removed {validationDiff.removed.length}</span>
+                    </div>
+                  </div>
+                ) : null}
+                {validationTop.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Top Breaches Preview</p>
+                    <ul className="space-y-2">
+                      {validationTop.map((entry) => (
+                        <li
+                          key={entry.id}
+                          className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-200"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold text-slate-100">{entry.rule}</span>
+                            <span className="text-xs uppercase tracking-wide text-slate-400">
+                              {severityLabel[entry.severity]}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400">{entry.subject}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {lastValidation.errors.length ? (
+                  <div className="space-y-1 text-sm text-rose-200">
+                    {lastValidation.errors.map((message, index) => (
+                      <p key={index}>{message}</p>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </form>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-8 border-b border-slate-900/70 px-6 py-8 md:flex-row md:items-start md:justify-between">
         <div className="md:max-w-xs">
           <header className="space-y-4">

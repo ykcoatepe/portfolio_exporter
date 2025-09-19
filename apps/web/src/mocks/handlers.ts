@@ -34,6 +34,59 @@ interface RulesSummaryFixture {
   fundamentals?: typeof fundamentalsFixture;
 }
 
+interface RulesCatalogFixture {
+  version: number;
+  updated_at: string;
+  updated_by: string | null;
+  rules: Array<Record<string, unknown>>;
+}
+
+interface CatalogDiffFixture {
+  added: Array<Record<string, unknown>>;
+  removed: Array<Record<string, unknown>>;
+  changed: Array<Record<string, unknown>>;
+}
+
+interface RulesCatalogValidationFixture {
+  ok: boolean;
+  counters: RulesSummaryCounters;
+  top: RuleBreachFixture[];
+  errors: string[];
+  diff?: CatalogDiffFixture;
+}
+
+const seedCatalogRules: Array<Record<string, unknown>> = [
+  {
+    rule_id: "combo__annualized_premium_high",
+    name: "Annualized premium >=30% within a week",
+    severity: "CRITICAL",
+    scope: "COMBO",
+    filter: "dte <= 7",
+    expr: "annualized_premium_pct >= 30",
+  },
+  {
+    rule_id: "leg__iv_missing_near_term",
+    name: "Missing IV for near-term legs",
+    severity: "WARNING",
+    scope: "LEG",
+    filter: "dte <= 5",
+    expr: "iv is None",
+  },
+];
+
+let catalogState: RulesCatalogFixture;
+
+export const resetCatalogState = (): void => {
+  catalogState = {
+    version: 12,
+    updated_at: new Date().toISOString(),
+    updated_by: "ops-admin",
+    rules: seedCatalogRules.map((rule) => ({ ...rule })),
+  };
+};
+
+resetCatalogState();
+
 export const buildStocksResponse = (
   overrides: Partial<StocksApiResponse> = {},
 ): StocksApiResponse => {
@@ -418,7 +471,123 @@ export const buildRulesSummaryResponse = (
   };
 };
 
+export const buildRulesCatalogResponse = (
+  overrides: Partial<RulesCatalogFixture> = {},
+): RulesCatalogFixture => {
+  const baseRules = overrides.rules ?? catalogState.rules;
+  return {
+    version: overrides.version ?? catalogState.version,
+    updated_at: overrides.updated_at ?? catalogState.updated_at,
+    updated_by: overrides.updated_by ?? catalogState.updated_by,
+    rules: baseRules.map((rule) => ({ ...rule })),
+  };
+};
+
+export const buildRulesCatalogValidationResponse = (
+  overrides: Partial<RulesCatalogValidationFixture> = {},
+): RulesCatalogValidationFixture => {
+  const nowIso = new Date().toISOString();
+  const counters: RulesSummaryCounters = {
+    total: overrides.counters?.total ?? 5,
+    critical: overrides.counters?.critical ?? 2,
+    warning: overrides.counters?.warning ?? 2,
+    info: overrides.counters?.info ?? 1,
+  };
+  const top: RuleBreachFixture[] =
+    overrides.top ??
+    [
+      {
+        id: "preview-portfolio-var",
+        rule: "Portfolio VaR Limit",
+        severity: "critical",
+        subject: "Aggregate VaR",
+        symbol: "SPX",
+        occurred_at: nowIso,
+        description: "Portfolio limit would remain triggered.",
+        status: "OPEN",
+      },
+      {
+        id: "preview-tsla-delta",
+        rule: "Single Name Delta",
+        severity: "critical",
+        subject: "TSLA Delta Exposure",
+        symbol: "TSLA",
+        occurred_at: nowIso,
+        description: "Delta drift still above threshold.",
+        status: "OPEN",
+      },
+    ];
+  const diff: CatalogDiffFixture =
+    overrides.diff ??
+    {
+      added: [
+        {
+          rule_id: "combo__risk_budget",
+          name: "Combo Risk Budget",
+          severity: "WARNING",
+          scope: "COMBO",
+          expr: "risk_budget_pct > 0.5",
+        },
+      ],
+      removed: [],
+      changed: [
+        {
+          rule_id: "port__theta_negative",
+          changes: {
+            severity: { old: "INFO", new: "WARNING" },
+            expr: { old: "net_theta_per_day < 0", new: "net_theta_per_day < -5" },
+          },
+        },
+      ],
+    };
+
+  return {
+    ok: overrides.ok ?? true,
+    counters,
+    top,
+    errors: overrides.errors ?? [],
+    diff,
+  };
+};
+
 export const handlers = [
+  http.get("*/rules/catalog", () => HttpResponse.json(buildRulesCatalogResponse())),
+  http.post("*/rules/validate", async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { catalog_text?: string };
+    if (!body.catalog_text || typeof body.catalog_text !== "string") {
+      return HttpResponse.json(
+        {
+          ok: false,
+          counters: { total: 0, critical: 0, warning: 0, info: 0 },
+          top: [],
+          errors: ["catalog_text is required"],
+        },
+        { status: 400 },
+      );
+    }
+    const { diff, ...rest } = buildRulesCatalogValidationResponse();
+    return HttpResponse.json(rest);
+  }),
+  http.post("*/rules/preview", async ({ request }) => {
+    await request.json().catch(() => ({}));
+    return HttpResponse.json(buildRulesCatalogValidationResponse());
+  }),
+  http.post("*/rules/publish", async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { author?: string | null };
+    const author = typeof body.author === "string" && body.author ? body.author : "ops-bot";
+    catalogState = {
+      ...catalogState,
+      version: catalogState.version + 1,
+      updated_at: new Date().toISOString(),
+      updated_by: author,
+    };
+    return HttpResponse.json({
+      version: catalogState.version,
+      updated_at: catalogState.updated_at,
+      updated_by: catalogState.updated_by,
+    });
+  }),
+  http.post("*/rules/reload", () => HttpResponse.json(buildRulesCatalogResponse())),
   http.get("*/positions/stocks", () => HttpResponse.json(buildStocksResponse())),
   http.get("*/positions/options", () => HttpResponse.json(buildOptionsResponse())),
   http.get("*/rules/summary", () => HttpResponse.json(buildRulesSummaryResponse())),

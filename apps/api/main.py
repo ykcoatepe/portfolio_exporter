@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 LIBS_PATH = Path(__file__).resolve().parents[2] / "libs" / "py"
@@ -22,8 +22,10 @@ from positions_engine.ingest.csv import (  # noqa: E402
     load_latest_positions,
     load_latest_quotes,
 )
+from positions_engine.rules.catalog import CatalogError, CatalogValidationError  # noqa: E402
 from positions_engine.service import (  # noqa: E402
     PositionsState,
+    RulesCatalogState,
     RulesState,
     positions_from_records,
     quotes_from_records,
@@ -32,6 +34,7 @@ from positions_engine.service import (  # noqa: E402
 app = FastAPI(title="Positions Engine API", version="0.1.0")
 _state = PositionsState()
 _rules_state = RulesState(_state)
+_catalog_state = RulesCatalogState(_state, _rules_state)
 _DATA_ROOT = Path(os.getenv("POSITIONS_ENGINE_DATA_DIR", "var")).expanduser()
 _AUTO_REFRESH = os.getenv("POSITIONS_ENGINE_AUTO_REFRESH", "0") == "1"
 
@@ -61,6 +64,44 @@ class RulesSummaryResponseModel(BaseModel):
     focus_symbols: List[str]
     rules_total: int
     evaluation_ms: float
+
+
+class CatalogTextRequest(BaseModel):
+    catalog_text: str = Field(..., min_length=1)
+
+
+class CatalogPublishRequest(CatalogTextRequest):
+    author: str | None = Field(default=None, max_length=256)
+
+
+class RulesCatalogResponseModel(BaseModel):
+    version: int
+    updated_at: str
+    updated_by: str | None = None
+    rules: List[dict[str, Any]]
+
+
+class CatalogDiffModel(BaseModel):
+    added: List[dict[str, Any]]
+    removed: List[dict[str, Any]]
+    changed: List[dict[str, Any]]
+
+
+class RulesCatalogValidationResponseModel(BaseModel):
+    ok: bool
+    counters: dict[str, int]
+    top: List[dict[str, Any]]
+    errors: List[str]
+
+
+class RulesCatalogPreviewResponseModel(RulesCatalogValidationResponseModel):
+    diff: CatalogDiffModel
+
+
+class RulesCatalogPublishResponseModel(BaseModel):
+    version: int
+    updated_at: str
+    updated_by: str | None = None
 
 
 @app.on_event("startup")
@@ -187,3 +228,53 @@ def rules_summary() -> RulesSummaryResponseModel:
         rules_total=int(summary.get("rules_total", len(_rules_state.rules))) if isinstance(summary, dict) else len(_rules_state.rules),
         evaluation_ms=float(evaluation.duration_ms),
     )
+
+
+@app.get("/rules/catalog", tags=["rules"], response_model=RulesCatalogResponseModel)
+def rules_catalog() -> RulesCatalogResponseModel:
+    return RulesCatalogResponseModel(**_catalog_state.as_dict())
+
+
+@app.post("/rules/validate", tags=["rules"], response_model=RulesCatalogValidationResponseModel)
+def rules_validate(payload: CatalogTextRequest) -> RulesCatalogValidationResponseModel:
+    result = _catalog_state.validate_catalog_text(payload.catalog_text)
+    return RulesCatalogValidationResponseModel(
+        ok=result.ok,
+        counters=result.counters,
+        top=result.top,
+        errors=result.errors,
+    )
+
+
+@app.post("/rules/preview", tags=["rules"], response_model=RulesCatalogPreviewResponseModel)
+def rules_preview(payload: CatalogTextRequest) -> RulesCatalogPreviewResponseModel:
+    validation, diff = _catalog_state.preview_catalog(payload.catalog_text)
+    diff_model = CatalogDiffModel(**diff)
+    return RulesCatalogPreviewResponseModel(
+        ok=validation.ok,
+        counters=validation.counters,
+        top=validation.top,
+        errors=validation.errors,
+        diff=diff_model,
+    )
+
+
+@app.post("/rules/publish", tags=["rules"], response_model=RulesCatalogPublishResponseModel)
+def rules_publish(payload: CatalogPublishRequest) -> RulesCatalogPublishResponseModel:
+    try:
+        catalog = _catalog_state.publish_catalog(payload.catalog_text, author=payload.author)
+    except CatalogValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except CatalogError as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=500, detail=str(exc))
+    return RulesCatalogPublishResponseModel(
+        version=catalog.version,
+        updated_at=catalog.updated_at.isoformat(),
+        updated_by=catalog.updated_by,
+    )
+
+
+@app.post("/rules/reload", tags=["rules"], response_model=RulesCatalogResponseModel)
+def rules_reload() -> RulesCatalogResponseModel:
+    _catalog_state.reload()
+    return RulesCatalogResponseModel(**_catalog_state.as_dict())
