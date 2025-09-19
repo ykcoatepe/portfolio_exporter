@@ -7,8 +7,9 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class InstrumentType(str, Enum):
@@ -48,6 +49,7 @@ class Position(BaseModel):
     quantity: Decimal
     avg_cost: Decimal
     cost_basis: Decimal | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def multiplier(self) -> Decimal:

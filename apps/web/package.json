@@ -8,8 +8,11 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "npm run test:all",
+    "test:watch": "vitest",
+    "test:unit": "vitest run --workspace vitest.workspace.ts --project unit",
+    "test:contracts": "vitest run --workspace vitest.workspace.ts --project contracts",
+    "test:all": "vitest run --workspace vitest.workspace.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.3",
@@ -19,7 +22,7 @@
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.5.0",
-    "@testing-library/react": "^14.1.2",
+    "@testing-library/react": "^15.0.6",
     "@testing-library/user-event": "^14.5.1",
     "@types/node": "^20.14.9",
     "@pact-foundation/pact": "^10.1.4",

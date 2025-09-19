@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, DivisionByZero, InvalidOperation
 from typing import Any
 
+from ..combos import ComboDetection, build_option_leg_snapshot, detect_option_combos
 from ..core.marks import MarkResult, MarkSettings, select_equity_mark
 from ..core.models import InstrumentType, Position, Quote
 from ..core.pnl import equity_pnl
@@ -21,6 +22,9 @@ class PositionsState:
         self._mark_settings = mark_settings or MarkSettings()
         self._positions: dict[str, Position] = {}
         self._quotes: dict[str, Quote] = {}
+        self._positions_version = 0
+        self._quotes_version = 0
+        self._options_cache: dict[str, Any] | None = None
 
     def refresh(
         self,
@@ -28,20 +32,37 @@ class PositionsState:
         quotes: Iterable[Quote] | None = None,
     ) -> None:
         if positions is not None:
+            self._positions_version += 1
             self._positions = {p.instrument.symbol: p for p in positions}
         if quotes is not None:
+            self._quotes_version += 1
             self._quotes = {q.symbol: q for q in quotes}
+        if positions is not None or quotes is not None:
+            self._options_cache = None
 
     def equities_payload(self, now: datetime | None = None) -> list[dict[str, Any]]:
         rows, _ = self._rows(now)
         return rows
 
-    def stats(self, now: datetime | None = None) -> dict[str, int]:
+    def options_payload(self, now: datetime | None = None) -> dict[str, Any]:
+        detection, as_of = self._ensure_options_detection(now)
+        return {
+            "as_of": _isoformat(as_of),
+            "combos": [combo.to_payload() for combo in detection.combos],
+            "legs": [leg.to_payload() for leg in detection.orphans],
+        }
+
+    def stats(self, now: datetime | None = None) -> dict[str, int | float]:
         rows, stale = self._rows(now)
+        detection, _ = self._ensure_options_detection(now)
+        legs_count = sum(len(combo.legs) for combo in detection.combos) + len(detection.orphans)
         return {
             "equity_count": len(rows),
             "quote_count": len(self._quotes),
             "stale_quotes_count": stale,
+            "option_legs_count": legs_count,
+            "combos_matched": len(detection.combos),
+            "combos_detection_ms": detection.detection_ms,
         }
 
     def _rows(self, now: datetime | None) -> tuple[list[dict[str, Any]], int]:
@@ -75,6 +96,39 @@ class PositionsState:
                 }
             )
         return rows, stale
+
+    def _ensure_options_detection(
+        self, now: datetime | None
+    ) -> tuple[ComboDetection, datetime]:
+        now = _ensure_aware(now)
+        cache = self._options_cache or {}
+        cache_day = now.date()
+        if (
+            cache
+            and cache.get("positions_version") == self._positions_version
+            and cache.get("quotes_version") == self._quotes_version
+            and cache.get("day") == cache_day
+        ):
+            detection = cache["detection"]
+        else:
+            legs = []
+            for position in self._positions.values():
+                leg = build_option_leg_snapshot(
+                    position,
+                    self._quotes.get(position.instrument.symbol),
+                    now,
+                    self._mark_settings,
+                )
+                if leg is not None:
+                    legs.append(leg)
+            detection = detect_option_combos(legs)
+            self._options_cache = {
+                "positions_version": self._positions_version,
+                "quotes_version": self._quotes_version,
+                "day": cache_day,
+                "detection": detection,
+            }
+        return detection, now
 
 
 def _day_basis(position: Position, previous_close: Decimal | None) -> Decimal | None:
@@ -117,3 +171,11 @@ def _ensure_aware(ts: datetime | None) -> datetime:
     if ts.tzinfo is None:
         return ts.replace(tzinfo=UTC)
     return ts.astimezone(UTC)
+
+
+def _isoformat(ts: datetime) -> str:
+    ts = _ensure_aware(ts)
+    text = ts.isoformat()
+    if text.endswith("+00:00"):
+        return text[:-6] + "Z"
+    return text

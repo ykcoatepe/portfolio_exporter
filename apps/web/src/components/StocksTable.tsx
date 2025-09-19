@@ -2,18 +2,15 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
 
+import { MarkBadge } from "./MarkBadge";
 import { useStocks } from "../hooks/useStocks";
 import { formatDuration, formatMoney, formatPercent } from "../lib/format";
-import type { MarkSource, StockRow } from "../lib/types";
+import type { StockRow } from "../lib/types";
 
 const SKELETON_ROWS = Array.from({ length: 8 }, (_, idx) => idx);
+const COLUMN_COUNT = 7;
+const SHOULD_POLL = import.meta.env.MODE !== "test";
 
-
-const markSourceTone: Record<MarkSource, string> = {
-  MID: "bg-sky-500/10 text-sky-300 border border-sky-500/30",
-  LAST: "bg-amber-500/10 text-amber-300 border border-amber-500/40",
-  PREV: "bg-slate-500/10 text-slate-200 border border-slate-500/40",
-};
 
 const severityTone: Record<string, string> = {
   CRITICAL: "bg-rose-500/10 text-rose-300 border border-rose-400/40",
@@ -38,20 +35,6 @@ const placeholderBreaches = [
     subtitle: "47m ago • Analytics",
   },
 ];
-
-function MarkBadge({ source }: { source: MarkSource }) {
-  return (
-    <span
-      className={clsx(
-        "inline-flex min-w-[2.75rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
-        markSourceTone[source],
-      )}
-      title={`Mark source: ${source}`}
-    >
-      {source}
-    </span>
-  );
-}
 
 function valueTone(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value) || value === 0) {
@@ -88,29 +71,33 @@ function StocksTableSkeleton() {
   return (
     <tbody>
       {SKELETON_ROWS.map((key) => (
-        <tr key={`skeleton-${key}`} className="animate-pulse border-b border-slate-800/60 last:border-0">
-          <td className="px-4 py-4">
+        <tr
+          key={`skeleton-${key}`}
+          role="row"
+          className="animate-pulse border-b border-slate-800/60 last:border-0"
+        >
+          <td role="gridcell" className="px-4 py-4">
             <div className="h-3 w-16 rounded bg-slate-800" />
           </td>
-          <td className="px-4 py-4">
+          <td role="gridcell" className="px-4 py-4">
             <div className="h-3 w-10 rounded bg-slate-800" />
           </td>
-          <td className="px-4 py-4">
+          <td role="gridcell" className="px-4 py-4">
             <div className="h-3 w-16 rounded bg-slate-800" />
           </td>
-          <td className="px-4 py-4">
+          <td role="gridcell" className="px-4 py-4">
             <div className="flex items-center gap-2">
               <div className="h-3 w-16 rounded bg-slate-800" />
               <div className="h-5 w-12 rounded-full bg-slate-800" />
             </div>
           </td>
-          <td className="px-4 py-4">
+          <td role="gridcell" className="px-4 py-4">
             <div className="h-3 w-20 rounded bg-slate-800" />
           </td>
-          <td className="px-4 py-4">
+          <td role="gridcell" className="px-4 py-4">
             <div className="h-3 w-20 rounded bg-slate-800" />
           </td>
-          <td className="px-4 py-4">
+          <td role="gridcell" className="px-4 py-4">
             <div className="h-3 w-14 rounded bg-slate-800" />
           </td>
         </tr>
@@ -167,6 +154,7 @@ export function StocksTable(): JSX.Element {
   const { data, isLoading, isFetching, error, refetch } = useStocks();
   const [filter, setFilter] = useState("");
   const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
+  const [activeSymbol, setActiveSymbol] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [sortDirection, setSortDirection] = useState<"ascending" | "descending">(
     "descending",
@@ -175,6 +163,9 @@ export function StocksTable(): JSX.Element {
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
   useEffect(() => {
+    if (!SHOULD_POLL) {
+      return;
+    }
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -225,8 +216,23 @@ export function StocksTable(): JSX.Element {
     }
   }, [expandedSymbol, filteredRows]);
 
+  useEffect(() => {
+    if (filteredRows.length === 0) {
+      if (activeSymbol !== null) {
+        setActiveSymbol(null);
+      }
+      return;
+    }
+
+    if (!activeSymbol || !filteredRows.some((row) => row.symbol === activeSymbol)) {
+      setActiveSymbol(filteredRows[0].symbol);
+    }
+  }, [filteredRows, activeSymbol]);
+
   const showSkeleton = isLoading;
   const showEmpty = !isLoading && !error && filteredRows.length === 0;
+  const bodyRowCount = showSkeleton ? SKELETON_ROWS.length : showEmpty ? 1 : filteredRows.length;
+  const totalRowCount = bodyRowCount + 1;
 
   function toggleRow(symbol: string) {
     setExpandedSymbol((prev) => (prev === symbol ? null : symbol));
@@ -240,8 +246,16 @@ export function StocksTable(): JSX.Element {
     if (!symbol) {
       return;
     }
-    const node = rowRefs.current[symbol];
-    node?.focus();
+    setActiveSymbol(symbol);
+    const focusNode = () => {
+      const node = rowRefs.current[symbol];
+      node?.focus();
+    };
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(focusNode);
+    } else {
+      setTimeout(focusNode, 0);
+    }
   }
 
   function handleRowKeyDown(
@@ -249,21 +263,39 @@ export function StocksTable(): JSX.Element {
     row: StockRow,
     orderIndex: number,
   ) {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      const nextIndex = Math.min(filteredRows.length - 1, orderIndex + 1);
-      focusRowBySymbol(filteredRows[nextIndex]?.symbol);
-      return;
-    }
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      const prevIndex = Math.max(0, orderIndex - 1);
-      focusRowBySymbol(filteredRows[prevIndex]?.symbol);
-      return;
-    }
-    if (event.key === "Enter" || event.key === " " || event.key === "Space" || event.key === "Spacebar") {
-      event.preventDefault();
-      toggleRow(row.symbol);
+    switch (event.key) {
+      case "ArrowDown": {
+        event.preventDefault();
+        const nextIndex = Math.min(filteredRows.length - 1, orderIndex + 1);
+        focusRowBySymbol(filteredRows[nextIndex]?.symbol);
+        return;
+      }
+      case "ArrowUp": {
+        event.preventDefault();
+        const prevIndex = Math.max(0, orderIndex - 1);
+        focusRowBySymbol(filteredRows[prevIndex]?.symbol);
+        return;
+      }
+      case "Home": {
+        event.preventDefault();
+        focusRowBySymbol(filteredRows[0]?.symbol);
+        return;
+      }
+      case "End": {
+        event.preventDefault();
+        focusRowBySymbol(filteredRows[filteredRows.length - 1]?.symbol);
+        return;
+      }
+      case "Enter":
+      case " ":
+      case "Space":
+      case "Spacebar": {
+        event.preventDefault();
+        toggleRow(row.symbol);
+        return;
+      }
+      default:
+        break;
     }
   }
 
@@ -307,24 +339,31 @@ export function StocksTable(): JSX.Element {
         <table
           role="grid"
           aria-label="Single stocks positions"
+          aria-rowcount={totalRowCount}
+          aria-colcount={COLUMN_COUNT}
+          aria-busy={isLoading || isFetching ? true : undefined}
           className="min-w-full border-collapse text-sm text-slate-200"
         >
           <thead>
-            <tr className="border-b border-slate-800/80 bg-slate-950/60 text-xs uppercase tracking-wide text-slate-400">
-              <th scope="col" className="px-4 py-3 text-left">
+            <tr
+              role="row"
+              className="border-b border-slate-800/80 bg-slate-950/60 text-xs uppercase tracking-wide text-slate-400"
+            >
+              <th scope="col" role="columnheader" className="px-4 py-3 text-left">
                 Symbol
               </th>
-              <th scope="col" className="px-4 py-3 text-right">
+              <th scope="col" role="columnheader" className="px-4 py-3 text-right">
                 Qty
               </th>
-              <th scope="col" className="px-4 py-3 text-right">
+              <th scope="col" role="columnheader" className="px-4 py-3 text-right">
                 Avg
               </th>
-              <th scope="col" className="px-4 py-3 text-right">
+              <th scope="col" role="columnheader" className="px-4 py-3 text-right">
                 Mark
               </th>
               <th
                 scope="col"
+                role="columnheader"
                 aria-sort={sortDirection}
                 className="px-4 py-3 text-right"
               >
@@ -339,10 +378,10 @@ export function StocksTable(): JSX.Element {
                   </span>
                 </button>
               </th>
-              <th scope="col" className="px-4 py-3 text-right">
+              <th scope="col" role="columnheader" className="px-4 py-3 text-right">
                 Total P&amp;L
               </th>
-              <th scope="col" className="px-4 py-3 text-right">
+              <th scope="col" role="columnheader" className="px-4 py-3 text-right">
                 Staleness
               </th>
             </tr>
@@ -356,6 +395,8 @@ export function StocksTable(): JSX.Element {
                 const { symbol } = row;
                 const isExpanded = expandedSymbol === symbol;
                 const stalenessSeconds = deriveStalenessSeconds(row.markTime, now);
+                const isActiveRow = activeSymbol ? activeSymbol === symbol : orderIndex === 0;
+                const ariaRowIndex = orderIndex + 2;
                 return (
                   <Fragment key={symbol}>
                     <tr
@@ -366,16 +407,27 @@ export function StocksTable(): JSX.Element {
                           delete rowRefs.current[symbol];
                         }
                       }}
-                      tabIndex={0}
+                      role="row"
+                      tabIndex={isActiveRow ? 0 : -1}
+                      aria-selected={isActiveRow}
                       aria-expanded={isExpanded}
+                      aria-rowindex={ariaRowIndex}
                       className={clsx(
                         "border-b border-slate-900/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
                         isExpanded ? "bg-slate-900/70" : "hover:bg-slate-900/40",
                       )}
-                      onClick={() => toggleRow(symbol)}
+                      onClick={() => {
+                        focusRowBySymbol(symbol);
+                        toggleRow(symbol);
+                      }}
+                      onFocus={() => setActiveSymbol(symbol)}
                       onKeyDown={(event) => handleRowKeyDown(event, row, orderIndex)}
                     >
-                      <td className="px-4 py-3 font-semibold tracking-wide text-slate-100">
+                      <th
+                        scope="row"
+                        role="rowheader"
+                        className="px-4 py-3 font-semibold tracking-wide text-slate-100"
+                      >
                         <div className="flex items-center gap-2">
                           <span>{symbol}</span>
                           <span
@@ -388,20 +440,26 @@ export function StocksTable(): JSX.Element {
                             {isExpanded ? "−" : "+"}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-sm text-slate-200">
+                      </th>
+                      <td
+                        role="gridcell"
+                        className="px-4 py-3 text-right font-mono text-sm text-slate-200"
+                      >
                         {row.quantity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-sm text-slate-200">
+                      <td
+                        role="gridcell"
+                        className="px-4 py-3 text-right font-mono text-sm text-slate-200"
+                      >
                         {formatMoney(row.averagePrice, { currency: row.currency })}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-sm">
+                      <td role="gridcell" className="px-4 py-3 text-right font-mono text-sm">
                         <div className="flex items-center justify-end gap-3">
                           <span>{formatMoney(row.markPrice, { currency: row.currency })}</span>
                           <MarkBadge source={row.markSource} />
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td role="gridcell" className="px-4 py-3 text-right">
                         <div className="flex flex-col items-end gap-1">
                           <span className={clsx("font-mono text-sm", valueTone(row.dayPnlAmount))}>
                             {formatMoney(row.dayPnlAmount, { currency: row.currency, signDisplay: "always" })}
@@ -411,7 +469,7 @@ export function StocksTable(): JSX.Element {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td role="gridcell" className="px-4 py-3 text-right">
                         <div className="flex flex-col items-end gap-1">
                           <span className={clsx("font-mono text-sm", valueTone(row.totalPnlAmount))}>
                             {formatMoney(row.totalPnlAmount, { currency: row.currency, signDisplay: "always" })}
@@ -421,15 +479,15 @@ export function StocksTable(): JSX.Element {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-sm">
+                      <td role="gridcell" className="px-4 py-3 text-right font-mono text-sm">
                         <span className={stalenessTone(stalenessSeconds)}>
                           {formatDuration(stalenessSeconds)}
                         </span>
                       </td>
                     </tr>
                     {isExpanded ? (
-                      <tr className="border-b border-slate-900/60 bg-slate-950/60">
-                        <td colSpan={7} className="px-4 py-4">
+                      <tr role="row" className="border-b border-slate-900/60 bg-slate-950/60">
+                        <td role="gridcell" colSpan={COLUMN_COUNT} className="px-4 py-4">
                           <ExpansionDrawer symbol={symbol} />
                         </td>
                       </tr>
@@ -438,8 +496,12 @@ export function StocksTable(): JSX.Element {
                 );
               })}
               {showEmpty ? (
-                <tr>
-                  <td className="px-4 py-6 text-center text-sm text-slate-400" colSpan={7}>
+                <tr role="row">
+                  <td
+                    role="gridcell"
+                    className="px-4 py-6 text-center text-sm text-slate-400"
+                    colSpan={COLUMN_COUNT}
+                  >
                     No matching positions. Clear filters to see all symbols.
                   </td>
                 </tr>

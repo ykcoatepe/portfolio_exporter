@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
+import json
 
 from ..core.models import Instrument, InstrumentType, Position, Quote, TradingSession
 
@@ -15,10 +16,11 @@ from ..core.models import Instrument, InstrumentType, Position, Quote, TradingSe
 def positions_from_records(records: Iterable[dict[str, Any]]) -> list[Position]:
     out: list[Position] = []
     for row in records:
-        symbol = row.get("symbol")
+        symbol = _resolve_symbol(row)
         if not symbol:
             continue
-        inst_type = _safe_instrument_type(row.get("instrument_type", "equity"))
+        raw_type = row.get("instrument_type") or row.get("secType") or "equity"
+        inst_type = _safe_instrument_type(str(raw_type))
         instrument = Instrument(
             symbol=symbol,
             instrument_type=inst_type,
@@ -26,12 +28,14 @@ def positions_from_records(records: Iterable[dict[str, Any]]) -> list[Position]:
             currency=str(row.get("currency", "USD")),
             multiplier=Decimal(str(row.get("multiplier", 1))),
         )
+        metadata = _extract_metadata(row, inst_type)
         out.append(
             Position(
                 instrument=instrument,
-                quantity=Decimal(str(row.get("quantity", row.get("qty", 0)))),
-                avg_cost=Decimal(str(row.get("avg_cost", row.get("average_cost", 0)))),
+                quantity=Decimal(str(row.get("quantity", row.get("qty", row.get("position", 0))))),
+                avg_cost=Decimal(str(row.get("avg_cost", row.get("average_cost", row.get("avgCost", 0))))),
                 cost_basis=_to_decimal(row.get("cost_basis")),
+                metadata=metadata,
             )
         )
     return out
@@ -56,6 +60,103 @@ def quotes_from_records(records: Iterable[dict[str, Any]]) -> list[Quote]:
             )
         )
     return out
+
+
+def _resolve_symbol(row: dict[str, Any]) -> str | None:
+    for key in ("symbol", "ticker", "underlying_symbol", "conIdSymbol"):
+        value = row.get(key)
+        if value in (None, ""):
+            continue
+        symbol = str(value).strip()
+        if symbol:
+            return symbol
+    return None
+
+
+def _extract_metadata(row: dict[str, Any], inst_type: InstrumentType) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+
+    def _get_value(*keys: str) -> Any:
+        for key in keys:
+            if key in row:
+                value = row[key]
+                if value not in (None, ""):
+                    return value
+        return None
+
+    account = _get_value("account", "Account", "acct", "AccountName")
+    if account is not None:
+        metadata["account"] = str(account).strip()
+
+    if inst_type == InstrumentType.OPTION:
+        underlying = _get_value("underlying", "Underlying", "ticker", "root", "symbol")
+        if underlying is not None:
+            metadata["underlying"] = str(underlying).strip()
+        expiry = _get_value(
+            "expiry",
+            "expiration",
+            "maturity",
+            "lastTradeDateOrContractMonth",
+            "expiryDate",
+        )
+        if expiry is not None:
+            metadata["expiry"] = str(expiry).strip()
+        right = _normalize_right(_get_value("right", "option_right", "call_put", "cp", "optionRight", "side"))
+        if right is not None:
+            metadata["right"] = right
+        strike = _get_value("strike", "option_strike", "strike_price", "strikePrice")
+        if strike is not None:
+            metadata["strike"] = _to_decimal(strike)
+        ratio = _get_value("ratio", "leg_ratio", "ratioQuantity")
+        if ratio is not None:
+            metadata["ratio"] = _to_decimal(ratio)
+        strategy_id = _get_value("strategy_id", "StrategyId", "ib_strategy_id")
+        if strategy_id is not None:
+            metadata["strategy_id"] = str(strategy_id).strip()
+        combo_id = _get_value("combo_id", "ComboId", "comboUid")
+        if combo_id is not None:
+            metadata["combo_id"] = str(combo_id).strip()
+
+    previous_close = _get_value("previous_close", "prior_close", "prev_close", "prevClose")
+    if previous_close is not None:
+        metadata["previous_close"] = _to_decimal(previous_close)
+
+    for greek in ("delta", "gamma", "theta", "vega"):
+        value = _get_value(greek, greek.upper(), f"option_{greek}")
+        if value is not None:
+            metadata[greek] = _to_decimal(value)
+
+    combo_legs = _get_value("combo_legs")
+    if combo_legs is not None:
+        parsed = _parse_combo_legs(combo_legs)
+        if parsed:
+            metadata["combo_legs"] = parsed
+
+    return metadata
+
+
+def _parse_combo_legs(raw: Any) -> list[dict[str, Any]] | None:
+    if isinstance(raw, list):
+        return [entry for entry in raw if isinstance(entry, dict)] or None
+    if isinstance(raw, str):
+        try:
+            decoded = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(decoded, list):
+            return [entry for entry in decoded if isinstance(entry, dict)] or None
+    return None
+
+
+def _normalize_right(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().upper()
+    if text in {"CALL", "C", "CALLS"}:
+        return "CALL"
+    if text in {"PUT", "P", "PUTS"}:
+        return "PUT"
+    return None
 
 
 def _safe_instrument_type(value: str) -> InstrumentType:

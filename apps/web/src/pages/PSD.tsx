@@ -1,3 +1,5 @@
+import CombosTable from "../components/CombosTable";
+import OptionLegsTable from "../components/OptionLegsTable";
 import StocksTable from "../components/StocksTable";
 
 const PlaceholderCard = ({
@@ -50,17 +52,10 @@ const PSDPage = () => (
         id="section-options"
         aria-label="Options Combos and Legs"
         tabIndex={0}
-        className="rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+        className="space-y-6 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
       >
-        <PlaceholderCard
-          title="Options Combos & Legs"
-          description="Upcoming: combo grouping, leg drill-down, and streaming Greeks with the same keyboard affordances as equities."
-          bullets={[
-            "Strategy filters (verticals, calendars, ratio spreads)",
-            "Nested legs table with mark-source badges",
-            "Delta, gamma, theta, vega aggregates with alerts",
-          ]}
-        />
+        <CombosTable />
+        <OptionLegsTable />
       </section>
 
       <section

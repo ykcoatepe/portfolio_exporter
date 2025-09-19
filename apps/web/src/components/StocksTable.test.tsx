@@ -115,6 +115,16 @@ describe("StocksTable", () => {
 
     const grid = await screen.findByRole("grid", { name: /single stocks positions/i });
     expect(grid).toBeInTheDocument();
+    await within(grid).findByRole("rowheader", { name: "SHOP" });
+    expect(grid).toHaveAttribute("aria-rowcount", "2");
+    expect(grid).toHaveAttribute("aria-colcount", "7");
+    expect(grid).not.toHaveAttribute("aria-busy");
+
+    const rows = within(grid).getAllByRole("row");
+    expect(rows).toHaveLength(2);
+    const dataRow = rows[1];
+    expect(within(dataRow).getByRole("rowheader")).toHaveTextContent("SHOP");
+    expect(within(dataRow).getAllByRole("gridcell")).toHaveLength(6);
 
     const headers = within(grid).getAllByRole("columnheader");
     expect(headers).not.toHaveLength(0);
@@ -195,118 +205,42 @@ describe("StocksTable", () => {
     await user.tab(); // focus sort toggle
     await user.tab(); // focus first row
 
-    const dataRows = within(screen.getByRole("grid", { name: /single stocks positions/i })).getAllByRole("row").slice(1, 3);
+    const dataRows = within(screen.getByRole("grid", { name: /single stocks positions/i }))
+      .getAllByRole("row")
+      .slice(1, 3);
     const [firstRow, secondRow] = dataRows;
+
     expect(document.activeElement).toBe(firstRow);
-    expect(document.activeElement).toMatchInlineSnapshot(`
-      <tr
-        aria-expanded="false"
-        class="border-b border-slate-900/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 hover:bg-slate-900/40"
-        tabindex="0"
-      >
-        <td
-          class="px-4 py-3 font-semibold tracking-wide text-slate-100"
-        >
-          <div
-            class="flex items-center gap-2"
-          >
-            <span>
-              NVDA
-            </span>
-            <span
-              aria-hidden="true"
-              class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-800/70 text-[0.6rem] text-slate-500"
-            >
-              +
-            </span>
-          </div>
-        </td>
-        <td
-          class="px-4 py-3 text-right font-mono text-sm text-slate-200"
-        >
-          30
-        </td>
-        <td
-          class="px-4 py-3 text-right font-mono text-sm text-slate-200"
-        >
-          $440.00
-        </td>
-        <td
-          class="px-4 py-3 text-right font-mono text-sm"
-        >
-          <div
-            class="flex items-center justify-end gap-3"
-          >
-            <span>
-              $456.50
-            </span>
-            <span
-              class="inline-flex min-w-[2.75rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide bg-sky-500/10 text-sky-300 border border-sky-500/30"
-              title="Mark source: MID"
-            >
-              MID
-            </span>
-          </div>
-        </td>
-        <td
-          class="px-4 py-3 text-right"
-        >
-          <div
-            class="flex flex-col items-end gap-1"
-          >
-            <span
-              class="font-mono text-sm text-emerald-300"
-            >
-              +$620.00
-            </span>
-            <span
-              class="text-xs text-emerald-300"
-            >
-              +3.40%
-            </span>
-          </div>
-        </td>
-        <td
-          class="px-4 py-3 text-right"
-        >
-          <div
-            class="flex flex-col items-end gap-1"
-          >
-            <span
-              class="font-mono text-sm text-emerald-300"
-            >
-              +$1,800.00
-            </span>
-            <span
-              class="text-xs text-emerald-300"
-            >
-              +7.20%
-            </span>
-          </div>
-        </td>
-        <td
-          class="px-4 py-3 text-right font-mono text-sm"
-        >
-          <span
-            class="text-emerald-300"
-          >
-            00:30
-          </span>
-        </td>
-      </tr>
-    `);
+    expect(firstRow).toHaveAttribute("tabindex", "0");
+    expect(firstRow).toHaveAttribute("aria-selected", "true");
+    expect(within(firstRow).getByRole("rowheader")).toHaveTextContent("NVDA");
+    expect(within(firstRow).getAllByRole("gridcell")).toHaveLength(6);
+    expect(secondRow).toHaveAttribute("tabindex", "-1");
 
     await user.keyboard("{ArrowDown}");
-    expect(document.activeElement).toBe(secondRow);
+    await waitFor(() => expect(document.activeElement).toBe(secondRow));
+    await waitFor(() => expect(secondRow).toHaveAttribute("aria-selected", "true"));
+    expect(firstRow).toHaveAttribute("aria-selected", "false");
+    expect(firstRow).toHaveAttribute("tabindex", "-1");
 
     await user.keyboard("{Enter}");
-    expect(document.activeElement).toBe(secondRow);
+    await waitFor(() => expect(secondRow).toHaveAttribute("aria-expanded", "true"));
     await screen.findByRole("heading", { level: 4, name: "Fundamentals" });
 
     await user.keyboard("{Space}");
+    await waitFor(() => expect(secondRow).toHaveAttribute("aria-expanded", "false"));
     await waitFor(() =>
       expect(screen.queryByRole("heading", { level: 4, name: "Fundamentals" })).toBeNull(),
     );
+
+    await user.keyboard("{Home}");
+    await waitFor(() => expect(document.activeElement).toBe(firstRow));
+    expect(firstRow).toHaveAttribute("aria-selected", "true");
+    expect(secondRow).toHaveAttribute("aria-selected", "false");
+
+    await user.keyboard("{End}");
+    await waitFor(() => expect(document.activeElement).toBe(secondRow));
+    expect(secondRow).toHaveAttribute("aria-selected", "true");
 
   });
 

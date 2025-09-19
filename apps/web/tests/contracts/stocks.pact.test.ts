@@ -1,10 +1,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MatchersV3, PactV3 } from "@pact-foundation/pact";
 
 import { fetchStocks } from "../../src/hooks/useStocks";
-import { server } from "../../src/mocks/server";
 
 const { eachLike, like, decimal, regex, datetime } = MatchersV3;
 
@@ -13,13 +12,6 @@ const __dirname = path.dirname(__filename);
 const pactDir = path.resolve(__dirname, "../../pacts");
 
 describe("contracts: /positions/stocks", () => {
-  beforeAll(() => {
-    server.close();
-  });
-
-  afterAll(() => {
-    server.listen({ onUnhandledRequest: "bypass" });
-  });
   const provider = new PactV3({
     consumer: "web-ui",
     provider: "positions-engine-api",

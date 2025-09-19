@@ -90,7 +90,8 @@ def _load_prior_positions_hint() -> str | None:
     return os.getenv("TRADES_PRIOR_POSITIONS")
 
 
-# Optional bonus endpoint placeholder.
 @app.get("/positions/options", tags=["positions"])
-def options_placeholder() -> dict[str, list[Any]]:
-    return {"combos": [], "legs": []}
+def options() -> dict[str, Any]:
+    if _AUTO_REFRESH:
+        _refresh_from_disk()
+    return _state.options_payload()

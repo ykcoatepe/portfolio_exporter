@@ -6,8 +6,8 @@
     "PSD_RULES_FN": "portfolio_exporter.psd_rules:evaluate",
     "PSD_SNAPSHOT_FN": "portfolio_exporter.psd_adapter:snapshot_once"
   },
-  "ingestor": 67761,
+  "ingestor": 49942,
   "port": 51127,
-  "scanner": 67762,
-  "web": 67763
+  "scanner": 49943,
+  "web": 49944
 }

@@ -59,10 +59,17 @@ serve-api:
 # ------------------------------------------------------------------
 # Web & API helpers
 # ------------------------------------------------------------------
-.PHONY: contract-sync ui-test ui-dev api-test api-serve perf-check
+.PHONY: contract-sync ui-test ui-test-contracts ui-dev api-test api-serve perf-check
 
-contract-sync: ; cd apps/web && npx openapi-typescript http://localhost:8000/openapi.json -o src/lib/api.d.ts
-ui-test: ; cd apps/web && npm run test
+contract-sync:
+	cd apps/web && npx openapi-typescript http://127.0.0.1:8000/openapi.json -o src/lib/api.d.ts
+
+ui-test:
+	cd apps/web && npm run test:unit
+
+ui-test-contracts:
+	cd apps/web && npm run test:contracts
+
 ui-dev: ; cd apps/web && npm run dev
 api-test: ; pytest -q libs/py/positions_engine/tests
 api-serve: ; uvicorn apps.api.main:app --reload
@@ -103,7 +110,7 @@ memory-context:
 	@$(VENV)/bin/python -m portfolio_exporter.scripts.memory validate >/dev/null && echo "--- preferences" && $(VENV)/bin/python -m portfolio_exporter.scripts.memory view --section preferences && echo "--- workflows" && $(VENV)/bin/python -m portfolio_exporter.scripts.memory view --section workflows && echo "--- tasks" && $(VENV)/bin/python -m portfolio_exporter.scripts.memory list-tasks --status open && echo "--- questions" && $(VENV)/bin/python -m portfolio_exporter.scripts.memory list-questions
 
 memory-bootstrap:
-	$(VENV)/bin/python -m portfolio_exporter.scripts.memory bootstrap
+	python3 scripts/memory.py
 
 memory-digest:
 	$(VENV)/bin/python -m portfolio_exporter.scripts.memory digest
