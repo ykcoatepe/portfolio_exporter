@@ -175,6 +175,7 @@ def stats() -> StatsResponse:
     payload.setdefault("net_liq", None)
     payload.setdefault("var95_1d_pct", None)
     payload.setdefault("margin_used_pct", None)
+    payload.setdefault("data_source", _state.data_source)
 
     snapshot_at = _state.snapshot_updated_at()
     if snapshot_at is not None and not payload.get("updated_at"):
