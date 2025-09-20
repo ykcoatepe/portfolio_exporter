@@ -114,17 +114,6 @@
                 }
               ]
             }
-          },
-          "header": {
-            "$['Content-Type'][0]": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "application/json;?.*"
-                }
-              ]
-            }
           }
         },
         "status": 200
@@ -157,7 +146,7 @@
               "id": "breach-portfolio-var",
               "occurred_at": "2024-10-18T14:05:00Z",
               "rule": "Portfolio VaR Limit",
-              "severity": "critical",
+              "severity": "CRITICAL",
               "subject": "Aggregate VaR",
               "symbol": "SPX"
             }
@@ -289,7 +278,7 @@
               "matchers": [
                 {
                   "match": "regex",
-                  "regex": "critical|warning|info"
+                  "regex": "CRITICAL|WARNING|INFO"
                 }
               ]
             },
@@ -306,17 +295,6 @@
               "matchers": [
                 {
                   "match": "type"
-                }
-              ]
-            }
-          },
-          "header": {
-            "$['Content-Type'][0]": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "application/json;?.*"
                 }
               ]
             }
@@ -345,8 +323,7 @@
                 }
               ]
             }
-          },
-          "header": {}
+          }
         },
         "method": "POST",
         "path": "/rules/preview"
@@ -391,7 +368,7 @@
               "id": "preview-portfolio-var",
               "occurred_at": "2024-10-18T14:05:00Z",
               "rule": "Portfolio VaR Limit",
-              "severity": "critical",
+              "severity": "CRITICAL",
               "subject": "Aggregate VaR",
               "symbol": "SPX"
             }
@@ -596,7 +573,7 @@
               "matchers": [
                 {
                   "match": "regex",
-                  "regex": "critical|warning|info"
+                  "regex": "CRITICAL|WARNING|INFO"
                 }
               ]
             },
@@ -613,17 +590,6 @@
               "matchers": [
                 {
                   "match": "type"
-                }
-              ]
-            }
-          },
-          "header": {
-            "$['Content-Type'][0]": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "application/json;?.*"
                 }
               ]
             }
@@ -661,8 +627,7 @@
                 }
               ]
             }
-          },
-          "header": {}
+          }
         },
         "method": "POST",
         "path": "/rules/publish"
@@ -708,17 +673,6 @@
               "matchers": [
                 {
                   "match": "type"
-                }
-              ]
-            }
-          },
-          "header": {
-            "$['Content-Type'][0]": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "application/json;?.*"
                 }
               ]
             }
@@ -810,17 +764,6 @@
                 }
               ]
             }
-          },
-          "header": {
-            "$['Content-Type'][0]": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "application/json;?.*"
-                }
-              ]
-            }
           }
         },
         "status": 200
@@ -846,8 +789,7 @@
                 }
               ]
             }
-          },
-          "header": {}
+          }
         },
         "method": "POST",
         "path": "/rules/validate"
@@ -868,7 +810,7 @@
               "id": "preview-portfolio-var",
               "occurred_at": "2024-10-18T14:05:00Z",
               "rule": "Portfolio VaR Limit",
-              "severity": "critical",
+              "severity": "CRITICAL",
               "subject": "Aggregate VaR",
               "symbol": "SPX"
             }
@@ -990,7 +932,7 @@
               "matchers": [
                 {
                   "match": "regex",
-                  "regex": "critical|warning|info"
+                  "regex": "CRITICAL|WARNING|INFO"
                 }
               ]
             },
@@ -1010,17 +952,6 @@
                 }
               ]
             }
-          },
-          "header": {
-            "$['Content-Type'][0]": {
-              "combine": "AND",
-              "matchers": [
-                {
-                  "match": "regex",
-                  "regex": "application/json;?.*"
-                }
-              ]
-            }
           }
         },
         "status": 200
@@ -1029,11 +960,11 @@
   ],
   "metadata": {
     "pact-js": {
-      "version": "10.4.1"
+      "version": "15.0.1"
     },
     "pactRust": {
-      "ffi": "0.4.0",
-      "models": "1.0.4"
+      "ffi": "0.4.28",
+      "models": "1.3.5"
     },
     "pactSpecification": {
       "version": "3.0.0"

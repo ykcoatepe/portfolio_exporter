@@ -147,11 +147,17 @@ def _normalize_positions(positions_df: pd.DataFrame, greeks_df: pd.DataFrame) ->
         symbol = str(row.get("symbol") or "").strip()
         if not symbol:
             continue
+        quantity = row.get("quantity", row.get("qty", row.get("position")))
+        if quantity in (None, ""):
+            quantity = 0
+        avg_cost = row.get("avg_cost", row.get("average_cost", row.get("avgcost")))
+        if avg_cost in (None, ""):
+            avg_cost = 0
         entry: dict[str, Any] = {
             "symbol": symbol,
             "instrument_type": _normalize_type(row.get("type")),
-            "quantity": row.get("quantity", row.get("qty", row.get("position"))),
-            "avg_cost": row.get("avg_cost", row.get("average_cost", row.get("avgcost"))),
+            "quantity": quantity,
+            "avg_cost": avg_cost,
             "multiplier": row.get("multiplier", 1),
             "account": row.get("account"),
             "previous_close": row.get("previous_close", row.get("prior_close", row.get("prev_close"))),

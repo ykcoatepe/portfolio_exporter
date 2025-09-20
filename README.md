@@ -1297,6 +1297,7 @@ PID file lives at `run/psd-pids.json`; logs stream to `run/ingestor.log`, `run/s
 Quick smoke (local):
 - `python -m psd.menus.ops` -> press **4** to start -> `run/psd-pids.json` appears and `run/*.log` fills.
 - Press **1** for status, **2** to stop; confirm the PID file updates or disappears accordingly.
+- `POSITIONS_ENGINE_DEMO=1 python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000` launches the API with the demo dataset if no CSVs are present.
 
 > **SSE Troubleshooting:** If events appear in bursts, check proxy buffering or ensure `X-Accel-Buffering: no` is not ignored by `proxy_ignore_headers`.
 

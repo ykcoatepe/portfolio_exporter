@@ -34,7 +34,7 @@ describe("contracts: /positions/options", () => {
       willRespondWith: {
         status: 200,
         headers: {
-          "Content-Type": regex("application/json;?.*", "application/json; charset=utf-8"),
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: like({
           combos: eachLike({

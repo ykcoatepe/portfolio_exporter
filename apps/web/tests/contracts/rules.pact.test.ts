@@ -34,7 +34,7 @@ describe("contracts: /rules/summary", () => {
       willRespondWith: {
         status: 200,
         headers: {
-          "Content-Type": regex("application/json;?.*", "application/json; charset=utf-8"),
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: like({
           as_of: datetime("yyyy-MM-dd'T'HH:mm:ssxxx", "2024-10-18T14:10:00Z"),
@@ -49,7 +49,7 @@ describe("contracts: /rules/summary", () => {
             {
               id: like("breach-portfolio-var"),
               rule: like("Portfolio VaR Limit"),
-              severity: regex("critical|warning|info", "critical"),
+              severity: regex("CRITICAL|WARNING|INFO", "CRITICAL"),
               subject: like("Aggregate VaR"),
               symbol: like("SPX"),
               occurred_at: datetime("yyyy-MM-dd'T'HH:mm:ssxxx", "2024-10-18T14:05:00Z"),
@@ -67,7 +67,7 @@ describe("contracts: /rules/summary", () => {
       expect(response.breaches.total).toBeGreaterThan(0);
       expect(Array.isArray(response.top)).toBe(true);
       expect(response.top.every((entry) => Boolean(entry.rule))).toBe(true);
-      expect(response.top.every((entry) => ["critical", "warning", "info"].includes(entry.severity))).toBe(
+      expect(response.top.every((entry) => ["CRITICAL", "WARNING", "INFO"].includes(entry.severity))).toBe(
         true,
       );
     });
@@ -87,7 +87,7 @@ describe("contracts: /rules/summary", () => {
       willRespondWith: {
         status: 200,
         headers: {
-          "Content-Type": regex("application/json;?.*", "application/json; charset=utf-8"),
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: like({
           version: like(12),
@@ -134,7 +134,7 @@ describe("contracts: /rules/summary", () => {
       willRespondWith: {
         status: 200,
         headers: {
-          "Content-Type": regex("application/json;?.*", "application/json; charset=utf-8"),
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: like({
           ok: like(true),
@@ -143,7 +143,7 @@ describe("contracts: /rules/summary", () => {
             {
               id: like("preview-portfolio-var"),
               rule: like("Portfolio VaR Limit"),
-              severity: regex("critical|warning|info", "critical"),
+              severity: regex("CRITICAL|WARNING|INFO", "CRITICAL"),
               subject: like("Aggregate VaR"),
               symbol: like("SPX"),
               occurred_at: datetime("yyyy-MM-dd'T'HH:mm:ssxxx", "2024-10-18T14:05:00Z"),
@@ -188,7 +188,7 @@ describe("contracts: /rules/summary", () => {
       willRespondWith: {
         status: 200,
         headers: {
-          "Content-Type": regex("application/json;?.*", "application/json; charset=utf-8"),
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: like({
           ok: like(true),
@@ -197,7 +197,7 @@ describe("contracts: /rules/summary", () => {
             {
               id: like("preview-portfolio-var"),
               rule: like("Portfolio VaR Limit"),
-              severity: regex("critical|warning|info", "critical"),
+              severity: regex("CRITICAL|WARNING|INFO", "CRITICAL"),
               subject: like("Aggregate VaR"),
               symbol: like("SPX"),
               occurred_at: datetime("yyyy-MM-dd'T'HH:mm:ssxxx", "2024-10-18T14:05:00Z"),
@@ -267,7 +267,7 @@ describe("contracts: /rules/summary", () => {
       willRespondWith: {
         status: 200,
         headers: {
-          "Content-Type": regex("application/json;?.*", "application/json; charset=utf-8"),
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: like({
           version: like(13),
@@ -306,7 +306,7 @@ describe("contracts: /rules/summary", () => {
       willRespondWith: {
         status: 200,
         headers: {
-          "Content-Type": regex("application/json;?.*", "application/json; charset=utf-8"),
+          "Content-Type": "application/json; charset=utf-8",
         },
         body: like({
           version: like(12),

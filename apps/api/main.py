@@ -185,28 +185,73 @@ def stats() -> StatsResponse:
 
 
 def _refresh_from_disk() -> None:
-    if not _DATA_ROOT.exists():
-        _state.refresh(positions=[], quotes=[])
-        return
-    positions_df = load_latest_positions(_DATA_ROOT)
-    quotes_df = load_latest_quotes(_DATA_ROOT)
-    positions = (
-        positions_from_records(positions_df.to_dict("records")) if hasattr(positions_df, "to_dict") else []
+    data_root = _resolve_data_root()
+    csv_result = load_csv_records(data_root)
+    metadata = csv_result.metadata
+    logger.info(
+        "[ingest] DATA_ROOT=%s positions_rows=%d quotes_rows=%d greeks_rows=%d",
+        metadata.get("data_root"),
+        metadata.get("positions_rows", 0),
+        metadata.get("quotes_rows", 0),
+        metadata.get("greeks_rows", 0),
     )
-    quotes_raw = quotes_from_records(quotes_df.to_dict("records")) if hasattr(quotes_df, "to_dict") else []
-    quotes = _guard_quotes(quotes_raw)
 
-    snapshot_at: datetime | None = None
-    for quote in quotes:
-        ts = quote.updated_at
-        if ts is None:
-            continue
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=UTC)
-        if snapshot_at is None or ts > snapshot_at:
-            snapshot_at = ts
+    positions_records = csv_result.positions
+    quotes_records = csv_result.quotes
 
-    _state.refresh(positions=positions, quotes=quotes, snapshot_at=snapshot_at)
+    positions = positions_from_records(positions_records)
+    quotes = _guard_quotes(quotes_from_records(quotes_records))
+
+    equity_positions = [
+        position for position in positions if position.instrument.instrument_type == InstrumentType.EQUITY
+    ]
+    option_positions = [
+        position for position in positions if position.instrument.instrument_type == InstrumentType.OPTION
+    ]
+
+    demo_env_enabled = os.getenv("POSITIONS_ENGINE_DEMO", "0") == "1"
+    allow_empty = os.getenv("POSITIONS_ENGINE_ALLOW_EMPTY", "0") == "1"
+    apply_demo = False
+    demo_reason: str | None = None
+
+    if _DEMO_OVERRIDE is True:
+        apply_demo = True
+        demo_reason = "debug override"
+    elif _DEMO_OVERRIDE is False:
+        apply_demo = False
+    elif not equity_positions and not option_positions:
+        if demo_env_enabled or not allow_empty:
+            apply_demo = True
+            demo_reason = "POSITIONS_ENGINE_DEMO=1" if demo_env_enabled else "ALLOW_EMPTY disabled"
+
+    data_source = "csv" if csv_result.has_data else "live"
+
+    if apply_demo:
+        demo_positions, demo_quotes = load_demo_dataset()
+        positions = positions_from_records(demo_positions)
+        quotes = _guard_quotes(quotes_from_records(demo_quotes))
+        equity_positions = [
+            position for position in positions if position.instrument.instrument_type == InstrumentType.EQUITY
+        ]
+        option_positions = [
+            position for position in positions if position.instrument.instrument_type == InstrumentType.OPTION
+        ]
+        data_source = "demo"
+        logger.info(
+            "[demo] Loaded fallback dataset equities=%d option_positions=%d reason=%s",
+            len(equity_positions),
+            len(option_positions),
+            demo_reason or "auto",
+        )
+    elif not positions and not quotes:
+        if not allow_empty and not demo_env_enabled:
+            logger.info(
+                "[ingest] No data available; set POSITIONS_ENGINE_DEMO=1 or POSITIONS_ENGINE_ALLOW_EMPTY=1 to control fallback"
+            )
+        # keep data_source as "live" to indicate no sample was injected
+
+    snapshot_at = _latest_quote_timestamp(quotes)
+    _state.refresh(positions=positions, quotes=quotes, snapshot_at=snapshot_at, data_source=data_source)
 
 
 def _guard_quotes(quotes: list[Quote]) -> list[Quote]:
@@ -215,6 +260,21 @@ def _guard_quotes(quotes: list[Quote]) -> list[Quote]:
     for quote in quotes:
         seen[quote.symbol] = quote
     return list(seen.values())
+
+
+def _latest_quote_timestamp(quotes: list[Quote]) -> datetime | None:
+    snapshot_at: datetime | None = None
+    for quote in quotes:
+        ts = quote.updated_at
+        if ts is None:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)
+        else:
+            ts = ts.astimezone(UTC)
+        if snapshot_at is None or ts > snapshot_at:
+            snapshot_at = ts
+    return snapshot_at
 
 
 def _load_prior_positions_hint() -> str | None:
@@ -226,6 +286,22 @@ def options() -> dict[str, Any]:
     if _AUTO_REFRESH:
         _refresh_from_disk()
     return _state.options_payload()
+
+
+@app.get("/debug/demo/enable", include_in_schema=False)
+def enable_demo() -> dict[str, bool]:
+    global _DEMO_OVERRIDE
+    _DEMO_OVERRIDE = True
+    _refresh_from_disk()
+    return {"demo": True}
+
+
+@app.get("/debug/demo/disable", include_in_schema=False)
+def disable_demo() -> dict[str, bool]:
+    global _DEMO_OVERRIDE
+    _DEMO_OVERRIDE = False
+    _refresh_from_disk()
+    return {"demo": False}
 
 
 @app.get("/rules/summary", tags=["rules"], response_model=RulesSummaryResponseModel)
