@@ -11,6 +11,9 @@ export default defineConfig({
     },
   },
   test: {
+    alias: {
+      "react-router-dom": routerAlias,
+    },
     reporters: "default",
     globals: true,
     css: true,
@@ -19,6 +22,10 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "jsdom",
+          globals: true,
+          alias: {
+            "react-router-dom": routerAlias,
+          },
           include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
           setupFiles: ["src/test/setup.ts"],
         },

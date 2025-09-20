@@ -19,3 +19,9 @@ var/memos/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# apps/web
+apps/web/node_modules
+apps/web/dep-tree.before.txt
+apps/web/dep-tree.after.txt
+apps/web/audit.json
