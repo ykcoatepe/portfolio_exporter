@@ -1,0 +1,938 @@
+INFO:     Started server process [58475]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63143 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63143 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63143 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [59291]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63200 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63200 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63200 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [59291]
+INFO:     Started server process [60158]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63299 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63299 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63299 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [60158]
+INFO:     Started server process [62390]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63653 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63653 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63653 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [67763]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:65072 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65072 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65072 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65259 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65259 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65259 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Started server process [46118]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51405 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51405 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51405 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51405 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51406 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46118]
+INFO:     Started server process [49416]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:52916 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52916 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52916 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52916 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52923 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53133 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52933 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [49944]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53243 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53243 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53243 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53243 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53244 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53345 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [49944]
+INFO:     Started server process [34062]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:61826 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61826 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61826 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61826 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61827 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61827 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61827 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61827 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61827 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61827 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61827 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61827 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61857 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [63312]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63856 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63856 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63856 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63856 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63860 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63861 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63861 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [63312]
+INFO:     Started server process [53468]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:65074 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65074 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65074 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65074 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65085 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65085 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65085 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65085 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65090 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [53468]
+INFO:     Started server process [17877]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:49435 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49435 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49435 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49435 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49457 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49457 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49457 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49457 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49460 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49461 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49462 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49463 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49464 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49466 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49480 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49492 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49507 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49513 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49537 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49546 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49569 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49598 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49598 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49598 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49598 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49598 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49601 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49615 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17877]
+INFO:     Started server process [96212]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50348 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50348 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50348 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50348 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50361 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50384 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50389 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50408 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50442 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50442 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50442 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50444 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50446 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50453 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50454 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50455 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50468 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50483 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50487 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50490 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50494 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50497 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50517 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50625 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50698 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50766 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50838 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50886 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50938 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51002 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51057 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51219 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51280 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51282 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51287 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51289 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51292 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51293 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51294 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51296 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51315 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51317 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51332 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51343 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51437 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51504 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [96212]
+INFO:     Started server process [56040]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51682 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51682 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51683 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51717 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51717 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51717 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51717 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51717 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51717 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51717 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51717 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51725 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51725 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51725 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51725 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51725 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51730 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51799 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51801 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51803 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51816 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51821 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51825 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51859 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51903 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [56040]
+INFO:     Started server process [29853]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53145 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53145 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53145 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53146 - "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53145 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53146 - "GET /apple-touch-icon.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53148 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53148 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53150 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53163 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53164 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53165 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53170 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53172 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53174 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53183 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53203 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53215 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53253 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53273 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53275 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53275 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53275 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53275 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53275 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29853]
+INFO:     Started server process [51387]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53396 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53396 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53396 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53396 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53407 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53410 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53411 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53412 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53412 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51387]
+INFO:     Started server process [89708]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54473 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54473 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54473 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54473 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [16232]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:65077 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65077 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65077 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65077 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65079 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65079 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65079 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65079 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Finished server process [16232]
+INFO:     Started server process [24162]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:65429 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65429 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65429 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24162]

@@ -7,7 +7,7 @@ no heavy imports to keep CLI startup fast.
 Environment variables
 ---------------------
 - `IB_HOST`: IBKR host (default: `127.0.0.1`).
-- `IB_PORT`: IBKR port (default: `7497`).
+- `IB_PORT`: IBKR port (default: `7496`).
 - `IB_CLIENT_ID`: Fallback client id if a per-script one isn’t provided.
 - `IB_CLIENT_ID_<NAME>`: Per-script client id override, where `<NAME>` is the
   uppercased name passed to `client_id(name, default)` (e.g., `update_tickers`
@@ -22,9 +22,9 @@ from __future__ import annotations
 
 import os
 
-# Defaults align with a typical TWS paper-trading setup.
+# Defaults align with a typical TWS live setup (set IB_PORT=7497 for paper).
 HOST: str = os.getenv("IB_HOST", "127.0.0.1")
-PORT: int = int(os.getenv("IB_PORT", "7497"))
+PORT: int = int(os.getenv("IB_PORT", "7496"))
 
 
 def client_id(name: str, default: int = 0) -> int:
@@ -56,4 +56,3 @@ def client_id(name: str, default: int = 0) -> int:
 
 
 __all__ = ["HOST", "PORT", "client_id"]
-

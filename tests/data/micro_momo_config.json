@@ -1,0 +1,42 @@
+{
+  "filters": {
+    "min_price": 10,
+    "max_price": 300,
+    "min_volume": 10000,
+    "max_atr_pct": 5
+  },
+  "scoring": {
+    "trend_w": 0.4,
+    "rs_w": 0.3,
+    "iv_rank_inv_w": 0.2,
+    "turnover_w": 0.1
+  },
+  "direction": {
+    "trend_threshold": 0.0
+  },
+  "options": {
+    "min_width": 5,
+    "max_spread_pct": 0.3
+  },
+  "liquidity": {
+    "min_oi": 10
+  },
+  "sizing": {
+    "risk_budget": 250,
+    "max_contracts": 5
+  },
+  "targets": {
+    "tp_pct": 0.5,
+    "sl_pct": 0.5
+  },
+  "entry": {
+    "pct_above": 0.01,
+    "pct_below": 0.01
+  },
+  "data": {
+    "mode": "csv-only",
+    "providers": ["ib", "yahoo"],
+    "offline": true,
+    "cache": {"enabled": true, "dir": "out/.cache", "ttl_sec": 60}
+  }
+}

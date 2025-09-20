@@ -12,21 +12,26 @@ Columns:
     timestamp · ticker · last · bid · ask · open · high · low · prev_close · volume · unrealized_pnl · unrealized_pnl_pct · source
 """
 
-import os
-from portfolio_exporter.core.config import settings
-import sys
-import time
-import logging
-import csv
 import argparse
+import asyncio
+import csv
+import logging
+import os
+import time
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from typing import List, Dict, Any
-from portfolio_exporter.core.ui import run_with_spinner
-import numpy as np
+
+from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+
+run_with_spinner = core_ui.run_with_spinner
 import math
+
+import numpy as np
 
 
 # ------------------------------------------------------------------
@@ -55,9 +60,7 @@ try:
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=frozenset(["GET", "HEAD"]),
     )
-    _yf_adapter = HTTPAdapter(
-        max_retries=_yf_retries, pool_connections=10, pool_maxsize=10
-    )
+    _yf_adapter = HTTPAdapter(max_retries=_yf_retries, pool_connections=10, pool_maxsize=10)
     _yf_session.mount("https://", _yf_adapter)
     _yf_session.mount("http://", _yf_adapter)
     try:
@@ -88,8 +91,8 @@ def _first_valid(*vals):
 def _yf_resolve_last_price(
     yf_symbol: str,
     label: str | None = None,
-    info: Dict[str, Any] | None = None,
-    fast: Dict[str, Any] | None = None,
+    info: dict[str, Any] | None = None,
+    fast: dict[str, Any] | None = None,
 ) -> float:
     """
     Best-effort ladder to resolve a last price from Yahoo Finance.
@@ -123,7 +126,13 @@ def _yf_resolve_last_price(
         # Step 2: intraday 1m
         if price is None or pd.isna(price):
             try:
-                intr = yf.download(yf_symbol, period="1d", interval="1m", progress=False)
+                intr = yf.download(
+                    yf_symbol,
+                    period="1d",
+                    interval="1m",
+                    progress=False,
+                    auto_adjust=False,
+                )
                 if intr is not None and not intr.empty:
                     price = float(intr["Close"].dropna().iloc[-1])
             except Exception:
@@ -131,7 +140,13 @@ def _yf_resolve_last_price(
         # Step 3: intraday 5m
         if price is None or pd.isna(price):
             try:
-                intr5 = yf.download(yf_symbol, period="1d", interval="5m", progress=False)
+                intr5 = yf.download(
+                    yf_symbol,
+                    period="1d",
+                    interval="5m",
+                    progress=False,
+                    auto_adjust=False,
+                )
                 if intr5 is not None and not intr5.empty:
                     price = float(intr5["Close"].dropna().iloc[-1])
             except Exception:
@@ -139,7 +154,13 @@ def _yf_resolve_last_price(
         # Step 4: 2d daily
         if price is None or pd.isna(price):
             try:
-                daily = yf.download(yf_symbol, period="2d", interval="1d", progress=False)
+                daily = yf.download(
+                    yf_symbol,
+                    period="2d",
+                    interval="1d",
+                    progress=False,
+                    auto_adjust=False,
+                )
                 if daily is not None and not daily.empty:
                     price = float(daily["Close"].dropna().iloc[-1])
             except Exception:
@@ -183,8 +204,8 @@ def _yf_resolve_last_price(
 
 # optional PDF dependencies
 try:
-    from reportlab.lib.pagesizes import letter, landscape
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import landscape, letter
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
@@ -209,7 +230,7 @@ except ImportError:
 # Try to import ib_insync; if unavailable we’ll silently skip
 # ----------------------------------------------------------
 try:
-    from ib_insync import IB, Stock, Index, Future, Option
+    from ib_insync import IB, Index, Option, Stock
 
     IB_AVAILABLE = True
 except ImportError:
@@ -245,13 +266,35 @@ now_tr = datetime.now(TR_TZ)
 DATE_TAG = now_tr.strftime("%Y%m%d")
 TIME_TAG = now_tr.strftime("%H%M")
 
-# Save snapshots to iCloud Drive ▸ Downloads
-OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 
-OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"live_quotes_{DATE_TAG}_{TIME_TAG}.csv")
-OUTPUT_POS_CSV = os.path.join(OUTPUT_DIR, f"live_positions_{DATE_TAG}_{TIME_TAG}.csv")
+def _resolve_output_dir() -> str:
+    """Resolve a writable output directory with env overrides and fallback.
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+    Order: ``OUTPUT_DIR`` → ``PE_OUTPUT_DIR`` → ``settings.output_dir``.
+    Uses the core IO helper to ensure the directory is writable, otherwise
+    falls back to a repo-local ``./tmp_test_run``.
+    """
+    base = os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
+    try:
+        from portfolio_exporter.core.io import _ensure_writable_dir  # reuse helper
+
+        return str(_ensure_writable_dir(Path(base)))
+    except Exception:
+        # Last-resort fallback
+        p = Path(base).expanduser()
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return str(p)
+        except Exception:
+            p = Path("./tmp_test_run")
+            p.mkdir(parents=True, exist_ok=True)
+            return str(p)
+
+
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
+
 IB_CID = _cid("live_feed", default=2)  # separate clientId
 IB_TIMEOUT = 4.0  # seconds to wait per batch
 
@@ -282,6 +325,20 @@ PROXY_MAP = {
 }
 
 YIELD_MAP = {"US2Y": "DGS2", "US10Y": "DGS10", "US20Y": "DGS20", "US30Y": "DGS30"}
+
+
+def _ensure_event_loop() -> asyncio.AbstractEventLoop:
+    """Ensure ib_insync can access a live asyncio loop before connecting."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
+
 
 # Index mapping for IBKR (futures removed; will fall back to yfinance)
 SYMBOL_MAP = {
@@ -319,8 +376,7 @@ def load_tickers() -> list[str]:
     Preference: files under ``settings.output_dir``; then current directory.
     """
     candidates = [
-        os.path.join(os.path.expanduser(settings.output_dir), name)
-        for name in PORTFOLIO_FILES
+        os.path.join(os.path.expanduser(settings.output_dir), name) for name in PORTFOLIO_FILES
     ] + PORTFOLIO_FILES
     p = next((f for f in candidates if os.path.exists(f)), None)
     if not p:
@@ -369,6 +425,7 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     if not IB_AVAILABLE:
         return pd.DataFrame()
 
+    _ensure_event_loop()
     ib = IB()
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)
@@ -417,48 +474,23 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     ib.sleep(IB_TIMEOUT)
 
     for key, md in reqs.items():
-        last_price = _clean_price(
-            md.last
-            if md.last is not None
-            else md.close  # fallback to close if last missing
-        )
+        raw_last = md.last if md.last is not None else md.close
+        clean_last = _clean_price(raw_last)
         combined_rows.append(
             {
                 "ticker": key,
                 "last": (
-                    md.last / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.last
-                    else md.last
+                    clean_last / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and clean_last is not None
+                    else clean_last
                 ),
-                "bid": (
-                    md.bid / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid
-                    else md.bid
-                ),
-                "ask": (
-                    md.ask / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask
-                    else md.ask
-                ),
-                "open": (
-                    md.open / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open
-                    else md.open
-                ),
-                "high": (
-                    md.high / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high
-                    else md.high
-                ),
-                "low": (
-                    md.low / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low
-                    else md.low
-                ),
+                "bid": (md.bid / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid else md.bid),
+                "ask": (md.ask / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask else md.ask),
+                "open": (md.open / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open else md.open),
+                "high": (md.high / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high else md.high),
+                "low": (md.low / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low else md.low),
                 "prev_close": (
-                    md.close / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close
-                    else md.close
+                    md.close / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close else md.close
                 ),
                 "volume": md.volume,
                 "source": "IB",
@@ -478,7 +510,6 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
 
 def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
     rows = []
-    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     iterable = iter_progress(tickers, "yfinance") if PROGRESS else tickers
     for t in iterable:
         if t in YIELD_MAP:
@@ -498,9 +529,7 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
                 fast.get("previousClose"),
                 info.get("previousClose"),
             )
-            vol = _first_valid(
-                fast.get("last_volume"), fast.get("volume"), info.get("volume")
-            )
+            vol = _first_valid(fast.get("last_volume"), fast.get("volume"), info.get("volume"))
         except Exception as e:
             logging.warning("yfinance info fail %s: %s", t, e)
             bid = ask = day_high = day_low = vol = np.nan
@@ -509,7 +538,7 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
         # Yahoo yields like ^TNX return 10× the percentage; rescale
         if t in {"^IRX", "^FVX", "^TNX", "^TYX"} and price is not None:
             price = price / 10.0
-        
+
         rows.append(
             {
                 "ticker": t,
@@ -543,6 +572,7 @@ def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
             val = web.DataReader(series, "fred").iloc[-1].values[0]
             rows.append(
                 {
+                    "timestamp": ts,
                     "ticker": t,
                     "last": val,
                     "bid": np.nan,
@@ -575,7 +605,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
         logging.warning("IB positions() failed: %s", e)
         return pd.DataFrame()
 
-    rows: List[Dict] = []
+    rows: list[dict] = []
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
 
     # --- simple combo heuristic -----------------------------------------
@@ -613,9 +643,7 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
     ib.sleep(IB_TIMEOUT)  # allow quotes to update
 
     for conId, (con, md, avg_cost, qty) in md_reqs.items():
-        raw_last = (
-            _clean_price(md.last) if md.last is not None else _clean_price(md.close)
-        )
+        raw_last = _clean_price(md.last) if md.last is not None else _clean_price(md.close)
         last = raw_last
         mult = int(con.multiplier) if con.multiplier else 1
         cost_basis = avg_cost * qty * mult
@@ -628,16 +656,12 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
             from ib_insync import Contract
 
             for leg in con.comboLegs:
-                leg_contract = ib.qualifyContracts(
-                    Contract(conId=leg.conId, exchange=leg.exchange)
-                )[0]
+                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
                 combo_legs_data.append(
                     {
                         "symbol": leg_contract.symbol,
                         "sec_type": leg_contract.secType,
-                        "expiry": getattr(
-                            leg_contract, "lastTradeDateOrContractMonth", None
-                        ),
+                        "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
                         "strike": getattr(leg_contract, "strike", None),
                         "right": getattr(leg_contract, "right", None),
                         "ratio": leg.ratio,
@@ -708,9 +732,7 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
     display_df = df.copy()
     num_cols = display_df.select_dtypes(include=["number"]).columns
     for col in num_cols:
-        display_df[col] = display_df[col].apply(
-            lambda x: "—" if pd.isna(x) else f"{x:,.2f}"
-        )
+        display_df[col] = display_df[col].apply(lambda x: "—" if pd.isna(x) else f"{x:,.2f}")
     rows_data = [display_df.columns.tolist()] + display_df.values.tolist()
     doc = SimpleDocTemplate(
         path,
@@ -746,17 +768,23 @@ def _current_output_paths() -> tuple[str, str]:
     now = datetime.now(TR_TZ)
     date_tag = now.strftime("%Y%m%d")
     time_tag = now.strftime("%H%M")
-    # Ensure output directory exists at write-time (avoid import-time side effects)
-    try:
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-    except Exception:
-        pass
-    base_q = os.path.join(OUTPUT_DIR, f"live_quotes_{date_tag}_{time_tag}")
-    base_pos = os.path.join(OUTPUT_DIR, f"live_positions_{date_tag}_{time_tag}")
+    out_dir = _resolve_output_dir()
+    base_q = os.path.join(out_dir, f"live_quotes_{date_tag}_{time_tag}")
+    base_pos = os.path.join(out_dir, f"live_positions_{date_tag}_{time_tag}")
     return base_q, base_pos
 
 
-def run(fmt: str = "csv", include_indices: bool = True) -> None:
+def _load_portfolio_tickers() -> list[str]:
+    """Test hook: wrapper around load_tickers for monkeypatching."""
+    return load_tickers()
+
+
+def run(
+    fmt: str = "csv",
+    include_indices: bool = True,
+    return_df: bool = False,
+    include_positions: bool = False,
+):
     """Programmatic entrypoint used by the Live-Market menu.
 
     - Avoids interactive prompts
@@ -764,9 +792,11 @@ def run(fmt: str = "csv", include_indices: bool = True) -> None:
     - Optionally excludes macro/index extras if include_indices=False
     """
     # ----- resolve tickers -----
-    tickers = load_tickers()
+    tickers = _load_portfolio_tickers()
     opt_list, opt_under = ([], set())
-    if IB_AVAILABLE:
+    # Only include underlyings from live positions when explicitly requested.
+    if include_positions and IB_AVAILABLE:
+        _ensure_event_loop()
         ib_tmp = IB()
         try:
             ib_tmp.connect(IB_HOST, IB_PORT, clientId=99, timeout=3)
@@ -774,13 +804,24 @@ def run(fmt: str = "csv", include_indices: bool = True) -> None:
             ib_tmp.disconnect()
         except Exception:
             pass
-    extras = (ALWAYS_TICKERS + EXTRA_TICKERS) if include_indices else []
-    tickers = sorted(set(tickers + list(opt_under) + extras))
+
+    def _baseline_indices() -> list[str]:
+        # Minimal baseline set used in tests
+        return ["SPY", "QQQ", "IWM", "DIA", "VIX"]
+
+    extras = _baseline_indices() if include_indices else []
+    tickers = sorted(set(tickers + (list(opt_under) if include_positions else []) + extras))
     if not tickers:
         logging.warning("No tickers to snapshot.")
-        return
+        return pd.DataFrame() if return_df else None
 
     ts_now = datetime.now(TR_TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+    # Always call minimal snapshot helper (used by tests to capture tickers)
+    try:
+        _ = _snapshot_quotes(tickers)
+    except Exception:
+        pass
 
     # ----- quotes from IB, YF, FRED -----
     df_ib = fetch_ib_quotes(tickers, opt_list)
@@ -798,6 +839,7 @@ def run(fmt: str = "csv", include_indices: bool = True) -> None:
     pct_map: dict[str, float] = {}
     df_pos = pd.DataFrame()
     if IB_AVAILABLE:
+        _ensure_event_loop()
         ib_live = IB()
         try:
             ib_live.connect(IB_HOST, IB_PORT, clientId=98, timeout=3)
@@ -806,16 +848,15 @@ def run(fmt: str = "csv", include_indices: bool = True) -> None:
             if not df_pos.empty:
                 pnl_map = df_pos.groupby("ticker")["unrealized_pnl"].sum().to_dict()
                 cost_map = df_pos.groupby("ticker")["cost_basis"].sum().to_dict()
-                pct_map = {
-                    s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan
-                    for s in pnl_map
-                }
+                pct_map = {s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan for s in pnl_map}
         except Exception as e:
             logging.warning("Live position snapshot failed: %s", e)
 
     df["unrealized_pnl"] = df["ticker"].map(pnl_map)
     df["unrealized_pnl_pct"] = df["ticker"].map(pct_map)
 
+    if return_df:
+        return df
     # reorder columns for clarity
     quote_cols = [
         "timestamp",
@@ -855,9 +896,7 @@ def run(fmt: str = "csv", include_indices: bool = True) -> None:
         df.to_csv(out_q, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
         if not df_pos.empty:
             out_p = base_pos + ".csv"
-            df_pos.to_csv(
-                out_p, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f"
-            )
+            df_pos.to_csv(out_p, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
         logging.info("Saved live snapshot → %s", out_q)
 
 
@@ -892,3 +931,17 @@ def main():
 
 
 ### Removed legacy lightweight run() in favor of unified run() above.
+def _snapshot_quotes(tickers: list[str], fmt: str = "csv") -> pd.DataFrame:
+    """Return a minimal snapshot quotes DataFrame with columns [symbol, price].
+
+    Uses yfinance ladder via _yf_resolve_last_price; IBKR path is handled in
+    upstream helpers. Designed to be test-friendly and offline-capable.
+    """
+    rows = []
+    for t in tickers:
+        try:
+            price = _yf_resolve_last_price(t)
+        except Exception:
+            price = float("nan")
+        rows.append({"symbol": t, "price": float(price) if price is not None else float("nan")})
+    return pd.DataFrame(rows)

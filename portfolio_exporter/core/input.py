@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import re
 import datetime as _dt
-from typing import NamedTuple, Optional, List
+import re
+from typing import NamedTuple
 
 import dateparser
 
@@ -15,18 +15,16 @@ class Leg(NamedTuple):
 
 class ParsedOrder(NamedTuple):
     underlying: str
-    legs: List[Leg]  # one or two legs supported for now
+    legs: list[Leg]  # one or two legs supported for now
     qty: int  # default 1
 
 
-_STRIKE_RGX = re.compile(
-    r"(?P<k1>\d+(?:\.\d+)?)(?:/|‑)?(?P<k2>\d+(?:\.\d+)?)?" r"(?P<right>[CPcp])?$"
-)
+_STRIKE_RGX = re.compile(r"(?P<k1>\d+(?:\.\d+)?)(?:/|‑)?(?P<k2>\d+(?:\.\d+)?)?" r"(?P<right>[CPcp])?$")
 
-LAST_PARSED: Optional[ParsedOrder] = None
+LAST_PARSED: ParsedOrder | None = None
 
 
-def parse_order_line(text: str) -> Optional[ParsedOrder]:
+def parse_order_line(text: str) -> ParsedOrder | None:
     """
     Parse shorthand like:
         'SPY 620/630C 18‑Oct‑25'

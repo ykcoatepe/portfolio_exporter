@@ -1,0 +1,79 @@
+name: PSD CI
+
+on:
+  pull_request:
+    branches: [ main, PSD, integrate, "feature/**" ]
+  push:
+    branches: [ PSD ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true  # cancel older runs on same branch
+
+jobs:
+  types:
+    name: Types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python env for exporting OpenAPI JSON (FastAPI auto-generates the schema)
+      # https://docs.github.com/actions  |  setup-python cache docs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'                               # built-in pip cache
+      - run: pip install fastapi "uvicorn[standard]" # minimal deps to import the app
+
+      - name: Export OpenAPI JSON (offline, no server)
+        run: |
+          python - <<'PY'
+          from apps.api.main import app
+          import json, sys
+          sys.stdout.write(json.dumps(app.openapi()))
+          PY > apps/web/openapi.json
+      # Now generate TypeScript types from the local file
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'                               # built-in npm cache
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Generate TS types
+        working-directory: apps/web
+        run: npx --yes openapi-typescript ./openapi.json -o src/lib/api.d.ts  # CLI supports local/remote
+
+      - name: Ensure types are up-to-date
+        run: git diff --exit-code -- apps/web/src/lib/api.d.ts
+
+  unit:
+    name: Unit
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run test:unit -- --run
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run test:contracts -- --run
+      - name: Upload pact artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pacts
+          path: apps/web/pacts/**/*.json

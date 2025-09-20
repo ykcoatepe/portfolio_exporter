@@ -20,24 +20,26 @@ $ python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL
 """
 
 import argparse
-import csv
 import logging
 import math
-from typing import Any
 import os
 import time
-from portfolio_exporter.core.config import settings
+
 from portfolio_exporter.core import io
-from portfolio_exporter.core.ui import run_with_spinner
-from datetime import datetime, timezone, date
-from typing import List, Sequence
+from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+
+run_with_spinner = core_ui.run_with_spinner
 import zipfile
+from collections.abc import Sequence
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from ib_insync import IB, Option, Stock
+
 from utils.bs import bs_greeks
 
 try:  # optional dependencies
@@ -46,8 +48,8 @@ except Exception:  # pragma: no cover - optional
     xlsxwriter = None  # type: ignore
 
 try:
-    from reportlab.lib.pagesizes import letter, landscape
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import landscape, letter
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
@@ -124,7 +126,10 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
+
 IB_CID = _cid("option_chain", default=10)
 LOG_FMT = "%(asctime)s %(levelname)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FMT)
@@ -145,14 +150,14 @@ except Exception:  # pragma: no cover - optional
 # ---------------------------------------------------------------------------
 
 
-def create_zip(files: List[str], dest: str) -> None:
+def create_zip(files: list[str], dest: str) -> None:
     """Create a zip archive containing the given files."""
     with zipfile.ZipFile(dest, "w") as zf:
         for path in files:
             zf.write(path, os.path.basename(path))
 
 
-def cleanup(files: List[str]) -> None:
+def cleanup(files: list[str]) -> None:
     """Delete the given files, ignoring missing paths."""
     for path in files:
         try:
@@ -161,14 +166,13 @@ def cleanup(files: List[str]) -> None:
             pass
 
 
-def load_tickers_from_files() -> List[str]:
+def load_tickers_from_files() -> list[str]:
     """Read tickers from the first portfolio file that exists.
 
     Preference: files under ``settings.output_dir``; then current directory.
     """
     candidates = [
-        os.path.join(os.path.expanduser(settings.output_dir), name)
-        for name in PORTFOLIO_FILES
+        os.path.join(os.path.expanduser(settings.output_dir), name) for name in PORTFOLIO_FILES
     ] + PORTFOLIO_FILES
     path = next((p for p in candidates if os.path.exists(p)), None)
     if not path:
@@ -177,12 +181,10 @@ def load_tickers_from_files() -> List[str]:
         return [ln.strip().upper() for ln in fh if ln.strip()]
 
 
-def get_portfolio_tickers(ib: IB) -> List[str]:
+def get_portfolio_tickers(ib: IB) -> list[str]:
     """Return all stock / ETF symbols currently held in the account."""
     tickers: set[str] = {
-        pos.contract.symbol.upper()
-        for pos in ib.portfolio()
-        if pos.contract.secType == "STK"
+        pos.contract.symbol.upper() for pos in ib.portfolio() if pos.contract.secType == "STK"
     }
     return sorted(tickers)
 
@@ -308,9 +310,7 @@ def prompt_symbol_expiries() -> dict[str, list[str]]:
         if not symbol:
             break
         symbol = symbol.upper()
-        exp = input(
-            f"Expiries for {symbol} (comma-separated, blank for auto): "
-        ).strip()
+        exp = input(f"Expiries for {symbol} (comma-separated, blank for auto): ").strip()
         entry = parse_symbol_expiries(f"{symbol}:{exp}" if exp else symbol)
         for sym, vals in entry.items():
             result.setdefault(sym, []).extend(vals)
@@ -522,9 +522,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
             contracts.append(c)
 
     if not contracts:
-        raise RuntimeError(
-            "No option contracts qualified for the chosen strikes / expiry"
-        )
+        raise RuntimeError("No option contracts qualified for the chosen strikes / expiry")
 
     # stream market data (need streaming for generic-tick 101)
     snapshots = [
@@ -550,9 +548,7 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         price_missing = (tk.bid in (None, -1)) and (tk.last in (None, -1))
         iv_missing = math.isnan(_g(tk, "impliedVolatility"))
         if price_missing or iv_missing:
-            snap = ib.reqMktData(
-                con, "", True, False
-            )  # snapshot: genericTickList must be empty
+            snap = ib.reqMktData(con, "", True, False)  # snapshot: genericTickList must be empty
             ib.sleep(0.35)
             for fld in ("bid", "ask", "last", "close", "impliedVolatility"):
                 val = getattr(snap, fld, None)
@@ -571,7 +567,6 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     ts = ts_local.isoformat()
     rows = []
     for con, tk in snapshots:
-        oi_attr = "callOpenInterest" if con.right == "C" else "putOpenInterest"
         iv_val = _g(tk, "impliedVolatility")
         delta_val = _g(tk, "delta")
         gamma_val = _g(tk, "gamma")
@@ -581,12 +576,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         # Black-Scholes fallback if still NaN
         if any(np.isnan(x) for x in (delta_val, gamma_val, vega_val, theta_val)):
             if spot and iv_val and not np.isnan(iv_val):
-                exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(
-                    tzinfo=timezone.utc
-                )
+                exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(tzinfo=UTC)
                 T = max(
-                    (exp_dt - datetime.now(timezone.utc)).total_seconds()
-                    / (365 * 24 * 3600),
+                    (exp_dt - datetime.now(UTC)).total_seconds() / (365 * 24 * 3600),
                     1 / (365 * 24),
                 )
                 bs = bs_greeks(spot, con.strike, T, 0.01, iv_val, con.right == "C")
@@ -619,18 +611,14 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         )
 
     df = (
-        pd.DataFrame(rows).sort_values(["right", "strike"]).reset_index(drop=True)
-        if rows
-        else pd.DataFrame()
+        pd.DataFrame(rows).sort_values(["right", "strike"]).reset_index(drop=True) if rows else pd.DataFrame()
     )
 
     return df
 
 
 def _save_excel(df: pd.DataFrame, path: str) -> None:
-    with pd.ExcelWriter(
-        path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
-    ) as writer:
+    with pd.ExcelWriter(path, engine="xlsxwriter", datetime_format="yyyy-mm-dd") as writer:
         df.to_excel(writer, sheet_name="Options", index=False, float_format="%.3f")
 
 
@@ -749,9 +737,7 @@ def run(
         hints = hints or [expiry_hint]
         for hint in hints:
             try:
-                df = run_with_spinner(
-                    f"Fetching {sym} chain…", snapshot_chain, ib, sym, hint
-                )
+                df = run_with_spinner(f"Fetching {sym} chain…", snapshot_chain, ib, sym, hint)
                 if df.empty:
                     logger.warning("%s %s – no data", sym, hint)
                     continue
@@ -759,9 +745,7 @@ def run(
                     combined.append(df)
                 else:
                     label = hint if hint else "auto"
-                    out_base = os.path.join(
-                        OUTPUT_DIR, f"option_chain_{sym}_{label}_{date_tag}"
-                    )
+                    out_base = os.path.join(OUTPUT_DIR, f"option_chain_{sym}_{label}_{date_tag}")
                     if args.excel:
                         path = f"{out_base}.xlsx"
                         _save_excel(df, path)
@@ -773,9 +757,7 @@ def run(
                         _save_txt(df, path)
                     else:
                         # Keep CSV naming consistent with other formats (include timestamp)
-                        path = io.save(
-                            df, f"option_chain_{sym}_{label}_{date_tag}", filetype
-                        )
+                        path = io.save(df, f"option_chain_{sym}_{label}_{date_tag}", filetype)
                     created_files.append(path)
                     logger.info("Saved %s (%d rows)", path, len(df))
             except Exception as e:

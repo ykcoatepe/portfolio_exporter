@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+# Example rule set for the PSD rules engine.
+
+- rule_id: combo__annualized_premium_high
+  name: Annualized premium >=30% within a week
+  severity: CRITICAL
+  scope: COMBO
+  filter: dte <= 7
+  expr: annualized_premium_pct >= 30
+
+- rule_id: ul__delta_extreme
+  name: Underlying delta beyond +-1.2
+  severity: WARNING
+  scope: UL
+  filter: ""
+  expr: delta > 1.2 or delta < -1.2
+
+- rule_id: port__theta_negative
+  name: Portfolio net theta is negative
+  severity: INFO
+  scope: PORT
+  filter: ""
+  expr: net_theta_per_day < 0
+
+- rule_id: leg__iv_missing_near_term
+  name: Missing IV for near-term legs
+  severity: WARNING
+  scope: LEG
+  filter: dte <= 5
+  expr: iv is None
+
+- rule_id: leg__mark_stale
+  name: Option mark stale > 15 minutes
+  severity: CRITICAL
+  scope: LEG
+  filter: ""
+  expr: stale_seconds > 900

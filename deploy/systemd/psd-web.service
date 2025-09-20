@@ -1,0 +1,14 @@
+[Unit]
+Description=Portfolio Sentinel Dashboard - Web
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/psd
+EnvironmentFile=/etc/psd.env
+ExecStart=/usr/bin/env gunicorn -k uvicorn.workers.UvicornWorker psd.web.server:make_app --bind 0.0.0.0:51127 --workers 2 --timeout 0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

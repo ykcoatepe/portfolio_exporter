@@ -1,15 +1,14 @@
-from contextlib import contextmanager
 import os
 import sys
+from contextlib import contextmanager
 
+import pandas as pd
 from rich.align import Align
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
-
-import pandas as pd
 
 console = Console()
 
@@ -25,9 +24,7 @@ class StatusBar:
         self._style = style
         # Use auto_refresh=False so Rich doesn't repaint while the user types
         # into regular input() prompts. We explicitly update the bar via update().
-        self._live = Live(
-            self._render(), console=console, transient=False, auto_refresh=False
-        )
+        self._live = Live(self._render(), console=console, transient=False, auto_refresh=False)
         self._live.__enter__()  # start live context
         # expose console for menus to print via the same console
         self.console = console
@@ -168,9 +165,7 @@ def run_with_spinner(msg: str, fn, *a, **kw):
         return fn(*a, **kw)
 
 
-def banner_delta_theta(
-    delta: float, theta: float, gamma: float, vega: float, cost: float
-) -> None:
+def banner_delta_theta(delta: float, theta: float, gamma: float, vega: float, cost: float) -> None:
     """Print a colour-coded risk banner."""
 
     def _c(val: float, fmt: str) -> str:

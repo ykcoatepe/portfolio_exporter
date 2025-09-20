@@ -5,10 +5,21 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+
+# Support running as a script via file path by ensuring repo root is importable
+import sys as _sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
+
+if __package__ in (None, ""):
+    try:  # pragma: no cover - environment guard
+        import pathlib as _pathlib
+
+        _sys.path.append(str(_pathlib.Path(__file__).resolve().parents[2]))
+    except Exception:
+        pass
 
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import io as core_io
@@ -16,8 +27,8 @@ from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.runlog import RunLog
 
 try:  # optional PDF support
-    from reportlab.platypus import SimpleDocTemplate, Paragraph
     from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = None  # type: ignore
     Paragraph = None  # type: ignore
@@ -62,7 +73,7 @@ def _load_quick_chain() -> pd.DataFrame:
 # analytics
 
 
-def _summarize(df: pd.DataFrame) -> Dict[str, Any]:
+def _summarize(df: pd.DataFrame) -> dict[str, Any]:
     if df.empty:
         return {
             "clusters": 0,
@@ -73,16 +84,12 @@ def _summarize(df: pd.DataFrame) -> Dict[str, Any]:
     clusters = int(df["cluster_id"].nunique()) if "cluster_id" in df.columns else len(df)
     val_col = "pnl" if "pnl" in df.columns else "credit_debit"
     net = float(df[val_col].sum()) if val_col in df.columns else 0.0
-    by_structure: Dict[str, int] = {}
+    by_structure: dict[str, int] = {}
     if "structure" in df.columns:
         by_structure = {str(k): int(v) for k, v in df.groupby("structure").size().items()}
     top_clusters: list[dict[str, Any]] = []
     if "cluster_id" in df.columns and val_col in df.columns:
-        top = (
-            df.groupby(["cluster_id", "structure"], dropna=False)[val_col]
-            .sum()
-            .reset_index()
-        )
+        top = df.groupby(["cluster_id", "structure"], dropna=False)[val_col].sum().reset_index()
         top = top.sort_values(val_col, key=lambda s: s.abs(), ascending=False).head(5)
         for _, row in top.iterrows():
             top_clusters.append(
@@ -104,12 +111,10 @@ def _summarize(df: pd.DataFrame) -> Dict[str, Any]:
 # output builders
 
 
-def _build_html(summary: Dict[str, Any]) -> str:
-    by_struct_rows = "".join(
-        f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in summary["by_structure"].items()
-    )
+def _build_html(summary: dict[str, Any]) -> str:
+    by_struct_rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in summary["by_structure"].items())
     top_rows = "".join(
-        f"<tr><td>{c['cluster_id']}</td><td>{c['pnl']}</td><td>{c.get('structure','')}</td></tr>"
+        f"<tr><td>{c['cluster_id']}</td><td>{c['pnl']}</td><td>{c.get('structure', '')}</td></tr>"
         for c in summary["top_clusters"]
     )
     return (
@@ -123,7 +128,7 @@ def _build_html(summary: Dict[str, Any]) -> str:
     )
 
 
-def _build_pdf(summary: Dict[str, Any], path: Path) -> None:
+def _build_pdf(summary: dict[str, Any], path: Path) -> None:
     if SimpleDocTemplate is None or Paragraph is None or getSampleStyleSheet is None:
         raise RuntimeError("reportlab not installed")
     doc = SimpleDocTemplate(str(path))
@@ -140,18 +145,27 @@ def _build_pdf(summary: Dict[str, Any], path: Path) -> None:
 # CLI
 
 
-def main(argv: list[str] | None = None):
+def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Trades Dashboard")
     parser.add_argument("--trades-report", help="Path to trades_report CSV/JSON", default=None)
-    cli_helpers.add_common_output_args(parser)
-    cli_helpers.add_common_debug_args(parser)
+    # Explicit flags required by tests
+    parser.add_argument("--json", action="store_true", help="Print JSON summary to stdout")
+    parser.add_argument("--no-files", action="store_true", help="Do not write any files")
+    parser.add_argument("--output-dir", help="Directory to write outputs")
+    parser.add_argument("--no-pretty", action="store_true", help="Disable pretty printing")
+    parser.add_argument("--debug-timings", action="store_true", help="Emit timing breakdown")
+    return parser
+
+
+def main(argv: list[str] | None = None):
+    parser = get_arg_parser()
     args = parser.parse_args(argv)
 
     quiet, pretty = cli_helpers.resolve_quiet(args.no_pretty)
-    outdir = Path(args.output_dir) if args.output_dir else None
-    formats = cli_helpers.decide_file_writes(
-        args, json_only_default=True, defaults={"html": True, "pdf": True}
-    )
+    outdir = Path(args.output_dir).expanduser() if args.output_dir else None
+    # Respect --no-files strictly regardless of defaults
+    write_files = bool(outdir) and not args.no_files
+    formats = {"html": write_files, "pdf": write_files}
 
     df = _load_latest_trades_report(args.trades_report)
     _ = _load_quick_chain()  # currently unused but loaded for future use
@@ -167,9 +181,7 @@ def main(argv: list[str] | None = None):
             path_html = core_io.save(html, "trades_dashboard", "html", outdir)
             outputs["html"] = str(path_html)
             written.append(path_html)
-            theme_css = (
-                Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
-            )
+            theme_css = Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
             if not theme_css.exists():
                 theme_css = Path(__file__).resolve().parents[1] / "assets" / "theme.css"
             if theme_css.exists() and outdir:
@@ -192,7 +204,7 @@ def main(argv: list[str] | None = None):
                 written.append(path_pdf)
         if args.debug_timings:
             meta["timings"] = rl.timings
-            if written:
+            if written and write_files:
                 tpath = core_io.save(pd.DataFrame(rl.timings), "timings", "csv", outdir)
                 outputs["timings"] = str(tpath)
                 written.append(tpath)
@@ -202,7 +214,7 @@ def main(argv: list[str] | None = None):
         if manifest_path:
             written.append(manifest_path)
     summary = json_helpers.report_summary(sections, outputs=outputs, meta=meta or None)
-    if 'manifest_path' in locals() and manifest_path:
+    if "manifest_path" in locals() and manifest_path:
         summary["outputs"].append(str(manifest_path))
     if args.json:
         cli_helpers.print_json(summary, quiet)

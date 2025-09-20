@@ -1,0 +1,82 @@
+# Portfolio Sentinel Dashboard rules configuration (v0.1 defaults)
+
+sleeves:
+  core_pct: 0.50
+  momo_pct: 0.10
+  alpha_pct: 0.25   # 20–30% band; default mid
+  theta_pct: 0.20
+  alts_pct: 0.10
+  meme_pct: 0.05
+  meme_per_trade_pct: 0.01
+
+universal:
+  oco:
+    stop_R: -1.0
+    target_R: 2.0
+  liquidity_max_spread_mid: 0.10
+  event_window_days: 10
+
+theta_templates:
+  low_vix:   { vix_lt: 15,        dte_min: 45, dte_max: 60, tp_min: 0.50, tp_max: 0.70, fee_nav_warn: 0.002 }
+  mid_vix:   { vix_min: 15, vix_max: 25, dte_min: 30, dte_max: 45, tp_min: 0.40, tp_max: 0.60, fee_nav_warn: 0.002 }
+  high_vix:  { vix_gt: 25,        dte_min: 14, dte_max: 30, tp_min: 0.30, tp_max: 0.50, fee_nav_warn: 0.002 }
+
+ibkr:
+  market_data_mode: auto   # "live" | "delayed" | "auto"
+  mktdata_timeout_sec: 2.0
+  greeks_timeout_sec: 5.0
+
+fill:
+  allow_yf_equity_marks: true
+
+# Optional theta global knobs (defaults used when regime-specific keys absent)
+theta:
+  weekly_fee_nav_warn: 0.002  # 0.20% of NAV per week
+
+risk_bands:
+  vix_le_20:
+    vix_max: 20
+    delta_beta_band: [0.45, 0.60]
+    var95_1d_max: 0.009
+    margin_max: 0.70
+  vix_20_30:
+    vix_min: 20
+    vix_max: 30
+    delta_beta_band: [0.40, 0.55]
+    var95_1d_max: 0.008
+    margin_max: 0.60
+  vix_gt_30:
+    vix_min: 30
+    delta_beta_band: [0.35, 0.50]
+    var95_1d_max: 0.007
+    margin_max: 0.50
+
+circuit_breakers:
+  soft_pre: -0.010
+  freeze_1d: -0.015
+  cut_var: -0.025
+
+budgets: {}
+budgets:
+  theta_weekly: 0.001    # 0.10% of NAV per week
+  hedge_monthly: 0.0035  # 0.35% of NAV per month
+
+# Alert controls
+alerts:
+  debounce_min: 5           # suppress duplicate alerts within this window
+  snooze_default_min: 30    # default snooze duration
+  snooze_options_min: [10, 30, 60]
+
+# One-step starter defaults
+psd:
+  auto:
+    start_on_menu: true
+    open_browser: true
+    web_host: "127.0.0.1"
+    web_port: 0              # 0 = choose free port automatically
+    interval_sec: 60
+    ib:
+      connect_retries: 10
+      backoff_sec: [1, 2, 3, 5]  # used cyclically
+      require_initial_positions: true
+      initial_timeout_sec: 20

@@ -37,8 +37,14 @@ def test_greeks_aggregation(monkeypatch):
         index=[1, 2],
     )
 
+    async def fake_loader():
+        return fake
+
     monkeypatch.setattr(
-        "portfolio_exporter.scripts.portfolio_greeks._load_positions", lambda: fake
+        "portfolio_exporter.scripts.portfolio_greeks._load_positions", fake_loader
+    )
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.portfolio_greeks.load_positions_sync", lambda: fake
     )
 
     result = portfolio_greeks.run(

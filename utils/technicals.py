@@ -36,18 +36,14 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     ema12 = grp["close"].transform(lambda s: s.ewm(span=12, adjust=False).mean())
     ema26 = grp["close"].transform(lambda s: s.ewm(span=26, adjust=False).mean())
     df["macd"] = ema12 - ema26
-    df["macd_signal"] = df.groupby("ticker")["macd"].transform(
-        lambda s: s.ewm(span=9, adjust=False).mean()
-    )
+    df["macd_signal"] = df.groupby("ticker")["macd"].transform(lambda s: s.ewm(span=9, adjust=False).mean())
 
     # Average True Range (ATR)
     tr1 = abs(df["high"] - df["low"])
     tr2 = abs(df["high"] - grp["close"].shift())
     tr3 = abs(df["low"] - grp["close"].shift())
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    df["atr14"] = tr.groupby(df["ticker"]).transform(
-        lambda s: s.ewm(alpha=1 / 14, adjust=False).mean()
-    )
+    df["atr14"] = tr.groupby(df["ticker"]).transform(lambda s: s.ewm(alpha=1 / 14, adjust=False).mean())
 
     # Bollinger Bands
     sma20 = df.groupby("ticker")["close"].transform(lambda s: s.rolling(20).mean())
@@ -56,9 +52,7 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["bb_lower"] = sma20 - (std20 * 2)
 
     # Realized Volatility
-    df["real_vol_30"] = (
-        grp["close"].pct_change().transform(lambda s: s.rolling(30).std() * (252**0.5))
-    )
+    df["real_vol_30"] = grp["close"].pct_change().transform(lambda s: s.rolling(30).std() * (252**0.5))
 
     # ADX
     plus_dm = (df["high"].diff()).where(

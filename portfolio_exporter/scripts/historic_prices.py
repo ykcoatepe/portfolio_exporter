@@ -1,9 +1,12 @@
-import os
+import asyncio
 import csv
-import argparse
-from portfolio_exporter.core.config import settings
+import os
+
 from portfolio_exporter.core import io
-from portfolio_exporter.core.ui import run_with_spinner
+from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+
+run_with_spinner = core_ui.run_with_spinner
 import pandas as pd
 import yfinance as yf
 
@@ -13,8 +16,8 @@ except Exception:  # pragma: no cover - optional
     xlsxwriter = None  # type: ignore
 
 try:
-    from reportlab.lib.pagesizes import letter, landscape
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import landscape, letter
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
@@ -30,23 +33,40 @@ from datetime import datetime
 
 # ---------- IBKR optional integration ----------
 try:
-    from ib_insync import IB, Stock
+    from ib_insync import IB
 
     IB_AVAILABLE = True
 except ImportError:
     IB_AVAILABLE = False
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
+
 IB_CID = _cid("historic_prices", default=3)  # separate clientId for historic pull
 
 EXTRA_TICKERS = ["SPY", "QQQ", "IWM", "^VIX", "DX-Y.NYB"]  # core indices
 PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}
 
 
+def _ensure_event_loop() -> asyncio.AbstractEventLoop:
+    """Ensure ib_insync has an event loop ready before initiating any async connect."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
+
+
 def _tickers_from_ib() -> list[str]:
     """Return unique stock tickers from current IBKR account positions."""
     if not IB_AVAILABLE:
         return []
+    _ensure_event_loop()
     ib = IB()
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)
@@ -57,9 +77,7 @@ def _tickers_from_ib() -> list[str]:
     if not positions:
         return []
     # extract underlying symbol for stocks only
-    tickers = {
-        p.contract.symbol.upper() for p in positions if p.contract.secType == "STK"
-    }
+    tickers = {p.contract.symbol.upper() for p in positions if p.contract.secType == "STK"}
     return sorted(tickers)
 
 
@@ -85,8 +103,7 @@ def load_tickers() -> list[str]:
 
     # 2) fallback to file
     candidates = [
-        os.path.join(os.path.expanduser(settings.output_dir), name)
-        for name in PORTFOLIO_FILES
+        os.path.join(os.path.expanduser(settings.output_dir), name) for name in PORTFOLIO_FILES
     ] + PORTFOLIO_FILES
     path = next((p for p in candidates if os.path.exists(p)), None)
     user_tickers = []
@@ -158,9 +175,7 @@ def save_to_csv(df: pd.DataFrame):
 
 
 def save_to_excel(df: pd.DataFrame, path: str) -> None:
-    with pd.ExcelWriter(
-        path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
-    ) as writer:
+    with pd.ExcelWriter(path, engine="xlsxwriter", datetime_format="yyyy-mm-dd") as writer:
         df.to_excel(
             writer,
             sheet_name="Prices",

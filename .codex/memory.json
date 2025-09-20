@@ -1,30 +1,438 @@
 {
-  "preferences": {
-    "quiet": true
-  },
-  "workflows": {
-    "submenu_queue": {
-      "live": ["quick-chain", "daily-report"],
-      "sanity": ["trades-report", "daily-report"]
-    }
-  },
-  "tasks": [],
-  "questions": [],
-  "decisions": [
-    {
-      "id": 1,
-      "timestamp": "2025-08-30T04:38:24Z",
-      "title": "ORDER_BUILDER_PRESETS_V1",
-      "decision": "Added preset-driven order builder and Stage Order preset wizard; standardized JSON envelope and risk_summary when determinable.",
-      "context": "Offline-only; no market calls. Added sanity script + Makefile target and console entry."
-    }
-  ],
   "changelog": [
     {
-      "timestamp": "2025-08-30T04:38:24Z",
+      "details": "--preset support in order_builder; trade menu Stage Order preset path; sanity script scripts/sanity_order_builder_presets.sh; Makefile sanity-order-builder; pyproject console entry 'order-builder'.",
       "event": "Add order builder presets and trade menu preset flow",
-      "details": "--preset support in order_builder; trade menu Stage Order preset path; sanity script scripts/sanity_order_builder_presets.sh; Makefile sanity-order-builder; pyproject console entry 'order-builder'."
+      "timestamp": "2025-08-30T04:38:24Z"
+    },
+    {
+      "details": "Executions: intent totals & by-underlying; Top combos by realized P&L; combos CSV/Excel include pnl; MTM preview (key 'm') using mid quotes; format toggle (key 't'); open last ticket (key 'k'); filters prefill/persist; daily-report open prompt; roll preview DTE; persisted preferences.trades_prior_positions.",
+      "event": "Trades menu enhancements: intent summary, P&L, MTM preview",
+      "timestamp": "2025-09-09T09:15:00Z"
+    },
+    {
+      "details": "Initiated pytest run and triaged failures; applied patches for UI import stability, IB guards, live_feed return_df, trades_report clustering and menu prompts. Ongoing fixes for CLI scripts (tech_signals_ibkr, wizards) queued.",
+      "event": "Tests run (dev_yordam)",
+      "timestamp": "2025-09-10T00:00:00Z"
+    },
+    {
+      "details": "Normalize Side/side and BOT/SLD\u2192BUY/SELL; position_effect streaming uses Side.fillna(side), keys STK by symbol, and honors openClose. Fallback uses realized_pnl when prior absent. save_combos default restored to emit trades_combos.csv. Docs updated; memory prefers preferences.trades_prior_positions when present.",
+      "event": "Trades report: fix Action + intent; restore combos",
+      "timestamp": "2025-09-11T00:00:00Z"
+    },
+    {
+      "details": "Added CLI micro-momo; filters, scoring, tiering, direction, structure picker, sizing + TP/SL, triggers; outputs scored+orders CSV; tests & fixtures; Makefile sanity-micro-momo.",
+      "event": "Micro-MOMO v1 landed (CSV-only)",
+      "timestamp": "2025-09-13T13:00:00Z"
+    },
+    {
+      "details": "--data-mode/--providers/--offline/--halts-source; IBKR quotes/bars/shortable/chains primary; Yahoo fundamentals/chains fallback; Nasdaq halts; provenance src_* and data_errors in outputs; tests mock providers (no network).",
+      "event": "Micro-MOMO v1.1 enrichment + halts + provenance",
+      "timestamp": "2025-09-13T13:40:00Z"
+    },
+    {
+      "details": "Analyzer accepts --symbols (CSV optional). Yahoo 1m bars + option chains with local JSON cache; derived RVOL/VWAP/ORB + above_vwap_now/pattern; menu symbols prompt; task/menu env passthrough.",
+      "event": "Micro-MOMO: symbols mode + Yahoo enrichment + caching",
+      "timestamp": "2025-09-13T16:00:00Z"
+    },
+    {
+      "details": "Added market_clock + calendar; menu toggles; effective config overlay via ENV+memory; cooldown bars and VWAP recross; post-halt single re-arm with mini-ORB and grace; dashboard shows post-halt count.",
+      "event": "Sentinel: TR-local schedule, overlay, cooldown+recross, post-halt re-arm, early-close aware",
+      "timestamp": "2025-09-14T00:00:00Z"
+    },
+    {
+      "details": "scan_once, memos JSONL, CLI table, rules & tests",
+      "event": "PSD v0.1 implemented",
+      "timestamp": "2025-09-14T17:44:48Z"
+    },
+    {
+      "details": "combos (spreads/condors), theta enforcement+carry, CLI rollups",
+      "event": "PSD v0.2 implemented",
+      "timestamp": "2025-09-14T17:44:48Z"
+    },
+    {
+      "details": "breakers, budgets, KPIs, rollup/EOD digests",
+      "event": "PSD v0.3 implemented",
+      "timestamp": "2025-09-14T19:06:46Z"
+    },
+    {
+      "details": "SQLite store entrypoints, SSE FastAPI app, pluggable snapshot/rules hooks, Makefile psd-up helper, SSE viewer.",
+      "event": "PSD store + adapters wired",
+      "timestamp": "2025-09-16T11:48:27Z"
+    },
+    {
+      "details": "Prometheus metrics for ingest/web stream endpoints plus WAL auto-checkpoint defaults and passive checkpoints; docs + tests updated.",
+      "event": "PSD observability instrumentation",
+      "timestamp": "2025-09-16T13:04:51Z"
+    },
+    {
+      "details": "SSE stream now seeds tail after the existing event ledger when Last-Event-ID is absent to prevent older snapshots replaying.",
+      "event": "PSD SSE bootstrap adjusted",
+      "timestamp": "2025-09-16T14:21:26Z"
+    },
+    {
+      "details": "Added PSD_SSE_TEST_MODE limiter with id/frame/time thresholds and introduced tests/test_sse_e2e.py for snapshot/resume monotonicity.",
+      "event": "PSD SSE limiter and deterministic tests",
+      "timestamp": "2025-09-16T17:38:11Z"
+    },
+    {
+      "details": "Added SSE burst troubleshooting callout, WAL FAQ expectations, and linked FastAPI deployment docs.",
+      "event": "Docs: PSD troubleshooting pointers",
+      "timestamp": "2025-09-16T18:18:44Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-19T09:52:28Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-19T11:54:02Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-19T13:19:40Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-19T13:48:14Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-19T14:06:46Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-19T14:28:53Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-19T16:02:38Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T10:39:06Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T10:53:48Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T10:57:07Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T11:52:31Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T14:26:29Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T14:53:41Z"
+    },
+    {
+      "details": "Add sitecustomize.py to load .venv",
+      "event": "Auto venv bootstrap",
+      "timestamp": "2025-09-20T15:08:32Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T15:40:28Z"
+    },
+    {
+      "details": "Ran vitest contract suite against Pact v15, updated response headers/severity matchers, and recorded dependency deprecations after upgrade verification.",
+      "event": "Pact contracts trial",
+      "timestamp": "2025-09-20T15:53:47Z"
+    }
+  ],
+  "decisions": [
+    {
+      "context": "Offline-only; no market calls. Added sanity script + Makefile target and console entry.",
+      "decision": "Added preset-driven order builder and Stage Order preset wizard; standardized JSON envelope and risk_summary when determinable.",
+      "id": 1,
+      "timestamp": "2025-08-30T04:38:24Z",
+      "title": "ORDER_BUILDER_PRESETS_V1"
+    },
+    {
+      "context": "Keep offline-friendly; JSON-only previews; clipboard in interactive mode; prefer strictly prior positions snapshot when available.",
+      "decision": "Expose intent summary and realized P&L in menu; add MTM preview; persist prior positions path; extend Stage Order auto-build for butterfly and calendar.",
+      "id": 2,
+      "timestamp": "2025-09-09T09:15:00Z",
+      "title": "TRADES_MENU_ENHANCEMENTS_V1"
+    },
+    {
+      "context": "Goal: reduce import-time coupling and stabilize CLI/menu tests without impacting runtime behavior.",
+      "decision": "Align imports to module-level for monkeypatching, add test hooks (_snapshot_quotes, prompt_input alias, run_with_spinner alias), guard IB connectivity checks, and make clustering robust to missing columns.",
+      "id": 3,
+      "timestamp": "2025-09-10T00:00:00Z",
+      "title": "TEST_HARDENING_V1"
+    },
+    {
+      "context": "Make intent robust without prior snapshot and consistent across menu/CLI; keep offline-friendly behaviour.",
+      "decision": "Correct Action mapping (BUY/SELL vs BOT/SLD), improve position_effect (Side.fillna(side); STK keyed by symbol; openClose override; realized_pnl fallback), restore combos CSV by default, and use memory preferences.trades_prior_positions when available.",
+      "id": 4,
+      "timestamp": "2025-09-11T00:00:00Z",
+      "title": "TRADES_REPORT_INTENT_FIXES_V1"
+    },
+    {
+      "context": "Deterministic v1 with no providers; Makefile sanity target; module entry portfolio_exporter.scripts.micro_momo_analyzer.",
+      "decision": "CSV-only Micro-MOMO Analyzer landed: filters, weighted scoring, A/B/C tiers, direction, option structure picker (Debit Call / Bear Call Credit), sizing + TP/SL, human-readable triggers; CLI + tests + fixtures; scored/orders CSV outputs.",
+      "id": 5,
+      "timestamp": "2025-09-13T13:00:00Z",
+      "title": "MICRO_MOMO_V1"
+    },
+    {
+      "context": "CI-safe via offline mode; tests mock providers; CSV precedence respected in enrich mode.",
+      "decision": "Live enrichment via IBKR (primary) and Yahoo (fallback) with halts + provenance. Adds --data-mode/--providers/--offline/--halts-source flags; enrichment fills last/prev_close, premarket gap, RVOL(1m/5m), VWAP, ORB, float/ADV/short%, borrow, chain near-money OI/spread, halts_count_today. Provenance src_* columns and data_errors included.",
+      "id": 6,
+      "timestamp": "2025-09-13T13:40:00Z",
+      "title": "MICRO_MOMO_V1_1"
+    },
+    {
+      "context": "Reduce dependence on external sources by reusing local files and cached provider data; enable quick multi-symbol ad-hoc runs.",
+      "decision": "Add --symbols mode to run without a shortlist CSV; implement Yahoo 1m bars and option chains with a local JSON cache; compute RVOL/VWAP/ORB and derive above_vwap_now/pattern; fallback to provider chains when CSV missing; add visible menu symbols prompt and env passthrough.",
+      "id": 7,
+      "timestamp": "2025-09-13T16:00:00Z",
+      "title": "MICRO_MOMO_SYMBOLS_YAHOO_CACHE"
+    },
+    {
+      "context": "Keep operators local in TR while honoring U.S. RTH/DST; reduce flapping via cooldown+recross; allow controlled post-halt re-arm consistent with primary reopen auction.",
+      "decision": "Sentinel aligned to TR-local schedule (ET->TR via zoneinfo), runtime overlay (CLI > ENV > memory > file > defaults), cooldown and VWAP recross gating, post-halt single re-arm with mini-ORB, early-close aware schedule, and dashboard post-halt count.",
+      "id": 8,
+      "timestamp": "2025-09-14T00:00:00Z",
+      "title": "SENTINEL_TR_LOCAL_OVERLAY_REARM"
+    },
+    {
+      "context": "branch=feature/psd-sentinel-v0, PR=#163",
+      "decision": "Implement scan loop + memos + CLI",
+      "id": 9,
+      "timestamp": "2025-09-14T17:44:48Z",
+      "title": "PSD_V0_1"
+    },
+    {
+      "context": "branch=feature/psd-sentinel-v0, PR=#163",
+      "decision": "Add combos engine, theta enforcement, CLI rollups",
+      "id": 10,
+      "timestamp": "2025-09-14T17:44:48Z",
+      "title": "PSD_V0_2"
+    },
+    {
+      "context": "PR=#163 (feature/psd-sentinel-v0)",
+      "decision": "Add breakers, budgets, KPIs, digests",
+      "id": 11,
+      "timestamp": "2025-09-14T19:06:46Z",
+      "title": "PSD_V0_3"
+    },
+    {
+      "context": "Enable PSD stack to persist snapshots and stream events via pluggable hooks.",
+      "decision": "Add store-backed ingestion/web/scan entrypoints plus snapshot and rules adapters with default hooks.",
+      "id": 12,
+      "timestamp": "2025-09-16T11:48:27Z",
+      "title": "PSD_STORE_HOOKS"
+    },
+    {
+      "context": "Ensure lightweight ops telemetry and bounded SQLite WAL size for PSD stack.",
+      "decision": "Instrument PSD ingest and stream via Prometheus metrics, expose /metrics, and enforce WAL auto-checkpoint defaults with periodic passive checkpoints.",
+      "id": 13,
+      "timestamp": "2025-09-16T13:04:51Z",
+      "title": "PSD_OBSERVABILITY_WAL"
+    },
+    {
+      "context": "Ensure dashboard SSE bootstrap does not replay stale snapshots when no Last-Event-ID is provided.",
+      "decision": "Start SSE tailing after the current max event id following the bootstrap snapshot so subsequent events stream monotonically.",
+      "id": 14,
+      "timestamp": "2025-09-16T14:21:26Z",
+      "title": "PSD_SSE_BOOTSTRAP_FIX"
+    },
+    {
+      "context": null,
+      "decision": "Load repo .venv via sitecustomize for system python",
+      "id": 15,
+      "rationale": "Eliminate manual activation for uvicorn",
+      "timestamp": "2025-09-20T15:08:26Z",
+      "title": "Auto activate venv"
+    }
+  ],
+  "preferences": {
+    "micro_momo": {
+      "symbols": "LDI, UBER, FORD"
+    },
+    "order_builder_wizard": {
+      "avoid_earnings": false,
+      "max_spread_pct": 0.02,
+      "min_oi": 200,
+      "min_volume": 50,
+      "profile": "balanced",
+      "risk_budget_pct": 1.0,
+      "strike_offset": 0
+    },
+    "quiet": true,
+    "sentinel": {
+      "allow_afternoon_rearm": true,
+      "cooldown_bars": 10,
+      "halt_mini_orb_minutes": 3,
+      "halt_rearm": true,
+      "halt_rearm_grace_sec": 45,
+      "max_halts_per_day": 1,
+      "require_vwap_recross": true
+    },
+    "trades_filters": {
+      "effect": "",
+      "structure": "",
+      "symbols": "",
+      "top_n": ""
+    },
+    "trades_prior_positions": ""
+  },
+  "questions": [],
+  "tasks": [
+    {
+      "closed_at": "2025-09-20T15:53:28Z",
+      "closed_reason": "Adjusted contract header matchers for Pact v15 behavior and ran vitest contracts suite (all green).",
+      "created_at": "2025-09-20T15:40:54Z",
+      "details": "Trial the Pact major upgrade to pick up Axios and cross-spawn fixes; run contract tests to confirm nothing regresses.\n\nClosed: Adjusted contract header matchers for Pact v15 behavior and ran vitest contracts suite (all green).",
+      "id": 1,
+      "labels": [
+        "deps",
+        "testing"
+      ],
+      "owner": null,
+      "priority": 2,
+      "status": "closed",
+      "title": "Trial Pact major bump",
+      "updated_at": "2025-09-20T15:53:28Z"
+    },
+    {
+      "closed_at": "2025-09-20T15:53:34Z",
+      "closed_reason": "Drafted Vite/Vitest major upgrade rollout plan with test sweep in docs/codex.",
+      "created_at": "2025-09-20T15:40:58Z",
+      "details": "Draft rollout plan for the Vite/Vitest major upgrade (includes new esbuild) and schedule a dedicated end-to-end test sweep.\n\nClosed: Drafted Vite/Vitest major upgrade rollout plan with test sweep in docs/codex.",
+      "id": 2,
+      "labels": [
+        "deps",
+        "build"
+      ],
+      "owner": null,
+      "priority": 2,
+      "status": "closed",
+      "title": "Plan Vite/Vitest major upgrade",
+      "updated_at": "2025-09-20T15:53:34Z"
+    },
+    {
+      "closed_at": "2025-09-20T15:53:40Z",
+      "closed_reason": "Logged glob/inflight deprecations on docs/codex dependency board for post-upgrade verification.",
+      "created_at": "2025-09-20T15:41:02Z",
+      "details": "Keep the noted deprecations visible on the dependency-tracking board so we can verify they clear after the Pact and Vite/Vitest upgrades.\n\nClosed: Logged glob/inflight deprecations on docs/codex dependency board for post-upgrade verification.",
+      "id": 3,
+      "labels": [
+        "process",
+        "deps"
+      ],
+      "owner": null,
+      "priority": 3,
+      "status": "closed",
+      "title": "Track dependency deprecations",
+      "updated_at": "2025-09-20T15:53:40Z"
+    }
+  ],
+  "workflows": {
+    "submenu_queue": {
+      "live": [
+        "quick-chain",
+        "daily-report"
+      ],
+      "sanity": [
+        "trades-report",
+        "daily-report"
+      ]
+    }
+  },
+  "worklog": [
+    {
+      "branch": "feature/psd-sentinel-v0",
+      "date": "2025-09-14T19:06:46Z",
+      "files": [
+        "src/psd/**",
+        "tests/test_*"
+      ],
+      "notes": "breakers, budgets, KPIs, rollup/EOD digests",
+      "owner": "codex",
+      "status": "merged",
+      "task": "PSD v0.3 implemented"
+    },
+    {
+      "branch": "feature/psd-sentinel-v0",
+      "date": "2025-09-14T17:44:48Z",
+      "files": [
+        "src/psd/**",
+        "config/rules.yaml",
+        "scripts/run_sentinel.py",
+        "tests/test_*"
+      ],
+      "notes": "scan_once, memos JSONL, CLI table, rules & tests",
+      "owner": "codex",
+      "status": "merged",
+      "task": "PSD v0.1 implemented"
+    },
+    {
+      "branch": "feature/psd-sentinel-v0",
+      "date": "2025-09-14T17:44:48Z",
+      "files": [
+        "src/psd/**",
+        "tests/test_*"
+      ],
+      "notes": "combos (spreads/condors), theta enforcement+carry, CLI rollups",
+      "owner": "codex",
+      "status": "merged",
+      "task": "PSD v0.2 implemented"
+    },
+    {
+      "branch": "feature/psd-sentinel-v0",
+      "date": "2025-09-14T00:00:00Z",
+      "files": [
+        "src/psd/**",
+        "config/rules.yaml",
+        "scripts/run_sentinel.py",
+        "Makefile",
+        "agent.md",
+        "LOGBOOK.md"
+      ],
+      "notes": "Scaffold only; no logic.",
+      "owner": "codex",
+      "status": "open",
+      "task": "PSD scaffold v0.1"
+    },
+    {
+      "branch": "dev_yordam2",
+      "commit": "c233116",
+      "date": "2025-09-13T19:28:46+03:00",
+      "files": [
+        "portfolio_exporter/scripts/micro_momo_analyzer.py"
+      ],
+      "interfaces": {},
+      "notes": "",
+      "owner": "codex",
+      "status": "merged",
+      "task": "micro-momo analyzer"
+    },
+    {
+      "branch": "dev_yordam2",
+      "commit": "fec3519",
+      "date": "2025-09-13T19:45:00+03:00",
+      "files": [
+        "portfolio_exporter/scripts/micro_momo_analyzer.py",
+        "portfolio_exporter/core/providers/yahoo_provider.py",
+        "portfolio_exporter/core/micro_momo_sources.py",
+        "portfolio_exporter/menus/pre.py",
+        "portfolio_exporter/main.py"
+      ],
+      "interfaces": {},
+      "notes": "symbols mode + Yahoo enrichment + cache",
+      "owner": "codex",
+      "status": "merged",
+      "task": "micro-momo analyzer"
     }
   ]
 }
-

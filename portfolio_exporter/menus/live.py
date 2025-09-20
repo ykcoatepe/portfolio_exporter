@@ -1,16 +1,17 @@
-from rich.table import Table
-import re
-from rich.console import Console
 import builtins as _builtins
+import re
+
 import pandas as pd
+from rich.console import Console
+from rich.table import Table
+
+from portfolio_exporter.core import caps_dash, risk_dash
+from portfolio_exporter.core.io import latest_file
 from portfolio_exporter.scripts import (
     live_feed,
-    tech_signals_ibkr,
     portfolio_greeks,
+    tech_signals_ibkr,
 )
-from portfolio_exporter.core import risk_dash
-from portfolio_exporter.core import caps_dash
-from portfolio_exporter.core.io import latest_file
 
 
 def _user_tech_signals(status, default_fmt):
@@ -41,9 +42,7 @@ def launch(status, default_fmt):
         if pos_path and combos_path:
             pos_df = pd.read_csv(pos_path)
             combos_df = pd.read_csv(combos_path)
-            console.print(
-                f"[green]Positions: {len(pos_df)} legs / {len(combos_df)} combos"
-            )
+            console.print(f"[green]Positions: {len(pos_df)} legs / {len(combos_df)} combos")
 
     actions = {
         "q": ("Snapshot quotes", _snapshot),

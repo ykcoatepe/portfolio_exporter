@@ -17,6 +17,53 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
 | `daily_report.py` | Render a one-page HTML/PDF snapshot from the latest portfolio greeks CSVs. |
 
+### Utilities → Sentinel (Micro‑MOMO)
+
+A lightweight background watcher that monitors scored Micro‑MOMO candidates and posts triggers.
+
+- Start/Stop/Status live in the TUI under Pre‑Market → Sentinel.
+- Writes PID and metadata under `out/.pid/` for safe lifecycle management.
+- Shows an “Active positions” view sourced from `out/micro_momo_journal.csv` (Pending/Triggered).
+
+TR-local schedule: Sentinel computes today’s Turkey-local times from U.S. RTH 09:30–16:00 ET via timezone conversion (DST-aware). By default it hard-resets at RTH open, optionally re-arms at 13:30 ET (TR-local time displayed), disallows new signals after 15:30 ET, and can honor a single post-halt re-arm per day. You can toggle afternoon/halts behavior from the Sentinel menu. Times shown/logged are Europe/Istanbul while staying aligned to the U.S. session and DST automatically.
+
+Config precedence at runtime: CLI > ENV (`MOMO_SEN_*`) > Menu preferences (`.codex/memory.json` → `preferences.sentinel.*`) > `micro_momo_config.json` > defaults. This keeps runtime overrides in the environment while persisting simple operator toggles in repo memory; TR-local schedule remains DST-safe via `zoneinfo`.
+
+Early close aware: set `MOMO_SEN_EARLY_CLOSE_TODAY=1` or provide a JSON list via `MOMO_SEN_EARLY_CLOSE_JSON` to auto-shift today’s ET close to 1:00 p.m. and adjust the TR-local schedule accordingly.
+
+Menu usage
+
+1. `python main.py` → select `Pre‑Market` → `Sentinel`.
+2. Options: `Start` (background), `Stop` (graceful), `Status`, `Active positions`.
+
+Environment (optional)
+
+- `MOMO_SCORED` default `out/micro_momo_scored.csv`
+- `MOMO_CFG` default `micro_momo_config.json`
+- `MOMO_OUT` default `out`
+- `MOMO_INTERVAL` default `10` seconds
+- `MOMO_WEBHOOK`, `MOMO_THREAD` for alerting
+- `MOMO_OFFLINE=1` to avoid live fetches
+
+Files created
+
+- `out/.pid/momo_sentinel.pid`
+- `out/.pid/momo_sentinel.meta.json`
+
+Behavior
+
+- Start uses a detached `subprocess.Popen` of `portfolio_exporter.scripts.micro_momo_sentinel` and writes a PID file.
+- Stop sends a graceful terminate (SIGTERM) and falls back to kill if needed.
+- Status validates the PID (uses `psutil` when available; falls back to `os.kill(pid, 0)`).
+
+Direct CLI (advanced)
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv --cfg micro_momo_config.json \
+  --out_dir out --interval 10 [--webhook ...] [--thread ...] [--offline]
+```
+
 ## Strike Enrichment in Combos
 
 The `portfolio_greeks` workflow generates an additional combos CSV alongside the per‑position output. Strike details for option combos are consistently enriched across all combo sources.
@@ -111,6 +158,39 @@ doctor --json --no-files
 daily-report --json --no-files | validate-json
 ```
 
+## Task recipes
+
+Copy-paste snippets for common day-to-day tasks.
+
+### Pre-market: quick-chain → daily-report
+
+```bash
+quick-chain --chain-csv tests/data/quick_chain_fixture.csv --json --no-files
+daily-report --json --no-files
+daily-report --output-dir pre && ls pre/daily_report.html pre/daily_report.pdf
+```
+
+### Trades review: trades-report → trades-dashboard
+
+```bash
+trades-report --executions-csv tests/data/executions_fixture.csv --symbol SPY --json --no-files
+trades-dashboard --executions-csv tests/data/executions_fixture.csv --output-dir trades && ls trades/trades_dashboard.html
+```
+
+### Roll preview: roll-manager --dry-run
+
+```bash
+roll-manager --dry-run --json --no-files
+roll-manager --dry-run --output-dir rolls && ls rolls/roll_manager_preview.html rolls/roll_manager_ticket.json
+```
+
+### Maintenance: combo-db-maint
+
+```bash
+combo-db-maint --json --no-files
+combo-db-maint --fix --output-dir combo && ls combo
+```
+
 ## Order Builder presets
 
 `order_builder` can scaffold common option strategies without manual strike
@@ -138,6 +218,32 @@ The JSON response shape is:
 ```
 
 Use other presets like `bear_call`, `iron_condor`, `iron_fly` or `calendar`.
+
+### Auto strike selection (preview)
+
+You can preview live-data candidates for presets using `--auto`. The engine
+selects strikes by target delta with liquidity and earnings filters, and emits
+JSON so you can choose a candidate or feed it to other tools.
+
+```bash
+# Credit vertical example with liquidity and earnings guardrails
+python -m portfolio_exporter.scripts.order_builder \
+  --preset bear_call --symbol AAPL --expiry nov \
+  --auto --profile balanced --earnings-window 7 \
+  --min-oi 200 --min-volume 50 --max-spread-pct 0.02 \
+  --json --no-files
+
+# Debit vertical example by DTE
+python -m portfolio_exporter.scripts.order_builder \
+  --preset bull_call --symbol AAPL --dte 30 \
+  --auto --profile conservative \
+  --json --no-files
+
+# Iron condor preview
+python -m portfolio_exporter.scripts.order_builder \
+  --preset iron_condor --symbol AAPL --expiry nov \
+  --auto --json --no-files
+```
 
 Quick reference
 - Presets: `bull_put`, `bear_call`, `bull_call`, `bear_put`, `iron_condor`, `iron_fly`, `calendar`.
@@ -168,6 +274,51 @@ TSLA Δ+1.20 +0.50
 AAPL Δ-0.80 -0.30
 ```
 
+### Trades Menu — Quick Actions
+
+Quick shortcuts in the Trades & Reports menu:
+
+- **Open last report** – launch the most recent `daily_report.html` or `trades_dashboard.html`.
+- **Save filtered trades CSV** – pick filters and write a CSV, for example:
+
+  ```
+  Trades & Reports › Save filtered trades CSV… (choose filters)
+  Symbols: AAPL,MSFT
+  Effect: Close
+  Top N: 10
+  ```
+
+- **Copy trades JSON summary** – copy a filtered summary to the clipboard (uses `pyperclip` if installed; otherwise prints the JSON).
+
+- **Executions → intent + P&L** – after “Executions / open orders”, the menu prints:
+  - Intent totals: Open/Close/Roll/Mixed/Unknown and dominant effect by underlying.
+  - Top Combos by realized P&L (clustered fills in the selected window) with an Effect column.
+  - If Unknown is high or a prior-snapshot warning appears, the menu prompts for a prior positions CSV and persists it for next runs.
+
+- **Combos MTM P&L (JSON-only)** – press `m` to compute mark‑to‑market P&L per detected combo using mid quotes per leg. The JSON is copied to clipboard in interactive mode.
+  - Includes `quoted_ratio` (e.g., `3/4`) and caches quotes for 30s with a small per-run time budget.
+
+- **Format toggle** – press `t` to cycle the default output format (`csv → excel → pdf`) used by actions in this menu.
+
+- **Open last ticket** – press `k` to print the last saved `order_ticket*.json` path and copy its JSON to the clipboard.
+
+Preference for prior positions snapshot:
+
+The menu auto-uses a default prior positions CSV when present under `.codex/memory.json`:
+
+```json
+{
+  "preferences": {
+    "trades_prior_positions": "/absolute/path/to/portfolio_greeks_positions_YYYYMMDD.csv"
+  }
+}
+```
+You can set this interactively when prompted after Executions, or edit the file directly.
+
+Notes
+- Executions intent mapping auto-picks a strictly prior snapshot by earliest fill time and uses the saved path as an override when present.
+- Combos CSV/Excel now include both `pnl` (gross) and `pnl_net` (commission-aware) when data is available.
+
 Typical fixes:
 
 ```bash
@@ -193,6 +344,332 @@ Flags are unified across scripts: `--json`, `--no-files`, `--output-dir`,
 `--no-pretty`, `--debug-timings`. When files are written a RunLog manifest is
 emitted; adding `--debug-timings` also writes `timings.csv` and includes
 per-stage timings in the JSON summary.
+
+## Micro-MOMO Analyzer (CSV-only v1)
+
+Micro-MOMO is a lightweight shortlist analyzer that operates entirely offline for v1.
+
+- Intraday patterns: computed from 1‑min bars (VWAP reclaim/reject, ORB/Retest, HOD/LOD) and exposed as `pattern_signal`, with `above_vwap_now` and `vwap_distance_pct`.
+- Expiry selection: prefers a DTE window (config `options.{dte_min,dte_max}`), then the nearest weekly strictly above `dte_max` by ≤7 days (Friday when available), then nearest overall. When multiple match, it prefers higher near‑money OI.
+
+- Inputs: a scan CSV and optional per-symbol option chain CSVs named `{SYMBOL}_{YYYYMMDD}.csv`.
+- Flow: filters → scoring → tier & direction → structure pick (DebitCall for long, BearCallCredit for short) → sizing → TP/SL → entry trigger.
+
+- Off-hours safety: when the market is closed (TR-local) or intraday signals are unavailable (VWAP/RVOL N/A), the analyzer emits a neutral `Template` structure with a "market-closed" preview trigger to avoid suggesting short entries.
+
+Examples:
+
+```bash
+micro-momo --input tests/data/meme_scan_sample.csv \
+  --cfg tests/data/micro_momo_config.json \
+  --chains_dir tests/data --out_dir out
+
+# JSON-only, no files
+micro-momo --input tests/data/meme_scan_sample.csv --cfg tests/data/micro_momo_config.json --chains_dir tests/data --out_dir out --json --no-files
+```
+
+Symbols mode (no CSV):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --symbols AAPL,TSLA,MSFT \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --data-mode enrich --providers ib,yahoo
+```
+
+In the app (Pre-Market → Micro‑MOMO Analyzer), you can optionally type a comma‑separated symbol list; leave blank to use the latest `meme_scan_*.csv`.
+
+Clear scanner list: In the Analyzer menu, choose C and type CLEAR to wipe the saved symbols. (We confirm destructive actions per HIG/NNg.)
+
+Outputs when files are enabled:
+- `out/micro_momo_scored.csv`
+- `out/micro_momo_orders.csv`
+
+If a chain file is missing for a symbol, a `Template` structure is emitted with `needs_chain=1` so you can add data or switch to live providers in a later version.
+
+Run via task or menu
+- Task runner: `python main.py --task micro-momo`
+- Pre-Market menu: choose “Micro-MOMO Analyzer” and provide paths.
+
+Auto-discovery: If `MOMO_INPUT` is not set, the task looks for the newest `meme_scan_YYYYMMDD.csv` in `MOMO_INPUT_DIR` (if set) or in `./, ./data, ./scans, ./inputs`. Override the glob with `MOMO_INPUT_GLOB` (comma-separated). When `--chains_dir` is set, the analyzer picks the newest per‑symbol chain file (`SYMBOL_YYYYMMDD.csv`, falling back to `SYMBOL.csv`).
+
+### Alerts & IB Basket (v1.2)
+
+- Alerts: build a compact alerts list for each scored row and write `out/micro_momo_alerts.json`.
+  - JSON-only (no POST): add `--alerts-json-only`.
+  - Webhook POST: add `--webhook https://hooks.slack.com/services/...` (skipped when `--offline`).
+
+- IB Basket export: write a BasketTrader-friendly CSV plus notes (TP/SL/trigger per order). OCO is not encoded in the CSV.
+
+Examples:
+
+```
+# Alerts only, no POST
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input tests/data/meme_scan_sample.csv \
+  --cfg tests/data/micro_momo_config.json \
+  --out_dir out --alerts-json-only --no-files
+
+# Webhook POST to Slack-compatible endpoint (skips when --offline)
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input meme_scan_YYYYMMDD.csv --cfg micro_momo_config.json \
+  --out_dir out --webhook https://hooks.slack.com/services/XXX/YYY/ZZZ
+
+# IB basket CSV + notes
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input meme_scan_YYYYMMDD.csv --cfg micro_momo_config.json \
+  --out_dir out --ib-basket-out out/micro_momo_basket.csv
+```
+
+
+### Journal & Sentinel (v1.3)
+
+- Journal template: the analyzer can emit a ready-to-fill journal CSV with `--journal-template`.
+  - Writes `out/micro_momo_journal.csv` with status=Pending rows for each scored candidate.
+
+- Sentinel (trigger watcher): monitors scored rows and logs when the trigger condition fires.
+
+```
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --interval 10 \
+  --offline
+```
+
+Notes: The sentinel is deliberately lightweight — it polls price/volume (IB provider when not offline), checks the simplified trigger rule (long: ORB break → pullback to VWAP → reclaim, short: lower-high → VWAP rejection) with RVOL ≥ confirm, then appends to `out/micro_momo_triggers_log.csv`, updates journal status to Triggered when present, and can send a webhook alert when `--webhook` is provided.
+
+Slack thread: pass `--thread <thread_ts>` to post alerts into an existing Slack thread (for incoming webhooks that honor `thread_ts`). When a thread is provided, the sentinel posts one alert per message.
+
+### EOD outcome scorer (v1.4)
+
+Compute end‑of‑day outcomes from the journal and update statuses/`result_R`.
+
+```
+python -m portfolio_exporter.scripts.micro_momo_eod \
+  --journal out/micro_momo_journal.csv \
+  --out_dir out \
+  --offline
+```
+
+### Run from task registry
+
+- Sentinel (test/offline):
+  `python main.py --task micro-momo-sentinel`
+
+- EOD scorer (offline):
+  `python main.py --task micro-momo-eod`
+
+Environment overrides:
+- `MOMO_SCORED`, `MOMO_CFG`, `MOMO_OUT`, `MOMO_INTERVAL`, `MOMO_WEBHOOK`, `MOMO_OFFLINE`, `MOMO_JOURNAL`
+
+### Logbook
+
+Append a quick entry to LOGBOOK.md and .codex/memory.json worklog:
+
+```bash
+make logbook-add \
+  TASK="Micro-MOMO v1.4 EOD + Guard" \
+  BRANCH="dev_yordam2" \
+  OWNER="codex" \
+  COMMIT="$(git rev-parse --short HEAD)" \
+  SCOPE="EOD scorer + guard" \
+  FILES="portfolio_exporter/scripts/micro_momo_eod.py" \
+  STATUS="merged" \
+  NEXT="Dashboard" \
+  NOTES="dtype warning benign"
+```
+
+List recent entries:
+
+```bash
+python tools/logbook.py list
+```
+
+Opt-in auto-logbook
+- Set `LOGBOOK_AUTO=1` to auto-append after app tasks succeed (micro‑momo, sentinel, EOD, dashboard).
+- Use Make “+log” variants to bundle run+log in one command (e.g., `make momo-dashboard-open-log`).
+
+### Micro-MOMO Dashboard (HTML)
+
+Generate a single-file report:
+
+```bash
+make momo-dashboard
+# -> out/micro_momo_dashboard.html
+```
+
+Includes Scored, Orders, Journal, EOD Summary, and Trigger Log when present.
+
+### Go-Live Orchestrator
+One command for pre-market: analyze → journal → basket → dashboard (optional sentinel).
+
+```bash
+# task runner
+python main.py --task micro-momo-go
+
+# env overrides (examples)
+MOMO_SYMBOLS="F,LDI" MOMO_DATA_MODE=enrich MOMO_PROVIDERS=yahoo \
+MOMO_WEBHOOK=https://hooks.slack.com/services/... MOMO_THREAD=169... \
+MOMO_AUTO_PRODUCERS=1 MOMO_START_SENTINEL=1 \
+python main.py --task micro-momo-go
+```
+
+The orchestrator respects `--offline` and uses your cache/artifacts first.
+
+Make helper:
+
+```bash
+make momo-go
+```
+
+#### Acceptance
+- `make lint`
+- Dry run:
+
+```bash
+MOMO_SYMBOLS="F,LDI" MOMO_DATA_MODE=csv-only \
+python main.py --task micro-momo-go
+```
+
+Expect analyzer+dashboard; sentinel only if `MOMO_START_SENTINEL=1`.
+
+Go‑Live publishes a curated pack to `out/publish/YYYY-MM-DD/` and, on macOS, opens the dashboard in your default browser. Use `--publish-dir` to override the publish root and `--publish` to keep the step enabled (default).
+
+Slack digest (optional)
+- Env switch: set `MOMO_POST_DIGEST=1` to post a one‑shot Block Kit digest after publish.
+- Webhook path: also set `MOMO_WEBHOOK=…` to post via incoming webhooks (no `ts` returned).
+- Web API path: set `MOMO_SLACK_TOKEN=xoxb-…` and `MOMO_SLACK_CHANNEL=C123…` to post with `chat.postMessage` and capture the message `ts`; it is saved under `preferences.slack.digest_ts` and used to auto‑thread the Sentinel when started.
+- Threading: replies are posted by including `thread_ts` in the payload.
+
+## Micro-MOMO — Operator Runbook (v1.4+)
+
+Morning (13:25 TRT)
+1) Drop your shortlist CSV (e.g., `data/meme_scan_YYYYMMDD.csv`).
+2) Run analyzer (auto‑enrich IB → Yahoo) and emit a journal template:
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_analyzer \
+  --input data/meme_scan_YYYYMMDD.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --data-mode enrich --providers ib,yahoo \
+  --journal-template
+```
+
+Outputs: `out/micro_momo_scored.csv`, `out/micro_momo_orders.csv`, `out/micro_momo_journal.csv`.
+
+During session
+3) Start sentinel (optional Slack thread):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv \
+  --cfg micro_momo_config.json \
+  --out_dir out \
+  --interval 10 \
+  --webhook https://hooks.slack.com/services/XXX/YYY/ZZZ \
+  --thread <thread_ts>   # optional
+```
+
+Logs firings to `out/micro_momo_triggers_log.csv` and updates journal status.
+
+End of day
+4) Score outcomes (offline OK):
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_eod \
+  --journal out/micro_momo_journal.csv \
+  --out_dir out --offline
+```
+
+Writes `out/micro_momo_eod_summary.csv` and annotates the journal.
+
+Review
+5) Build & open dashboard:
+
+```bash
+make momo-dashboard-open
+# or via UI: Pre-Market → Micro-MOMO Dashboard
+```
+
+App task equivalents
+- Analyzer: `python main.py --task micro-momo`
+- Sentinel: `python main.py --task micro-momo-sentinel`
+- EOD: `python main.py --task micro-momo-eod`
+- Dashboard: `python main.py --task micro-momo-dashboard`
+
+Make helpers
+- `make momo-journal` (fixture CSV → journal template)
+- `make momo-sentinel-offline` (idle loop for CI)
+- `make momo-eod-offline` (journal update in offline mode)
+- `make momo-dashboard`, `make momo-dashboard-open`
+
+### Logbook habits for parallel Codex tracks
+
+- Append a log after each task merge:
+
+```bash
+make logbook-add TASK="Micro-MOMO v1.4 EOD + Guard" BRANCH="dev_yordam2" OWNER="codex" \
+  COMMIT="$(git rev-parse --short HEAD)" SCOPE="EOD scorer + guard" \
+  FILES="portfolio_exporter/scripts/micro_momo_eod.py" STATUS="merged" NEXT="Dashboard" NOTES="—"
+```
+
+- Quick tail:
+
+```bash
+python tools/logbook.py list
+```
+
+
+
+### Live enrichment (v1.1)
+
+Micro‑MOMO can enrich shortlist rows with live data (IBKR primary, Yahoo fallback).
+
+- Flags:
+  - `--data-mode {csv-only,enrich,fetch}`: enrich fills missing fields only; fetch rebuilds all fields from providers.
+  - `--providers ib,yahoo`: comma‑separated priority (default `ib,yahoo`).
+  - `--offline`: disable network fetches and halts; useful in CI.
+- `--halts-source nasdaq`: enable halts count (cached; disabled when `--offline`).
+
+Auto‑producers (optional)
+- `--auto-producers`: when artifacts (minute bars / option chains) are missing, try to generate them via in‑repo scripts first, then re‑read artifacts before falling back to providers.
+- Works in both `--symbols` mode and with `--input` CSVs. In `csv-only` data mode, only artifacts are used (no providers).
+
+Enrichment & caching (Yahoo)
+- 1m bars: populates `rvol_1m`, `rvol_5m`, `vwap`, `orb_high/low`, and derives `above_vwap_now`/`pattern_signal`.
+  - Patterns computed locally: `VWAP Reclaim`, `VWAP Reject`, `ORB`, `ORB Retest`, `HOD Reclaim`, `LOD Break`, `Fail`.
+  - `vwap_distance_pct` indicates absolute distance to VWAP (fraction).
+- Option chains: sets `optionable=Yes`, fills `oi_near_money` and `spread_pct_near_money` from the nearest expiry.
+- Local cache: responses stored under `out/.cache/yahoo_*.json` (configurable via `cfg.data.cache.{enabled,dir,ttl_sec}`) and reused even when `--offline` is set.
+- Symbols mode: when `--symbols` is provided, the analyzer synthesizes rows and uses provider data + cache; chain CSVs are optional.
+
+Environment shortcuts
+- `MOMO_SYMBOLS`: pass comma‑separated symbols via task/menu.
+- `MOMO_DATA_MODE`, `MOMO_PROVIDERS`, `MOMO_OFFLINE`: forwarded to the analyzer from both the menu and `main.py --task micro-momo`.
+
+Provenance columns are appended to outputs when present: `src_last`, `src_prev_close`, `src_gap`, `src_rvol`, `src_vwap`, `src_orb`, `src_chain`, `src_float`, `src_adv`, `src_short_interest`, `src_borrow`, `src_borrow_rate`, `src_halts`. Any enrichment issues are summarized in `data_errors` (semicolon‑joined).
+
+Examples:
+
+```
+micro-momo --input meme_scan.csv --cfg micro_momo_config.json \
+  --out_dir out --data-mode enrich --providers ib,yahoo
+
+# Offline CI run
+micro-momo --input tests/data/meme_scan_sample.csv --cfg tests/data/micro_momo_config.json \
+  --offline --no-files --json
+```
+
+## Troubleshooting & Env
+
+- **command not found** → `pip install -e .` ; `PATH=.venv/bin:$PATH`
+- **missing ruff/pytest** → `make setup` (or `pip install -r requirements-dev.txt`)
+- **reportlab missing** → PDF step skipped
+- **pyperclip missing** → clipboard copy skipped
 
 ## Repo Memory (Agent-Shared)
 
@@ -418,6 +895,16 @@ Intent tagging notes
 - Use `--debug-intent` to emit `trades_intent_debug.csv` showing per‑leg `match_mode` (id, attr_exact, attr_tol, no_match) and `prior_qty` used for decisions.
 - If no strictly‑prior snapshot is found, the latest snapshot is used and a warning is emitted; accuracy may be lower in that case.
 
+Additional details (intent mechanics)
+- Streaming classification computes signed deltas per instrument. For options, the key is `(underlying, expiry, right, strike_2dp)`; for stocks (`STK`) the key is just `symbol` so within‑window reductions are tagged `Close`.
+- The IBKR execution field `openClose` (`O`/`C`) overrides the computed intent for that row. The menu/report also maps snake_case `open_close` if present.
+- Side detection accepts both `Side` and `side` and normalizes `BOT/SLD → BUY/SELL` to avoid NaN‑driven mislabels.
+- When a prior snapshot is truly unavailable, a non‑zero `realized_pnl` implies the row is `Close`.
+- For best accuracy across days, either pass `--prior-positions-csv …` or set `.codex/memory.json` `preferences.trades_prior_positions` to a positions CSV path.
+
+Action column
+- `Action` is derived from side/liquidation/roll heuristics and now normalizes `BUY/SELL` vs `BOT/SLD`. `OrderRef` containing `ROLL` shows `Roll`, and executions that hit liquidity removal or liquidation are shown as `Close`.
+
 Note: Intent tagging prefers a positions snapshot strictly older than the earliest execution in your selected window to decide whether combos are Open, Close, Mixed, or Roll. Use `--debug-intent` to emit `trades_intent_debug.csv` with per‑leg matching details. If no prior snapshot exists, tagging falls back to the latest positions and accuracy may decrease.
 
 ### Trades report filters & Excel
@@ -552,17 +1039,17 @@ python -m portfolio_exporter.scripts.net_liq_history_export --start 2025-01-01 -
 ### Build Order (CLI)
 
 The non-interactive order builder creates normalized ticket JSONs for common strategies.
-Each strategy defaults to the house leg directions; flipping the sign of `--qty`
-switches between credit and debit orientations.
+For verticals, you can explicitly set orientation with `--credit` or `--debit`.
+If omitted, legacy defaults apply (calls default to debit, puts default to credit).
 
 ```bash
 # Bull call (debit) vs. bear call (credit)
-python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty 1
-python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty -1
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty 1 --debit
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right C --expiry 2025-06-20 --strikes 400,410 --qty 1 --credit
 
 # Bull put (credit) vs. bear put (debit)
-python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty 1
-python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty -1
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty 1 --credit
+python -m portfolio_exporter.scripts.order_builder --strategy vertical --symbol SPY --right P --expiry 2025-06-20 --strikes 390,380 --qty 1 --debit
 
 # Short vs. long iron condor (strike order auto-sorted)
 python -m portfolio_exporter.scripts.order_builder --strategy iron_condor --symbol SPY --expiry 2025-06-20 --strikes 380,390,410,420 --qty -1
@@ -589,6 +1076,47 @@ python -m portfolio_exporter.scripts.order_builder --strategy covered_call --sym
 python -m portfolio_exporter.scripts.order_builder --strategy covered_call --symbol SPY --expiry 2025-06-20 --call-strike 410 --qty 1
 ```
 
+### Wizard Auto Mode (preview)
+
+The interactive wizard can suggest strikes from live data for verticals
+(credit/debit) and iron condors, then let you accept or tweak. It remembers
+your liquidity thresholds and risk-budget defaults in `.codex/memory.json`.
+
+CLI preview for the same wizard selection logic:
+
+```bash
+# Preview vertical credit candidates and pick the 2nd to emit a ticket
+python -m portfolio_exporter.scripts.order_builder \
+  --wizard --auto --strategy vertical --right P \
+  --symbol AAPL --expiry nov --profile balanced \
+  --min-oi 200 --min-volume 50 --max-spread-pct 0.02 \
+  --earnings-window 7 --pick 2 \
+  --json --no-files
+
+# Preview iron condor candidates
+python -m portfolio_exporter.scripts.order_builder \
+  --wizard --auto --strategy iron_condor \
+  --symbol AAPL --expiry nov \
+  --json --no-files
+
+# Preview calendar / diagonal candidates (ATM near/far with optional offset)
+python -m portfolio_exporter.scripts.order_builder \
+  --wizard --auto --strategy calendar --right C \
+  --symbol AAPL --expiry nov --strike-offset 1 \
+  --min-oi 200 --min-volume 50 --max-spread-pct 0.02 \
+  --earnings-window 7 --json --no-files
+```
+
+### Stage Order (menu)
+
+From the Trades & Reports menu, choose Build order → Preset to stage tickets.
+
+- Auto candidates: vertical (credit/debit), iron condor, butterfly, and calendar.
+- Butterfly/calendar prompt for Right (C/P). Calendar also supports a diagonal offset.
+- Flow: select a preset → Symbol → Expiry (date/month/DTE) → Auto = Y → review candidates table → pick a number → ticket JSON prints with a risk summary and optional save.
+- Calendar rows show near/far hints and diagonal offset (e.g., `100/105 (n/f 30/60, Δ+1)`).
+- Iron fly currently uses presets/manual (no auto suggestions yet).
+
 ### Expiry hint formats
 
 When prompted for an expiry, you may provide:
@@ -598,6 +1126,7 @@ When prompted for an expiry, you may provide:
 * Month name or abbreviation (e.g. ``June`` or ``Jun``)
 * Day and month like ``26 Jun``, ``Jun 26`` or ``26/06``. The script picks the
   nearest available expiry on or after that date.
+* DTE number (e.g., ``30``) to add N days, then snap to the next listed expiry
 
 Leaving the field blank automatically chooses the next weekly expiry within a
 week or the first Friday that is available.
@@ -607,8 +1136,9 @@ week or the first Friday that is available.
 Scripts that use `ib_insync` (`historic_prices.py`, `live_feed.py` and
 `tech_signals_ibkr.py`) expect the IBKR Trader Workstation or IB Gateway to be
 running locally with API access enabled (default host `127.0.0.1` and port
-`7497`). Ensure your IBKR configuration allows API connections from your machine
-and that the account is logged in before running these scripts.
+`7496`; switch to `7497` for paper/simulated accounts). Ensure your IBKR
+configuration allows API connections from your machine and that the account is
+logged in before running these scripts.
 ## Automation
 
 Schedule `update_tickers.py` with cron or another task scheduler to run daily:
@@ -743,3 +1273,43 @@ Troubleshooting
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+### Browser Dashboard (PSD)
+
+Quick start via the Rich ops menu - no manual process juggling required:
+
+```bash
+make run-menu
+# [4] Start PSD   -> ingestor + scanner + web start and the dashboard opens automatically
+# [1] Status      -> show running services and PIDs
+# [2] Stop PSD    -> graceful shutdown (SIGINT->SIGTERM->SIGKILL)
+```
+
+PID file lives at `run/psd-pids.json`; logs stream to `run/ingestor.log`, `run/scanner.log`, and `run/web.log`.
+
+- Access via TUI only: open the app and navigate to "Portfolio Sentinel". The dashboard auto-starts once per session (web + browser + loop).
+- Disable auto-start by setting `psd.auto.start_on_menu: false` in `config/rules.yaml`; then use the menu action `o = Open in browser` to trigger the starter on demand.
+- The server is a minimal FastAPI + WebSocket app; broadcasts are pushed from the in-process scheduler each iteration.
+- Prometheus scrape target: `http://localhost:51127/metrics` (see ingest tick histogram, data age gauge, event counters, and SSE stream gauges).
+- Readiness gate: `GET /ready` returns `{ "ok": true, "data_age_s": <float>, "threshold_s": <float> }` when a snapshot is available and the latest health row is newer than `PSD_READY_MAX_AGE` (default 15s). Missing or stale data yields `503` with `{ "ok": false, "reason": "...", "data_age_s": <float|null> }`.
+
+---
+
+Quick smoke (local):
+- `python -m psd.menus.ops` -> press **4** to start -> `run/psd-pids.json` appears and `run/*.log` fills.
+- Press **1** for status, **2** to stop; confirm the PID file updates or disappears accordingly.
+- `POSITIONS_ENGINE_DEMO=1 python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000` launches the API with the demo dataset if no CSVs are present.
+
+> **SSE Troubleshooting:** If events appear in bursts, check proxy buffering or ensure `X-Accel-Buffering: no` is not ignored by `proxy_ignore_headers`.
+
+#### SSE latency check
+
+- Local smoke: `make sse-check URL=https://your.domain/stream THRESH=3` runs `tools/check_sse.sh` and passes when median inter-arrival stays under the threshold (seconds).
+- CI dispatch: `.github/workflows/psd-smoke.yml` runs the same script against `${{ secrets.PSD_SSE_URL }}` when triggered via `workflow_dispatch`.
+
+#### WAL FAQ
+
+SQLite runs the dashboard database in write-ahead logging mode, so a `*.db-wal` file sits next to the main file while writes stream in. That log lets readers keep working without blocking writers. Checkpoints will roll the changes back into the main file periodically, so seeing the `-wal` file grow and then shrink over time is expected.
+
+#### Ops (optional)
+
+- For systemd/launchd integrations, call `python scripts/psd_start.py` to run the internal starter. This is not a public CLI command.

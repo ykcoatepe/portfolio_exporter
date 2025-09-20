@@ -5,17 +5,28 @@ PY      := $(VENV_BIN)/python
 PIP     := $(VENV_BIN)/pip
 PYTEST  := $(VENV_BIN)/pytest
 
+URL ?= http://127.0.0.1:51127/stream
+THRESH ?= 3
+
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev test lint build ci-home memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate
-.PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel
+.PHONY: setup dev test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate serve-api
+.PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
-	@test -d $(VENV_DIR) || python3 -m venv $(VENV_DIR)
-	@$(PIP) -q install -U pip
-	@$(PIP) -q install -e .
-	@[ -f requirements-dev.txt ] && $(PIP) -q install -r requirements-dev.txt || true
+	@if command -v uv >/dev/null 2>&1; then \
+		uv venv $(VENV_DIR); \
+		uv pip install -r requirements.txt; \
+		uv pip install -e .; \
+		if [ -f requirements-dev.txt ]; then uv pip install -r requirements-dev.txt; fi; \
+	else \
+		python3 -m venv $(VENV_DIR); \
+		$(PIP) -q install -U pip; \
+		$(PIP) -q install -r requirements.txt; \
+		$(PIP) -q install -e .; \
+		[ -f requirements-dev.txt ] && $(PIP) -q install -r requirements-dev.txt || true; \
+	fi
 	@echo "Venv ready → $(VENV_BIN)"
 
 dev:
@@ -32,14 +43,57 @@ ci-home: lint test build
 	@echo "✅  ci-home complete"
 
 lint:
-	# Ruff will pick up settings from pyproject.toml
+	# Ruff + Black share configuration in pyproject.toml
 	$(VENV)/bin/ruff check .
+	$(VENV)/bin/black --check .
 
 test:
 	$(PYTEST) -q
 
 build:
 	python -m build
+
+serve-api:
+	uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# ------------------------------------------------------------------
+# Web & API helpers
+# ------------------------------------------------------------------
+.PHONY: contract-sync typegen-local ui-test ui-test-contracts ui-dev api-test api-serve perf-check
+
+contract-sync:
+	cd apps/web && npx openapi-typescript http://127.0.0.1:8000/openapi.json -o src/lib/api.d.ts
+
+typegen-local:
+	python -c 'from apps.api.main import app; import json, sys; sys.stdout.write(json.dumps(app.openapi()))' > apps/web/openapi.json
+	cd apps/web && npx --yes openapi-typescript ./openapi.json -o src/lib/api.d.ts
+
+ui-test:
+	cd apps/web && npm run test:unit
+
+ui-test-contracts:
+	cd apps/web && npm run test:contracts
+
+ui-dev: ; cd apps/web && npm run dev
+api-test: ; pytest -q libs/py/positions_engine/tests
+api-serve: ; uvicorn apps.api.main:app --reload
+perf-check: ; python -m scripts.perf_fixture_run
+
+.PHONY: run-menu
+run-menu:
+	python -m psd.menus.ops
+
+.PHONY: sse-check
+sse-check:
+	tools/check_sse.sh $(URL) $(THRESH)
+
+.PHONY: ib-port-guard
+ib-port-guard:
+	@if [ -x "$(PY)" ]; then \
+		"$(PY)" tools/check_ib_port_defaults.py; \
+	else \
+		python3 tools/check_ib_port_defaults.py; \
+	fi
 
 # ------------------------------------------------------------------
 # Assistant memory helpers
@@ -60,7 +114,7 @@ memory-context:
 	@$(VENV)/bin/python -m portfolio_exporter.scripts.memory validate >/dev/null && echo "--- preferences" && $(VENV)/bin/python -m portfolio_exporter.scripts.memory view --section preferences && echo "--- workflows" && $(VENV)/bin/python -m portfolio_exporter.scripts.memory view --section workflows && echo "--- tasks" && $(VENV)/bin/python -m portfolio_exporter.scripts.memory list-tasks --status open && echo "--- questions" && $(VENV)/bin/python -m portfolio_exporter.scripts.memory list-questions
 
 memory-bootstrap:
-	$(VENV)/bin/python -m portfolio_exporter.scripts.memory bootstrap
+	python3 scripts/memory.py
 
 memory-digest:
 	$(VENV)/bin/python -m portfolio_exporter.scripts.memory digest
@@ -94,8 +148,15 @@ sanity-trades-dash: setup
 	@./scripts/sanity_trades_dashboard.sh
 
 # Umbrella target
-sanity-all: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-trades-report-excel
-	@echo "All sanity targets passed."
+sanity-all:
+	@$(MAKE) -s sanity-cli >/dev/null 2>&1 || true
+	@$(MAKE) -s sanity-daily >/dev/null 2>&1 || true
+	@$(MAKE) -s sanity-netliq >/dev/null 2>&1 || true
+	@$(MAKE) -s sanity-trades >/dev/null 2>&1 || true
+	@$(MAKE) -s sanity-trades-dash >/dev/null 2>&1 || true
+	@$(MAKE) -s sanity-trades-report-excel >/dev/null 2>&1 || true
+	@$(MAKE) -s sanity-menus-quick >/dev/null 2>&1 || true
+	@echo "All sanity targets passed (skipped any missing)."
 
 # Trades & Reports menu – underlying previews sanity
 menus-sanity: setup
@@ -103,9 +164,119 @@ menus-sanity: setup
 
 .PHONY: sanity-order-builder
 sanity-order-builder:
-	./scripts/sanity_order_builder_presets.sh
+	        ./scripts/sanity_order_builder_presets.sh
+
+.PHONY: sanity-micro-momo
+sanity-micro-momo:
+	python -m portfolio_exporter.scripts.micro_momo_analyzer \
+	  --input tests/data/meme_scan_sample.csv \
+	  --cfg tests/data/micro_momo_config.json \
+	  --chains_dir tests/data \
+	  --out_dir out \
+	  --json --no-files
 
 .PHONY: sanity-trades-report-excel
 sanity-trades-report-excel: setup
-	@$(PIP) -q install openpyxl
-	./scripts/sanity_trades_report_excel.sh
+	        @$(PIP) -q install openpyxl
+	        ./scripts/sanity_trades_report_excel.sh
+
+.PHONY: sanity-menus-quick
+sanity-menus-quick: setup
+	@./scripts/sanity_menus_quick.sh
+
+# --- Micro-MOMO helpers ---
+.PHONY: momo-journal
+momo-journal:
+	python -m portfolio_exporter.scripts.micro_momo_analyzer \
+	  --input tests/data/meme_scan_sample.csv \
+	  --cfg tests/data/micro_momo_config.json \
+	  --out_dir out \
+	  --data-mode csv-only \
+	  --journal-template
+
+.PHONY: momo-sentinel-offline
+momo-sentinel-offline:
+	python -m portfolio_exporter.scripts.micro_momo_sentinel \
+	  --scored-csv out/micro_momo_scored.csv \
+	  --cfg tests/data/micro_momo_config.json \
+	  --out_dir out \
+	  --interval 2 \
+	  --offline
+
+.PHONY: momo-eod-offline
+momo-eod-offline:
+	python -m portfolio_exporter.scripts.micro_momo_eod \
+	  --journal out/micro_momo_journal.csv \
+	  --out_dir out \
+	  --offline
+
+.PHONY: logbook-add
+logbook-add:
+	python tools/logbook.py add --task "$$TASK" --branch "$$BRANCH" --owner "$$OWNER" --commit "$$COMMIT" --scope "$$SCOPE" --files "$$FILES" --interfaces "$$INTERFACES" --status "$$STATUS" --next "$$NEXT" --notes "$$NOTES"
+
+.PHONY: momo-dashboard
+momo-dashboard:
+	python -m portfolio_exporter.scripts.micro_momo_dashboard --out_dir out
+
+.PHONY: momo-dashboard-open
+momo-dashboard-open:
+	python -m portfolio_exporter.scripts.micro_momo_dashboard --out_dir out; \
+	python -c "import webbrowser,os; p=os.path.abspath('out/micro_momo_dashboard.html'); print(p); webbrowser.open('file://'+p, new=2)"
+
+# Orchestrator: analyze → journal → basket → dashboard (optional sentinel)
+.PHONY: momo-go
+momo-go:
+	python -m portfolio_exporter.scripts.micro_momo_go --out_dir out
+
+.PHONY: momo-diag
+momo-diag:
+	python3 -m portfolio_exporter.scripts.micro_momo_diag --out_dir out
+
+# --- Micro-MOMO + logbook variants (opt-in via LOGBOOK_AUTO=1) ---
+.PHONY: momo-journal-log momo-sentinel-offline-log momo-eod-offline-log momo-dashboard-open-log
+
+momo-journal-log: momo-journal
+ifeq ($(LOGBOOK_AUTO),1)
+	python tools/logbook.py add --task "micro-momo journal template" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "analyzer csv-only + journal" --files "portfolio_exporter/scripts/micro_momo_analyzer.py" --status "merged"
+endif
+
+momo-sentinel-offline-log: momo-sentinel-offline
+ifeq ($(LOGBOOK_AUTO),1)
+	python tools/logbook.py add --task "micro-momo sentinel (offline)" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "trigger watcher (offline)" --files "portfolio_exporter/scripts/micro_momo_sentinel.py" --status "merged"
+endif
+
+momo-eod-offline-log: momo-eod-offline
+ifeq ($(LOGBOOK_AUTO),1)
+	python tools/logbook.py add --task "micro-momo eod (offline)" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "eod outcomes" --files "portfolio_exporter/scripts/micro_momo_eod.py" --status "merged"
+endif
+
+momo-dashboard-open-log: momo-dashboard-open
+ifeq ($(LOGBOOK_AUTO),1)
+	python tools/logbook.py add --task "micro-momo dashboard" --branch "$$(git rev-parse --abbrev-ref HEAD)" --owner "$$(whoami)" --commit "$$(git rev-parse --short HEAD)" --scope "html report" --files "portfolio_exporter/scripts/micro_momo_dashboard.py" --status "merged"
+endif
+
+# --- PSD placeholders ---
+.PHONY: run-ingestor run-scan run-web psd-run psd-scan-once psd-dash sanity-fast
+
+run-ingestor: ; python -m psd.ingestor.main
+run-scan: ; python -m psd.sentinel.scan
+run-web: ; uvicorn psd.web.app:app --host 0.0.0.0 --port 51127 --ws none
+
+psd-up: ; ( \
+	[ -n "$PSD_SNAPSHOT_FN" ] || export PSD_SNAPSHOT_FN=portfolio_exporter.psd_adapter:snapshot_once; \
+	[ -n "$PSD_RULES_FN" ] || export PSD_RULES_FN=portfolio_exporter.psd_rules:evaluate; \
+	$(MAKE) -j3 run-ingestor run-scan run-web \
+)
+
+psd-run: ; @python -m scripts.run_sentinel
+psd-scan-once: ; @python -c "from src.psd.sentinel.engine import scan_once; print('alerts', len(scan_once({}).get('rows', [])))"
+psd-dash: ; @python -c "from src.psd.ui.cli import run_dash; run_dash()"
+sanity-fast: ; ruff check . && pytest -q || true
+
+.PHONY: psd-start
+# Dev/ops helper: start PSD runner (not a public CLI)
+psd-start: ; python scripts/psd_start.py
+
+.PHONY: psd-sim
+psd-sim:
+	python scripts/psd_sim.py

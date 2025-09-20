@@ -1,0 +1,697 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Positions Engine API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Healthz",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Healthz Healthz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/positions/stocks": {
+      "get": {
+        "tags": [
+          "positions"
+        ],
+        "summary": "Equities",
+        "operationId": "equities_positions_stocks_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Equities Positions Stocks Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "tags": [
+          "positions"
+        ],
+        "summary": "Stats",
+        "operationId": "stats_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Stats Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/positions/options": {
+      "get": {
+        "tags": [
+          "positions"
+        ],
+        "summary": "Options",
+        "operationId": "options_positions_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Options Positions Options Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/summary": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Rules Summary",
+        "operationId": "rules_summary_rules_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesSummaryResponseModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/catalog": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Rules Catalog",
+        "operationId": "rules_catalog_rules_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesCatalogResponseModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/validate": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Rules Validate",
+        "operationId": "rules_validate_rules_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogTextRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesCatalogValidationResponseModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/preview": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Rules Preview",
+        "operationId": "rules_preview_rules_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogTextRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesCatalogPreviewResponseModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/publish": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Rules Publish",
+        "operationId": "rules_publish_rules_publish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogPublishRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesCatalogPublishResponseModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/reload": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Rules Reload",
+        "operationId": "rules_reload_rules_reload_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesCatalogResponseModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BreachCountsModel": {
+        "properties": {
+          "critical": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Critical",
+            "default": 0
+          },
+          "warning": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Warning",
+            "default": 0
+          },
+          "info": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Info",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "BreachCountsModel"
+      },
+      "CatalogDiffModel": {
+        "properties": {
+          "added": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Added"
+          },
+          "removed": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Removed"
+          },
+          "changed": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "added",
+          "removed",
+          "changed"
+        ],
+        "title": "CatalogDiffModel"
+      },
+      "CatalogPublishRequest": {
+        "properties": {
+          "catalog_text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Catalog Text"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          }
+        },
+        "type": "object",
+        "required": [
+          "catalog_text"
+        ],
+        "title": "CatalogPublishRequest"
+      },
+      "CatalogTextRequest": {
+        "properties": {
+          "catalog_text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Catalog Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "catalog_text"
+        ],
+        "title": "CatalogTextRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "RulesCatalogPreviewResponseModel": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "counters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counters"
+          },
+          "top": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Top"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "diff": {
+            "$ref": "#/components/schemas/CatalogDiffModel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "counters",
+          "top",
+          "errors",
+          "diff"
+        ],
+        "title": "RulesCatalogPreviewResponseModel"
+      },
+      "RulesCatalogPublishResponseModel": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "updated_at"
+        ],
+        "title": "RulesCatalogPublishResponseModel"
+      },
+      "RulesCatalogResponseModel": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "rules": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "updated_at",
+          "rules"
+        ],
+        "title": "RulesCatalogResponseModel"
+      },
+      "RulesCatalogValidationResponseModel": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "counters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counters"
+          },
+          "top": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Top"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "counters",
+          "top",
+          "errors"
+        ],
+        "title": "RulesCatalogValidationResponseModel"
+      },
+      "RulesSummaryResponseModel": {
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "rules_total": {
+            "type": "integer",
+            "title": "Rules Total"
+          },
+          "breaches": {
+            "$ref": "#/components/schemas/BreachCountsModel"
+          },
+          "top": {
+            "items": {
+              "$ref": "#/components/schemas/RulesSummaryTopModel"
+            },
+            "type": "array",
+            "title": "Top"
+          },
+          "focus_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Focus Symbols"
+          },
+          "evaluation_ms": {
+            "type": "number",
+            "title": "Evaluation Ms"
+          },
+          "fundamentals": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fundamentals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "as_of",
+          "rules_total",
+          "evaluation_ms"
+        ],
+        "title": "RulesSummaryResponseModel"
+      },
+      "RulesSummaryTopModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "occurred_at": {
+            "type": "string",
+            "title": "Occurred At"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rule",
+          "severity",
+          "subject",
+          "occurred_at"
+        ],
+        "title": "RulesSummaryTopModel"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

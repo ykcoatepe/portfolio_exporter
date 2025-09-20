@@ -1,0 +1,27 @@
+name: Sanity (core)
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package + tools
+        run: |
+          python -m pip install -U pip
+          pip install -e .
+          sudo apt-get update && sudo apt-get install -y jq
+          pip install openpyxl
+      - name: Sanity — CLI flags
+        run: ./scripts/sanity_cli_helpers.sh
+        env: { PE_QUIET: "1", OUTPUT_DIR: "tests/data" }
+      - name: Sanity — Trades Dashboard
+        run: ./scripts/sanity_trades_dashboard.sh
+      - name: Sanity — Trades Excel
+        run: ./scripts/sanity_trades_report_excel.sh

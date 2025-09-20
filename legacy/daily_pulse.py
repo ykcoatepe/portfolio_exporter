@@ -74,7 +74,7 @@ INDICATORS = [
 
 def load_ib_positions_ib(
     host: str = "127.0.0.1",
-    port: int = 7497,
+    port: int = 7496,
     client_id: int = 999,
 ) -> pd.DataFrame:
     """
