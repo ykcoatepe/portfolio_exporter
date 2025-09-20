@@ -3,6 +3,8 @@ from __future__ import annotations
 """Helpers to launch the Portfolio Sentinel Dashboard."""
 
 import importlib
+import os
+import shlex
 import socket
 import subprocess
 import sys
@@ -16,9 +18,48 @@ MODULE_PATH = Path(__file__).resolve()
 REPO_ROOT = MODULE_PATH.parents[2]
 WEB_ROOT = REPO_ROOT / "apps" / "web"
 DIST_INDEX = WEB_ROOT / "dist" / "index.html"
+PSD_ENV_PATH = REPO_ROOT / ".psd.env"
 _DASH_URL = f"http://{API_HOST}:{API_PORT}/psd"
 
 _AUTO_STARTED = False
+
+
+def _build_uvicorn_command() -> list[str]:
+    return [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "apps.api.main:app",
+        "--host",
+        API_HOST,
+        "--port",
+        str(API_PORT),
+    ]
+
+
+def _uvicorn_command_display() -> str:
+    return shlex.join(_build_uvicorn_command())
+
+
+def _format_start_failure(exit_code: int | None) -> str:
+    code = f" (exit code {exit_code})" if exit_code is not None else ""
+    return (
+        "Portfolio Sentinel API failed to start"
+        f"{code}. Try running `{_uvicorn_command_display()}` from the repo root for details."
+    )
+
+
+def _notify_psd_error(status: Any, message: str) -> None:
+    if status:
+        try:
+            status.update("Portfolio Sentinel failed", "red")
+            console = getattr(status, "console", None)
+            if console is not None:
+                console.print(f"[red]{message}[/]")
+                return
+        except Exception:
+            pass
+    print(message)
 
 
 def _port_open(host: str, port: int, timeout: float = 0.2) -> bool:
@@ -48,6 +89,34 @@ def _ensure_uvicorn_runtime() -> None:
     )
 
 
+def _load_psd_env() -> dict[str, str]:
+    """Load environment overrides from .psd.env if present."""
+
+    if not PSD_ENV_PATH.exists():
+        return {}
+
+    overrides: dict[str, str] = {}
+    try:
+        content = PSD_ENV_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return overrides
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip().strip("\"'")
+        overrides[key] = value
+    return overrides
+
+
 def start_psd_dashboard() -> None:
     """Build the PSD web bundle if needed, ensure the API is live, and open /psd."""
 
@@ -55,27 +124,39 @@ def start_psd_dashboard() -> None:
         subprocess.check_call(["npm", "ci"], cwd=str(WEB_ROOT))
         subprocess.check_call(["npm", "run", "build"], cwd=str(WEB_ROOT))
 
-    if not _port_open(API_HOST, API_PORT):
-        _ensure_uvicorn_runtime()
-        subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "uvicorn",
-                "apps.api.main:app",
-                "--host",
-                API_HOST,
-                "--port",
-                str(API_PORT),
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.STDOUT,
-            cwd=str(REPO_ROOT),
+    if _port_open(API_HOST, API_PORT):
+        _open_dash_tab()
+        return
+
+    _ensure_uvicorn_runtime()
+    env = os.environ.copy()
+    env.update(_load_psd_env())
+    proc = subprocess.Popen(
+        _build_uvicorn_command(),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.STDOUT,
+        cwd=str(REPO_ROOT),
+        env=env,
+    )
+
+    for _ in range(25):
+        if _port_open(API_HOST, API_PORT):
+            break
+        if proc.poll() is not None:
+            raise RuntimeError(_format_start_failure(proc.returncode))
+        time.sleep(0.2)
+    else:
+        if proc.poll() is not None:
+            raise RuntimeError(_format_start_failure(proc.returncode))
+        raise TimeoutError(
+            f"Timed out waiting for Portfolio Sentinel API on {API_HOST}:{API_PORT}. "
+            f"Run `{_uvicorn_command_display()}` for diagnostics."
         )
-        for _ in range(25):
-            if _port_open(API_HOST, API_PORT):
-                break
-            time.sleep(0.2)
+
+    if not _port_open(API_HOST, API_PORT):
+        raise RuntimeError(
+            "Portfolio Sentinel API did not respond after startup. Check for firewall blocks or port conflicts."
+        )
 
     _open_dash_tab()
 
@@ -101,7 +182,10 @@ def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for fu
             start_psd_dashboard()
         else:
             _open_dash_tab()
-    finally:
+    except Exception as exc:  # pragma: no cover - surfaced to the user below
+        _AUTO_STARTED = False
+        _notify_psd_error(status, str(exc))
+    else:
         if status:
             try:
                 status.update("Ready", "green")
