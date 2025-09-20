@@ -119,6 +119,23 @@
     {
       "event": "session_start",
       "timestamp": "2025-09-20T10:57:07Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T11:52:31Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T14:26:29Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T14:53:41Z"
+    },
+    {
+      "details": "Add sitecustomize.py to load .venv",
+      "event": "Auto venv bootstrap",
+      "timestamp": "2025-09-20T15:08:32Z"
     }
   ],
   "decisions": [
@@ -219,6 +236,14 @@
       "id": 14,
       "timestamp": "2025-09-16T14:21:26Z",
       "title": "PSD_SSE_BOOTSTRAP_FIX"
+    },
+    {
+      "context": null,
+      "decision": "Load repo .venv via sitecustomize for system python",
+      "id": 15,
+      "rationale": "Eliminate manual activation for uvicorn",
+      "timestamp": "2025-09-20T15:08:26Z",
+      "title": "Auto activate venv"
     }
   ],
   "preferences": {

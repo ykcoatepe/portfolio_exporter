@@ -23,15 +23,21 @@ const SKELETON_ROWS = Array.from({ length: 10 }, (_, idx) => idx);
 const DEFAULT_DELTA_RANGE = { min: -1, max: 1 } as const;
 const SHOULD_POLL = import.meta.env.MODE !== "test";
 
-const EXPIRY_WINDOWS = [
+type ExpiryWindowId = "all" | "0-7" | "8-30" | "31-90" | "90+";
+interface ExpiryWindow {
+  id: ExpiryWindowId;
+  label: string;
+  min: number | null;
+  max: number | null;
+}
+
+const EXPIRY_WINDOW_OPTIONS: ExpiryWindow[] = [
   { id: "all", label: "All", min: null, max: null },
   { id: "0-7", label: "0-7d", min: 0, max: 7 },
   { id: "8-30", label: "8-30d", min: 8, max: 30 },
   { id: "31-90", label: "31-90d", min: 31, max: 90 },
   { id: "90+", label: "90d+", min: 91, max: null },
-] as const;
-
-type ExpiryWindow = (typeof EXPIRY_WINDOWS)[number];
+];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -221,15 +227,15 @@ function filterByWindow(leg: OptionLegRow, window: ExpiryWindow): boolean {
 
 export function OptionLegsTable(): JSX.Element {
   const {
-    data: legs,
+    data: legs = [],
     isLoading,
     isFetching,
     error,
     refetch,
-    underlyings,
+    underlyings = [],
   } = useOptionLegs();
   const [selectedUnderlyings, setSelectedUnderlyings] = useState<string[]>([]);
-  const [selectedWindow, setSelectedWindow] = useState<ExpiryWindow>(EXPIRY_WINDOWS[0]);
+  const [selectedWindow, setSelectedWindow] = useState<ExpiryWindow>(EXPIRY_WINDOW_OPTIONS[0]);
   const [deltaRange, setDeltaRange] = useState<{ min: number; max: number }>(
     DEFAULT_DELTA_RANGE,
   );
@@ -277,7 +283,7 @@ export function OptionLegsTable(): JSX.Element {
   };
 
   const filteredLegs = useMemo(() => {
-    return legs.filter((leg) => {
+    return legs.filter((leg: OptionLegRow) => {
       if (onlyOrphans && !leg.isOrphan) {
         return false;
       }
@@ -383,7 +389,7 @@ export function OptionLegsTable(): JSX.Element {
             >
               All
             </button>
-            {underlyings.map((symbol) => {
+            {underlyings.map((symbol: string) => {
               const isActive = selectedUnderlyings.includes(symbol);
               return (
                 <button
@@ -410,20 +416,20 @@ export function OptionLegsTable(): JSX.Element {
             Expiry Window
           </p>
           <div className="flex flex-wrap gap-2">
-            {EXPIRY_WINDOWS.map((window) => (
+            {EXPIRY_WINDOW_OPTIONS.map((windowOption) => (
               <button
-                key={window.id}
+                key={windowOption.id}
                 type="button"
-                aria-pressed={selectedWindow.id === window.id}
-                onClick={() => setSelectedWindow(window)}
+                aria-pressed={selectedWindow.id === windowOption.id}
+                onClick={() => setSelectedWindow(windowOption)}
                 className={clsx(
                   "rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
-                  selectedWindow.id === window.id
+                  selectedWindow.id === windowOption.id
                     ? "border-sky-500/60 bg-sky-500/10 text-sky-100"
                     : "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800",
                 )}
               >
-                {window.label}
+                {windowOption.label}
               </button>
             ))}
           </div>
@@ -522,7 +528,7 @@ export function OptionLegsTable(): JSX.Element {
             <LegsSkeleton />
           ) : (
             <tbody data-testid="rows-body">
-              {filteredLegs.map((leg, index) => (
+              {filteredLegs.map((leg: OptionLegRow, index: number) => (
                 <ForwardedLegRow
                   key={leg.id}
                   ref={(node) => {

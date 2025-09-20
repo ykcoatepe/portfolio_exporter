@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 import type { StockRow, StocksApiResponse } from "../lib/types";
 
@@ -51,7 +52,11 @@ export function useStocks(): UseQueryResult<StockRow[], Error> {
     refetchInterval: 30_000,
   });
 
-  const data = useMemo(() => query.data ?? [], [query.data]);
+  const { data: rawData } = query;
+  const data = useMemo(() => rawData ?? [], [rawData]);
 
-  return { ...query, data };
+  return {
+    ...(query as UseQueryResult<StockRow[], Error>),
+    data,
+  } as UseQueryResult<StockRow[], Error>;
 }

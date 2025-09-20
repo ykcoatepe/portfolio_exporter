@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { useQuery, UseQueryResult } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 import type {
   OptionComboApi,
@@ -142,16 +143,15 @@ async function fetchOptions(baseUrl = ""): Promise<OptionsApiResponse> {
   };
 }
 
-export interface OptionCombosResult
-  extends UseQueryResult<OptionComboRow[], Error> {
+export type OptionCombosResult = UseQueryResult<OptionComboRow[], Error> & {
   asOf: string | null;
-}
+};
 
-export interface OptionLegsResult extends UseQueryResult<OptionLegRow[], Error> {
+export type OptionLegsResult = UseQueryResult<OptionLegRow[], Error> & {
   asOf: string | null;
   underlyings: string[];
   expiries: string[];
-}
+};
 
 export function useOptionCombos(): OptionCombosResult {
   const query = useQuery<OptionsApiResponse, Error>({
@@ -161,12 +161,14 @@ export function useOptionCombos(): OptionCombosResult {
     refetchInterval: 30_000,
   });
 
+  const { data: rawData, ...rest } = query;
+
   const legMap = useMemo(() => {
     const map = new Map<string, OptionComboLegApi[]>();
-    if (!query.data) {
+    if (!rawData) {
       return map;
     }
-    for (const leg of query.data.legs) {
+    for (const leg of rawData.legs) {
       if (!leg.combo_id) {
         continue;
       }
@@ -175,22 +177,24 @@ export function useOptionCombos(): OptionCombosResult {
       map.set(leg.combo_id, current);
     }
     return map;
-  }, [query.data]);
+  }, [rawData]);
 
   const combos = useMemo<OptionComboRow[]>(() => {
-    if (!query.data) {
+    if (!rawData) {
       return [];
     }
-    return query.data.combos
-      .map((combo) => mapComboApiToRow(combo, legMap, query.data?.as_of))
+    return rawData.combos
+      .map((combo) => mapComboApiToRow(combo, legMap, rawData.as_of))
       .sort((a, b) => (b.dayPnlAmount ?? 0) - (a.dayPnlAmount ?? 0));
-  }, [query.data, legMap]);
+  }, [rawData, legMap]);
+
+  const typedQuery = query as unknown as UseQueryResult<OptionComboRow[], Error>;
 
   return {
-    ...query,
+    ...typedQuery,
     data: combos,
-    asOf: query.data?.as_of ?? null,
-  };
+    asOf: rawData?.as_of ?? null,
+  } as OptionCombosResult;
 }
 
 export function useOptionLegs(): OptionLegsResult {
@@ -201,12 +205,14 @@ export function useOptionLegs(): OptionLegsResult {
     refetchInterval: 30_000,
   });
 
+  const { data: rawData, ...rest } = query;
+
   const legs = useMemo<OptionLegRow[]>(() => {
-    if (!query.data) {
+    if (!rawData) {
       return [];
     }
-    return query.data.legs
-      .map((leg) => mapLegApiToStandaloneRow(leg, query.data?.as_of))
+    return rawData.legs
+      .map((leg) => mapLegApiToStandaloneRow(leg, rawData.as_of))
       .sort((a, b) => {
         if (a.isOrphan !== b.isOrphan) {
           return a.isOrphan ? -1 : 1;
@@ -220,7 +226,7 @@ export function useOptionLegs(): OptionLegsResult {
         }
         return a.strike - b.strike;
       });
-  }, [query.data]);
+  }, [rawData]);
 
   const underlyings = useMemo(() => {
     const set = new Set<string>();
@@ -238,13 +244,15 @@ export function useOptionLegs(): OptionLegsResult {
     return Array.from(set).sort((a, b) => Date.parse(a) - Date.parse(b));
   }, [legs]);
 
+  const typedQuery = query as unknown as UseQueryResult<OptionLegRow[], Error>;
+
   return {
-    ...query,
+    ...typedQuery,
     data: legs,
     underlyings,
     expiries,
-    asOf: query.data?.as_of ?? null,
-  };
+    asOf: rawData?.as_of ?? null,
+  } as OptionLegsResult;
 }
 
 export { fetchOptions };

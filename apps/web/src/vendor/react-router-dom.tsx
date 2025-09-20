@@ -147,7 +147,10 @@ type NavLinkClass = string | ((state: { isActive: boolean }) => string);
 
 type NavLinkChildren = ReactNode | ((state: { isActive: boolean }) => ReactNode);
 
-export interface NavLinkProps extends Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "className"> {
+export interface NavLinkProps extends Omit<
+  React.AnchorHTMLAttributes<HTMLAnchorElement>,
+  "href" | "className" | "children"
+> {
   to: string;
   className?: NavLinkClass;
   end?: boolean;

@@ -335,7 +335,7 @@ const ComboRow = (
 const ForwardedComboRow = forwardRef<HTMLTableRowElement, ComboRowProps>(ComboRow);
 
 export function CombosTable(): JSX.Element {
-  const { data: combos, isLoading, isFetching, error, refetch } = useOptionCombos();
+  const { data: combos = [], isLoading, isFetching, error, refetch } = useOptionCombos();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [activeIndex, setActiveIndex] = useState(0);
@@ -350,7 +350,7 @@ export function CombosTable(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    if (expandedId && !combos.some((combo) => combo.id === expandedId)) {
+    if (expandedId && !combos.some((combo: OptionComboRow) => combo.id === expandedId)) {
       setExpandedId(null);
     }
   }, [combos, expandedId]);
@@ -469,7 +469,7 @@ export function CombosTable(): JSX.Element {
             <CombosSkeleton />
           ) : (
             <tbody data-testid="rows-body">
-              {combos.map((combo, index) => (
+              {combos.map((combo: OptionComboRow, index: number) => (
                 <ForwardedComboRow
                   key={combo.id}
                   ref={(node) => {

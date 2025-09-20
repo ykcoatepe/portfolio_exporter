@@ -51,10 +51,13 @@ const coerceNullableString = (value: unknown): string | null => {
 };
 
 const sanitizeSeverity = (value: unknown): RuleSeverity => {
-  if (value === "critical" || value === "warning" || value === "info") {
-    return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toUpperCase();
+    if (normalized === "CRITICAL" || normalized === "WARNING" || normalized === "INFO") {
+      return normalized;
+    }
   }
-  return "info";
+  return "INFO";
 };
 
 const coerceNumber = (value: unknown): number | null => {

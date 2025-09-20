@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useQuery, useQueryClient, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
 
 import type { components } from "../lib/api";
@@ -6,7 +6,7 @@ import type { components } from "../lib/api";
 type RawRulesSummary = components["schemas"]["RulesSummaryResponseModel"];
 type RawRuleBreach = components["schemas"]["RulesSummaryTopModel"];
 type RawBreaches = components["schemas"]["BreachCountsModel"];
-export type RuleSeverity = components["schemas"]["RuleSeverity"];
+export type RuleSeverity = "INFO" | "WARNING" | "CRITICAL";
 
 export interface RuleBreachSummary {
   id: string;
@@ -52,10 +52,9 @@ export interface SymbolFundamentals extends FundamentalsEntry {
   symbol: string;
 }
 
-export interface UseFundamentalsResult
-  extends UseQueryResult<SymbolFundamentals[], Error> {
+export type UseFundamentalsResult = UseQueryResult<SymbolFundamentals[], Error> & {
   allFundamentals: FundamentalsMap | null;
-}
+};
 
 const isTestEnvironment =
   typeof import.meta !== "undefined" && import.meta.env?.MODE === "test";
@@ -66,10 +65,13 @@ const isDevelopmentEnvironment =
 const allowAssetFallback = isTestEnvironment || isDevelopmentEnvironment;
 
 const sanitizeSeverity = (value: unknown): RuleSeverity => {
-  if (value === "critical" || value === "warning" || value === "info") {
-    return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toUpperCase();
+    if (normalized === "CRITICAL" || normalized === "WARNING" || normalized === "INFO") {
+      return normalized;
+    }
   }
-  return "info";
+  return "INFO";
 };
 
 const coerceString = (value: unknown, fallback = ""): string =>
@@ -255,10 +257,14 @@ async function fetchFundamentalsMap(queryClient: QueryClient): Promise<Fundament
   }
 
   try {
-    const summary = await queryClient.ensureQueryData<RulesSummaryResponse>(RULES_SUMMARY_QUERY_KEY);
-    if (summary?.fundamentals && Object.keys(summary.fundamentals).length > 0) {
-      fundamentalsCache = summary.fundamentals;
-      return fundamentalsCache;
+    const summary = await queryClient.ensureQueryData<RulesSummaryResponse>({
+      queryKey: RULES_SUMMARY_QUERY_KEY,
+      queryFn: () => fetchRulesSummary(),
+    });
+    const summaryFundamentals = summary?.fundamentals ?? null;
+    if (summaryFundamentals && Object.keys(summaryFundamentals).length > 0) {
+      fundamentalsCache = summaryFundamentals;
+      return summaryFundamentals;
     }
   } catch (error) {
     // Swallow and attempt fallback below; summary query handles surfacing its own errors.
@@ -301,45 +307,68 @@ const normalizeSymbols = (symbols: readonly string[]): string[] => {
   return Array.from(seen);
 };
 
+const buildSymbolFundamentals = (
+  map: FundamentalsMap | null,
+  symbols: string[],
+): SymbolFundamentals[] => {
+  if (!map || symbols.length === 0) {
+    return [];
+  }
+  const list: SymbolFundamentals[] = [];
+  for (const symbol of symbols) {
+    const entry = map[symbol];
+    if (!entry) {
+      continue;
+    }
+    list.push({
+      symbol,
+      company: entry.company ?? null,
+      market_cap: entry.market_cap ?? null,
+      pe: entry.pe ?? null,
+      next_earnings: entry.next_earnings ?? null,
+      dividend_yield: entry.dividend_yield ?? null,
+    });
+  }
+  return list;
+};
+
 export function useFundamentals(symbols: string[]): UseFundamentalsResult {
   const normalizedSymbols = useMemo(() => normalizeSymbols(symbols), [symbols]);
+  const symbolsEmpty = normalizedSymbols.length === 0;
   const queryClient = useQueryClient();
+  const lastMapRef = useRef<FundamentalsMap | null>(null);
 
-  const query = useQuery<FundamentalsMap, Error>({
+  if (symbolsEmpty && lastMapRef.current !== null) {
+    lastMapRef.current = null;
+  }
+
+  const query = useQuery<FundamentalsMap, Error, SymbolFundamentals[]>({
     queryKey: [...FUNDAMENTALS_QUERY_KEY, normalizedSymbols.join(",")],
     queryFn: () => fetchFundamentalsMap(queryClient),
-    enabled: normalizedSymbols.length > 0,
+    enabled: !symbolsEmpty,
     staleTime: Infinity,
     retry: isTestEnvironment ? false : 1,
+    select: (map) => {
+      lastMapRef.current = map;
+      return buildSymbolFundamentals(map, normalizedSymbols);
+    },
   });
 
-  const derived = useMemo<SymbolFundamentals[]>(() => {
-    if (!query.data || normalizedSymbols.length === 0) {
-      return [];
-    }
-    return normalizedSymbols
-      .map((symbol) => {
-        const entry = query.data?.[symbol];
-        if (!entry) {
-          return null;
-        }
-        return {
-          symbol,
-          company: entry.company ?? null,
-          market_cap: entry.market_cap ?? null,
-          pe: entry.pe ?? null,
-          next_earnings: entry.next_earnings ?? null,
-          dividend_yield: entry.dividend_yield ?? null,
-        } satisfies SymbolFundamentals;
-      })
-      .filter((item): item is SymbolFundamentals => item !== null);
-  }, [query.data, normalizedSymbols]);
+  if (symbolsEmpty) {
+    return {
+      ...query,
+      data: [],
+      allFundamentals: null,
+    } as UseFundamentalsResult;
+  }
+
+  const data = query.data ?? [];
 
   return {
     ...query,
-    data: derived,
-    allFundamentals: query.data ?? null,
-  };
+    data,
+    allFundamentals: lastMapRef.current,
+  } as UseFundamentalsResult;
 }
 
 export { RULES_SUMMARY_QUERY_KEY };

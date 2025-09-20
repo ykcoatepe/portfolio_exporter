@@ -3,6 +3,7 @@ import clsx from "clsx";
 
 import {
   type RuleBreachSummary,
+  type RuleCounters,
   type RuleSeverity,
   type SymbolFundamentals,
   useFundamentals,
@@ -18,17 +19,17 @@ import {
 } from "../hooks/useRuleCatalog";
 
 const severityStyles: Record<RuleSeverity, string> = {
-  critical:
+  CRITICAL:
     "border-rose-500/40 bg-rose-500/15 text-rose-200 focus-visible:ring-rose-400/60",
-  warning:
+  WARNING:
     "border-amber-500/40 bg-amber-400/10 text-amber-100 focus-visible:ring-amber-400/60",
-  info: "border-sky-500/40 bg-sky-400/10 text-sky-100 focus-visible:ring-sky-400/60",
+  INFO: "border-sky-500/40 bg-sky-400/10 text-sky-100 focus-visible:ring-sky-400/60",
 };
 
 const severityLabel: Record<RuleSeverity, string> = {
-  critical: "Critical",
-  warning: "Warning",
-  info: "Info",
+  CRITICAL: "Critical",
+  WARNING: "Warning",
+  INFO: "Info",
 };
 
 const relativeTimeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
@@ -114,7 +115,7 @@ const uniqueSymbolsFromBreaches = (top: RuleBreachSummary[]): string[] => {
   return Array.from(symbols);
 };
 
-const countersOrder: RuleSeverity[] = ["critical", "warning", "info"];
+const countersOrder: RuleSeverity[] = ["CRITICAL", "WARNING", "INFO"];
 
 export function RulesPanel(): JSX.Element {
   const {
@@ -549,14 +550,17 @@ export function RulesPanel(): JSX.Element {
               </p>
             </div>
             <dl className="space-y-3">
-              {countersOrder.map((level) => (
-                <div key={level} className="flex items-center justify-between">
-                  <dt className="text-sm text-slate-400">{severityLabel[level]}</dt>
-                  <dd className="text-sm font-medium text-slate-100">
-                    {summary.breaches[level]}
-                  </dd>
-                </div>
-              ))}
+              {countersOrder.map((level) => {
+                const counterKey = level.toLowerCase() as keyof RuleCounters;
+                return (
+                  <div key={level} className="flex items-center justify-between">
+                    <dt className="text-sm text-slate-400">{severityLabel[level]}</dt>
+                    <dd className="text-sm font-medium text-slate-100">
+                      {summary.breaches[counterKey]}
+                    </dd>
+                  </div>
+                );
+              })}
             </dl>
           </header>
           <p className="mt-6 text-xs text-slate-500">

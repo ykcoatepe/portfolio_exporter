@@ -26,12 +26,14 @@ class PositionsState:
         self._quotes_version = 0
         self._options_cache: dict[str, Any] | None = None
         self._snapshot_override: datetime | None = None
+        self._data_source: str = "unknown"
 
     def refresh(
         self,
         positions: Iterable[Position] | None = None,
         quotes: Iterable[Quote] | None = None,
         snapshot_at: datetime | None = None,
+        data_source: str | None = None,
     ) -> None:
         if positions is not None:
             self._positions_version += 1
@@ -45,6 +47,8 @@ class PositionsState:
             self._snapshot_override = _ensure_aware(snapshot_at)
         elif quotes is not None:
             self._snapshot_override = None
+        if data_source is not None:
+            self._data_source = data_source
 
     def snapshot_updated_at(self) -> datetime | None:
         """Return the freshest quote timestamp available, if any."""
@@ -88,7 +92,12 @@ class PositionsState:
             "option_legs_count": legs_count,
             "combos_matched": len(detection.combos),
             "combos_detection_ms": detection.detection_ms,
+            "data_source": self._data_source,
         }
+
+    @property
+    def data_source(self) -> str:
+        return self._data_source
 
     def _rows(self, now: datetime | None) -> tuple[list[dict[str, Any]], int]:
         now = _ensure_aware(now)

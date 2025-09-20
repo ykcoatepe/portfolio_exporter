@@ -151,7 +151,7 @@ function ExpansionDrawer({ symbol }: { symbol: string }) {
 }
 
 export function StocksTable(): JSX.Element {
-  const { data, isLoading, isFetching, error, refetch } = useStocks();
+  const { data: stocks = [], isLoading, isFetching, error, refetch } = useStocks();
   const [filter, setFilter] = useState("");
   const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
   const [activeSymbol, setActiveSymbol] = useState<string | null>(null);
@@ -192,12 +192,12 @@ export function StocksTable(): JSX.Element {
   }, []);
 
   const sortedRows = useMemo(() => {
-    const rows = [...data];
+    const rows = [...stocks];
     return rows.sort((a, b) => {
       const delta = a.dayPnlAmount - b.dayPnlAmount;
       return sortDirection === "ascending" ? delta : -delta;
     });
-  }, [data, sortDirection]);
+  }, [stocks, sortDirection]);
 
   const filteredRows = useMemo(() => {
     const trimmed = filter.trim().toUpperCase();

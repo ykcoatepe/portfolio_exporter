@@ -22,7 +22,7 @@ interface RulesSummaryCounters {
 interface RuleBreachFixture {
   id: string;
   rule: string;
-  severity: "critical" | "warning" | "info";
+  severity: "CRITICAL" | "WARNING" | "INFO";
   subject: string;
   symbol?: string | null;
   occurred_at: string;
@@ -528,7 +528,7 @@ export const buildRulesSummaryResponse = (
     {
       id: "breach-portfolio-var",
       rule: "Portfolio VaR Limit",
-      severity: "critical",
+      severity: "CRITICAL",
       subject: "Aggregate VaR",
       symbol: "SPX",
       occurred_at: minutesAgoFromNow(3),
@@ -538,7 +538,7 @@ export const buildRulesSummaryResponse = (
     {
       id: "breach-tsla-delta",
       rule: "Single Name Delta",
-      severity: "critical",
+      severity: "CRITICAL",
       subject: "TSLA Delta Exposure",
       symbol: "TSLA",
       occurred_at: minutesAgoFromNow(5),
@@ -548,7 +548,7 @@ export const buildRulesSummaryResponse = (
     {
       id: "breach-aapl-theta",
       rule: "Theta Budget",
-      severity: "warning",
+      severity: "WARNING",
       subject: "AAPL Short Theta",
       symbol: "AAPL",
       occurred_at: minutesAgoFromNow(12),
@@ -558,7 +558,7 @@ export const buildRulesSummaryResponse = (
     {
       id: "breach-msft-vol",
       rule: "Implied Vol Spike",
-      severity: "warning",
+      severity: "WARNING",
       subject: "MSFT Earnings Run-up",
       symbol: "MSFT",
       occurred_at: minutesAgoFromNow(18),
@@ -568,7 +568,7 @@ export const buildRulesSummaryResponse = (
     {
       id: "breach-gld-roll",
       rule: "Roll Reminder",
-      severity: "info",
+      severity: "INFO",
       subject: "GLD Hedge Roll",
       symbol: "GLD",
       occurred_at: minutesAgoFromNow(25),
@@ -578,9 +578,9 @@ export const buildRulesSummaryResponse = (
   ];
 
   const breachesCounts: RulesSummaryCounters = {
-    critical: top.filter((item) => item.severity === "critical").length,
-    warning: top.filter((item) => item.severity === "warning").length,
-    info: top.filter((item) => item.severity === "info").length,
+    critical: top.filter((item) => item.severity === "CRITICAL").length,
+    warning: top.filter((item) => item.severity === "WARNING").length,
+    info: top.filter((item) => item.severity === "INFO").length,
   };
 
   const base: RulesSummaryFixture = {
@@ -632,7 +632,7 @@ export const buildRulesCatalogValidationResponse = (
       {
         id: "preview-portfolio-var",
         rule: "Portfolio VaR Limit",
-        severity: "critical",
+        severity: "CRITICAL",
         subject: "Aggregate VaR",
         symbol: "SPX",
         occurred_at: nowIso,
@@ -642,7 +642,7 @@ export const buildRulesCatalogValidationResponse = (
       {
         id: "preview-tsla-delta",
         rule: "Single Name Delta",
-        severity: "critical",
+        severity: "CRITICAL",
         subject: "TSLA Delta Exposure",
         symbol: "TSLA",
         occurred_at: nowIso,

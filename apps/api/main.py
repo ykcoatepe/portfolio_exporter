@@ -25,11 +25,8 @@ if str(LIBS_PATH) not in sys.path:
 
 logger = logging.getLogger(__name__)
 
-from positions_engine.core.models import Quote  # noqa: E402
-from positions_engine.ingest.csv import (  # noqa: E402
-    load_latest_positions,
-    load_latest_quotes,
-)
+from positions_engine.core.models import InstrumentType, Quote  # noqa: E402
+from positions_engine.ingest import load_csv_records, load_demo_dataset  # noqa: E402
 from positions_engine.rules.catalog import CatalogError, CatalogValidationError  # noqa: E402
 from positions_engine.service import (  # noqa: E402
     PositionsState,
@@ -43,10 +40,14 @@ app = FastAPI(title="Positions Engine API", version="0.1.0")
 _state = PositionsState()
 _rules_state = RulesState(_state)
 _catalog_state = RulesCatalogState(_state, _rules_state)
-_DATA_ROOT = Path(os.getenv("POSITIONS_ENGINE_DATA_DIR", "var")).expanduser()
 _AUTO_REFRESH = os.getenv("POSITIONS_ENGINE_AUTO_REFRESH", "0") == "1"
 WEB_DIST = (REPO_ROOT / "apps" / "web" / "dist").resolve()
 INDEX_HTML = WEB_DIST / "index.html"
+_DEMO_OVERRIDE: bool | None = None
+
+
+def _resolve_data_root() -> Path:
+    return Path(os.getenv("POSITIONS_ENGINE_DATA_DIR", "var")).expanduser()
 
 
 class BreachCountsModel(BaseModel):
@@ -133,6 +134,7 @@ class StatsResponse(BaseModel):
     margin_used_pct: float | None = None
     updated_at: datetime | None = None
     trades_prior_positions: bool | None = None
+    data_source: str | None = None
 
     class Config:
         extra = "allow"
