@@ -4,19 +4,26 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
+from starlette.responses import FileResponse, PlainTextResponse
 from starlette.staticfiles import StaticFiles
 
-LIBS_PATH = Path(__file__).resolve().parents[2] / "libs" / "py"
+MODULE_PATH = Path(__file__).resolve()
+_API_DIR = MODULE_PATH.parent
+REPO_ROOT = _API_DIR.parents[1]
+LIBS_PATH = REPO_ROOT / "libs" / "py"
 if str(LIBS_PATH) not in sys.path:
     sys.path.append(str(LIBS_PATH))
+
+logger = logging.getLogger(__name__)
 
 from positions_engine.core.models import Quote  # noqa: E402
 from positions_engine.ingest.csv import (  # noqa: E402
@@ -38,6 +45,8 @@ _rules_state = RulesState(_state)
 _catalog_state = RulesCatalogState(_state, _rules_state)
 _DATA_ROOT = Path(os.getenv("POSITIONS_ENGINE_DATA_DIR", "var")).expanduser()
 _AUTO_REFRESH = os.getenv("POSITIONS_ENGINE_AUTO_REFRESH", "0") == "1"
+WEB_DIST = (REPO_ROOT / "apps" / "web" / "dist").resolve()
+INDEX_HTML = WEB_DIST / "index.html"
 
 
 class BreachCountsModel(BaseModel):
@@ -328,6 +337,38 @@ def rules_reload() -> RulesCatalogResponseModel:
     return RulesCatalogResponseModel(**_catalog_state.as_dict())
 
 
-WEB_DIST = Path("apps/web/dist")
-if WEB_DIST.exists():
+if WEB_DIST.is_dir() and INDEX_HTML.exists():
+    logger.info("[web] Serving SPA from %s", WEB_DIST)
     app.mount("/", StaticFiles(directory=str(WEB_DIST), html=True), name="web")
+else:
+    logger.info("[web] SPA dist not found at %s; API-only mode", WEB_DIST)
+
+
+@app.middleware("http")
+async def _spa_fallback(request: Request, call_next):  # pragma: no cover - thin wrapper
+    response = await call_next(request)
+    if response.status_code != 404 or request.method.upper() != "GET":
+        return response
+
+    path = request.url.path
+    if path.startswith((
+        "/docs",
+        "/openapi",
+        "/redoc",
+        "/healthz",
+        "/stats",
+        "/positions",
+        "/rules",
+        "/state",
+        "/static",
+        "/favicon.ico",
+    )):
+        return response
+
+    if not INDEX_HTML.exists():
+        return PlainTextResponse(
+            "PSD bundle not built; run `npm run build` in apps/web.",
+            status_code=404,
+        )
+
+    return FileResponse(INDEX_HTML)

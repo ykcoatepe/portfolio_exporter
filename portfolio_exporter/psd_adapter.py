@@ -137,7 +137,7 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
             leg_mark = _coerce_float(leg.get("mark"))
             legs.append(
                 {
-                    "symbol": leg.get("underlying") or leg.get("symbol"),
+                    "symbol": leg.get("symbol") or leg.get("underlying"),
                     "right": leg.get("right"),
                     "strike": _coerce_float(leg.get("strike")),
                     "expiry": leg.get("expiry"),
@@ -175,7 +175,7 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
         pnl_leg = _coerce_float(leg.get("total_pnl_amount") or leg.get("day_pnl_amount")) or 0.0
         legs_view.append(
             {
-                "symbol": leg.get("underlying") or leg.get("symbol"),
+                "symbol": leg.get("symbol") or leg.get("underlying"),
                 "underlying": leg.get("underlying"),
                 "expiry": leg.get("expiry"),
                 "strike": _coerce_float(leg.get("strike")),

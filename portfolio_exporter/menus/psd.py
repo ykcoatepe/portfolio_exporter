@@ -2,14 +2,23 @@ from __future__ import annotations
 
 """Helpers to launch the Portfolio Sentinel Dashboard."""
 
+import importlib
 import socket
 import subprocess
+import sys
 import time
 import webbrowser
 from pathlib import Path
 from typing import Any
 
 API_HOST, API_PORT = "127.0.0.1", 8000
+MODULE_PATH = Path(__file__).resolve()
+REPO_ROOT = MODULE_PATH.parents[2]
+WEB_ROOT = REPO_ROOT / "apps" / "web"
+DIST_INDEX = WEB_ROOT / "dist" / "index.html"
+_DASH_URL = f"http://{API_HOST}:{API_PORT}/psd"
+
+_AUTO_STARTED = False
 
 
 def _port_open(host: str, port: int, timeout: float = 0.2) -> bool:
@@ -22,18 +31,35 @@ def _port_open(host: str, port: int, timeout: float = 0.2) -> bool:
             return False
 
 
+def _ensure_uvicorn_runtime() -> None:
+    """Install uvicorn runtime deps if they are missing."""
+
+    missing: list[str] = []
+    for module_name, package_name in ("uvicorn", "uvicorn"), ("click", "click"):
+        try:
+            importlib.import_module(module_name)
+        except ModuleNotFoundError:
+            missing.append(package_name)
+    if not missing:
+        return
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", *missing],
+        cwd=str(REPO_ROOT),
+    )
+
+
 def start_psd_dashboard() -> None:
     """Build the PSD web bundle if needed, ensure the API is live, and open /psd."""
 
-    dist = Path("apps/web/dist")
-    if not dist.exists() or not any(dist.rglob("index.html")):
-        subprocess.check_call(["npm", "ci"], cwd="apps/web")
-        subprocess.check_call(["npm", "run", "build"], cwd="apps/web")
+    if not DIST_INDEX.exists():
+        subprocess.check_call(["npm", "ci"], cwd=str(WEB_ROOT))
+        subprocess.check_call(["npm", "run", "build"], cwd=str(WEB_ROOT))
 
     if not _port_open(API_HOST, API_PORT):
+        _ensure_uvicorn_runtime()
         subprocess.Popen(
             [
-                "python3",
+                sys.executable,
                 "-m",
                 "uvicorn",
                 "apps.api.main:app",
@@ -44,17 +70,24 @@ def start_psd_dashboard() -> None:
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
+            cwd=str(REPO_ROOT),
         )
         for _ in range(25):
             if _port_open(API_HOST, API_PORT):
                 break
             time.sleep(0.2)
 
-    webbrowser.open_new_tab(f"http://{API_HOST}:{API_PORT}/psd")
+    _open_dash_tab()
+
+
+def _open_dash_tab() -> None:
+    webbrowser.open_new_tab(_DASH_URL)
 
 
 def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for future
     """Entry point used by the main menu to open the PSD dashboard."""
+
+    global _AUTO_STARTED
 
     if status:
         try:
@@ -63,7 +96,11 @@ def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for fu
             pass
 
     try:
-        start_psd_dashboard()
+        if not _AUTO_STARTED or not _port_open(API_HOST, API_PORT):
+            _AUTO_STARTED = True
+            start_psd_dashboard()
+        else:
+            _open_dash_tab()
     finally:
         if status:
             try:

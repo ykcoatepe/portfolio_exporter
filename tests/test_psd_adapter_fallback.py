@@ -125,6 +125,8 @@ def test_snapshot_once_uses_engine_fallback(monkeypatch) -> None:
     assert view["single_stocks"], "fallback should populate single stocks"
     assert view["single_stocks"][0]["symbol"] == "AAPL"
     assert view["option_combos"], "fallback should populate combos"
-    assert view["option_combos"][0]["legs"], "combo legs should not be empty"
+    legs = view["option_combos"][0]["legs"]
+    assert legs, "combo legs should not be empty"
+    assert legs[0]["symbol"] == "TSLA 20240419C00750000"
     assert view["single_options"], "fallback should include orphan option legs"
-    assert view["single_options"][0]["symbol"] == "MSFT"
+    assert view["single_options"][0]["symbol"] == "MSFT 20240419P00250000"
