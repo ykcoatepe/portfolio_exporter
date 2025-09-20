@@ -12,6 +12,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from starlette.staticfiles import StaticFiles
 
 LIBS_PATH = Path(__file__).resolve().parents[2] / "libs" / "py"
 if str(LIBS_PATH) not in sys.path:
@@ -325,3 +326,8 @@ def rules_publish(payload: CatalogPublishRequest) -> RulesCatalogPublishResponse
 def rules_reload() -> RulesCatalogResponseModel:
     _catalog_state.reload()
     return RulesCatalogResponseModel(**_catalog_state.as_dict())
+
+
+WEB_DIST = Path("apps/web/dist")
+if WEB_DIST.exists():
+    app.mount("/", StaticFiles(directory=str(WEB_DIST), html=True), name="web")

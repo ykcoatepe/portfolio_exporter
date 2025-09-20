@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 import math
 import os
+import threading
 import time
 from collections.abc import Iterable
 from datetime import datetime
@@ -17,6 +19,197 @@ logger = logging.getLogger("portfolio_exporter.psd_adapter")
 
 
 _ALLOWED_SESSIONS: set[str] = {"RTH", "EXT", "CLOSED"}
+
+
+_UNSET = object()
+_CACHE_SENTINEL = _UNSET  # Backward compatibility for older tests
+_ENGINE_STATE_CACHE: Any = _UNSET
+_ENGINE_STATE_LOCK = threading.Lock()
+
+
+def _empty_positions_view() -> dict[str, list[Any]]:
+    return {"single_stocks": [], "option_combos": [], "single_options": []}
+
+
+def _coerce_float(value: Any) -> float | None:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(result):
+        return None
+    return result
+
+
+def _coerce_int(value: Any) -> int:
+    number = _coerce_float(value)
+    return int(number) if number is not None else 0
+
+
+def _get_positions_engine_state() -> Any | None:
+    global _ENGINE_STATE_CACHE
+    if _ENGINE_STATE_CACHE is not _UNSET:
+        return cast(Any | None, _ENGINE_STATE_CACHE)
+    with _ENGINE_STATE_LOCK:
+        if _ENGINE_STATE_CACHE is not _UNSET:
+            return cast(Any | None, _ENGINE_STATE_CACHE)
+        try:
+            module = importlib.import_module("apps.api.main")
+        except Exception as exc:  # pragma: no cover - optional dependency
+            logger.debug("positions engine state unavailable: %s", exc)
+            return None
+        state = getattr(module, "_state", None)
+        refresh = getattr(module, "_refresh_from_disk", None)
+        if callable(refresh):
+            try:
+                refresh()
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.debug("positions engine refresh failed: %s", exc)
+            else:
+                state = getattr(module, "_state", state)
+        if state is None:
+            return None
+        _ENGINE_STATE_CACHE = state
+        return cast(Any | None, _ENGINE_STATE_CACHE)
+
+
+def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, Any]:
+    state = pe_state if pe_state is not None else _get_positions_engine_state()
+    if state is None:
+        return _empty_positions_view()
+
+    try:
+        stocks_iter = state.stocks()  # type: ignore[attr-defined]
+    except AttributeError:
+        stocks_iter = state.equities_payload() if hasattr(state, "equities_payload") else []
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.debug("positions engine stocks() failed: %s", exc)
+        stocks_iter = []
+
+    stocks_view: list[dict[str, Any]] = []
+    for record in stocks_iter or []:
+        if not isinstance(record, dict):
+            continue
+        symbol = str(record.get("symbol") or record.get("underlying") or "").strip() or "?"
+        qty = _coerce_float(record.get("qty") or record.get("quantity")) or 0.0
+        mark = _coerce_float(record.get("mark") or record.get("mid"))
+        avg_cost = _coerce_float(record.get("avg_cost") or record.get("avg"))
+        if mark is None and avg_cost is not None:
+            mark = avg_cost
+        pnl_unrealized = 0.0
+        if mark is not None and avg_cost is not None:
+            pnl_unrealized = (mark - avg_cost) * qty
+        stocks_view.append(
+            {
+                "symbol": symbol,
+                "qty": qty,
+                "mark": mark if mark is not None else 0.0,
+                "avg_cost": avg_cost,
+                "pnl_unrealized": pnl_unrealized,
+                "pnl_intraday": pnl_unrealized,
+                "greeks": {"delta": 0.0, "gamma": 0.0, "theta": 0.0},
+                "mark_source": record.get("mark_source"),
+                "stale_seconds": _coerce_int(record.get("stale_seconds")),
+            }
+        )
+
+    try:
+        options_payload = state.options()  # type: ignore[attr-defined]
+    except AttributeError:
+        options_payload = state.options_payload() if hasattr(state, "options_payload") else {}
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.debug("positions engine options() failed: %s", exc)
+        options_payload = {}
+
+    if not isinstance(options_payload, dict):
+        options_payload = {}
+
+    combos_view: list[dict[str, Any]] = []
+    legs_view: list[dict[str, Any]] = []
+
+    for combo in options_payload.get("combos", []) or []:
+        if not isinstance(combo, dict):
+            continue
+        raw_legs = combo.get("legs") if isinstance(combo.get("legs"), list) else []
+        legs_payload: list[dict[str, Any]] = [leg for leg in raw_legs if isinstance(leg, dict)]
+        legs = []
+        for leg in legs_payload:
+            leg_mark = _coerce_float(leg.get("mark"))
+            legs.append(
+                {
+                    "symbol": leg.get("underlying") or leg.get("symbol"),
+                    "right": leg.get("right"),
+                    "strike": _coerce_float(leg.get("strike")),
+                    "expiry": leg.get("expiry"),
+                    "quantity": _coerce_float(leg.get("quantity") or leg.get("qty")) or 0.0,
+                    "mark": leg_mark,
+                    "greeks": {
+                        "delta": _coerce_float(leg.get("delta")) or 0.0,
+                        "theta": _coerce_float(leg.get("theta")) or 0.0,
+                    },
+                    "mark_source": leg.get("mark_source"),
+                    "stale_seconds": _coerce_int(leg.get("stale_seconds")),
+                }
+            )
+
+        greeks_payload = combo.get("sum_greeks") or combo.get("greeks") or {}
+        greeks = greeks_payload if isinstance(greeks_payload, dict) else {}
+        pnl_combo = _coerce_float(combo.get("total_pnl_amount") or combo.get("day_pnl_amount")) or 0.0
+        combos_view.append(
+            {
+                "combo_id": combo.get("combo_id") or combo.get("id"),
+                "strategy": combo.get("strategy") or combo.get("name"),
+                "underlying": combo.get("underlying"),
+                "dte": combo.get("dte"),
+                "net_price": combo.get("net_price"),
+                "greeks": greeks,
+                "pnl_unrealized": pnl_combo,
+                "pnl_intraday": pnl_combo,
+                "legs": legs,
+            }
+        )
+
+    for leg in options_payload.get("legs", []) or []:
+        if not isinstance(leg, dict):
+            continue
+        pnl_leg = _coerce_float(leg.get("total_pnl_amount") or leg.get("day_pnl_amount")) or 0.0
+        legs_view.append(
+            {
+                "symbol": leg.get("underlying") or leg.get("symbol"),
+                "underlying": leg.get("underlying"),
+                "expiry": leg.get("expiry"),
+                "strike": _coerce_float(leg.get("strike")),
+                "right": leg.get("right"),
+                "quantity": _coerce_float(leg.get("quantity") or leg.get("qty")) or 0.0,
+                "mark": _coerce_float(leg.get("mark")),
+                "greeks": {
+                    "delta": _coerce_float(leg.get("delta")) or 0.0,
+                    "theta": _coerce_float(leg.get("theta")) or 0.0,
+                },
+                "pnl_unrealized": pnl_leg,
+                "pnl_intraday": pnl_leg,
+                "mark_source": leg.get("mark_source"),
+                "stale_seconds": _coerce_int(leg.get("stale_seconds")),
+            }
+        )
+
+    return {
+        "single_stocks": stocks_view,
+        "option_combos": combos_view,
+        "single_options": legs_view,
+    }
+
+
+def _is_positions_view_empty(view: Any) -> bool:
+    if not isinstance(view, dict):
+        return True
+    try:
+        stocks = view.get("single_stocks") or []
+        combos = view.get("option_combos") or []
+        singles = view.get("single_options") or []
+    except AttributeError:
+        return True
+    return not any((stocks, combos, singles))
 
 
 def _infer_session_from_clock(now: datetime | None = None) -> Session:
@@ -199,7 +392,13 @@ async def snapshot_once() -> dict[str, Any]:
         positions_view = split_positions(positions, session)
     except Exception as exc:
         logger.warning("snapshot positions_view failed: %s", exc)
-        positions_view = {"single_stocks": [], "option_combos": [], "single_options": []}
+        positions_view = _empty_positions_view()
+
+    if _is_positions_view_empty(positions_view):
+        fallback_view = _build_positions_view_from_engine()
+        if not _is_positions_view_empty(fallback_view):
+            logger.debug("positions_view populated from engine fallback")
+            positions_view = fallback_view
 
     return {
         "ts": ts,

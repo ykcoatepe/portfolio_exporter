@@ -810,3 +810,129 @@ INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
 INFO:     Finished server process [29853]
+INFO:     Started server process [51387]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53396 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53396 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53396 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53396 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53399 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53407 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53410 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53411 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53412 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53412 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51387]
+INFO:     Started server process [89708]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54473 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54473 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54473 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54473 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54475 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54489 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [16232]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:65077 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65077 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65077 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65077 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65079 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65079 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65079 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65079 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65080 - "GET /stats HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Finished server process [16232]
+INFO:     Started server process [24162]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:65429 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65429 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65429 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65429 - "GET /stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65430 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /stream HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24162]

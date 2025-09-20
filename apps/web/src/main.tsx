@@ -1,10 +1,19 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import App from "./App";
 import "./index.css";
-import PSDPage from "./pages/PSD";
 
 const queryClient = new QueryClient();
+
+function AppProviders(): JSX.Element {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  );
+}
 
 async function enableMocking() {
   if (!import.meta.env.DEV) {
@@ -22,9 +31,7 @@ if (!container) {
 const renderApp = () => {
   ReactDOM.createRoot(container).render(
     <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <PSDPage />
-      </QueryClientProvider>
+      <AppProviders />
     </React.StrictMode>,
   );
 };
