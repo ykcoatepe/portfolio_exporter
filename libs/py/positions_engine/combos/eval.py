@@ -4,9 +4,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, DivisionByZero, InvalidOperation
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from ..core.models import Quote
 from .detector import OptionCombo, OptionLegSnapshot
@@ -189,8 +190,6 @@ def _evaluate_single_leg(leg: OptionLegSnapshot, band_low: Decimal, band_high: D
 
     if quantity is None or quantity == ZERO or pnl is None or multiplier <= ZERO:
         return payload
-
-    contracts = abs(quantity)
 
     if quantity < ZERO:
         band = _band_payload(band_low, band_high)

@@ -4,9 +4,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-
 from positions_engine.combos.detector import ComboDetection, OptionCombo, OptionLegSnapshot
-from positions_engine.combos.eval import evaluate_playbook_targets
+from positions_engine.combos.eval import PlaybookEvaluation, evaluate_playbook_targets
 from positions_engine.combos.taxonomy import ComboStrategy
 from positions_engine.core.models import Quote, TradingSession
 from positions_engine.service.state import PositionsState
@@ -313,3 +312,150 @@ def test_options_payload_includes_playbook_fields() -> None:
     assert leg_payload["tp_band_pct"] == [0.4, 0.6]
     assert leg_payload["tp_band_low_pct"] == 0.4
     assert leg_payload["tp_band_high_pct"] == 0.6
+
+
+def test_combo_group_merges_playbook_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    short_leg_one = _make_leg(
+        leg_id="group-short-1",
+        symbol="SPY 20250620C00420000",
+        underlying="SPY",
+        strike="420",
+        right="CALL",
+        quantity="-1",
+        avg_cost="1.00",
+    )
+    long_leg_one = _make_leg(
+        leg_id="group-long-1",
+        symbol="SPY 20250620C00425000",
+        underlying="SPY",
+        strike="425",
+        right="CALL",
+        quantity="1",
+        avg_cost="0.50",
+    )
+    combo_one = OptionCombo(
+        combo_id="group-combo-1",
+        strategy=ComboStrategy.VERTICAL,
+        account="TEST",
+        underlying="SPY",
+        dte=35,
+        net_price=Decimal("-0.50"),
+        sum_delta=Decimal("0"),
+        sum_gamma=Decimal("0"),
+        sum_theta=Decimal("0"),
+        sum_vega=Decimal("0"),
+        day_pnl=Decimal("0"),
+        total_pnl=Decimal("40"),
+        day_pnl_percent=None,
+        total_pnl_percent=None,
+        legs=(short_leg_one, long_leg_one),
+        notes=tuple(),
+    )
+
+    short_leg_two = _make_leg(
+        leg_id="group-short-2",
+        symbol="SPY 20250620C00420001",
+        underlying="SPY",
+        strike="420",
+        right="CALL",
+        quantity="-1",
+        avg_cost="1.05",
+    )
+    long_leg_two = _make_leg(
+        leg_id="group-long-2",
+        symbol="SPY 20250620C00425001",
+        underlying="SPY",
+        strike="425",
+        right="CALL",
+        quantity="1",
+        avg_cost="0.55",
+    )
+    combo_two = OptionCombo(
+        combo_id="group-combo-2",
+        strategy=ComboStrategy.VERTICAL,
+        account="TEST",
+        underlying="SPY",
+        dte=35,
+        net_price=Decimal("-0.60"),
+        sum_delta=Decimal("0"),
+        sum_gamma=Decimal("0"),
+        sum_theta=Decimal("0"),
+        sum_vega=Decimal("0"),
+        day_pnl=Decimal("0"),
+        total_pnl=Decimal("90"),
+        day_pnl_percent=None,
+        total_pnl_percent=None,
+        legs=(short_leg_two, long_leg_two),
+        notes=tuple(),
+    )
+
+    combo_targets = {
+        combo_one.combo_id: {
+            "tp_band_pct": [0.25, 0.5],
+            "tp_band_low_pct": 0.25,
+            "tp_band_high_pct": 0.5,
+            "tp_hit": True,
+            "tp_done": False,
+            "sl_hit": False,
+            "sl_r": 1.0,
+            "next_action": "TRIM",
+            "progress_pct_of_goal": 0.5,
+            "progress_pct_of_max": 0.3,
+            "progress": {
+                "pct_of_goal": 0.5,
+                "pct_of_max_profit_or_r": 0.3,
+            },
+            "exit_as_unit": False,
+        },
+        combo_two.combo_id: {
+            "tp_band_pct": [0.25, 0.5],
+            "tp_hit": True,
+            "tp_done": True,
+            "sl_hit": False,
+            "sl_r": None,
+            "next_action": "TAKE_PROFIT",
+            "progress_pct_of_goal": 1.1,
+            "progress_pct_of_max": 0.8,
+            "progress": {
+                "pct_of_goal": 1.1,
+                "pct_of_max_profit_or_r": 0.8,
+            },
+            "exit_as_unit": True,
+        },
+    }
+
+    def _fake_evaluation(*_: object) -> PlaybookEvaluation:
+        return PlaybookEvaluation(combo_targets=combo_targets, leg_targets={}, meta={})
+
+    monkeypatch.setattr(
+        "positions_engine.service.state.evaluate_playbook_targets",
+        _fake_evaluation,
+    )
+
+    detection = ComboDetection(combos=(combo_one, combo_two), orphans=(), detection_ms=0.0)
+    state = PositionsState()
+    now = datetime(2025, 5, 1, tzinfo=UTC)
+    state._options_cache = {
+        "positions_version": state._positions_version,
+        "quotes_version": state._quotes_version,
+        "day": now.date(),
+        "detection": detection,
+    }
+
+    payload = state.options_payload(now=now)
+    combo_groups = payload["combo_groups"]
+    assert len(combo_groups) == 1
+    group_payload = combo_groups[0]
+    assert group_payload["tp_band_pct"] == [0.25, 0.5]
+    assert group_payload["tp_band_low_pct"] == 0.25
+    assert group_payload["tp_band_high_pct"] == 0.5
+    assert group_payload["tp_hit"] is True
+    assert group_payload["tp_done"] is True
+    assert group_payload["sl_hit"] is False
+    assert group_payload["sl_r"] == pytest.approx(1.0)
+    assert group_payload["next_action"] == "TRIM"
+    assert group_payload["exit_as_unit"] is True
+    assert group_payload["progress_pct_of_goal"] == pytest.approx(0.8)
+    assert group_payload["progress_pct_of_max"] == pytest.approx(0.55)
+    assert group_payload["progress"]["pct_of_goal"] == pytest.approx(0.8)
+    assert group_payload["progress"]["pct_of_max_profit_or_r"] == pytest.approx(0.55)

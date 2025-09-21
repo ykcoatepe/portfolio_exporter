@@ -1,13 +1,12 @@
-from __future__ import annotations
-
 """Validate mark source aggregation prefers MID over LAST over PREV for combo legs."""
+
+from __future__ import annotations
 
 from collections.abc import Sequence
 from decimal import Decimal
 from itertools import permutations
 
 import pytest
-
 from positions_engine.combos import (
     ComboStrategy,
     OptionCombo,

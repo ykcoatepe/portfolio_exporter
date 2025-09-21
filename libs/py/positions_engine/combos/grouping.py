@@ -5,10 +5,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from .detector import OptionCombo, OptionLegSnapshot
 from .taxonomy import ComboStrategy
@@ -339,13 +340,27 @@ def _combo_net_quantity(combo: OptionCombo) -> Decimal:
     """Return +1 for debit (long) combos, -1 for credit (short) combos, else 0."""
 
     net_price = combo.net_price
-    if net_price is None:
+    if net_price is not None:
+        if net_price < ZERO:
+            return Decimal("1")
+        if net_price > ZERO:
+            return Decimal("-1")
+
+    fallback_sign: Decimal | None = None
+    fallback_magnitude: Decimal | None = None
+    for leg in combo.legs:
+        quantity = leg.quantity
+        if quantity is None or quantity == ZERO:
+            continue
+        if fallback_sign is None:
+            fallback_sign = Decimal("1") if quantity > ZERO else Decimal("-1")
+        magnitude = abs(quantity)
+        fallback_magnitude = magnitude if fallback_magnitude is None else min(fallback_magnitude, magnitude)
+    if fallback_sign is None:
         return ZERO
-    if net_price < ZERO:
-        return Decimal("1")
-    if net_price > ZERO:
-        return Decimal("-1")
-    return ZERO
+    if fallback_magnitude is None or fallback_magnitude == ZERO:
+        fallback_magnitude = Decimal("1")
+    return fallback_sign * fallback_magnitude
 
 
 def _combo_mark_source(combo: OptionCombo) -> str:

@@ -27,7 +27,6 @@ from ..core.marks import MarkResult, MarkSettings, select_equity_mark
 from ..core.models import InstrumentType, Position, Quote, TradingSession
 from ..core.pnl import equity_pnl
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -191,6 +190,8 @@ class PositionsState:
                 payload.update(leg_fields)
             legs_payload.append(payload)
 
+        _merge_playbook_into_combo_groups(combo_groups_payload, combos_payload)
+
         result = {
             "as_of": _isoformat(as_of),
             "combos": combos_payload,
@@ -348,6 +349,8 @@ class PositionsState:
                         leg_payload.update(leg_fields)
             combos_view.append(combo_payload)
 
+        _merge_playbook_into_combo_groups(combo_groups_payload, combos_view)
+
         single_options_view: list[dict[str, Any]] = []
         for leg in detection.orphans:
             leg_payload = _option_leg_view_from_detection(leg)
@@ -476,6 +479,174 @@ def _positions_view_has_rows(view: dict[str, Any] | None) -> bool:
         if isinstance(entries, list) and len(entries) > 0:
             return True
     return False
+
+
+def _coerce_float(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(result):
+        return None
+    return result
+
+
+class _GroupPlaybookAccumulator:
+    """Aggregate combo playbook metrics for a combo group."""
+
+    __slots__ = (
+        "tp_band_low_pct",
+        "tp_band_high_pct",
+        "tp_hit",
+        "tp_done",
+        "sl_hit",
+        "sl_r",
+        "next_action",
+        "exit_as_unit",
+        "progress_goal_sum",
+        "progress_goal_count",
+        "progress_max_sum",
+        "progress_max_count",
+    )
+
+    def __init__(self) -> None:
+        self.tp_band_low_pct: float | None = None
+        self.tp_band_high_pct: float | None = None
+        self.tp_hit = False
+        self.tp_done = False
+        self.sl_hit = False
+        self.sl_r: float | None = None
+        self.next_action: str | None = None
+        self.exit_as_unit = False
+        self.progress_goal_sum = 0.0
+        self.progress_goal_count = 0
+        self.progress_max_sum = 0.0
+        self.progress_max_count = 0
+
+    def consume(self, combo: dict[str, Any]) -> None:
+        band_low = _coerce_float(combo.get("tp_band_low_pct"))
+        band_high = _coerce_float(combo.get("tp_band_high_pct"))
+        band = combo.get("tp_band_pct")
+        if isinstance(band, (list, tuple)):
+            if band_low is None and len(band) >= 1:
+                band_low = _coerce_float(band[0])
+            if band_high is None and len(band) >= 2:
+                band_high = _coerce_float(band[1])
+        if band_low is not None and self.tp_band_low_pct is None:
+            self.tp_band_low_pct = band_low
+        if band_high is not None and self.tp_band_high_pct is None:
+            self.tp_band_high_pct = band_high
+
+        if combo.get("tp_hit"):
+            self.tp_hit = True
+        if combo.get("tp_done"):
+            self.tp_done = True
+        if combo.get("sl_hit"):
+            self.sl_hit = True
+
+        sl_r_value = _coerce_float(combo.get("sl_r"))
+        if self.sl_r is None and sl_r_value is not None:
+            self.sl_r = sl_r_value
+
+        next_action_value = combo.get("next_action")
+        if isinstance(next_action_value, str):
+            action = next_action_value.strip().upper()
+            if action:
+                current = self.next_action
+                if current and current != "HOLD":
+                    pass
+                elif action == "HOLD":
+                    if current is None:
+                        self.next_action = "HOLD"
+                else:
+                    self.next_action = action
+
+        if combo.get("exit_as_unit"):
+            self.exit_as_unit = True
+
+        progress_value = combo.get("progress")
+        progress_dict = progress_value if isinstance(progress_value, dict) else None
+        goal_value: Any = combo.get("progress_pct_of_goal")
+        if goal_value is None and progress_dict is not None:
+            goal_value = progress_dict.get("pct_of_goal")
+        goal_float = _coerce_float(goal_value)
+        if goal_float is not None:
+            self.progress_goal_sum += goal_float
+            self.progress_goal_count += 1
+
+        max_value: Any = combo.get("progress_pct_of_max")
+        if max_value is None and progress_dict is not None:
+            max_value = progress_dict.get("pct_of_max_profit_or_r")
+        max_float = _coerce_float(max_value)
+        if max_float is not None:
+            self.progress_max_sum += max_float
+            self.progress_max_count += 1
+
+    def apply(self, target: dict[str, Any]) -> None:
+        band_low = self.tp_band_low_pct
+        band_high = self.tp_band_high_pct
+        target["tp_band_low_pct"] = band_low
+        target["tp_band_high_pct"] = band_high
+        target["tp_band_pct"] = [band_low, band_high] if band_low is not None and band_high is not None else None
+        target["tp_hit"] = self.tp_hit
+        target["tp_done"] = self.tp_done
+        target["sl_hit"] = self.sl_hit
+        target["sl_r"] = self.sl_r
+        target["exit_as_unit"] = self.exit_as_unit
+        action = self.next_action
+        if action == "HOLD":
+            action = None
+        target["next_action"] = action
+        goal_avg = self._average(self.progress_goal_sum, self.progress_goal_count)
+        max_avg = self._average(self.progress_max_sum, self.progress_max_count)
+        target["progress_pct_of_goal"] = goal_avg
+        target["progress_pct_of_max"] = max_avg
+        target["progress"] = {
+            "pct_of_goal": goal_avg,
+            "pct_of_max_profit_or_r": max_avg,
+        }
+
+    @staticmethod
+    def _average(total: float, count: int) -> float | None:
+        if count <= 0:
+            return None
+        value = total / count
+        if not math.isfinite(value):
+            return None
+        return value
+
+
+def _merge_playbook_into_combo_groups(
+    combo_groups: list[dict[str, Any]],
+    combos: Iterable[dict[str, Any]],
+) -> None:
+    if not combo_groups:
+        return
+    group_lookup = {
+        group.get("combo_group_id"): group
+        for group in combo_groups
+        if isinstance(group, dict) and isinstance(group.get("combo_group_id"), str)
+    }
+    if not group_lookup:
+        return
+    accumulators: dict[str, _GroupPlaybookAccumulator] = {}
+    for combo in combos:
+        if not isinstance(combo, dict):
+            continue
+        group_id = combo.get("combo_group_id")
+        if not isinstance(group_id, str):
+            continue
+        if group_id not in group_lookup:
+            continue
+        accumulator = accumulators.setdefault(group_id, _GroupPlaybookAccumulator())
+        accumulator.consume(combo)
+    for group_id, accumulator in accumulators.items():
+        group_payload = group_lookup.get(group_id)
+        if group_payload is None:
+            continue
+        accumulator.apply(group_payload)
 
 
 def _sanitize_positions_view(view: dict[str, Any]) -> dict[str, Any]:
