@@ -1,0 +1,177 @@
+version: 1
+updated_at: '2025-09-19T10:16:33.863928+00:00'
+updated_by: null
+rules:
+- rule_id: risk-bands-vix-low
+  name: Risk bands respected (VIX <=20)
+  severity: CRITICAL
+  scope: PORT
+  filter: vix <= 20
+  expr: (delta_beta < 0.45 or delta_beta > 0.60) or (var95_1d_pct > 0.9) or
+    (margin_used_pct > 70)
+  enabled: true
+- rule_id: risk-bands-vix-mid
+  name: Risk bands respected (20 < VIX <=30)
+  severity: CRITICAL
+  scope: PORT
+  filter: vix > 20 and vix <= 30
+  expr: (delta_beta < 0.40 or delta_beta > 0.55) or (var95_1d_pct > 0.8) or
+    (margin_used_pct > 60)
+  enabled: true
+- rule_id: risk-bands-vix-high
+  name: Risk bands respected (VIX >30)
+  severity: CRITICAL
+  scope: PORT
+  filter: vix > 30
+  expr: (delta_beta < 0.35 or delta_beta > 0.50) or (var95_1d_pct > 0.7) or
+    (margin_used_pct > 50)
+  enabled: true
+- rule_id: port-liquidity-min
+  name: Liquidity >=12% NAV
+  severity: WARNING
+  scope: PORT
+  filter: 'true'
+  expr: liquidity_nav_pct < 12
+  enabled: true
+- rule_id: cap-index-treas
+  name: 'Per-name cap: Index/Treas ETF <=10%'
+  severity: CRITICAL
+  scope: UL
+  filter: bucket == 'IndexTreasETF'
+  expr: ul_nav_pct > 10
+  enabled: true
+- rule_id: cap-large-mega
+  name: 'Per-name cap: Large/Mega <=5%'
+  severity: CRITICAL
+  scope: UL
+  filter: bucket == 'LargeMega'
+  expr: ul_nav_pct > 5
+  enabled: true
+- rule_id: cap-small-spec
+  name: 'Per-name cap: Small/Spec <=3%'
+  severity: CRITICAL
+  scope: UL
+  filter: bucket == 'SmallSpec'
+  expr: ul_nav_pct > 3
+  enabled: true
+- rule_id: cap-spy-gld
+  name: SPY/GLD thesis cap <=8%
+  severity: WARNING
+  scope: UL
+  filter: bucket == 'SPY_GLD_thesis'
+  expr: ul_nav_pct > 8
+  enabled: true
+- rule_id: sleeve-theta-ceiling
+  name: Options theta sleeve <=20% NAV
+  severity: WARNING
+  scope: PORT
+  filter: 'true'
+  expr: options_theta_nav_pct > 20
+  enabled: true
+- rule_id: condor-guard-vix-low
+  name: 'Condors: 45-60 DTE when VIX<15'
+  severity: INFO
+  scope: COMBO
+  filter: strategy == 'IRON_CONDOR' and vix < 15
+  expr: (dte < 45 or dte > 60) or (sum_delta < -0.15 or sum_delta > 0.15)
+  enabled: true
+- rule_id: condor-guard-vix-mid
+  name: 'Condors/put spreads: 30-45 DTE when 15<=VIX<=25'
+  severity: INFO
+  scope: COMBO
+  filter: (strategy == 'IRON_CONDOR' or strategy == 'PUT_SPREAD') and vix >= 15 and
+    vix <= 25
+  expr: (dte < 30 or dte > 45) or (sum_delta < -0.20 or sum_delta > 0.20)
+  enabled: true
+- rule_id: condor-guard-vix-high
+  name: Defined-risk only; 14-30 DTE when VIX>25
+  severity: WARNING
+  scope: COMBO
+  filter: vix > 25
+  expr: (dte < 14 or dte > 30) or (is_defined_risk != true)
+  enabled: true
+- rule_id: exit-as-unit
+  name: Exit as a unit - no orphan legs
+  severity: CRITICAL
+  scope: COMBO
+  filter: 'true'
+  expr: all_legs_present != true
+  enabled: true
+- rule_id: option-spread-10pct
+  name: Bid/ask spread <=10% of mid
+  severity: WARNING
+  scope: LEG
+  filter: bid > 0 and ask > 0
+  expr: (ask - bid) / ((bid + ask) / 2) > 0.10
+  enabled: true
+- rule_id: event-half-size
+  name: Event within life -> half size
+  severity: WARNING
+  scope: COMBO
+  filter: next_earnings_within_dte == true or has_macro_event_tag == true
+  expr: position_size_pct > baseline_size_pct * 0.5
+  enabled: true
+- rule_id: microcap-sleeve-cap
+  name: Micro-cap sleeve <=5% NAV
+  severity: CRITICAL
+  scope: PORT
+  filter: 'true'
+  expr: microcap_nav_pct > 5
+  enabled: true
+- rule_id: microcap-trade-cap
+  name: Micro-cap per-trade <=1% NAV
+  severity: CRITICAL
+  scope: UL
+  filter: bucket == 'MicroCap'
+  expr: trade_nav_pct > 1
+  enabled: true
+- rule_id: microcap-entry-filters
+  name: 'Micro-cap entry: gap>5%, RVOL>3, float<200M, borrowable'
+  severity: WARNING
+  scope: UL
+  filter: bucket == 'MicroCap'
+  expr: (premarket_gap_pct < 5) or (rvol < 3) or (float_millions >= 200) or
+    (is_borrowable != true)
+  enabled: true
+- rule_id: breaker-freeze-1_5
+  name: <= -1.5% day -> freeze new trades 1D
+  severity: CRITICAL
+  scope: PORT
+  filter: 'true'
+  expr: (day_pnl_nav_pct <= -1.5) and (trading_frozen_1d != true)
+  enabled: true
+- rule_id: breaker-cut-var-2_5
+  name: <= -2.5% day -> cut top-15% VaR
+  severity: CRITICAL
+  scope: PORT
+  filter: 'true'
+  expr: (day_pnl_nav_pct <= -2.5) and (pct_cut_top_var < 15)
+  enabled: true
+- rule_id: breaker-month-dd-4
+  name: Month DD >= -4% -> halt new risk
+  severity: CRITICAL
+  scope: PORT
+  filter: 'true'
+  expr: (month_dd_nav_pct <= -4) and (new_risk_halted != true)
+  enabled: true
+- rule_id: naked-short-hedge
+  name: Naked short -> hedge/close now
+  severity: CRITICAL
+  scope: PORT
+  filter: has_naked_short == true
+  expr: naked_short_hedged != true
+  enabled: true
+- rule_id: leg-iv-present-near
+  name: Near-term legs (<=5 DTE) must have IV
+  severity: INFO
+  scope: LEG
+  filter: dte <= 5
+  expr: iv is null
+  enabled: true
+- rule_id: oco-attached
+  name: OCO attached on new trades (<=1d)
+  severity: WARNING
+  scope: COMBO
+  filter: opened_within_days <= 1
+  expr: (has_stop != true) or (has_target != true)
+  enabled: true

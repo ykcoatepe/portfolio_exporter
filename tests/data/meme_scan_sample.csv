@@ -1,0 +1,4 @@
+symbol,price,volume,rel_strength,short_interest,turnover,iv_rank,atr_pct,trend
+ABC,100,50000,65,8,2.0,30,2.5,0.4
+XYZ,15,15000,45,5,1.0,70,3.0,-0.2
+

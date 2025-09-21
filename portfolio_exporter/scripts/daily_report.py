@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -14,19 +12,20 @@ import pandas as pd
 from rich.console import Console
 
 from portfolio_exporter.core import cli as cli_helpers
-from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core import io as core_io
+from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core.config import settings
 
 try:  # optional dependency for PDF output
-    from reportlab.platypus import (
-        SimpleDocTemplate,
-        Table as RLTable,
-        Paragraph,
-        PageBreak,
-    )
     from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import (
+        PageBreak,
+        Paragraph,
+        SimpleDocTemplate,
+    )
+    from reportlab.platypus import (
+        Table as RLTable,
+    )
 except Exception:  # pragma: no cover - optional
     (
         SimpleDocTemplate,
@@ -39,6 +38,7 @@ except Exception:  # pragma: no cover - optional
 
 # ---------------------------------------------------------------------------
 # data loaders & helpers
+
 
 def _load_csv(name: str) -> pd.DataFrame:
     path = core_io.latest_file(name)
@@ -63,9 +63,7 @@ def _prep_positions(df: pd.DataFrame, since: str | None, until: str | None) -> p
     cols = ["underlying", "right", "strike", "expiry", "qty"]
     greek_cols = [c for c in ["delta", "gamma", "vega", "theta"] if c in df.columns]
     exposure_cols = [
-        c
-        for c in ["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]
-        if c in df.columns
+        c for c in ["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"] if c in df.columns
     ]
     keep = [c for c in cols + greek_cols + exposure_cols if c in df.columns]
     return df[keep]
@@ -131,14 +129,10 @@ def _expiry_radar(
     if df.empty:
         return result
     delta_col = (
-        "delta_exposure"
-        if "delta_exposure" in df.columns
-        else "delta" if "delta" in df.columns else None
+        "delta_exposure" if "delta_exposure" in df.columns else "delta" if "delta" in df.columns else None
     )
     theta_col = (
-        "theta_exposure"
-        if "theta_exposure" in df.columns
-        else "theta" if "theta" in df.columns else None
+        "theta_exposure" if "theta_exposure" in df.columns else "theta" if "theta" in df.columns else None
     )
     rows: list[dict[str, Any]] = []
     for date, grp in df.groupby(df["expiry_dt"].dt.date):
@@ -181,9 +175,7 @@ def _theta_decay_5d(df: pd.DataFrame) -> float:
     if df.empty:
         return 0.0
     theta_col = (
-        "theta_exposure"
-        if "theta_exposure" in df.columns
-        else "theta" if "theta" in df.columns else None
+        "theta_exposure" if "theta_exposure" in df.columns else "theta" if "theta" in df.columns else None
     )
     if theta_col is None:
         return 0.0
@@ -226,47 +218,33 @@ def _build_html(
             for r in rows:
                 r = r.copy()
                 if "by_structure" in r:
-                    r["by_structure"] = "; ".join(
-                        f"{k}: {v}" for k, v in r["by_structure"].items()
-                    )
+                    r["by_structure"] = "; ".join(f"{k}: {v}" for k, v in r["by_structure"].items())
                 tab_rows.append(r)
             sec_parts.append(pd.DataFrame(tab_rows).to_html(index=False))
         else:
             sec_parts.append("<p>No expiries within window.</p>")
         parts.append('<section class="card">' + "".join(sec_parts) + "</section>")
     if delta_buckets is not None:
-        db_df = pd.DataFrame({
-            "bucket": list(delta_buckets.keys()),
-            "count": list(delta_buckets.values()),
-        })
+        db_df = pd.DataFrame(
+            {
+                "bucket": list(delta_buckets.keys()),
+                "count": list(delta_buckets.values()),
+            }
+        )
         parts.append(
-            '<section class="card"><h2>Delta Buckets</h2>'
-            + db_df.to_html(index=False)
-            + "</section>"
+            '<section class="card"><h2>Delta Buckets</h2>' + db_df.to_html(index=False) + "</section>"
         )
     if theta_decay_5d is not None:
         parts.append(
-            '<section class="card"><h2>Theta Decay 5d</h2>'
-            + f"<p>{theta_decay_5d}</p>"
-            + "</section>"
+            '<section class="card"><h2>Theta Decay 5d</h2>' + f"<p>{theta_decay_5d}</p>" + "</section>"
         )
     if not totals.empty:
-        parts.append(
-            '<section class="card"><h2>Totals</h2>'
-            + totals.to_html(index=False)
-            + "</section>"
-        )
+        parts.append('<section class="card"><h2>Totals</h2>' + totals.to_html(index=False) + "</section>")
     if not combos.empty:
-        parts.append(
-            '<section class="card"><h2>Combos</h2>'
-            + combos.to_html(index=False)
-            + "</section>"
-        )
+        parts.append('<section class="card"><h2>Combos</h2>' + combos.to_html(index=False) + "</section>")
     if not positions.empty:
         parts.append(
-            '<section class="card"><h2>Positions</h2>'
-            + positions.to_html(index=False)
-            + "</section>"
+            '<section class="card"><h2>Positions</h2>' + positions.to_html(index=False) + "</section>"
         )
     parts.append("</body></html>")
     return "\n".join(parts)
@@ -303,9 +281,7 @@ def _build_pdf_flowables(
             for r in rows:
                 r = r.copy()
                 if "by_structure" in r:
-                    r["by_structure"] = ", ".join(
-                        f"{k}: {v}" for k, v in r["by_structure"].items()
-                    )
+                    r["by_structure"] = ", ".join(f"{k}: {v}" for k, v in r["by_structure"].items())
                 tab_rows.append(r)
             df_r = pd.DataFrame(tab_rows)
             flow.append(RLTable([df_r.columns.tolist()] + df_r.values.tolist()))
@@ -313,10 +289,12 @@ def _build_pdf_flowables(
             flow.append(Paragraph("No expiries within window.", styles["Normal"]))
     if delta_buckets is not None:
         flow.append(Paragraph("Delta Buckets", styles["Heading2"]))
-        df_b = pd.DataFrame({
-            "bucket": list(delta_buckets.keys()),
-            "count": list(delta_buckets.values()),
-        })
+        df_b = pd.DataFrame(
+            {
+                "bucket": list(delta_buckets.keys()),
+                "count": list(delta_buckets.values()),
+            }
+        )
         flow.append(RLTable([df_b.columns.tolist()] + df_b.values.tolist()))
     if theta_decay_5d is not None:
         flow.append(Paragraph("Theta Decay 5d", styles["Heading2"]))
@@ -396,7 +374,9 @@ def main(argv: list[str] | None = None) -> dict:
         # Provide an actionable hint when inputs are missing
         if missing_any:
             warnings.append("run: portfolio-greeks to generate latest CSVs")
-        summary = json_helpers.report_summary({}, outputs={}, warnings=warnings, meta={"script": "daily_report"})
+        summary = json_helpers.report_summary(
+            {}, outputs={}, warnings=warnings, meta={"script": "daily_report"}
+        )
         summary["ok"] = ok
         if args.json:
             cli_helpers.print_json(summary, quiet)
@@ -406,9 +386,7 @@ def main(argv: list[str] | None = None) -> dict:
 
     with RunLog(script="daily_report", args=vars(args), output_dir=outdir) as rl:
         with rl.time("load_data"):
-            positions = _prep_positions(
-                _load_csv("portfolio_greeks_positions"), args.since, args.until
-            )
+            positions = _prep_positions(_load_csv("portfolio_greeks_positions"), args.since, args.until)
             totals = _load_csv("portfolio_greeks_totals")
             combos_raw = _load_csv("portfolio_greeks_combos")
 
@@ -425,11 +403,7 @@ def main(argv: list[str] | None = None) -> dict:
         with rl.time("analytics"):
             combos = _prep_combos(combos_raw)
 
-            account = (
-                totals["account"].iloc[0]
-                if "account" in totals.columns and not totals.empty
-                else None
-            )
+            account = totals["account"].iloc[0] if "account" in totals.columns and not totals.empty else None
 
             # Expiry radar (exposed at top-level via meta back-compat)
             expiry_radar = None
@@ -444,9 +418,7 @@ def main(argv: list[str] | None = None) -> dict:
             # Pre-build HTML for HTML/PDF requests
             html_str = None
             # Locate stylesheet: prefer repo docs; fallback to packaged asset
-            theme_css = (
-                Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
-            )
+            theme_css = Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
             if not theme_css.exists():
                 theme_css = Path(__file__).resolve().parents[1] / "assets" / "theme.css"
             link_theme = theme_css.exists()

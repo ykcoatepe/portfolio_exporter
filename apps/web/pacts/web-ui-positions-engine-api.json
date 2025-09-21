@@ -1,0 +1,790 @@
+{
+  "consumer": {
+    "name": "web-ui"
+  },
+  "interactions": [
+    {
+      "description": "a request for option combos and legs",
+      "request": {
+        "headers": {
+          "accept": "application/json"
+        },
+        "method": "GET",
+        "path": "/positions/options"
+      },
+      "response": {
+        "body": {
+          "as_of": "2024-10-18T14:05:00.000Z",
+          "combos": [
+            {
+              "day_pnl_amount": 700,
+              "day_pnl_percent": 11.2,
+              "dte": 32,
+              "expiry": "2024-10-18",
+              "greeks": {
+                "delta": -0.04,
+                "gamma": 0.01,
+                "theta": -5.4,
+                "vega": -20.3
+              },
+              "id": "combo-iron-condor",
+              "legs": [
+                {
+                  "combo_id": "combo-iron-condor",
+                  "day_pnl_amount": 480,
+                  "day_pnl_percent": 12.4,
+                  "delta": 0.12,
+                  "expiry": "2024-10-18",
+                  "gamma": 0.01,
+                  "id": "leg-condor-short-call",
+                  "iv": 0.19,
+                  "mark_price": 1.05,
+                  "mark_source": "MID",
+                  "mark_time": "2024-10-18T14:02:00.000Z",
+                  "quantity": -10,
+                  "right": "C",
+                  "strike": 4600,
+                  "theta": -4.2,
+                  "total_pnl_amount": 1240,
+                  "total_pnl_percent": 18.1,
+                  "underlying": "SPX",
+                  "vega": -18.5
+                }
+              ],
+              "mark_price": 1.98,
+              "mark_source": "MID",
+              "mark_time": "2024-10-18T14:02:00.000Z",
+              "net_premium": 2.21,
+              "side": "credit",
+              "strategy": "Iron Condor",
+              "total_pnl_amount": 1850,
+              "total_pnl_percent": 24.8,
+              "underlying": "SPX"
+            }
+          ],
+          "legs": [
+            {
+              "combo_id": null,
+              "day_pnl_amount": 75,
+              "day_pnl_percent": 1.6,
+              "delta": -0.18,
+              "expiry": "2024-12-20",
+              "gamma": 0.01,
+              "id": "leg-orphan",
+              "iv": 0.27,
+              "mark_price": 6.1,
+              "mark_source": "MID",
+              "mark_time": "2024-12-20T14:12:00.000Z",
+              "quantity": -2,
+              "right": "C",
+              "strike": 360,
+              "theta": 1.2,
+              "total_pnl_amount": 210,
+              "total_pnl_percent": 5.1,
+              "underlying": "MSFT",
+              "vega": -9.8
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json; charset=utf-8"
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.as_of": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
+                  "match": "datetime"
+                }
+              ]
+            },
+            "$.combos": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.combos[*].day_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].day_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].dte": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].expiry": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d{4}-\\d{2}-\\d{2}"
+                }
+              ]
+            },
+            "$.combos[*].greeks": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].greeks.delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].greeks.gamma": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].greeks.theta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].greeks.vega": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].legs": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.combos[*].legs[*].combo_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].day_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].day_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].expiry": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d{4}-\\d{2}-\\d{2}"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].gamma": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].iv": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].mark_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].mark_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "MID|LAST|PREV"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].mark_time": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
+                  "match": "datetime"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].quantity": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].right": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "C|P"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].strike": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].theta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].total_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].total_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].underlying": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].vega": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].mark_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].mark_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "MID|LAST|PREV"
+                }
+              ]
+            },
+            "$.combos[*].mark_time": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
+                  "match": "datetime"
+                }
+              ]
+            },
+            "$.combos[*].net_premium": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].side": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "credit|debit"
+                }
+              ]
+            },
+            "$.combos[*].strategy": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].total_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].total_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].underlying": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.legs": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.legs[*].combo_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "null"
+                }
+              ]
+            },
+            "$.legs[*].day_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].day_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].expiry": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d{4}-\\d{2}-\\d{2}"
+                }
+              ]
+            },
+            "$.legs[*].gamma": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.legs[*].iv": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].mark_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].mark_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "MID|LAST|PREV"
+                }
+              ]
+            },
+            "$.legs[*].mark_time": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
+                  "match": "datetime"
+                }
+              ]
+            },
+            "$.legs[*].quantity": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].right": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "C|P"
+                }
+              ]
+            },
+            "$.legs[*].strike": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].theta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].total_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].total_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].underlying": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.legs[*].vega": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a request for stock positions",
+      "request": {
+        "headers": {
+          "accept": "application/json"
+        },
+        "method": "GET",
+        "path": "/positions/stocks"
+      },
+      "response": {
+        "body": {
+          "as_of": "2024-08-21T15:00:00.000Z",
+          "data": [
+            {
+              "average_price": 150.12,
+              "currency": "USD",
+              "day_pnl_amount": 125.98,
+              "day_pnl_percent": 1.23,
+              "exposure": 1500.43,
+              "mark_price": 151.42,
+              "mark_source": "MID",
+              "mark_time": "2024-08-21T14:05:00.000Z",
+              "quantity": 10.5,
+              "symbol": "AAPL",
+              "total_pnl_amount": 512.78,
+              "total_pnl_percent": 5.12
+            }
+          ]
+        },
+        "headers": {
+          "Content-Type": "application/json; charset=utf-8"
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.as_of": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
+                  "match": "datetime"
+                }
+              ]
+            },
+            "$.data": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.data[*].average_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].currency": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.data[*].day_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].day_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].exposure": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].mark_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].mark_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "MID|LAST|PREV"
+                }
+              ]
+            },
+            "$.data[*].mark_time": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "format": "yyyy-MM-dd'T'HH:mm:ss.SSSxxx",
+                  "match": "datetime"
+                }
+              ]
+            },
+            "$.data[*].quantity": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].symbol": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.data[*].total_pnl_amount": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.data[*].total_pnl_percent": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-js": {
+      "version": "15.0.1"
+    },
+    "pactRust": {
+      "ffi": "0.4.28",
+      "models": "1.3.5"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "positions-engine-api"
+  }
+}

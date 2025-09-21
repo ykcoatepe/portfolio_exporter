@@ -3,14 +3,15 @@ ib.py - Centralized IBKR connection and data fetching.
 """
 
 import logging
-from typing import List, Optional, Set, Tuple, Dict, Any
-from datetime import datetime
 import os
 import time
+from datetime import datetime
+from typing import Any
 
+import numpy as np
 import pandas as pd
 import yfinance as yf
-from ib_insync import IB, Contract, Option, Stock, Index, Future, Ticker, Position, util
+from ib_insync import IB, Contract, Future, Index, Option, Stock
 
 try:
     from pandas_datareader import data as web
@@ -21,14 +22,12 @@ except ImportError:
 
 # --- Configuration ---
 IB_HOST = "127.0.0.1"
-IB_PORT = 7497
+IB_PORT = 7496  # use 7497 for paper/sim
 # Use a dedicated client ID for this utility module
 CLIENT_ID = 20
 
 # --- Logging ---
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 log = logging.getLogger(__name__)
 
 # Silence noisy ib_insync logs
@@ -39,9 +38,7 @@ for logger_name in ("ib_insync.client", "ib_insync.wrapper", "ib_insync.ib"):
 class IBManager:
     """A context manager for handling IBKR connections."""
 
-    def __init__(
-        self, host: str = IB_HOST, port: int = IB_PORT, client_id: int = CLIENT_ID
-    ):
+    def __init__(self, host: str = IB_HOST, port: int = IB_PORT, client_id: int = CLIENT_ID):
         self.ib = IB()
         self.host = host
         self.port = port
@@ -88,12 +85,8 @@ def get_positions(ib: IB) -> pd.DataFrame:
                 "position": p.position,
                 "avg_cost": p.avgCost,
                 "mark_price": mark_price,
-                "market_value": p.position
-                * mark_price
-                * float(p.contract.multiplier or 1),
-                "unrealized_pnl": (mark_price - p.avgCost)
-                * p.position
-                * float(p.contract.multiplier or 1),
+                "market_value": p.position * mark_price * float(p.contract.multiplier or 1),
+                "unrealized_pnl": (mark_price - p.avgCost) * p.position * float(p.contract.multiplier or 1),
             }
         )
 
@@ -115,8 +108,7 @@ def load_ib_positions_ib(ib: IB) -> pd.DataFrame:
     if not positions:
         ib.disconnect()
         raise RuntimeError(
-            "API returned no positions. Confirm account is logged in and the "
-            "API user has permissions."
+            "API returned no positions. Confirm account is logged in and the API user has permissions."
         )
 
     contracts = [p.contract for p in positions]
@@ -167,9 +159,7 @@ def _tickers_from_ib(ib: IB) -> list[str]:
     if not positions:
         return []
     # extract underlying symbol for stocks only
-    tickers = {
-        p.contract.symbol.upper() for p in positions if p.contract.secType == "STK"
-    }
+    tickers = {p.contract.symbol.upper() for p in positions if p.contract.secType == "STK"}
     return sorted(tickers)
 
 
@@ -197,10 +187,10 @@ def load_tickers(ib: IB) -> list[str]:
     return sorted(set(mapped + EXTRA_TICKERS))
 
 
-def get_option_positions(ib: IB) -> Tuple[List[Option], Set[str]]:
+def get_option_positions(ib: IB) -> tuple[list[Option], set[str]]:
     """Return option contracts in the IBKR account and their underlying symbols."""
-    opt_cons: List[Option] = []
-    underlyings: Set[str] = set()
+    opt_cons: list[Option] = []
+    underlyings: set[str] = set()
     for pos in ib.positions():
         c = pos.contract
         if getattr(c, "secType", "") == "OPT":
@@ -209,10 +199,10 @@ def get_option_positions(ib: IB) -> Tuple[List[Option], Set[str]]:
     return opt_cons, underlyings
 
 
-def fetch_ib_quotes(ib: IB, tickers: List[str], opt_cons: List[Option]) -> pd.DataFrame:
+def fetch_ib_quotes(ib: IB, tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     """Return DataFrame of quotes for symbols IB can serve; missing ones flagged NaN."""
-    combined_rows: List[Dict] = []
-    reqs: Dict[str, Any] = {}
+    combined_rows: list[dict] = []
+    reqs: dict[str, Any] = {}
 
     for tk in tickers:
         if tk.endswith("=F") or tk in YIELD_MAP:
@@ -247,40 +237,14 @@ def fetch_ib_quotes(ib: IB, tickers: List[str], opt_cons: List[Option]) -> pd.Da
         combined_rows.append(
             {
                 "ticker": key,
-                "last": (
-                    md.last / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.last
-                    else md.last
-                ),
-                "bid": (
-                    md.bid / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid
-                    else md.bid
-                ),
-                "ask": (
-                    md.ask / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask
-                    else md.ask
-                ),
-                "open": (
-                    md.open / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open
-                    else md.open
-                ),
-                "high": (
-                    md.high / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high
-                    else md.high
-                ),
-                "low": (
-                    md.low / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low
-                    else md.low
-                ),
+                "last": (md.last / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.last else md.last),
+                "bid": (md.bid / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid else md.bid),
+                "ask": (md.ask / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask else md.ask),
+                "open": (md.open / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open else md.open),
+                "high": (md.high / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high else md.high),
+                "low": (md.low / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low else md.low),
                 "prev_close": (
-                    md.close / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close
-                    else md.close
+                    md.close / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close else md.close
                 ),
                 "volume": md.volume,
                 "source": "IB",
@@ -291,7 +255,7 @@ def fetch_ib_quotes(ib: IB, tickers: List[str], opt_cons: List[Option]) -> pd.Da
     return pd.DataFrame(combined_rows)
 
 
-def fetch_yf_quotes(tickers: List[str]) -> pd.DataFrame:
+def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
     rows = []
     for t in tickers:
         if t in YIELD_MAP:
@@ -337,7 +301,7 @@ def fetch_yf_quotes(tickers: List[str]) -> pd.DataFrame:
     return df
 
 
-def fetch_fred_yields(tickers: List[str]) -> pd.DataFrame:
+def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
     if not FRED_AVAILABLE:
         return pd.DataFrame()
     rows = []
@@ -376,10 +340,10 @@ def fetch_live_positions(ib: IB) -> pd.DataFrame:
         log.warning("IB positions() failed: %s", e)
         return pd.DataFrame()
 
-    rows: List[Dict] = []
+    rows: list[dict] = []
     ts_now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
 
-    combo_counts: Dict[Tuple[str, str], int] = {}
+    combo_counts: dict[tuple[str, str], int] = {}
     for pos in positions:
         c = pos.contract
         if c.secType == "OPT":
@@ -419,16 +383,12 @@ def fetch_live_positions(ib: IB) -> pd.DataFrame:
         combo_legs_data = []
         if con.secType == "BAG" and con.comboLegs:
             for leg in con.comboLegs:
-                leg_contract = ib.qualifyContracts(
-                    Contract(conId=leg.conId, exchange=leg.exchange)
-                )[0]
+                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
                 combo_legs_data.append(
                     {
                         "symbol": leg_contract.symbol,
                         "sec_type": leg_contract.secType,
-                        "expiry": getattr(
-                            leg_contract, "lastTradeDateOrContractMonth", None
-                        ),
+                        "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
                         "strike": getattr(leg_contract, "strike", None),
                         "right": getattr(leg_contract, "right", None),
                         "ratio": leg.ratio,
@@ -499,9 +459,7 @@ def _parse_ib_month(dt_str: str) -> datetime:
     return datetime(1900, 1, 1)
 
 
-def _first_valid_expiry(
-    ib: IB, symbol: str, expirations: list[str], spot: float, root_tc: str
-) -> str:
+def _first_valid_expiry(ib: IB, symbol: str, expirations: list[str], spot: float, root_tc: str) -> str:
     """
     Return the first expiry whose chain has a *valid* ATM contract.
     Falls back to earliest expiry if none validate.
@@ -533,9 +491,7 @@ def front_future(ib: IB, root: str, exch: str) -> Future:
     details = ib.reqContractDetails(Future(root, exchange=exch))
     if not details:
         raise ValueError("no contract details")
-    for det in sorted(
-        details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)
-    ):
+    for det in sorted(details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)):
         dt = _parse_ib_month(det.contract.lastTradeDateOrContractMonth)
         if dt > datetime.utcnow():
             return det.contract

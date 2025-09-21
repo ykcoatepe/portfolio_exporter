@@ -184,7 +184,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 NAV_LOG = Path(os.path.join(OUTPUT_DIR, "nav_history.csv"))
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 11  # separate clientId from snapshots
+IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7496, 11  # separate clientId from snapshots (use 7497 for paper)
 
 # contract multipliers by secType (IB doesn't always fill this field)
 DEFAULT_MULT = {

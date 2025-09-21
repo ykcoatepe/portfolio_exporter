@@ -3,7 +3,7 @@ tech_scan.py  –  Ad-hoc technical-indicator exporter for arbitrary tickers.
 Usage (internal): run(tickers=["AAPL","SHOP"], fmt="csv")
 """
 
-from typing import Sequence
+from collections.abc import Sequence
 
 import pandas as pd
 import yfinance as yf
@@ -27,16 +27,14 @@ def _rsi(series: pd.Series, n: int = 14) -> pd.Series:
 
     # Avoid division by zero
     rs = gain / loss
-    rs.replace([float('inf'), -float('inf')], float('nan'), inplace=True)
+    rs.replace([float("inf"), -float("inf")], float("nan"), inplace=True)
     rs.fillna(0, inplace=True)
 
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
 
-def _macd(
-    series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9
-) -> pd.Series:
+def _macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.Series:
     ema_fast = series.ewm(span=fast, adjust=False).mean()
     ema_slow = series.ewm(span=slow, adjust=False).mean()
     macd = ema_fast - ema_slow

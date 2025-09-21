@@ -1,0 +1,37 @@
+{
+  "AAPL": {
+    "company": "Apple Inc.",
+    "market_cap": 2825000000000,
+    "pe": 29.4,
+    "next_earnings": "2024-10-24",
+    "dividend_yield": 0.0055
+  },
+  "MSFT": {
+    "company": "Microsoft Corp.",
+    "market_cap": 3120000000000,
+    "pe": 32.1,
+    "next_earnings": "2024-10-22",
+    "dividend_yield": 0.0087
+  },
+  "TSLA": {
+    "company": "Tesla Inc.",
+    "market_cap": 875000000000,
+    "pe": 68.9,
+    "next_earnings": "2024-10-18",
+    "dividend_yield": null
+  },
+  "GLD": {
+    "company": "SPDR Gold Shares",
+    "market_cap": 63000000000,
+    "pe": null,
+    "next_earnings": null,
+    "dividend_yield": 0.0175
+  },
+  "SPX": {
+    "company": "S&P 500 Index",
+    "market_cap": 42000000000000,
+    "pe": 22.8,
+    "next_earnings": null,
+    "dividend_yield": 0.014
+  }
+}

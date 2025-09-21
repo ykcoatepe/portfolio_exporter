@@ -1,0 +1,404 @@
+from __future__ import annotations
+
+from collections.abc import Iterable
+from datetime import date, datetime
+from typing import Any
+
+from .micro_momo_types import ChainRow, ScanRow, Structure
+from .micro_momo_utils import spread_pct
+
+
+def _calls_by_strike(chain: Iterable[Any]) -> dict[float, Any]:
+    out: dict[float, ChainRow] = {}
+    for r in chain:
+        right = _get(r, "right", "").upper()
+        if right == "C":
+            out[float(_get(r, "strike", 0.0))] = r
+    return dict(sorted(out.items()))
+
+
+def _pick_expiry(chain: list[Any]) -> str | None:
+    if not chain:
+        return None
+    # v1: single-file chain often has one expiry; just pick the first by sort
+    expiries = sorted({_get(r, "expiry") for r in chain if _get(r, "expiry")})
+    return expiries[0] if expiries else None
+
+
+def _dte(expiry_yyyymmdd: str, today: date) -> int:
+    try:
+        dt = datetime.strptime(expiry_yyyymmdd, "%Y%m%d").date()
+        return max(0, (dt - today).days)
+    except Exception:
+        return 0
+
+
+def _is_friday(expiry_yyyymmdd: str) -> bool:
+    try:
+        return datetime.strptime(expiry_yyyymmdd, "%Y%m%d").date().weekday() == 4
+    except Exception:
+        return False
+
+
+def _near_money_oi(chain: list[Any], spot: float, expiry: str, pct: float = 3.0) -> int:
+    lo = spot * (1.0 - pct / 100.0)
+    hi = spot * (1.0 + pct / 100.0)
+    tot = 0
+    for r in chain:
+        if _get(r, "expiry") != expiry:
+            continue
+        strike = float(_get(r, "strike", 0.0))
+        if lo <= strike <= hi:
+            tot += int(_get(r, "oi", 0))
+    return tot
+
+
+def _pick_expiry_by_dte(
+    chain: list[Any],
+    spot: float,
+    dte_min: int,
+    dte_max: int,
+    today: date | None = None,
+) -> str | None:
+    if not chain:
+        return None
+    today = today or date.today()
+    expiries = sorted({_get(r, "expiry") for r in chain if _get(r, "expiry")})
+    if not expiries:
+        return None
+
+    # Build candidates with DTE
+    ex_d = [(e, _dte(e, today)) for e in expiries]
+    in_win = [(e, d) for e, d in ex_d if dte_min <= d <= dte_max]
+    if in_win:
+        # Prefer higher near-money OI
+        in_win.sort(key=lambda t: (_near_money_oi(chain, spot, t[0]), -t[1]))
+        # highest OI last if we use ascending; switch to descending explicitly
+        best = sorted(in_win, key=lambda t: _near_money_oi(chain, spot, t[0]), reverse=True)[0][0]
+        return best
+
+    # Prefer nearest weekly strictly above max within 7 days
+    above = [(e, d) for e, d in ex_d if d > dte_max and (d - dte_max) <= 7]
+    if above:
+        # Prefer Friday expiries, then smallest DTE above max, then OI
+        def key_fn(t: tuple[str, int]):
+            e, d = t
+            return (
+                0 if _is_friday(e) else 1,
+                d - dte_max,
+                -_near_money_oi(chain, spot, e),
+            )
+
+        best = sorted(above, key=key_fn)[0][0]
+        return best
+
+    # Else nearest overall by absolute distance to mid-point of window
+    target = (dte_min + dte_max) / 2.0
+    best_any = min(ex_d, key=lambda t: abs(t[1] - target))[0]
+    return best_any
+
+
+def _nearest_otm_call(price: float, calls: dict[float, ChainRow]) -> ChainRow | None:
+    for strike, row in calls.items():
+        if strike >= price:
+            return row
+    # fall back to the highest strike if all are ITM by this simple rule
+    if calls:
+        return list(calls.values())[-1]
+    return None
+
+
+def _call_at_strike(strike: float, calls: dict[float, ChainRow]) -> ChainRow | None:
+    return calls.get(strike)
+
+
+def _get(r: Any, name: str, default: Any = None) -> Any:
+    return getattr(r, name, default) if not isinstance(r, dict) else r.get(name, default)
+
+
+def _mid(r: Any) -> float:
+    m = _get(r, "mid", None)
+    try:
+        if isinstance(m, (int, float)) and float(m) > 0:
+            return float(m)
+    except Exception:
+        pass
+    bid = float(_get(r, "bid", 0.0))
+    ask = float(_get(r, "ask", 0.0))
+    last = float(_get(r, "last", 0.0))
+    if bid > 0 and ask > 0:
+        return (bid + ask) / 2
+    if ask > 0:
+        return ask
+    if bid > 0:
+        return bid
+    return last
+
+
+def pick_bull_put_credit(
+    spot: float,
+    chain: list[Any],
+    expiry: str | None,
+    cfg: dict[str, object],
+) -> Structure:
+    if not chain or not expiry or spot <= 0:
+        return Structure(
+            template="Template",
+            expiry=expiry,
+            long_strike=None,
+            short_strike=None,
+            debit_or_credit=None,
+            width=None,
+            per_leg_oi_ok=False,
+            per_leg_spread_pct=None,
+            needs_chain=True,
+            limit_price=None,
+        )
+    min_oi = int(cfg.get("liquidity", {}).get("min_oi", 50))  # type: ignore[union-attr]
+    max_spread = float(cfg.get("options", {}).get("max_spread_pct", 0.25))  # type: ignore[union-attr]
+    credit_ratio = float(cfg.get("options", {}).get("credit_min_collect_ratio", 0.3))  # type: ignore[union-attr]
+
+    # Filter puts roughly near delta 0.2-0.25; if no delta, fallback to 5-15% OTM
+    puts = [r for r in chain if str(_get(r, "right", "")).upper().startswith("P")]
+    candidates: list[tuple[float, Any]] = []
+    for r in puts:
+        strike = float(_get(r, "strike", 0.0))
+        delta = _get(r, "delta", None)
+        if delta is not None:
+            d = abs(float(delta))
+            if 0.18 <= d <= 0.30:
+                candidates.append((strike, r))
+        else:
+            if spot * 0.85 <= strike <= spot * 0.97:
+                candidates.append((strike, r))
+    candidates.sort(key=lambda x: abs(x[0] - spot * 0.9))
+    if not candidates:
+        return Structure(
+            template="Template",
+            expiry=expiry,
+            long_strike=None,
+            short_strike=None,
+            debit_or_credit=None,
+            width=None,
+            per_leg_oi_ok=False,
+            per_leg_spread_pct=None,
+            needs_chain=True,
+            limit_price=None,
+        )
+    short_put = candidates[0][1]
+    # Long put 3-8% lower
+    long_target = float(_get(short_put, "strike", 0.0)) * 0.95
+    lp: Any | None = None
+    distance = float("inf")
+    for r in puts:
+        st = float(_get(r, "strike", 0.0))
+        if st < float(_get(short_put, "strike", 0.0)) and spot * 0.82 <= st <= spot * 0.97:
+            d = abs(st - long_target)
+            if d < distance:
+                lp, distance = r, d
+    if not lp:
+        return Structure(
+            template="Template",
+            expiry=expiry,
+            long_strike=None,
+            short_strike=None,
+            debit_or_credit=None,
+            width=None,
+            per_leg_oi_ok=False,
+            per_leg_spread_pct=None,
+            needs_chain=True,
+            limit_price=None,
+        )
+
+    # Check OI and spreads
+    sp1 = spread_pct(float(_get(short_put, "bid", 0.0)), float(_get(short_put, "ask", 0.0)))
+    sp2 = spread_pct(float(_get(lp, "bid", 0.0)), float(_get(lp, "ask", 0.0)))
+    per_leg_spread = None
+    if sp1 is not None and sp2 is not None:
+        per_leg_spread = max(sp1, sp2)
+    oi_ok = int(_get(short_put, "oi", 0)) >= min_oi and int(_get(lp, "oi", 0)) >= min_oi
+    spread_ok = per_leg_spread is not None and per_leg_spread <= max_spread
+
+    credit = max(
+        0.01,
+        float(_get(short_put, "mid", (_get(short_put, "bid", 0.0) + _get(short_put, "ask", 0.0)) / 2))
+        - float(_get(lp, "mid", (_get(lp, "bid", 0.0) + _get(lp, "ask", 0.0)) / 2)),
+    )
+    width = abs(float(_get(short_put, "strike", 0.0)) - float(_get(lp, "strike", 0.0)))
+    credit_ok = credit >= credit_ratio * width
+
+    return Structure(
+        template="BullPutCredit",
+        expiry=expiry,
+        long_strike=float(_get(lp, "strike", 0.0)),
+        short_strike=float(_get(short_put, "strike", 0.0)),
+        debit_or_credit="credit",
+        width=width,
+        per_leg_oi_ok=bool(oi_ok),
+        per_leg_spread_pct=per_leg_spread,
+        needs_chain=not (oi_ok and spread_ok and credit_ok),
+        limit_price=credit,
+    )
+
+
+def pick_structure(
+    scan: ScanRow,
+    chain: list[Any],
+    direction: str,  # "long" | "short"
+    cfg: dict[str, object],
+    tier: str | None = None,
+) -> Structure:
+    # Choose expiry using DTE smart selection
+    d_min = int(cfg.get("options", {}).get("dte_min", 3))  # type: ignore[union-attr]
+    d_max = int(cfg.get("options", {}).get("dte_max", 10))  # type: ignore[union-attr]
+    expiry = _pick_expiry_by_dte(chain, scan.price, d_min, d_max)
+    calls = _calls_by_strike(
+        [r for r in chain if hasattr(r, "right") or (isinstance(r, dict) and r.get("right"))]
+    )
+
+    min_width = float(cfg.get("options", {}).get("min_width", 5.0))  # type: ignore[union-attr]
+    min_oi = int(cfg.get("liquidity", {}).get("min_oi", 50))  # type: ignore[union-attr]
+    max_spread = float(cfg.get("options", {}).get("max_spread_pct", 0.25))  # type: ignore[union-attr]
+
+    if not expiry or not calls:
+        return Structure(
+            template="Template",
+            expiry=expiry,
+            long_strike=None,
+            short_strike=None,
+            debit_or_credit=None,
+            width=None,
+            per_leg_oi_ok=False,
+            per_leg_spread_pct=None,
+            needs_chain=True,
+            limit_price=None,
+        )
+
+    if direction == "long":
+        # Debit call: buy ATM/OTM call, sell higher strike call (vertical debit)
+        long_call = _nearest_otm_call(scan.price, calls)
+        if not long_call:
+            dc = Structure(
+                template="Template",
+                expiry=expiry,
+                long_strike=None,
+                short_strike=None,
+                debit_or_credit=None,
+                width=None,
+                per_leg_oi_ok=False,
+                per_leg_spread_pct=None,
+                needs_chain=True,
+                limit_price=None,
+            )
+            # B-tier alternative: Bull Put Credit when DebitCall not available
+            if tier == "B":
+                return pick_bull_put_credit(scan.price, chain, expiry, cfg)
+            return dc
+        # find short strike at least min_width above
+        short_strike = None
+        for strike in sorted(calls):
+            if strike >= float(_get(long_call, "strike", 0.0)) + min_width:
+                short_strike = strike
+                break
+        short_call = _call_at_strike(short_strike, calls) if short_strike else None
+        if not short_call:
+            dc = Structure(
+                template="Template",
+                expiry=expiry,
+                long_strike=float(_get(long_call, "strike", 0.0)),
+                short_strike=None,
+                debit_or_credit=None,
+                width=None,
+                per_leg_oi_ok=False,
+                per_leg_spread_pct=None,
+                needs_chain=True,
+                limit_price=None,
+            )
+            if tier == "B":
+                return pick_bull_put_credit(scan.price, chain, expiry, cfg)
+            return dc
+
+        leg_spreads = [
+            spread_pct(float(_get(long_call, "bid", 0.0)), float(_get(long_call, "ask", 0.0))),
+            spread_pct(float(_get(short_call, "bid", 0.0)), float(_get(short_call, "ask", 0.0))),
+        ]
+        # If any leg has no reliable spread, treat as failing spread check
+        per_leg_spread = None
+        if all(v is not None for v in leg_spreads):
+            per_leg_spread = max([v for v in leg_spreads if v is not None])  # type: ignore[arg-type]
+        oi_ok = int(_get(long_call, "oi", 0)) >= min_oi and int(_get(short_call, "oi", 0)) >= min_oi
+        spread_ok = per_leg_spread is not None and per_leg_spread <= max_spread
+        limit_price = max(0.01, _mid(long_call) - _mid(short_call))
+        dc_struct = Structure(
+            template="DebitCall",
+            expiry=expiry,
+            long_strike=float(_get(long_call, "strike", 0.0)),
+            short_strike=float(_get(short_call, "strike", 0.0)),
+            debit_or_credit="debit",
+            width=abs(float(_get(short_call, "strike", 0.0)) - float(_get(long_call, "strike", 0.0))),
+            per_leg_oi_ok=bool(oi_ok),
+            per_leg_spread_pct=per_leg_spread,
+            needs_chain=not (oi_ok and spread_ok),
+            limit_price=limit_price,
+        )
+        if dc_struct.needs_chain and tier == "B":
+            # Try Bull Put Credit as alternative when debit fails checks
+            return pick_bull_put_credit(scan.price, chain, expiry, cfg)
+        return dc_struct
+
+    # Short direction: bear call credit (sell OTM call, buy further OTM call)
+    short_call = _nearest_otm_call(scan.price, calls)
+    if not short_call:
+        return Structure(
+            template="Template",
+            expiry=expiry,
+            long_strike=None,
+            short_strike=None,
+            debit_or_credit=None,
+            width=None,
+            per_leg_oi_ok=False,
+            per_leg_spread_pct=None,
+            needs_chain=True,
+            limit_price=None,
+        )
+    long_protect = None
+    for strike in sorted(calls):
+        if strike >= float(_get(short_call, "strike", 0.0)) + min_width:
+            long_protect = calls[strike]
+            break
+    if not long_protect:
+        return Structure(
+            template="Template",
+            expiry=expiry,
+            long_strike=None,
+            short_strike=float(_get(short_call, "strike", 0.0)),
+            debit_or_credit=None,
+            width=None,
+            per_leg_oi_ok=False,
+            per_leg_spread_pct=None,
+            needs_chain=True,
+            limit_price=None,
+        )
+
+    leg_spreads2 = [
+        spread_pct(float(_get(short_call, "bid", 0.0)), float(_get(short_call, "ask", 0.0))),
+        spread_pct(float(_get(long_protect, "bid", 0.0)), float(_get(long_protect, "ask", 0.0))),
+    ]
+    per_leg_spread2 = None
+    if all(v is not None for v in leg_spreads2):
+        per_leg_spread2 = max([v for v in leg_spreads2 if v is not None])  # type: ignore[arg-type]
+    oi_ok2 = int(_get(short_call, "oi", 0)) >= min_oi and int(_get(long_protect, "oi", 0)) >= min_oi
+    spread_ok2 = per_leg_spread2 is not None and per_leg_spread2 <= max_spread
+    limit_price2 = max(0.01, _mid(short_call) - _mid(long_protect))
+    return Structure(
+        template="BearCallCredit",
+        expiry=expiry,
+        long_strike=float(_get(long_protect, "strike", 0.0)),
+        short_strike=float(_get(short_call, "strike", 0.0)),
+        debit_or_credit="credit",
+        width=abs(float(_get(long_protect, "strike", 0.0)) - float(_get(short_call, "strike", 0.0))),
+        per_leg_oi_ok=bool(oi_ok2),
+        per_leg_spread_pct=per_leg_spread2,
+        needs_chain=not (oi_ok2 and spread_ok2),
+        limit_price=limit_price2,
+    )

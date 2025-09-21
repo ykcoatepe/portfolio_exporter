@@ -1,0 +1,2 @@
+exec_id,perm_id,order_id,symbol,secType,Side,qty,price,datetime,Liquidation,lastLiquidity,OrderRef,underlying,side,side_sign,multiplier,cluster_id,pnl_leg
+1,1,1,AAPL,STK,BUY,1.0,10.0,2024-01-01 10:00:00,0,1,,AAPL,BUY,1,1.0,1,10.0

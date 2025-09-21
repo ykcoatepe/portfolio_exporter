@@ -1,0 +1,32 @@
+groups:
+  - name: psd
+    rules:
+      - alert: NoEvents
+        expr: rate(psd_stream_events_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PSD stream stopped emitting events"
+          description: |
+            No Server-Sent Events were emitted in the last 5 minutes.
+            Check psd-web and psd-ingestor processes.
+      - alert: StaleData
+        expr: psd_data_age_seconds > 60
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PSD data is stale"
+          description: |
+            Dashboard data has been older than 60 seconds for 2 minutes.
+            Verify ingestion and upstream data sources.
+      - alert: IngestSlow
+        expr: histogram_quantile(0.95, sum(rate(psd_ingest_tick_seconds_bucket[5m])) by (le)) > 1.5
+        labels:
+          severity: warning
+        annotations:
+          summary: "PSD ingestion is running slow"
+          description: |
+            The 95th percentile ingest tick duration exceeded 1.5 seconds.
+            Investigate load, network, or upstream data latency.

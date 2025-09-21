@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>PSD SSE Viewer</title>
+<style>
+  body {
+    font: 14px system-ui, sans-serif;
+    margin: 16px;
+  }
+  pre {
+    background: #111;
+    color: #eee;
+    padding: 12px;
+    border-radius: 8px;
+    max-height: 60vh;
+    overflow: auto;
+  }
+</style>
+<h1>PSD SSE Viewer</h1>
+<p>Listening on <code>/stream</code> …</p>
+<pre id="log"></pre>
+<script>
+  const log = (t) => {
+    const el = document.getElementById('log');
+    el.textContent += `${t}\n`;
+    el.scrollTop = el.scrollHeight;
+  };
+  const es = new EventSource('/stream');
+  ['snapshot', 'diff', 'breach', 'health', 'heartbeat', 'message'].forEach((ev) => {
+    es.addEventListener(ev, (e) => log(`[${ev}] ${e.data}`));
+  });
+  es.onerror = (e) => log(`[error] ${JSON.stringify(e)}`);
+</script>

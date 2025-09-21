@@ -1,0 +1,13 @@
+name: PSD Smoke
+
+on: [workflow_dispatch]
+
+jobs:
+  sse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSE check (staging)
+        run: |
+          chmod +x tools/check_sse.sh
+          tools/check_sse.sh "${{ secrets.PSD_SSE_URL }}" 3

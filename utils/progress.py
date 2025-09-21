@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Iterable, Iterator, TypeVar
+from collections.abc import Iterable, Iterator
+from typing import TypeVar
 
 from rich.console import Console
 from rich.progress import (

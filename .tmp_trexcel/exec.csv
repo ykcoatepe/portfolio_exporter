@@ -1,0 +1,2 @@
+exec_id,perm_id,order_id,symbol,secType,Side,qty,price,datetime,expiry,right,strike
+1,1,1,AAPL,OPT,BOT,1,1.0,2024-01-01T10:00:00,2024-02-16,C,150

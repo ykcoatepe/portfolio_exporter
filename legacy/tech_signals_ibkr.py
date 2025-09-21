@@ -108,7 +108,7 @@ RISK_FREE_RATE = 0.01
 DATA_DIR = "iv_history"
 os.makedirs(DATA_DIR, exist_ok=True)
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 1  # tweak if needed
+IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7496, 1  # tweak if needed (set 7497 for paper)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 

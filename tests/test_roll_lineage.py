@@ -37,15 +37,25 @@ def test_roll_lineage(tmp_path, monkeypatch):
         ],
         index=[1, 2],
     )
-    monkeypatch.setattr(portfolio_greeks, "_load_positions", lambda: df1)
-    combos1 = combo.detect_combos(portfolio_greeks._load_positions(), mode="all")
+
+    async def loader_one():
+        return df1
+
+    monkeypatch.setattr(portfolio_greeks, "_load_positions", loader_one)
+    monkeypatch.setattr(portfolio_greeks, "load_positions_sync", lambda: df1)
+    combos1 = combo.detect_combos(portfolio_greeks.load_positions_sync(), mode="all")
     parent_id = combos1.index[0]
 
     df2 = df1.copy()
     df2["expiry"] = "20240216"
     df2.index = [3, 4]
-    monkeypatch.setattr(portfolio_greeks, "_load_positions", lambda: df2)
-    combos2 = combo.detect_combos(portfolio_greeks._load_positions(), mode="all")
+
+    async def loader_two():
+        return df2
+
+    monkeypatch.setattr(portfolio_greeks, "_load_positions", loader_two)
+    monkeypatch.setattr(portfolio_greeks, "load_positions_sync", lambda: df2)
+    combos2 = combo.detect_combos(portfolio_greeks.load_positions_sync(), mode="all")
     child_id = combos2.index[0]
 
     assert combos2.loc[child_id, "parent_combo_id"] == parent_id

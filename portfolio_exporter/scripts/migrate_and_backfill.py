@@ -11,26 +11,21 @@ To inspect the last few combos after running, you can execute:
 """
 
 import argparse
-from pathlib import Path
-import sys
 import sqlite3
+import sys
+from pathlib import Path
 
 from portfolio_exporter.core import chain
-from portfolio_exporter.core.io import migrate_combo_schema
 from portfolio_exporter.core.chain import get_combo_db_path
+from portfolio_exporter.core.io import migrate_combo_schema
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Migrate schema and backfill combo metadata."
-    )
+    parser = argparse.ArgumentParser(description="Migrate schema and backfill combo metadata.")
     parser.add_argument(
         "--db",
         default=None,
-        help=(
-            "Path to combos.db. If omitted, uses PE_DB_PATH or "
-            "settings.output_dir/combos.db"
-        ),
+        help=("Path to combos.db. If omitted, uses PE_DB_PATH or settings.output_dir/combos.db"),
     )
     parser.add_argument(
         "--from",

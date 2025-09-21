@@ -1,4 +1,5 @@
 """Environment and data sanity checks."""
+
 from __future__ import annotations
 
 import argparse
@@ -30,15 +31,13 @@ def cli(ns: argparse.Namespace) -> dict[str, Any]:
             fixes.extend(
                 [
                     "fix: export OUTPUT_DIR=~/pe",
-                    "fix: mkdir -p \"$OUTPUT_DIR\"",
+                    'fix: mkdir -p "$OUTPUT_DIR"',
                 ]
             )
         if "CP_REFRESH_TOKEN" in missing:
             fixes.append("fix: export CP_REFRESH_TOKEN=<token>")
         if "TWS_EXPORT_DIR" in missing:
-            fixes.append(
-                "fix: mkdir -p ~/Jts/export && export TWS_EXPORT_DIR=~/Jts/export"
-            )
+            fixes.append("fix: mkdir -p ~/Jts/export && export TWS_EXPORT_DIR=~/Jts/export")
     sections["env"] = len(env_vars)
 
     # Output dir

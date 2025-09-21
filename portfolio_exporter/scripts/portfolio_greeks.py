@@ -19,33 +19,38 @@ $ python portfolio_greeks.py --symbols MSFT,QQQ    # restrict to subset
 """
 
 import argparse
+import asyncio
 import csv
+import hashlib
+import json
 import logging
-from portfolio_exporter.core.config import settings
 import math
 import os
 import sys
-import json
-import hashlib
+
+from portfolio_exporter.core.config import settings
+
 try:
     import requests
 except Exception:  # pragma: no cover - optional dependency
     requests = None  # type: ignore
-import calendar
 import time
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
-from typing import Any, Dict, List, Tuple, Optional
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
 try:
+    from rich import box
     from rich.console import Console
     from rich.table import Table
-    from rich import box
 except Exception:  # pragma: no cover - optional dependency
     Console = None  # type: ignore
     Table = None  # type: ignore
     box = None  # type: ignore
 import sqlite3
+
 import pandas as pd
 
 # Prefer in-package BS greeks; fall back to legacy utils in dev trees
@@ -56,21 +61,47 @@ except Exception:  # pragma: no cover - optional fallback for local dev
 try:
     from legacy.option_chain_snapshot import fetch_yf_open_interest
 except Exception:  # pragma: no cover - optional
+
     def fetch_yf_open_interest(*args, **kwargs):  # type: ignore
         return {}
+
+
 try:
-    from portfolio_exporter.core.ui import run_with_spinner
+    from portfolio_exporter.core import ui as core_ui
+
+    run_with_spinner = core_ui.run_with_spinner
 except Exception:  # pragma: no cover - fallback
+
     def run_with_spinner(msg, func, *args, **kwargs):
         return func(*args, **kwargs)
-from portfolio_exporter.core import combo as combo_core
-from portfolio_exporter.core import io as io_core
-from portfolio_exporter.core import config as config_core
-from portfolio_exporter.core import cli as cli_helpers
-from portfolio_exporter.core import json as json_helpers
-from portfolio_exporter.core.runlog import RunLog
+
 
 import numpy as np
+
+from portfolio_exporter.core import cli as cli_helpers
+from portfolio_exporter.core import combo as combo_core
+from portfolio_exporter.core import config as config_core
+from portfolio_exporter.core import io as io_core
+from portfolio_exporter.core import json as json_helpers
+from portfolio_exporter.core.runlog import RunLog
+from portfolio_exporter.ibx.compat import (
+    connect as ibx_connect,
+)
+from portfolio_exporter.ibx.compat import (
+    disconnect as ibx_disconnect,
+)
+from portfolio_exporter.ibx.compat import (
+    qualify_contracts as ibx_qualify,
+)
+from portfolio_exporter.ibx.compat import (
+    req_contract_details as ibx_contract_details,
+)
+from portfolio_exporter.ibx.compat import (
+    req_mkt_data as ibx_mkt,
+)
+from portfolio_exporter.ibx.compat import (
+    req_positions as ibx_req_positions,
+)
 
 try:  # optional dependency
     import xlsxwriter  # type: ignore
@@ -79,14 +110,14 @@ except Exception:  # pragma: no cover - optional
 
 # PDF export dependencies
 try:
-    from reportlab.lib.pagesizes import letter, landscape
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import landscape, letter
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
 
 try:
-    from ib_insync import Future, IB, Index, Option, Position, Stock, Ticker, util
+    from ib_insync import IB, Future, Index, Option, Position, Stock, Ticker, util
     from ib_insync.contract import Contract
 except Exception:  # pragma: no cover - optional dependency
     Future = IB = Index = Option = Position = Stock = Ticker = util = Contract = None  # type: ignore
@@ -127,7 +158,7 @@ CP_URL = "https://localhost:5000/v1/pa/performance"
 IB_ACCOUNT = os.getenv("IB_ACCOUNT") or "U4380392"
 
 
-def bootstrap_nav(ib: "IB", days: int = 365) -> pd.Series:
+def bootstrap_nav(ib: IB, days: int = 365) -> pd.Series:
     """
     Try to fetch historical NetLiq series in order of preference:
     1) Client-Portal REST (all available history)
@@ -137,9 +168,7 @@ def bootstrap_nav(ib: "IB", days: int = 365) -> pd.Series:
     # ---- 1) Client-Portal REST ----
     try:
         parms = {"period": "all", "fields": "nav"}
-        resp = requests.get(
-            f"{CP_URL}/{IB_ACCOUNT}", params=parms, verify=False, timeout=20
-        )
+        resp = requests.get(f"{CP_URL}/{IB_ACCOUNT}", params=parms, verify=False, timeout=20)
         resp.raise_for_status()
         data = resp.json().get("nav", [])
         ks = ("value", "nav")
@@ -181,9 +210,7 @@ def bootstrap_nav(ib: "IB", days: int = 365) -> pd.Series:
     return pd.Series(dtype=float)
 
 
-def eddr(
-    path: pd.Series, horizon_days: int = 252, alpha: float = 0.99
-) -> tuple[float, float]:
+def eddr(path: pd.Series, horizon_days: int = 252, alpha: float = 0.99) -> tuple[float, float]:
     """
     Extreme Downside Draw-down Risk (DaR & CDaR).
 
@@ -222,13 +249,17 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 NAV_LOG = Path(os.path.join(OUTPUT_DIR, "nav_history.csv"))
 
 try:
-    from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+    from portfolio_exporter.core.ib_config import HOST as IB_HOST
+    from portfolio_exporter.core.ib_config import PORT as IB_PORT
+    from portfolio_exporter.core.ib_config import client_id as _cid
 except Exception:  # pragma: no cover - optional fallback
     IB_HOST = "127.0.0.1"  # type: ignore
     IB_PORT = 7497  # type: ignore
 
     def _cid(name: str, default: int = 0) -> int:  # type: ignore
         return default
+
+
 IB_CID = _cid("portfolio_greeks", default=11)  # separate clientId from snapshots
 
 # contract multipliers by secType (IB doesn't always fill this field)
@@ -265,7 +296,7 @@ RISK_FREE_RATE = 0.01  # annualised risk-free rate for BS fallback
 # ───────────────────── helpers ──────────────────────
 
 
-def _net_liq(ib: "IB") -> float:
+def _net_liq(ib: IB) -> float:
     """Return current NetLiquidation as float or np.nan on failure."""
     try:
         for row in ib.accountSummary():
@@ -353,75 +384,105 @@ def _has_any_greeks_populated(ticker: Ticker) -> bool:
 # ───────────────── pull positions & request data ─────────────────
 
 
-def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
-    """
-    Retrieve option/FOP positions and fetch live market data streams for Greeks.
-    """
-    raw_positions = [p for p in ib.positions() if p.position != 0]
+async def list_positions(
+    ib: IB,
+    *,
+    positions: Sequence[Position] | None = None,
+) -> list[tuple[Position, Ticker]]:
+    """Retrieve option/FOP positions and fetch live market data streams for Greeks."""
+
+    if positions is None:
+        try:
+            raw_positions = await ibx_req_positions(ib)
+        except Exception as exc:
+            logger.error(f"Failed to request IBKR positions: {exc}")
+            return []
+    else:
+        raw_positions = list(positions)
+
+    raw_positions = [p for p in raw_positions if getattr(p, "position", 0) != 0]
+
+    last_req_ts = 0.0
+    try:
+        max_rps = float(os.getenv("PSD_IBKR_MAX_RPS", "40"))
+    except ValueError:
+        max_rps = 40.0
+
+    async def pace() -> None:
+        nonlocal last_req_ts
+        if max_rps <= 0:
+            return
+        now = time.monotonic()
+        wait_for = (1.0 / max_rps) - (now - last_req_ts)
+        if wait_for > 0:
+            await asyncio.sleep(wait_for)
+        last_req_ts = time.monotonic()
 
     # Expand IB "BAG" combo positions into per-leg pseudo-positions so we can
     # fetch Greeks for each option leg. Some accounts only show combos as BAGs
     # without separate option legs; previously these were silently skipped.
-    positions: list[Position] = []
+    positions_list: list[Position] = []
     for p in raw_positions:
         try:
             st = getattr(p.contract, "secType", "")
         except Exception:
             st = ""
         if st in {"OPT", "FOP"}:
-            positions.append(p)
+            positions_list.append(p)
             continue
         if st == "BAG":
             try:
                 legs = getattr(p.contract, "comboLegs", None) or []
                 if not legs:
                     continue
-                # For each leg, qualify by conId and synthesize a Position-like object
                 for leg in legs:
                     try:
-                        # Qualify the leg contract by conId to obtain full details
                         c = Contract()
                         c.conId = int(getattr(leg, "conId"))
-                        cds = ib.reqContractDetails(c)
-                        lc = cds[0].contract if cds else None
-                        if lc is None:
-                            continue
-                        # Compute effective leg quantity (respect leg action/buy/sell and ratio)
-                        ratio = int(getattr(leg, "ratio", 1) or 1)
-                        action = str(getattr(leg, "action", "")).upper()
-                        eff_qty = int(p.position) * ratio
-                        if action == "SELL":
-                            eff_qty *= -1
-
-                        # Build a minimal Position-like object with required attributes
-                        class _PosLike:
-                            def __init__(self, contract, position):
-                                self.contract = contract
-                                self.position = position
-
-                        positions.append(_PosLike(lc, eff_qty))
                     except Exception:
-                        # Skip legs we cannot qualify
                         continue
+                    try:
+                        cds = await ibx_contract_details(ib, c)
+                    except Exception:
+                        cds = []
+                    lc = cds[0].contract if cds else None
+                    if lc is None:
+                        continue
+                    try:
+                        ratio = int(getattr(leg, "ratio", 1) or 1)
+                    except Exception:
+                        ratio = 1
+                    action = str(getattr(leg, "action", "")).upper()
+                    try:
+                        eff_qty = int(p.position) * ratio
+                    except Exception:
+                        eff_qty = 0
+                    if action == "SELL":
+                        eff_qty *= -1
+
+                    class _PosLike:
+                        def __init__(self, contract, position):
+                            self.contract = contract
+                            self.position = position
+
+                    positions_list.append(_PosLike(lc, eff_qty))
             except Exception:
-                # Defensive: if anything goes wrong, just skip the BAG
                 continue
 
-    # Keep only option-like instruments after expansion
-    positions = [p for p in positions if getattr(p.contract, "secType", "") in {"OPT", "FOP"}]
-    if not positions:
+    positions_list = [p for p in positions_list if getattr(p.contract, "secType", "") in {"OPT", "FOP"}]
+    if not positions_list:
         return []
 
-    logger.info(
-        f"Found {len(positions)} option/FOP positions. "
-        "Requesting live market data (Greeks)…"
-    )
+    logger.info(f"Found {len(positions_list)} option/FOP positions. Requesting live market data (Greeks)…")
 
-    bundles: List[Tuple[Position, Ticker]] = []
-    for pos in positions:
-        qc = ib.qualifyContracts(pos.contract)
+    bundles: list[tuple[Position, Ticker]] = []
+    for pos in positions_list:
+        try:
+            qc = await ibx_qualify(ib, pos.contract)
+        except Exception:
+            qc = []
         if not qc:
-            logger.warning(f"Could not qualify {pos.contract.localSymbol}. Skipping.")
+            logger.warning(f"Could not qualify {getattr(pos.contract, 'localSymbol', 'contract')}. Skipping.")
             continue
         c = qc[0]
         if not c.exchange:
@@ -429,24 +490,50 @@ def list_positions(ib: IB) -> List[Tuple[Position, Ticker]]:
         if not c.currency:
             c.currency = "USD"
 
-        tk = ib.reqMktData(
-            c,
-            genericTickList="106",  # IV only; greeks auto-populate via MODEL_OPTION
-            snapshot=False,
-            regulatorySnapshot=False,
-        )
+        await pace()
+        try:
+            tk = await ibx_mkt(
+                ib,
+                c,
+                genericTickList="106",
+                snapshot=False,
+                regulatorySnapshot=False,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"reqMktDataAsync failed for {getattr(c, 'localSymbol', getattr(c, 'conId', 'contract'))}: {exc}"
+            )
+            continue
         bundles.append((pos, tk))
 
-    # wait until every ticker has at least one greek populated, or timeout
     deadline = time.time() + TIMEOUT_SECONDS
     while time.time() < deadline:
-        ib.sleep(0.25)
-        if all(_has_any_greeks_populated(tk) for _, tk in bundles):
+        if bundles and all(_has_any_greeks_populated(tk) for _, tk in bundles):
             break
+        try:
+            await ib.sleep(0.25)
+        except Exception:
+            await asyncio.sleep(0.25)
     else:
         logger.warning("Timeout waiting for Greeks; some tickers may lack data.")
 
     return bundles
+
+
+def list_positions_sync(
+    ib: IB,
+    *,
+    positions: Sequence[Position] | None = None,
+) -> list[tuple[Position, Ticker]]:
+    """Synchronous wrapper for :func:`list_positions`."""
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(list_positions(ib, positions=positions))
+    raise RuntimeError(
+        "list_positions_sync() cannot be used inside a running event loop; await list_positions() instead."
+    )
 
 
 #
@@ -459,7 +546,7 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
     df_fmt = df.copy()
     float_cols = df_fmt.select_dtypes(include=[float]).columns
     df_fmt[float_cols] = df_fmt[float_cols].map(lambda x: f"{x:,.3f}")
-    rows_data = [df_fmt.columns.tolist()] + df_fmt.values.tolist()
+    _ = [df_fmt.columns.tolist()] + df_fmt.values.tolist()
 
     totals_fmt = totals.copy()
     float_cols_tot = totals_fmt.select_dtypes(include=[float]).columns
@@ -568,10 +655,10 @@ def _save_pdf(df: pd.DataFrame, totals: pd.DataFrame, path: str) -> None:
     doc.build(elements)
 
 
-# ─────────────────────────── MAIN ──────────────────────────
+# ─────────────────────────── LEGACY CLI (deprecated) ──────────────────────────
 
 
-def main() -> None:
+def main_cli() -> None:
     parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
     parser.add_argument(
         "--output-dir",
@@ -627,11 +714,7 @@ def main() -> None:
     ):
         try:
             choice = (
-                input(
-                    "Select output format [csv / flat / excel / pdf / txt] (default csv): "
-                )
-                .strip()
-                .lower()
+                input("Select output format [csv / flat / excel / pdf / txt] (default csv): ").strip().lower()
             )
         except EOFError:
             # non‑interactive environment (e.g., redirected), default to csv
@@ -674,10 +757,7 @@ def main() -> None:
         if not args.include_indices:
             df = df[df["symbol"] != "VIX"]
         totals = (
-            df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
-            .sum()
-            .to_frame()
-            .T
+            df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]].sum().to_frame().T
         )
         totals.insert(0, "timestamp", ts_iso)
         totals.index = ["PORTFOLIO_TOTAL"]
@@ -715,7 +795,7 @@ def main() -> None:
         else:
             NAV_LOG.write_text("timestamp,nav\n")
 
-    pkgs = list_positions(ib)
+    pkgs = list_positions_sync(ib)
     if not pkgs:
         logger.warning("No option/FOP positions with data – exiting.")
         ib.disconnect()
@@ -730,11 +810,11 @@ def main() -> None:
             ib.disconnect()
             sys.exit(0)
 
-    ts_utc = datetime.now(timezone.utc)  # for option T calculation
+    ts_utc = datetime.now(UTC)  # for option T calculation
     ts_local = datetime.now(ZoneInfo("Europe/Istanbul"))  # local timestamp
     ts_iso = ts_local.strftime("%Y-%m-%d %H:%M:%S")  # what we write to CSV
-    rows: List[Dict[str, Any]] = []
-    yf_oi_cache: Dict[tuple[str, str], dict[tuple[float, str], int]] = {}
+    rows: list[dict[str, Any]] = []
+    yf_oi_cache: dict[tuple[str, str], dict[tuple[float, str], int]] = {}
 
     iterable = iter_progress(pkgs, "Processing portfolio greeks") if PROGRESS else pkgs
     for pos, tk in iterable:
@@ -747,8 +827,7 @@ def main() -> None:
             (
                 getattr(tk, name)
                 for name in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks")
-                if getattr(tk, name, None)
-                and getattr(getattr(tk, name), "delta") is not None
+                if getattr(tk, name, None) and getattr(getattr(tk, name), "delta") is not None
             ),
             None,
         )
@@ -769,9 +848,7 @@ def main() -> None:
                 try:
                     under = _get_underlying(ib, c)
                     if under:
-                        snap = ib.reqMktData(
-                            under, "", snapshot=True, regulatorySnapshot=False
-                        )
+                        snap = ib.reqMktData(under, "", snapshot=True, regulatorySnapshot=False)
                         ib.sleep(1.0)
                         prices = [
                             snap.midpoint(),
@@ -781,11 +858,7 @@ def main() -> None:
                             snap.ask,
                         ]
                         S = next(
-                            (
-                                p
-                                for p in prices
-                                if p is not None and not math.isnan(p) and p > 0
-                            ),
+                            (p for p in prices if p is not None and not math.isnan(p) and p > 0),
                             np.nan,
                         )
                         ib.cancelMktData(under)
@@ -807,7 +880,7 @@ def main() -> None:
                     23,
                     59,
                     59,
-                    tzinfo=timezone.utc,
+                    tzinfo=UTC,
                 )
                 T = max(
                     (exp - ts_utc).total_seconds() / (365 * 24 * 3600),
@@ -841,11 +914,7 @@ def main() -> None:
 
         # ---- robust volume ----
         volume = getattr(tk, "volume", np.nan)
-        if (
-            volume is None
-            or (isinstance(volume, float) and math.isnan(volume))
-            or volume == -1
-        ):
+        if volume is None or (isinstance(volume, float) and math.isnan(volume)) or volume == -1:
             try:
                 snap_vol = ib.reqMktData(c, "", snapshot=True, regulatorySnapshot=False)
                 ib.sleep(0.8)
@@ -879,11 +948,7 @@ def main() -> None:
                 "underlying_price": und_price,
                 "open_interest": open_int,
                 "volume": volume,
-                "iv": (
-                    iv_from_greeks
-                    if not math.isnan(iv_from_greeks)
-                    else tk.impliedVolatility
-                ),
+                "iv": (iv_from_greeks if not math.isnan(iv_from_greeks) else tk.impliedVolatility),
                 **greeks,
                 "delta_exposure": greeks["delta"] * qty * mult,
                 "gamma_exposure": greeks["gamma"] * qty * mult,
@@ -914,8 +979,7 @@ def main() -> None:
         if isinstance(df.columns, pd.MultiIndex):
             df_flat = df.copy()
             df_flat.columns = [
-                "_".join([str(s) for s in tup if s != ""]).rstrip("_")
-                for tup in df_flat.columns.values
+                "_".join([str(s) for s in tup if s != ""]).rstrip("_") for tup in df_flat.columns.values
             ]
         else:
             df_flat = df
@@ -936,12 +1000,7 @@ def main() -> None:
     if not args.include_indices:
         df = df[~df["symbol"].isin(["VIX"])]
 
-    totals = (
-        df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]]
-        .sum()
-        .to_frame()
-        .T
-    )
+    totals = df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]].sum().to_frame().T
     totals.insert(0, "timestamp", ts_iso)
     totals.index = ["PORTFOLIO_TOTAL"]
 
@@ -964,9 +1023,7 @@ def main() -> None:
     # If still empty, fall back to current NetLiq if available
     if nav_series.empty:
         nav_today = _net_liq(ib)
-        nav_series = pd.Series(
-            {pd.Timestamp(ts_local.date()): nav_today}, name="nav", dtype=float
-        )
+        nav_series = pd.Series({pd.Timestamp(ts_local.date()): nav_today}, name="nav", dtype=float)
 
     # ─── append today's NAV to series & file ───
     nav_today = _net_liq(ib)
@@ -1000,15 +1057,9 @@ def main() -> None:
         logger.info(f"Flat CSV saved to {fn_flat} and printed to STDOUT (--flat-csv).")
     elif args.excel:
         fn_xlsx = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.xlsx")
-        with pd.ExcelWriter(
-            fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss"
-        ) as writer:
-            df.to_excel(
-                writer, sheet_name="Positions", index=False, float_format="%.3f"
-            )
-            totals.to_excel(
-                writer, sheet_name="Totals", index=False, float_format="%.3f"
-            )
+        with pd.ExcelWriter(fn_xlsx, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
+            df.to_excel(writer, sheet_name="Positions", index=False, float_format="%.3f")
+            totals.to_excel(writer, sheet_name="Totals", index=False, float_format="%.3f")
         logger.info(f"Saved Excel workbook → {fn_xlsx}")
     elif getattr(args, "pdf", False):
         fn_pdf = os.path.join(OUTPUT_DIR, f"portfolio_greeks_{date_tag}.pdf")
@@ -1046,140 +1097,143 @@ def main() -> None:
     ib.disconnect()
 
 
-def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
-    """Connect to IBKR and return current positions with greeks.
+async def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in tests
+    """Connect to IBKR and return current positions with greeks."""
 
-    The returned DataFrame includes ``symbol``, ``secType``, ``qty``,
-    ``multiplier`` and the option greeks ``delta``, ``gamma``, ``vega`` and
-    ``theta``.  Option greeks are pulled live from IBKR while stock/ETF
-    positions receive a delta of ``1`` and zero for the remaining greeks.
-    """
-
-    ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
+        ib = await ibx_connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
     except Exception as exc:  # pragma: no cover - network
         logger.error(f"IBKR connect failed in _load_positions: {exc}")
         return pd.DataFrame()
 
-    # -------- options & futures options --------
-    bundles = list_positions(ib)
-    # Build avg cost lookup by conId for P&L calculations
-    avg_cost_map: dict[int, float] = {}
     try:
-        for p in ib.positions():
+        try:
+            positions_snapshot = await ibx_req_positions(ib)
+        except Exception:
+            positions_snapshot = []
+
+        bundles = await list_positions(ib, positions=positions_snapshot)
+
+        avg_cost_map: dict[int, float] = {}
+        for p in positions_snapshot:
             try:
                 cid = int(getattr(p.contract, "conId", 0))
                 if cid:
                     avg_cost_map[cid] = float(getattr(p, "avgCost", float("nan")))
             except Exception:
                 continue
-    except Exception:
-        pass
 
-    opt_rows: list[dict[str, float | str | int]] = []
-    for pos, tk in bundles:
-        c = pos.contract
-        mult = _multiplier(c)
-        qty = pos.position
-        # Try to pick a greeks source if available; otherwise leave NaN and let downstream handle
-        src = next(
-            (
-                getattr(tk, n)
-                for n in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks")
-                if getattr(tk, n, None) and getattr(getattr(tk, n), "delta") is not None
-            ),
-            None,
-        )
-        # robust option price (mid ▸ last ▸ close)
-        option_price = None
-        try:
-            option_price = tk.marketPrice()  # call as method
-        except Exception:
+        opt_rows: list[dict[str, float | str | int]] = []
+        for pos, tk in bundles:
+            c = pos.contract
+            mult = _multiplier(c)
+            qty = pos.position
+            src = next(
+                (
+                    getattr(tk, n)
+                    for n in ("modelGreeks", "lastGreeks", "bidGreeks", "askGreeks")
+                    if getattr(tk, n, None) and getattr(getattr(tk, n), "delta") is not None
+                ),
+                None,
+            )
             option_price = None
-        if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
-            option_price = getattr(tk, "last", None)
-        if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
-            option_price = getattr(tk, "close", None)
-        try:
-            conid_val = int(getattr(c, "conId", 0))
-        except Exception:
-            conid_val = 0
-        avg_cost_raw = avg_cost_map.get(conid_val, float("nan"))
-        # Normalize avg cost to per-unit for options/FOP where needed.
-        # Some IB endpoints return avgCost per contract (price * multiplier), others per unit.
-        # Heuristic: if avg_cost is much larger than the current mark price and multiplier>1, treat it as per-contract and divide.
-        per_unit_cost = float("nan")
-        try:
-            ac = float(avg_cost_raw)
-            mp = float(option_price) if option_price is not None else float("nan")
-            if getattr(c, "secType", "") in {"OPT", "FOP"} and mult and float(mult) > 1:
-                if (not math.isnan(mp) and ac > mp * 10) or ac > 50:
-                    per_unit_cost = ac / float(mult)
+            try:
+                option_price = tk.marketPrice()
+            except Exception:
+                option_price = None
+            if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
+                option_price = getattr(tk, "last", None)
+            if option_price is None or (isinstance(option_price, float) and math.isnan(option_price)):
+                option_price = getattr(tk, "close", None)
+            try:
+                conid_val = int(getattr(c, "conId", 0))
+            except Exception:
+                conid_val = 0
+            avg_cost_raw = avg_cost_map.get(conid_val, float("nan"))
+            per_unit_cost = float("nan")
+            try:
+                ac = float(avg_cost_raw)
+                mp = float(option_price) if option_price is not None else float("nan")
+                if getattr(c, "secType", "") in {"OPT", "FOP"} and mult and float(mult) > 1:
+                    if (not math.isnan(mp) and ac > mp * 10) or ac > 50:
+                        per_unit_cost = ac / float(mult)
+                    else:
+                        per_unit_cost = ac
                 else:
                     per_unit_cost = ac
-            else:
-                per_unit_cost = ac
-        except Exception:
-            per_unit_cost = float("nan")
-        try:
-            # Unrealized P&L per leg: (mark_per_unit − per_unit_cost) × qty × multiplier
-            pnl_leg = (float(option_price) - per_unit_cost) * float(qty) * float(mult)
-        except Exception:
-            pnl_leg = float("nan")
+            except Exception:
+                per_unit_cost = float("nan")
+            try:
+                pnl_leg = (float(option_price) - per_unit_cost) * float(qty) * float(mult)
+            except Exception:
+                pnl_leg = float("nan")
 
-        opt_rows.append(
-            {
-                "symbol": c.localSymbol,
-                "underlying": c.symbol,
-                "secType": c.secType,
-                "conId": getattr(c, "conId", None),
-                "qty": qty,
-                "multiplier": mult,
-                "right": getattr(c, "right", None),  # "C"/"P" for options
-                "strike": getattr(c, "strike", None),
-                "expiry": getattr(c, "lastTradeDateOrContractMonth", None),
-                "delta": getattr(src, "delta", float("nan")),
-                "gamma": getattr(src, "gamma", float("nan")),
-                "vega": getattr(src, "vega", float("nan")),
-                "theta": getattr(src, "theta", float("nan")),
-                "price": option_price if option_price is not None else float("nan"),
-                "avg_cost": avg_cost_raw,
-                "avg_cost_unit": per_unit_cost,
-                "pnl_leg": pnl_leg,
-            }
-        )
-
-    # -------- stock / ETF positions --------
-    stk_rows: list[dict[str, float | str | int]] = []
-    for p in ib.positions():
-        if p.contract.secType in {"STK", "ETF"} and p.position != 0:
-            # best-effort price snapshot is not fetched here; leave price NaN
-            ac = float(getattr(p, "avgCost", float("nan")))
-            stk_rows.append(
+            opt_rows.append(
                 {
-                    "symbol": p.contract.symbol,
-                    "underlying": p.contract.symbol,
-                    "secType": p.contract.secType,
-                    "qty": p.position,
-                    "multiplier": 1,
-                    "right": None,
-                    "strike": None,
-                    "expiry": None,
-                    # shares: delta = 1, other greeks 0
-                    "delta": 1.0,
-                    "gamma": 0.0,
-                    "vega": 0.0,
-                    "theta": 0.0,
-                    "price": float("nan"),
-                    "avg_cost": ac,
-                    "avg_cost_unit": ac,
-                    "pnl_leg": float("nan"),
+                    "symbol": getattr(c, "localSymbol", None),
+                    "underlying": getattr(c, "symbol", None),
+                    "secType": getattr(c, "secType", None),
+                    "conId": getattr(c, "conId", None),
+                    "qty": qty,
+                    "multiplier": mult,
+                    "right": getattr(c, "right", None),
+                    "strike": getattr(c, "strike", None),
+                    "expiry": getattr(c, "lastTradeDateOrContractMonth", None),
+                    "delta": getattr(src, "delta", float("nan")),
+                    "gamma": getattr(src, "gamma", float("nan")),
+                    "vega": getattr(src, "vega", float("nan")),
+                    "theta": getattr(src, "theta", float("nan")),
+                    "price": option_price if option_price is not None else float("nan"),
+                    "avg_cost": avg_cost_raw,
+                    "avg_cost_unit": per_unit_cost,
+                    "pnl_leg": pnl_leg,
                 }
             )
 
-    ib.disconnect()
-    return pd.DataFrame(opt_rows + stk_rows)
+        stk_rows: list[dict[str, float | str | int]] = []
+        for p in positions_snapshot:
+            try:
+                sec_type = p.contract.secType
+            except Exception:
+                continue
+            if sec_type in {"STK", "ETF"} and getattr(p, "position", 0) != 0:
+                ac = float(getattr(p, "avgCost", float("nan")))
+                stk_rows.append(
+                    {
+                        "symbol": getattr(p.contract, "symbol", None),
+                        "underlying": getattr(p.contract, "symbol", None),
+                        "secType": sec_type,
+                        "qty": getattr(p, "position", 0),
+                        "multiplier": 1,
+                        "right": None,
+                        "strike": None,
+                        "expiry": None,
+                        "delta": 1.0,
+                        "gamma": 0.0,
+                        "vega": 0.0,
+                        "theta": 0.0,
+                        "price": float("nan"),
+                        "avg_cost": ac,
+                        "avg_cost_unit": ac,
+                        "pnl_leg": float("nan"),
+                    }
+                )
+
+        return pd.DataFrame(opt_rows + stk_rows)
+    finally:
+        await ibx_disconnect()
+
+
+def load_positions_sync() -> pd.DataFrame:
+    """Synchronous wrapper around :func:`_load_positions`."""
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_load_positions())
+    raise RuntimeError(
+        "load_positions_sync() cannot be used inside a running event loop; await _load_positions() instead."
+    )
 
 
 def _load_db_legs_map() -> dict[str, list[dict[str, object]]]:
@@ -1242,7 +1296,7 @@ def _load_db_legs_map() -> dict[str, list[dict[str, object]]]:
                     df[c] = pd.to_numeric(df[c], errors="coerce")
             if "right" in df.columns:
                 df["right"] = df["right"].astype(str).str.upper().replace({"NAN": ""})
-                df.loc[~df["right"].isin(["C", "P"]) , "right"] = ""
+                df.loc[~df["right"].isin(["C", "P"]), "right"] = ""
             if "secType" in df.columns:
                 df["secType"] = df["secType"].astype(str)
 
@@ -1253,7 +1307,9 @@ def _load_db_legs_map() -> dict[str, list[dict[str, object]]]:
                         {
                             "conid": int(r["conid"]) if not pd.isna(r.get("conid")) else None,
                             "right": str(r.get("right")) if "right" in r else "",
-                            "strike": float(r.get("strike")) if "strike" in r and not pd.isna(r.get("strike")) else None,
+                            "strike": float(r.get("strike"))
+                            if "strike" in r and not pd.isna(r.get("strike"))
+                            else None,
                             "secType": str(r.get("secType")) if "secType" in r else None,
                         }
                     )
@@ -1278,9 +1334,12 @@ def _load_db_combos_or_none():
     - If a combo has no direct legs but `parent_combo_id` exists and parent legs are available, uses the parent’s legs as a fallback.
     - Keeps `combo_id` for downstream processing. Helper columns are subsequently dropped before writing the final CSV to disk.
     """
-    import os, sqlite3
-    import pandas as pd
+    import os
+    import sqlite3
     from pathlib import Path
+
+    import pandas as pd
+
     from portfolio_exporter.core.config import settings
 
     db = os.environ.get("PE_DB_PATH") or (Path(settings.output_dir) / "combos.db")
@@ -1323,7 +1382,11 @@ def _load_db_combos_or_none():
                 legs_detail_col: list[object] = []
                 for _, r in df.iterrows():
                     cid = str(r.get("combo_id"))
-                    pid = str(r.get("parent_combo_id")) if "parent_combo_id" in r and pd.notna(r.get("parent_combo_id")) else None
+                    pid = (
+                        str(r.get("parent_combo_id"))
+                        if "parent_combo_id" in r and pd.notna(r.get("parent_combo_id"))
+                        else None
+                    )
                     items = legs_map.get(cid, [])
                     if not items and pid:
                         items = legs_map.get(pid, [])
@@ -1350,9 +1413,7 @@ def _load_db_combos_or_none():
 KNOWN_MULTI = {"vertical", "iron condor", "butterfly", "calendar"}
 
 
-def _choose_combos_df(
-    source: str, positions_df: pd.DataFrame, combo_types: str
-) -> tuple[pd.DataFrame, str]:
+def _choose_combos_df(source: str, positions_df: pd.DataFrame, combo_types: str) -> tuple[pd.DataFrame, str]:
     """Resolve combo DataFrame from desired *source* and filter to true combos.
 
     Preference in "auto" mode: live → engine → db.
@@ -1397,14 +1458,10 @@ def _choose_combos_df(
                 lc = pd.Series(dtype=str)
             informative = lc.isin(KNOWN_MULTI).any()
             if not informative and "width" in db_df.columns:
-                informative = (
-                    pd.to_numeric(db_df["width"], errors="coerce").fillna(0) > 0
-                ).any()
+                informative = (pd.to_numeric(db_df["width"], errors="coerce").fillna(0) > 0).any()
             if not informative and "legs" in db_df.columns:
                 informative = (
-                    db_df["legs"]
-                    .apply(lambda v: isinstance(v, (list, tuple)) and len(v) >= 2)
-                    .any()
+                    db_df["legs"].apply(lambda v: isinstance(v, (list, tuple)) and len(v) >= 2).any()
                 )
         if informative and db_df is not None:
             df_raw = db_df
@@ -1463,16 +1520,33 @@ def _filter_true_combos(df: pd.DataFrame) -> pd.DataFrame:
         log.info("Combos filter: raw=0 kept=0 (nothing to do)")
         return df
 
-    s_norm = df.get("structure", pd.Series(index=df.index, dtype="object")).astype(str).str.lower().str.strip()
+    s_norm = (
+        df.get("structure", pd.Series(index=df.index, dtype="object")).astype(str).str.lower().str.strip()
+    )
     t_norm = df.get("type", pd.Series(index=df.index, dtype="object")).astype(str).str.lower().str.strip()
     legs = df.get("legs", pd.Series(index=df.index, dtype="object"))
     legs_n = df.get("legs_n", pd.Series(index=df.index, dtype="Int64"))
 
-    known_multi = {"vertical", "iron condor", "butterfly", "calendar", "diagonal", "diag", "strangle", "straddle", "ratio"}
+    known_multi = {
+        "vertical",
+        "iron condor",
+        "butterfly",
+        "calendar",
+        "diagonal",
+        "diag",
+        "strangle",
+        "straddle",
+        "ratio",
+    }
     has_known = s_norm.isin(known_multi) | t_norm.isin(known_multi)
 
-    non_empty = lambda s: s.notna() & (s != "") & (s != "nan")
-    has_non_single = (non_empty(s_norm) & ~s_norm.eq("single")) | (non_empty(t_norm) & ~t_norm.eq("single"))
+    def _non_empty(series: pd.Series) -> pd.Series:
+        return series.notna() & (series != "") & (series != "nan")
+
+    has_non_single = (_non_empty(s_norm) & ~s_norm.eq("single")) | (
+        _non_empty(t_norm) & ~t_norm.eq("single")
+    )
+
     def _has2(v):
         if isinstance(v, (list, tuple)):
             return len(v) >= 2
@@ -1493,8 +1567,8 @@ def _filter_true_combos(df: pd.DataFrame) -> pd.DataFrame:
 
     # Debug logging for diagnostics
     try:
-        s_vals = s_norm[non_empty(s_norm)].value_counts().head(10).to_dict()
-        t_vals = t_norm[non_empty(t_norm)].value_counts().head(10).to_dict()
+        s_vals = s_norm[_non_empty(s_norm)].value_counts().head(10).to_dict()
+        t_vals = t_norm[_non_empty(t_norm)].value_counts().head(10).to_dict()
         log.info(
             "Combos filter: raw=%d kept=%d (known=%d legs2=%d) struct_top=%s type_top=%s",
             raw,
@@ -1562,17 +1636,14 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
     if "expiry" not in out.columns:
         out["expiry"] = ""
     else:
+
         def _norm_exp(x: Any) -> str:
             s = str(x).strip()
             if not s:
                 return ""
             for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y%m%d"):
                 try:
-                    return (
-                        pd.to_datetime(s, format=fmt, errors="raise")
-                        .date()
-                        .isoformat()
-                    )
+                    return pd.to_datetime(s, format=fmt, errors="raise").date().isoformat()
                 except Exception:
                     pass
             try:
@@ -1610,6 +1681,7 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
         if isinstance(v, str) and v.startswith("[") and v.endswith("]"):
             try:
                 import ast
+
                 parsed = ast.literal_eval(v)
                 return len(parsed) if isinstance(parsed, (list, tuple)) else np.nan
             except Exception:
@@ -1649,9 +1721,7 @@ def _normalize_combos_columns(df: pd.DataFrame | None) -> pd.DataFrame:
     ]
 
 
-def _enrich_combo_strikes(
-    combos_df: pd.DataFrame, positions_df: pd.DataFrame | None
-) -> pd.DataFrame:
+def _enrich_combo_strikes(combos_df: pd.DataFrame, positions_df: pd.DataFrame | None) -> pd.DataFrame:
     """
     Populate strike details and leg counts for all combos.
 
@@ -1742,16 +1812,15 @@ def _enrich_combo_strikes(
             p["conid"] = p["conid"].astype(int)
             # Coerce strike to float where possible
             p["strike"] = pd.to_numeric(p["strike"], errors="coerce")
-            pos_lookup = p.set_index("conid")[
-                ["right", "strike", "secType"]
-            ]
+            pos_lookup = p.set_index("conid")[["right", "strike", "secType"]]
         except Exception:
             pos_lookup = pd.DataFrame(columns=["right", "strike", "secType"]).set_index(
                 pd.Index([], name="conid")
             )
 
     # Numeric to string formatting helper: 0/1 decimal places
-    fmt = lambda x: ("{:.1f}".format(float(x)).rstrip("0").rstrip("."))
+    def _fmt_number(value: object) -> str:
+        return (f"{float(value):.1f}".rstrip("0").rstrip("."))
 
     import ast
 
@@ -1765,7 +1834,7 @@ def _enrich_combo_strikes(
     }
 
     # Helper to normalise entries from DB detail
-    def _norm_db_leg(entry: dict) -> tuple[str, Optional[float], str]:
+    def _norm_db_leg(entry: dict) -> tuple[str, float | None, str]:
         right = str(entry.get("right") or "").upper()
         if right not in ("C", "P"):
             right = ""
@@ -1780,6 +1849,7 @@ def _enrich_combo_strikes(
         v = row.get("legs")
         leg_ids: list[int] = []
         leg_dicts: list[dict] = []
+
         def _collect_from_seq(seq):
             nonlocal leg_ids, leg_dicts
             for x in seq:
@@ -1879,7 +1949,9 @@ def _enrich_combo_strikes(
         # DB fallback: include legs from __db_legs_detail that positions lookup couldn't resolve
         db_detail = row.get("__db_legs_detail")
         if isinstance(db_detail, (list, tuple)) and db_detail:
-            resolved_ids = set(leg_ids) & set(pos_lookup.index.tolist()) if len(pos_lookup.index) > 0 else set()
+            resolved_ids = (
+                set(leg_ids) & set(pos_lookup.index.tolist()) if len(pos_lookup.index) > 0 else set()
+            )
             for ent in db_detail:
                 if not isinstance(ent, dict):
                     continue
@@ -1907,9 +1979,9 @@ def _enrich_combo_strikes(
 
         # Compose output fields
         all_k = sorted(call_k.union(put_k))
-        call_s = "/".join(fmt(x) for x in sorted(call_k)) if call_k else ""
-        put_s = "/".join(fmt(x) for x in sorted(put_k)) if put_k else ""
-        all_s = "/".join(fmt(x) for x in all_k) if all_k else ""
+        call_s = "/".join(_fmt_number(x) for x in sorted(call_k)) if call_k else ""
+        put_s = "/".join(_fmt_number(x) for x in sorted(put_k)) if put_k else ""
+        all_s = "/".join(_fmt_number(x) for x in all_k) if all_k else ""
 
         results["strikes"].append(all_s)
         results["call_strikes"].append(call_s)
@@ -1952,9 +2024,7 @@ def _enrich_combo_strikes(
 
 def _stable_combo_id(row: pd.Series) -> str:
     expiry = (
-        pd.to_datetime(row.get("expiry"), errors="coerce").strftime("%Y-%m-%d")
-        if row.get("expiry")
-        else ""
+        pd.to_datetime(row.get("expiry"), errors="coerce").strftime("%Y-%m-%d") if row.get("expiry") else ""
     )
     legs = row.get("legs") or []
     parts: list = []
@@ -1981,7 +2051,15 @@ def _stable_combo_id(row: pd.Series) -> str:
                     )
     sig = json.dumps(sorted(parts), sort_keys=True)
     payload = json.dumps(
-        {"u": row.get("underlying"), "e": expiry, "t": row.get("type"), "s": row.get("structure"), "w": row.get("width"), "l": sig}, sort_keys=True
+        {
+            "u": row.get("underlying"),
+            "e": expiry,
+            "t": row.get("type"),
+            "s": row.get("structure"),
+            "w": row.get("width"),
+            "l": sig,
+        },
+        sort_keys=True,
     )
     return hashlib.sha1(payload.encode()).hexdigest()
 
@@ -2030,7 +2108,7 @@ def _persist_combos(df: pd.DataFrame, positions_df: pd.DataFrame | None = None) 
         elif work.index.name == "combo_id":
             work = work.reset_index()
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         if "ts_created" in cols and "ts_created" not in work.columns:
             work["ts_created"] = now
 
@@ -2068,6 +2146,7 @@ def _persist_combos(df: pd.DataFrame, positions_df: pd.DataFrame | None = None) 
                 if isinstance(v, str) and v.startswith("["):
                     try:
                         import ast
+
                         v = ast.literal_eval(v)
                     except Exception:
                         v = []
@@ -2100,14 +2179,14 @@ def _persist_combos(df: pd.DataFrame, positions_df: pd.DataFrame | None = None) 
         return len(rows)
 
 
-def _fmt_float(x: Optional[float]) -> str:
+def _fmt_float(x: float | None) -> str:
     try:
         return f"{x:,.2f}"
     except Exception:
         return "-"
 
 
-def _print_totals(console: Console, totals_df: Optional[pd.DataFrame]) -> None:
+def _print_totals(console: Console, totals_df: pd.DataFrame | None) -> None:
     if totals_df is None or totals_df.empty:
         return
     t = Table(title="Totals", box=box.SIMPLE_HEAVY)
@@ -2123,7 +2202,7 @@ def _print_totals(console: Console, totals_df: Optional[pd.DataFrame]) -> None:
     console.print(t)
 
 
-def _print_positions(console: Console, pos_df: Optional[pd.DataFrame]) -> None:
+def _print_positions(console: Console, pos_df: pd.DataFrame | None) -> None:
     if pos_df is None or pos_df.empty:
         return
     cols = [
@@ -2166,7 +2245,7 @@ def _print_positions(console: Console, pos_df: Optional[pd.DataFrame]) -> None:
     console.print(t)
 
 
-def _print_combos(console: Console, combos_df: Optional[pd.DataFrame]) -> None:
+def _print_combos(console: Console, combos_df: pd.DataFrame | None) -> None:
     if combos_df is None or combos_df.empty:
         console.print("Combos: (no combos)")
         return
@@ -2199,7 +2278,14 @@ def _print_combos(console: Console, combos_df: Optional[pd.DataFrame]) -> None:
         cells = []
         for col in present:
             val = r.get(col, "")
-            if isinstance(val, (int, float)) and col in {"width", "qty", "legs", "legs_n", "call_count", "put_count"}:
+            if isinstance(val, (int, float)) and col in {
+                "width",
+                "qty",
+                "legs",
+                "legs_n",
+                "call_count",
+                "put_count",
+            }:
                 cells.append(_fmt_float(val))
             else:
                 cells.append(str(val) if val is not None else "")
@@ -2228,61 +2314,8 @@ def run(
     except Exception:
         pass
 
-    # Optional offline positions override
-    positions_override: pd.DataFrame | None = None
-    if "args" in globals() and getattr(globals()["args"], "positions_csv", None):
-        try:
-            positions_override = pd.read_csv(os.path.expanduser(globals()["args"].positions_csv))
-            logger.info(
-                f"Loaded positions from CSV: {globals()['args'].positions_csv} rows={len(positions_override)}"
-            )
-        except Exception as e:
-            logger.error(f"Failed to read --positions-csv: {e}")
-            positions_override = None
-
-    pos_df: pd.DataFrame
-    if positions_override is None:
-        pos_df = run_with_spinner("Fetching positions…", _load_positions).copy()
-    else:
-        csv_df = positions_override.copy()
-        for col in ["delta", "gamma", "vega", "theta", "multiplier"]:
-            if col not in csv_df.columns:
-                csv_df[col] = np.nan
-        if "symbol" not in csv_df.columns and "underlying" in csv_df.columns:
-            csv_df["symbol"] = csv_df["underlying"]
-        # Build a minimal positions DataFrame compatible with downstream logic
-        cols = [
-            "symbol",
-            "secType",
-            "expiry",
-            "strike",
-            "right",
-            "qty",
-            "multiplier",
-            "underlying",
-            "conId",
-            "delta",
-            "gamma",
-            "vega",
-            "theta",
-        ]
-        for c in cols:
-            if c not in csv_df.columns:
-                csv_df[c] = np.nan
-        pos_df = csv_df[cols].copy()
-        # synthesize conId if missing
-        if pos_df.get("conId").isna().any():
-            def _synth(row):
-                try:
-                    v = row.get("conId")
-                    if pd.notna(v):
-                        return int(v)
-                except Exception:
-                    pass
-                key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike','')}"
-                import hashlib as _hl
-                return -int(int.from_bytes(_hl.sha1(key.encode()).digest()[:4], 'big'))
-            pos_df["conId"] = pos_df.apply(_synth, axis=1).astype("Int64")
+    # Load positions via live loader (tests may monkeypatch _load_positions)
+    pos_df: pd.DataFrame = run_with_spinner("Fetching positions…", load_positions_sync).copy()
     if pos_df.empty:
         pos_df = pd.DataFrame(
             columns=[
@@ -2300,36 +2333,48 @@ def run(
             ]
         )
 
-    pos_df.loc[(pos_df.secType == "OPT") & (pos_df.multiplier.isna()), "multiplier"] = (
-        100
-    )
+    pos_df.loc[(pos_df.secType == "OPT") & (pos_df.multiplier.isna()), "multiplier"] = 100
     pos_df.loc[pos_df.secType.isin(["STK", "ETF"]), "multiplier"] = 1
 
     if "greeks_source" not in pos_df.columns:
         pos_df["greeks_source"] = "IB"
     else:
         pos_df["greeks_source"] = pos_df["greeks_source"].apply(
-            lambda v: (
-                "IB" if v in (True, 1, "IB") else "BS" if v in (False, 0, "BS") else ""
-            )
+            lambda v: ("IB" if v in (True, 1, "IB") else "BS" if v in (False, 0, "BS") else "")
         )
 
+    # Compute per-row exposures using robust numeric coercion (avoids dtype quirks)
+    qty_f = pd.to_numeric(pos_df.get("qty", 0.0), errors="coerce").astype(float).fillna(0.0)
+    mult_f = pd.to_numeric(pos_df.get("multiplier", 0.0), errors="coerce").astype(float).fillna(0.0)
     for greek in ["delta", "gamma", "vega", "theta"]:
-        pos_df[f"{greek}_exposure"] = pos_df[greek] * pos_df.qty * pos_df.multiplier
+        g_f = pd.to_numeric(pos_df.get(greek, 0.0), errors="coerce").astype(float).fillna(0.0)
+        try:
+            pos_df[f"{greek}_exposure"] = (g_f * qty_f * mult_f).astype(float)
+        except Exception:
+            pos_df[f"{greek}_exposure"] = 0.0
 
-    totals = (
-        pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]]
-        .sum()
-        .to_frame()
-        .T
-    )
+    # Totals computed directly from precomputed exposures for robustness
+    try:
+        totals = pos_df[[f"{g}_exposure" for g in ["delta", "gamma", "vega", "theta"]]].sum().to_frame().T
+        # Ensure plain Python floats
+        for g in ["delta", "gamma", "vega", "theta"]:
+            col = f"{g}_exposure"
+            totals[col] = float(totals[col].iloc[0]) if not totals.empty else 0.0
+    except Exception:
+        totals = pd.DataFrame(
+            {
+                "delta_exposure": 0.0,
+                "gamma_exposure": 0.0,
+                "vega_exposure": 0.0,
+                "theta_exposure": 0.0,
+            },
+            index=[0],
+        )
 
     combos_df = pd.DataFrame()
     resolved_source = "none"
     if combos:
-        combos_df, resolved_source = _choose_combos_df(
-            combos_source, pos_df, combo_types
-        )
+        combos_df, resolved_source = _choose_combos_df(combos_source, pos_df, combo_types)
         # Enrich with per-leg strike details (before saving/printing)
         try:
             combos_df = _enrich_combo_strikes(combos_df, positions_df=pos_df)
@@ -2344,21 +2389,31 @@ def run(
                     if isinstance(v, (list, tuple)):
                         return len([x for x in v if x is not None]) == 0
                     import ast
+
                     if isinstance(v, str) and v.strip().startswith("["):
                         try:
                             parsed = ast.literal_eval(v)
-                            return not isinstance(parsed, (list, tuple)) or len([x for x in parsed if x is not None]) == 0
+                            return (
+                                not isinstance(parsed, (list, tuple))
+                                or len([x for x in parsed if x is not None]) == 0
+                            )
                         except Exception:
                             return True
                     return True
 
-                mask_empty = combos_df.get("legs").apply(_legs_empty) if "legs" in combos_df.columns else pd.Series([False] * len(combos_df))
+                mask_empty = (
+                    combos_df.get("legs").apply(_legs_empty)
+                    if "legs" in combos_df.columns
+                    else pd.Series([False] * len(combos_df))
+                )
                 if bool(mask_empty.any()):
                     # Detect live combos once
                     try:
                         live_df = combo_core.detect_from_positions(pos_df)
                     except Exception:
-                        live_df = pd.DataFrame(columns=["underlying","expiry","type","structure_label","legs","width"]) 
+                        live_df = pd.DataFrame(
+                            columns=["underlying", "expiry", "type", "structure_label", "legs", "width"]
+                        )
 
                     # Build helper keys for matching
                     def _norm_exp(s: str) -> str:
@@ -2371,7 +2426,9 @@ def run(
                         return (
                             str(df_row.get("underlying", "")),
                             _norm_exp(df_row.get("expiry", "")),
-                            str(df_row.get("type", "")) or str(df_row.get("structure", "")) or str(df_row.get("structure_label", "")),
+                            str(df_row.get("type", ""))
+                            or str(df_row.get("structure", ""))
+                            or str(df_row.get("structure_label", "")),
                         )
 
                     # Precompute live map by key -> list of rows
@@ -2388,7 +2445,7 @@ def run(
                             healed_flags.append(False)
                             continue
                         cand = live_groups.get(_key(r), [])
-                        match_row: Optional[pd.Series] = None
+                        match_row: pd.Series | None = None
                         if len(cand) == 1:
                             match_row = cand[0]
                         elif len(cand) > 1:
@@ -2398,10 +2455,15 @@ def run(
                                     return float(x.get("width")) if pd.notna(x.get("width")) else 0.0
                                 except Exception:
                                     return 0.0
+
                             target_w = _width(r)
                             cand_sorted = sorted(cand, key=lambda x: abs(_width(x) - target_w))
                             match_row = cand_sorted[0]
-                        if match_row is not None and isinstance(match_row.get("legs"), (list, tuple)) and len(match_row.get("legs")) > 0:
+                        if (
+                            match_row is not None
+                            and isinstance(match_row.get("legs"), (list, tuple))
+                            and len(match_row.get("legs")) > 0
+                        ):
                             new_legs.append(list(match_row.get("legs")))
                             healed_flags.append(True)
                             healed += 1
@@ -2427,13 +2489,18 @@ def run(
                                 persisted = False
                         else:
                             persisted = False
-                        logger.info("Combos self-heal: healed_rows=%d (persisted=%s)", healed, "yes" if persisted else "no")
+                        logger.info(
+                            "Combos self-heal: healed_rows=%d (persisted=%s)",
+                            healed,
+                            "yes" if persisted else "no",
+                        )
         except Exception as exc:
             logger.warning("Combos self-heal failed: %s", exc)
 
         # Ensure 'legs' is a parsed list and recompute legs_n before saving/persisting
         try:
             import json as _json
+
             def _parse_legs(v):
                 if isinstance(v, list):
                     return v
@@ -2445,9 +2512,12 @@ def run(
                         except Exception:
                             return []
                 return []
+
             if "legs" in combos_df.columns:
                 combos_df["legs"] = combos_df["legs"].apply(_parse_legs)
-                combos_df["legs_n"] = combos_df["legs"].apply(lambda x: len(x) if isinstance(x, list) else 0).astype("Int64")
+                combos_df["legs_n"] = (
+                    combos_df["legs"].apply(lambda x: len(x) if isinstance(x, list) else 0).astype("Int64")
+                )
             # Compute unrealized P&L per combo from per-leg P&L (pnl_leg) in positions
             try:
                 pmap = pos_df.copy()
@@ -2460,6 +2530,7 @@ def run(
                     pmap = pmap.set_index("conId", drop=False)
                 else:
                     pmap.index = pd.Index([], name="conId")
+
                 def _sum_pnl(legs):
                     total = 0.0
                     if not isinstance(legs, list):
@@ -2508,7 +2579,9 @@ def run(
                 combos_df["unrealized_pnl"] = combos_df["legs"].apply(_sum_pnl)
                 combos_df["credit_debit"] = combos_df.get("credit_debit", np.nan)
                 combos_df["credit_debit"] = combos_df.apply(
-                    lambda r: _sum_basis(r.get("legs")) if (pd.isna(r.get("credit_debit")) or r.get("credit_debit") is None) else r.get("credit_debit"),
+                    lambda r: _sum_basis(r.get("legs"))
+                    if (pd.isna(r.get("credit_debit")) or r.get("credit_debit") is None)
+                    else r.get("credit_debit"),
                     axis=1,
                 )
 
@@ -2542,7 +2615,11 @@ def run(
                                 except Exception:
                                     continue
                         lots = min(qs) if qs else float("nan")
-                        mult = float(pmap.loc[int(legs[0])].get("multiplier", 100.0)) if isinstance(legs, list) and legs and int(legs[0]) in pmap.index else 100.0
+                        mult = (
+                            float(pmap.loc[int(legs[0])].get("multiplier", 100.0))
+                            if isinstance(legs, list) and legs and int(legs[0]) in pmap.index
+                            else 100.0
+                        )
                         denom = width * mult * lots
                         if denom and not math.isnan(denom) and denom > 0:
                             return float(pnl) / denom * 100.0
@@ -2559,9 +2636,7 @@ def run(
         # Optional debug dump of enriched combos
         if os.getenv("PE_DEBUG_COMBOS"):
             try:
-                logger.info(
-                    "Combos enriched columns: %s", list(combos_df.columns)
-                )
+                logger.info("Combos enriched columns: %s", list(combos_df.columns))
                 logger.info("Combos enriched head: \n%s", combos_df.head(3).to_string())
                 try:
                     io_core.save(
@@ -2588,7 +2663,9 @@ def run(
         io_core.save(totals, "portfolio_greeks_totals", fmt, outdir)
         if combos:
             # Drop auxiliary columns from CSV output
-            save_df = combos_df.drop(columns=["__db_legs_detail", "__strike_source", "__healed_legs"], errors="ignore")
+            save_df = combos_df.drop(
+                columns=["__db_legs_detail", "__strike_source", "__healed_legs"], errors="ignore"
+            )
             io_core.save(save_df, "portfolio_greeks_combos", fmt, outdir)
             logger.info("Combos saved: %d", len(combos_df))
 
@@ -2620,12 +2697,8 @@ def run(
 
     if return_dict:
         totals_row = totals.iloc[0].to_dict()
-        combo_sum: Dict[str, float] = {}
-        if (
-            combos
-            and not combos_df.empty
-            and {"delta", "gamma", "vega", "theta"}.issubset(combos_df.columns)
-        ):
+        combo_sum: dict[str, float] = {}
+        if combos and not combos_df.empty and {"delta", "gamma", "vega", "theta"}.issubset(combos_df.columns):
             combo_sum = combos_df[["delta", "gamma", "vega", "theta"]].sum().to_dict()
         result = {"legs": totals_row, "combos": combo_sum}
         if return_frames:
@@ -2636,13 +2709,11 @@ def run(
     return None
 
 
-def main(argv: list[str] | None = None) -> Dict[str, Any]:
+def main(argv: list[str] | None = None) -> dict[str, Any]:
     parser = argparse.ArgumentParser(description="Portfolio Greeks exporter")
     parser.add_argument("--positions-csv")
     parser.add_argument("--no-combos", action="store_true")
-    parser.add_argument(
-        "--combo-types", choices=["simple", "all"], default="simple"
-    )
+    parser.add_argument("--combo-types", choices=["simple", "all"], default="simple")
     parser.add_argument(
         "--combos-source",
         choices=["auto", "db", "live", "engine"],
@@ -2676,7 +2747,9 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
         else:
             warnings.append("--positions-csv required for preflight")
             ok = False
-        summary = json_helpers.report_summary({}, outputs={}, warnings=warnings, meta={"script": "portfolio_greeks"})
+        summary = json_helpers.report_summary(
+            {}, outputs={}, warnings=warnings, meta={"script": "portfolio_greeks"}
+        )
         summary["ok"] = ok
         if args.json:
             cli_helpers.print_json(summary, True)
@@ -2711,7 +2784,7 @@ def main(argv: list[str] | None = None) -> Dict[str, Any]:
             return_frames=True,
         )
 
-        outputs: Dict[str, str] = {}
+        outputs: dict[str, str] = {}
         written: list[Path] = []
         if formats["positions"]:
             p = Path(outdir) / "portfolio_greeks_positions.csv"

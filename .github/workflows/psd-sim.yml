@@ -1,0 +1,24 @@
+name: PSD Sim Smoke
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+jobs:
+  psd_sim_smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package (editable)
+        run: |
+          python -m pip install -U pip
+          pip install -e .
+      - name: Run simulator
+        run: |
+          python scripts/psd_sim.py | tee sim_out.txt
+          grep -q "pacing_ok=True" sim_out.txt
+

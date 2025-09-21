@@ -1,0 +1,611 @@
+{
+  "consumer": {
+    "name": "web-ui"
+  },
+  "interactions": [
+    {
+      "description": "a request for the PSD state snapshot",
+      "request": {
+        "headers": {
+          "accept": "application/json"
+        },
+        "method": "GET",
+        "path": "/state"
+      },
+      "response": {
+        "body": {
+          "positions_view": {
+            "option_combos": [
+              {
+                "combo_id": "combo-aapl-call-spread",
+                "greeks_agg": {
+                  "delta": 0.22,
+                  "gamma": 0.08,
+                  "theta": -0.05
+                },
+                "legs": [
+                  {
+                    "avg_cost": 5,
+                    "conId": 2001,
+                    "expiry": "20240119",
+                    "greeks": {
+                      "delta": 0.4,
+                      "gamma": 0.02,
+                      "theta": -0.08
+                    },
+                    "mark": 6.4,
+                    "multiplier": 100,
+                    "pnl_intraday": 140,
+                    "price_source": "mid",
+                    "qty": 1,
+                    "right": "CALL",
+                    "secType": "OPT",
+                    "stale_s": 40,
+                    "strike": 180,
+                    "symbol": "AAPL"
+                  }
+                ],
+                "name": "AAPL CALL SPREAD",
+                "pnl_intraday": 420,
+                "underlier": "AAPL"
+              }
+            ],
+            "single_options": [
+              {
+                "avg_cost": 2,
+                "conId": 3001,
+                "expiry": "20240216",
+                "greeks": {
+                  "delta": -0.4,
+                  "theta": -0.02
+                },
+                "mark": 2.6,
+                "multiplier": 100,
+                "pnl_intraday": 60,
+                "price_source": "mid",
+                "qty": 1,
+                "right": "PUT",
+                "secType": "OPT",
+                "stale_s": 35,
+                "strike": 300,
+                "symbol": "MSFT"
+              }
+            ],
+            "single_stocks": [
+              {
+                "avg_cost": 150,
+                "conId": 101,
+                "greeks": {
+                  "delta": 120
+                },
+                "mark": 152.34,
+                "multiplier": 1,
+                "pnl_intraday": 280.8,
+                "price_source": "last",
+                "qty": 120,
+                "secType": "STK",
+                "stale_s": 25,
+                "symbol": "AAPL"
+              }
+            ]
+          },
+          "session": "RTH",
+          "ts": 1700000000
+        },
+        "headers": {
+          "Content-Type": "application/json; charset=utf-8"
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].combo_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].greeks_agg": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].greeks_agg.delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].greeks_agg.gamma": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].greeks_agg.theta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].avg_cost": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].conId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].expiry": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].greeks": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].greeks.delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].greeks.gamma": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].greeks.theta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].mark": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].multiplier": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].pnl_intraday": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].price_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].qty": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].right": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "CALL|PUT"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].secType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "OPT|FOP"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].stale_s": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].strike": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].legs[*].symbol": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].pnl_intraday": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.option_combos[*].underlier": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_options": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].avg_cost": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].conId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].expiry": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].greeks": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].greeks.delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].greeks.theta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].mark": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].multiplier": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].pnl_intraday": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].price_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].qty": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].right": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "CALL|PUT"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].secType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "OPT|FOP"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].stale_s": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].strike": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_options[*].symbol": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].avg_cost": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].conId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].greeks": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].greeks.delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].mark": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].multiplier": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].pnl_intraday": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].price_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].qty": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].secType": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "STK|OPT|FOP"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].stale_s": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.positions_view.single_stocks[*].symbol": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.session": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "RTH|EXT|CLOSED"
+                }
+              ]
+            },
+            "$.ts": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-js": {
+      "version": "15.0.1"
+    },
+    "pactRust": {
+      "ffi": "0.4.28",
+      "models": "1.3.5"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "psd-api"
+  }
+}

@@ -45,7 +45,7 @@ def _fixtures():
         index=[0, 1, 2],
     )
 
-    def _fake_positions():
+    async def _fake_positions_async():
         return pos_df
 
     def _fake_detect(_df):
@@ -78,12 +78,15 @@ def _fixtures():
             )
         return pd.DataFrame(rows)
 
-    return pos_df, _fake_positions, _fake_detect, _fake_chain
+    return pos_df, _fake_positions_async, _fake_detect, _fake_chain
 
 
 def _prep(monkeypatch):
-    pos_df, fake_positions, fake_detect, fake_chain = _fixtures()
-    fake_pg = types.SimpleNamespace(_load_positions=fake_positions)
+    pos_df, fake_positions_async, fake_detect, fake_chain = _fixtures()
+    fake_pg = types.SimpleNamespace(
+        _load_positions=fake_positions_async,
+        load_positions_sync=lambda: pos_df,
+    )
     monkeypatch.setattr(roll_manager, "portfolio_greeks", fake_pg)
     monkeypatch.setattr(roll_manager, "run_with_spinner", _stub_spinner)
     monkeypatch.setattr(roll_manager, "detect_combos", fake_detect)

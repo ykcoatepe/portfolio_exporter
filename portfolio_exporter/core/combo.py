@@ -6,14 +6,14 @@ import logging
 import os
 import pathlib
 import sqlite3
-from typing import Dict, List, Tuple, Optional
-
-from .io import migrate_combo_schema
-from .config import settings
 
 import pandas as pd
 
+from .config import settings
+from .io import _ensure_writable_dir, migrate_combo_schema
+
 log = logging.getLogger(__name__)
+
 
 # ── database setup ────────────────────────────────────────────────────────────
 def _default_db_path() -> pathlib.Path:
@@ -36,21 +36,13 @@ def _default_db_path() -> pathlib.Path:
         local_p.parent.mkdir(parents=True, exist_ok=True)
         return local_p
 
-    # Preferred location alongside other app outputs
+    # Preferred location alongside other app outputs with writable fallback
     try:
-        outdir = pathlib.Path(getattr(settings, "output_dir", ".")).expanduser()
+        base = pathlib.Path(getattr(settings, "output_dir", "."))
     except Exception:
-        outdir = pathlib.Path.cwd()
-    home_p = outdir / "combos.db"
-    try:
-        # Only ensure the directory exists here; avoid touching the DB file at import time.
-        home_p.parent.mkdir(parents=True, exist_ok=True)
-        return home_p
-    except Exception:
-        # Fall back to a repo-local path to avoid sandbox restrictions
-        local_p = pathlib.Path.cwd() / "tmp_test_run" / "combos.db"
-        local_p.parent.mkdir(parents=True, exist_ok=True)
-        return local_p
+        base = pathlib.Path.cwd()
+    outdir = _ensure_writable_dir(base)
+    return outdir / "combos.db"
 
 
 DB_PATH = _default_db_path()
@@ -80,14 +72,19 @@ CREATE TABLE IF NOT EXISTS legs (
 
 
 def _db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn = sqlite3.connect(DB_PATH)
+    except Exception:
+        # Last-resort fallback to local tmp if prior path became unwritable
+        fallback = _ensure_writable_dir(pathlib.Path.cwd() / "tmp_test_run") / "combos.db"
+        conn = sqlite3.connect(fallback)
     conn.executescript(_DDL)
     migrate_combo_schema(conn)
     return conn
 
 
 # ---------- util helpers --------------------------------------------------
-def _hash_combo(conids: List[int]) -> str:
+def _hash_combo(conids: list[int]) -> str:
     h = hashlib.sha256()
     for cid in sorted(conids):
         h.update(str(cid).encode())
@@ -111,7 +108,7 @@ def detect_combos(pos_df: pd.DataFrame, mode: str = "all") -> pd.DataFrame:
     if "right" not in pos_df.columns:
         pos_df["right"] = pd.NA
 
-    combos: List[Dict] = []
+    combos: list[dict] = []
     used: set[int] = set()
 
     for _, sub in pos_df.groupby("underlying"):
@@ -180,13 +177,11 @@ def detect_combos(pos_df: pd.DataFrame, mode: str = "all") -> pd.DataFrame:
 
 
 def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
-    import pandas as pd
     import numpy as np
+    import pandas as pd
 
     if df is None or df.empty:
-        return pd.DataFrame(columns=[
-            "underlying","expiry","right","strike","qty","secType"
-        ])
+        return pd.DataFrame(columns=["underlying", "expiry", "right", "strike", "qty", "secType"])
 
     out = df.copy()
 
@@ -204,7 +199,7 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
     # ensure conId column presence
     if "conId" not in out.columns:
         out["conId"] = pd.NA
-    for col in ["underlying","expiry","right","strike","qty","secType","conId"]:
+    for col in ["underlying", "expiry", "right", "strike", "qty", "secType", "conId"]:
         if col not in out.columns:
             out[col] = np.nan
 
@@ -219,9 +214,12 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
         if x is None:
             return np.nan
         s = str(x).strip().upper()
-        if s in ("C","CALL"): return "C"
-        if s in ("P","PUT"):  return "P"
+        if s in ("C", "CALL"):
+            return "C"
+        if s in ("P", "PUT"):
+            return "P"
         return np.nan
+
     out["right"] = out["right"].apply(norm_right)
 
     # --- numeric coercions ---
@@ -251,7 +249,7 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             pass
         # compact numeric forms
-        t2 = t.replace("-","").replace("/","").replace(" ","")
+        t2 = t.replace("-", "").replace("/", "").replace(" ", "")
         if t2.isdigit():
             if len(t2) >= 8:
                 return t2[:8]
@@ -269,8 +267,9 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
                 return int(val)
         except Exception:
             pass
-        key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike','')}"
+        key = f"{row.get('underlying', '')}|{row.get('expiry', '')}|{row.get('right', '')}|{row.get('strike', '')}"
         import hashlib as _hl
+
         # Use 32-bit slice and negate to avoid colliding with real conIds
         v = int.from_bytes(_hl.sha1(key.encode()).digest()[:4], "big")
         return -int(v)
@@ -281,16 +280,19 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
         pass
 
     # Keep only columns the detector needs
-    out = out[["underlying","expiry","right","strike","qty","secType","conId"]].copy()
+    out = out[["underlying", "expiry", "right", "strike", "qty", "secType", "conId"]].copy()
 
     # Focus detection on option-like instruments only
     out = out[out["secType"].isin(["OPT", "FOP"])].copy()
 
     # Optional debug dump
     import os
+
     if os.getenv("PE_DEBUG_COMBOS") == "1":
         try:
-            from portfolio_exporter.core import io as io_core, config as config_core
+            from portfolio_exporter.core import config as config_core
+            from portfolio_exporter.core import io as io_core
+
             io_core.save(out, "positions_normalized_debug", "csv", config_core.settings.output_dir)
         except Exception:
             pass
@@ -335,15 +337,20 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
     if norm.empty:
         # Optional debug: emit a diagnostic when no option rows found
         import os
+
         if os.getenv("PE_DEBUG_COMBOS") == "1":
             try:
-                from portfolio_exporter.core import io as io_core, config as config_core
+                from portfolio_exporter.core import config as config_core
+                from portfolio_exporter.core import io as io_core
+
                 # Build minimal diagnostic frame
                 diag = pd.DataFrame(
-                    [{
-                        "reason": "no_option_rows_after_normalization",
-                        "total_input_rows": int(len(df_positions) if df_positions is not None else 0),
-                    }]
+                    [
+                        {
+                            "reason": "no_option_rows_after_normalization",
+                            "total_input_rows": int(len(df_positions) if df_positions is not None else 0),
+                        }
+                    ]
                 )
                 io_core.save(diag, "combos_diag_debug", "csv", config_core.settings.output_dir)
             except Exception:
@@ -366,12 +373,12 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
     # Track remaining lots per row
     remaining = norm["abs_qty"].to_dict()
 
-    rows: List[Dict[str, object]] = []
+    rows: list[dict[str, object]] = []
 
     # Per-underlying processing
     totals = {"vertical": 0, "iron condor": 0, "butterfly": 0, "calendar": 0}
     # Build equity positions lookup for covered-call detection
-    eq_lookup: Dict[str, Dict[str, object]] = {}
+    eq_lookup: dict[str, dict[str, object]] = {}
     try:
         eq_src = df_positions.copy()
         if "underlying" not in eq_src.columns and "symbol" in eq_src.columns:
@@ -408,17 +415,17 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             row_conid = {int(i): None for i in u_df.index}
 
         # Index helpers
-        def _legs_for(exp: str, right: str) -> List[int]:
+        def _legs_for(exp: str, right: str) -> list[int]:
             sub = u_df[(u_df["expiry"] == exp) & (u_df["right"] == right)]
             # Sorted by strike for verticals/butterflies
             return list(sub.sort_values("strike").index)
 
-        def _legs_for_strike(strike: float, right: str) -> List[int]:
+        def _legs_for_strike(strike: float, right: str) -> list[int]:
             sub = u_df[(u_df["strike"] == strike) & (u_df["right"] == right)]
             return list(sub.sort_values("expiry").index)
 
         # ── 1) Verticals (same expiry, same right) ──────────────────────
-        vertical_records: List[Tuple[str, str, float, float, int, List[int]]] = []
+        vertical_records: list[tuple[str, str, float, float, int, list[int]]] = []
         # (expiry, right, k_low, k_high, matched_qty, [row_i,row_j])
         for (exp, right), grp in u_df.groupby(["expiry", "right"]):
             idxs = list(grp.sort_values("strike").index)
@@ -427,6 +434,7 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             shorts = [i for i in idxs if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == "short"]
             if not longs or not shorts:
                 continue
+
             # Greedy pairing preference by option type
             # For calls prefer long lowerK with short higherK; for puts prefer short higherK with long lowerK.
             def _strike(i: int) -> float:
@@ -485,7 +493,7 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     si += 1
 
         # ── 2) Butterflies (same expiry, same right, 1:-2:1) ────────────
-        butterfly_records: List[Tuple[str, str, float, float, float, int, List[int]]] = []
+        butterfly_records: list[tuple[str, str, float, float, float, int, list[int]]] = []
         for (exp, right), grp in u_df.groupby(["expiry", "right"]):
             g = grp.sort_values("strike")
             strikes = list(g["strike"].unique())
@@ -493,8 +501,11 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                 continue
             # Build per-strike remaining longs/shorts counts and row indices
             rows_by_strike = {k: list(g[g["strike"] == k].index) for k in strikes}
-            def _avail(side: str, row_ids: List[int]) -> int:
-                return sum(remaining[i] for i in row_ids if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == side)
+
+            def _avail(side: str, row_ids: list[int]) -> int:
+                return sum(
+                    remaining[i] for i in row_ids if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == side
+                )
 
             for i in range(1, len(strikes) - 1):
                 k1, k2, k3 = strikes[i - 1], strikes[i], strikes[i + 1]
@@ -506,7 +517,7 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                 m1 = min(lots1, lots2_short // 2, lots3)
                 if m1 > 0:
                     # Consume greedily across rows
-                    used_rows: List[int] = []
+                    used_rows: list[int] = []
                     need = {"long@k1": m1, "short@k2": 2 * m1, "long@k3": m1}
                     for rid in rows1:
                         if need["long@k1"] == 0:
@@ -578,12 +589,12 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
 
         # ── 3) Iron condors (pair one call vertical with one put vertical) ──
         # Aggregate vertical units by expiry
-        condor_records: List[Tuple[str, float, int, List[int]]] = []
+        condor_records: list[tuple[str, float, int, list[int]]] = []
         # Map expiry -> lists of (width, qty, rows)
         from collections import defaultdict
 
-        exp_call: Dict[str, List[Tuple[float, int, List[int]]]] = defaultdict(list)
-        exp_put: Dict[str, List[Tuple[float, int, List[int]]]] = defaultdict(list)
+        exp_call: dict[str, list[tuple[float, int, list[int]]]] = defaultdict(list)
+        exp_put: dict[str, list[tuple[float, int, list[int]]]] = defaultdict(list)
         for exp, right, k1, k2, q, rows_used in vertical_records:
             width = float(abs(k2 - k1))
             rec = (width, q, rows_used)
@@ -593,20 +604,23 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                 exp_put[exp].append(rec)
 
         # Greedy pairing by matched qty and same orientation (both credit or both debit)
-        vertical_keep: List[Tuple[str, str, float, float, int, List[int]]] = []
-        def _vert_orient(row_ids: List[int], right_val: str) -> str:
+        vertical_keep: list[tuple[str, str, float, float, int, list[int]]] = []
+
+        def _vert_orient(row_ids: list[int], right_val: str) -> str:
             if len(row_ids) != 2:
                 return "unknown"
             i1, i2 = row_ids[0], row_ids[1]
-            k1, k2 = float(u_df.loc[i1, "strike"]), float(u_df.loc[i2, "strike"])
-            s1, s2 = str(u_df.loc[i1, "side"]), str(u_df.loc[i2, "side"])  # long/short
+            strike_first = float(u_df.loc[i1, "strike"])
+            strike_second = float(u_df.loc[i2, "strike"])
+            side_first = str(u_df.loc[i1, "side"])  # long/short
             # Identify which strike is long vs short
-            long_k = k1 if s1 == "long" else k2
-            short_k = k1 if s1 == "short" else k2
+            long_strike = strike_first if side_first == "long" else strike_second
+            short_strike = strike_first if side_first == "short" else strike_second
             if right_val == "C":
-                return "debit" if long_k < short_k else "credit"
+                return "debit" if long_strike < short_strike else "credit"
             else:  # P
-                return "debit" if long_k > short_k else "credit"
+                return "debit" if long_strike > short_strike else "credit"
+
         for exp in set(list(exp_call.keys()) + list(exp_put.keys())):
             calls = exp_call.get(exp, [])
             puts = exp_put.get(exp, [])
@@ -655,14 +669,15 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
 
         # Compose rows for this underlying
         # Helper: classify vertical orientation
-        def _classify_vertical(right_val: str, row_ids: List[int]) -> str:
+        def _classify_vertical(right_val: str, row_ids: list[int]) -> str:
             if len(row_ids) != 2:
                 return "vertical"
             i1, i2 = row_ids[0], row_ids[1]
-            s1, s2 = float(u_df.loc[i1, "strike"]), float(u_df.loc[i2, "strike"])
-            side1, side2 = str(u_df.loc[i1, "side"]), str(u_df.loc[i2, "side"])
-            long_k = s1 if side1 == "long" else s2
-            short_k = s1 if side1 == "short" else s2
+            strike_first = float(u_df.loc[i1, "strike"])
+            strike_second = float(u_df.loc[i2, "strike"])
+            side_first, _side_second = str(u_df.loc[i1, "side"]), str(u_df.loc[i2, "side"])
+            long_k = strike_first if side_first == "long" else strike_second
+            short_k = strike_first if side_first == "short" else strike_second
             if right_val == "C":
                 return "bull call" if long_k < short_k else "bear call"
             else:  # P
@@ -836,8 +851,20 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             for k in strikes:
                 gk = grp[grp["strike"] == k]
                 for side in ["long", "short"]:
-                    c_rows = [i for i in gk.index if u_df.loc[i, "right"] == "C" and u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0]
-                    p_rows = [i for i in gk.index if u_df.loc[i, "right"] == "P" and u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0]
+                    c_rows = [
+                        i
+                        for i in gk.index
+                        if u_df.loc[i, "right"] == "C"
+                        and u_df.loc[i, "side"] == side
+                        and remaining.get(i, 0) > 0
+                    ]
+                    p_rows = [
+                        i
+                        for i in gk.index
+                        if u_df.loc[i, "right"] == "P"
+                        and u_df.loc[i, "side"] == side
+                        and remaining.get(i, 0) > 0
+                    ]
                     if not c_rows or not p_rows:
                         continue
                     c_lots = sum(remaining[i] for i in c_rows)
@@ -845,7 +872,7 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     m_target = min(c_lots, p_lots)
                     if m_target <= 0:
                         continue
-                    used_rows: List[int] = []
+                    used_rows: list[int] = []
                     # consume from first available rows
                     for rid in c_rows:
                         if m_target <= 0:
@@ -933,7 +960,11 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
         if stock_info and float(stock_info.get("shares", 0)) > 0:
             shares_avail = float(stock_info.get("shares", 0))
             stk_conid = int(stock_info.get("conId"))
-            shorts = [i for i in u_df.index if u_df.loc[i, "right"] == "C" and u_df.loc[i, "side"] == "short" and remaining.get(i, 0) > 0]
+            shorts = [
+                i
+                for i in u_df.index
+                if u_df.loc[i, "right"] == "C" and u_df.loc[i, "side"] == "short" and remaining.get(i, 0) > 0
+            ]
             for rid in shorts:
                 lots_cover = int(min(remaining.get(rid, 0), shares_avail // 100))
                 if lots_cover <= 0:
@@ -962,9 +993,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             u_sym,
             totals["vertical"],
             totals["iron condor"],
-                totals["butterfly"],
-                totals["calendar"],
-            )
+            totals["butterfly"],
+            totals["calendar"],
+        )
 
     # Grand total log
     grand_total = sum(totals.values())
@@ -980,11 +1011,15 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
     if not rows:
         # Optional debug: emit per (underlying, expiry, right) sign/strike availability
         import os
+
         if os.getenv("PE_DEBUG_COMBOS") == "1":
             try:
-                from portfolio_exporter.core import io as io_core, config as config_core
+                from portfolio_exporter.core import config as config_core
+                from portfolio_exporter.core import io as io_core
+
                 def _signs(s: pd.Series) -> tuple[bool, bool]:
                     return (bool((s > 0).any()), bool((s < 0).any()))
+
                 # Group diagnostics
                 grp = (
                     norm.groupby(["underlying", "expiry", "right"], dropna=False)
@@ -992,22 +1027,24 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                         rows=("qty", "size"),
                         longs=("qty", lambda s: int((s > 0).sum())),
                         shorts=("qty", lambda s: int((s < 0).sum())),
-                        strikes_unique=("strike", lambda s: int(pd.Series(s).nunique()))
+                        strikes_unique=("strike", lambda s: int(pd.Series(s).nunique())),
                     )
                     .reset_index()
                 )
                 if grp.empty:
-                    grp = pd.DataFrame([
-                        {
-                            "underlying": "",
-                            "expiry": "",
-                            "right": "",
-                            "rows": 0,
-                            "longs": 0,
-                            "shorts": 0,
-                            "strikes_unique": 0,
-                        }
-                    ])
+                    grp = pd.DataFrame(
+                        [
+                            {
+                                "underlying": "",
+                                "expiry": "",
+                                "right": "",
+                                "rows": 0,
+                                "longs": 0,
+                                "shorts": 0,
+                                "strikes_unique": 0,
+                            }
+                        ]
+                    )
                 io_core.save(grp, "combos_diag_debug", "csv", config_core.settings.output_dir)
             except Exception:
                 pass
@@ -1058,20 +1095,25 @@ def _row(
     type_: str,
     width: float | None = None,
     credit_debit: float | None = None,
-) -> Dict:
+) -> dict:
     combo_id = _hash_combo(list(legs_df.index))
     # Derive a user-facing structure label without changing existing structure values
     structure_label = structure
     try:
-        if type_ == "vertical" and len(legs_df) == 2 and {
-            "right",
-            "strike",
-            "qty",
-        } <= set(legs_df.columns):
+        if (
+            type_ == "vertical"
+            and len(legs_df) == 2
+            and {
+                "right",
+                "strike",
+                "qty",
+            }
+            <= set(legs_df.columns)
+        ):
             right = str(legs_df["right"].iloc[0])
             # Identify long vs short strikes
             s0, s1 = float(legs_df["strike"].iloc[0]), float(legs_df["strike"].iloc[1])
-            q0, q1 = float(legs_df["qty"].iloc[0]), float(legs_df["qty"].iloc[1])
+            q0 = float(legs_df["qty"].iloc[0])
             # Long strike is attached to the positive-qty leg
             long_k = s0 if q0 > 0 else s1
             short_k = s0 if q0 < 0 else s1
@@ -1106,12 +1148,12 @@ def _calc_width(legs_df: pd.DataFrame) -> float | None:
     strikes = sorted(set(legs_df["strike"]))
     if len(strikes) <= 1:
         return 0.0
-    diffs = [b - a for a, b in zip(strikes[:-1], strikes[1:])]
+    diffs = [b - a for a, b in zip(strikes[:-1], strikes[1:], strict=True)]
     return min(diffs) if diffs else 0.0
 
 
-def _match_calendar(df: pd.DataFrame, used: set[int]) -> List[Dict]:
-    combos: List[Dict] = []
+def _match_calendar(df: pd.DataFrame, used: set[int]) -> list[dict]:
+    combos: list[dict] = []
     sub = df[~df.index.isin(used)]
     for (strike, right), grp in sub.groupby(["strike", "right"]):
         if len(grp) == 2 and grp["expiry"].nunique() == 2:
@@ -1123,8 +1165,8 @@ def _match_calendar(df: pd.DataFrame, used: set[int]) -> List[Dict]:
     return combos
 
 
-def _match_condor(df: pd.DataFrame, used: set[int]) -> List[Dict]:
-    combos: List[Dict] = []
+def _match_condor(df: pd.DataFrame, used: set[int]) -> list[dict]:
+    combos: list[dict] = []
     sub = df[~df.index.isin(used)]
     for exp, grp in sub.groupby("expiry"):
         calls = grp[grp["right"] == "C"]
@@ -1147,6 +1189,7 @@ def _match_condor(df: pd.DataFrame, used: set[int]) -> List[Dict]:
                         return "debit" if long_k < short_k else "credit"
                     else:
                         return "debit" if long_k > short_k else "credit"
+
                 o_calls = _orient(calls, "C")
                 o_puts = _orient(puts, "P")
                 if o_calls != "unknown" and o_puts != "unknown" and o_calls == o_puts:
@@ -1157,15 +1200,13 @@ def _match_condor(df: pd.DataFrame, used: set[int]) -> List[Dict]:
     return combos
 
 
-def _match_butterfly(df: pd.DataFrame, used: set[int]) -> List[Dict]:
-    combos: List[Dict] = []
+def _match_butterfly(df: pd.DataFrame, used: set[int]) -> list[dict]:
+    combos: list[dict] = []
     sub = df[~df.index.isin(used)]
     for (exp, right), grp in sub.groupby(["expiry", "right"]):
         if len(grp) == 3:
             qtys = list(grp["qty"])
-            if (qtys.count(-2) == 1 and qtys.count(1) == 2) or (
-                qtys.count(2) == 1 and qtys.count(-1) == 2
-            ):
+            if (qtys.count(-2) == 1 and qtys.count(1) == 2) or (qtys.count(2) == 1 and qtys.count(-1) == 2):
                 conids = list(grp.index)
                 used.update(conids)
                 width = _calc_width(df.loc[conids])
@@ -1173,10 +1214,10 @@ def _match_butterfly(df: pd.DataFrame, used: set[int]) -> List[Dict]:
     return combos
 
 
-def _pair_same_strike(df: pd.DataFrame, used: set[int]) -> List[List[int]]:
+def _pair_same_strike(df: pd.DataFrame, used: set[int]) -> list[list[int]]:
     mask = ~df.index.isin(used)
     sub = df[mask]
-    pairs: List[List[int]] = []
+    pairs: list[list[int]] = []
     for (u, strk, exp), grp in sub.groupby(["underlying", "strike", "expiry"]):
         if {"C", "P"} <= set(grp["right"]) and grp["qty"].nunique() == 1:
             pairs.append(list(grp.index))
@@ -1189,14 +1230,10 @@ def _sync_with_db(combo_df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
     today = _dt.date.today().isoformat()
 
     active = set(combo_df.index)
-    cur = conn.execute(
-        "SELECT combo_id, underlying, expiry, structure FROM combos WHERE ts_closed IS NULL"
-    )
+    cur = conn.execute("SELECT combo_id, underlying, expiry, structure FROM combos WHERE ts_closed IS NULL")
     open_combos = {}
     for cid, underlying, expiry, structure in cur.fetchall():
-        legs = conn.execute(
-            "SELECT strike, right FROM legs WHERE combo_id=?", (cid,)
-        ).fetchall()
+        legs = conn.execute("SELECT strike, right FROM legs WHERE combo_id=?", (cid,)).fetchall()
         open_combos[cid] = {
             "underlying": underlying,
             "expiry": expiry,
@@ -1204,9 +1241,11 @@ def _sync_with_db(combo_df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
             "legs": sorted(legs),
         }
 
-    parent_map: Dict[str, str] = {}
+    parent_map: dict[str, str] = {}
     for cid, row in combo_df.iterrows():
-        key = sorted([(pos_df.loc[l].strike, pos_df.loc[l].right) for l in row.legs])
+        key = sorted(
+            [(pos_df.loc[leg_id].strike, pos_df.loc[leg_id].right) for leg_id in row.legs]
+        )
         for ocid, data in open_combos.items():
             if (
                 data["underlying"] == row.underlying
@@ -1257,7 +1296,7 @@ def _sync_with_db(combo_df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
         combo_df.loc[cid, "parent_combo_id"] = parent
 
 
-def fetch_persisted_mapping() -> Dict[int, str]:
+def fetch_persisted_mapping() -> dict[int, str]:
     """Return mapping of ``conid`` to ``combo_id`` from the SQLite store."""
 
     conn = _db()

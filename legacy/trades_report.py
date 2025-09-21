@@ -137,7 +137,7 @@ OUTPUT_DIR = Path(
     "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
 )
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 5  # dedicated clientId
+IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7496, 5  # dedicated clientId (set 7497 for paper)
 
 
 MONTH_MAP = {m.lower(): i for i, m in enumerate(calendar.month_name) if m}
@@ -797,7 +797,7 @@ def main() -> None:
     g.add_argument("--phrase", help="Custom date phrase, e.g. 'June 2024'")
     g.add_argument("--start")
     p.add_argument("--end")
-    p.add_argument("--ibport", type=int, help="Override API port (default 7497)")
+    p.add_argument("--ibport", type=int, help="Override API port (default 7496; use 7497 for paper)")
     p.add_argument("--cid", type=int, help="Override IB clientId (default 5)")
     out_grp = p.add_mutually_exclusive_group()
     out_grp.add_argument(

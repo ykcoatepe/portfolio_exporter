@@ -49,7 +49,11 @@ df['right'] = df['right'].astype(str).str.upper().str[0]
 pos_df = df.set_index('conId')
 
 # Monkeypatch loader
-portfolio_greeks._load_positions = lambda: pos_df
+async def _fake_load_positions():
+    return pos_df
+
+portfolio_greeks._load_positions = _fake_load_positions
+portfolio_greeks.load_positions_sync = lambda: pos_df
 
 # Stub option chain fetcher to avoid network/optional deps
 def _fake_fetch_chain(symbol: str, expiry: str, strikes=None):
