@@ -9,6 +9,7 @@ prometheus-client
 pydantic
 pydantic-settings
 pyyaml
+jsonschema
 pypdf
 reportlab
 rich
