@@ -23,6 +23,7 @@ import { deriveStalenessSeconds, formatSigned, stalenessTone, valueTone } from "
 const COLUMN_COUNT = 8;
 const SKELETON_ROWS = Array.from({ length: 6 }, (_, idx) => idx);
 const SHOULD_POLL = import.meta.env.MODE !== "test";
+const QTY_TOOLTIP = "+ = long (debit), − = short (credit); magnitude = contracts";
 
 function CombosSkeleton() {
   return (
@@ -86,7 +87,7 @@ function ComboLegsDetail({ legs }: { legs: OptionComboLegRow[] }) {
           {legs.map((leg) => (
             <tr key={leg.id} className="border-b border-slate-900/60 last:border-0">
               <td className="px-3 py-2 text-sm font-semibold text-slate-100">
-                <span title={leg.symbol}>{leg.label}</span>
+                <span title={leg.labelTooltip ?? leg.symbol}>{leg.label}</span>
               </td>
               <td className="px-3 py-2 text-sm text-slate-200">{leg.quantity}</td>
               <td className="px-3 py-2 text-sm text-slate-200">
@@ -150,7 +151,7 @@ function GroupDetail({ group, combos }: GroupDetailProps) {
             <span
               key={leg.id}
               className="rounded-full border border-slate-800 bg-slate-950 px-3 py-1 text-xs text-slate-200"
-              title={leg.symbol}
+              title={leg.labelTooltip ?? leg.symbol}
             >
               {leg.label}
             </span>
@@ -245,12 +246,44 @@ const ComboRow = (
 
   const quantity = entry.kind === "group" ? entry.row.groupQty : entry.row.comboQty;
   const netPrice = entry.kind === "group" ? entry.row.netPrice : entry.row.netPremium;
+  const quantityNumber = Number(quantity);
+  const hasQuantity = Number.isFinite(quantityNumber);
+  const quantityRounded = hasQuantity
+    ? (Number.isInteger(quantityNumber) ? quantityNumber : Number(quantityNumber.toFixed(2)))
+    : null;
+  const quantityDisplay =
+    quantityRounded === null
+      ? null
+      : quantityRounded > 0
+        ? `+${quantityRounded}`
+        : quantityRounded === 0
+          ? "0"
+          : String(quantityRounded);
+  const netPriceNumber = Number(netPrice ?? 0);
+  const hasNetPrice = Number.isFinite(netPriceNumber);
+  const sideLabel = hasNetPrice && netPriceNumber !== 0
+    ? netPriceNumber > 0
+      ? "Credit"
+      : "Debit"
+    : null;
+  const priceText = fmtPrice(hasNetPrice ? netPriceNumber : 0);
   const greeks = entry.kind === "group"
     ? entry.row
     : entry.row;
 
   const markPrice = entry.kind === "group" ? null : entry.row.markPrice;
   const markSource = entry.kind === "group" ? entry.row.markSource : entry.row.markSource;
+  const rowLegs = entry.kind === "group" ? entry.row.legs : entry.row.legs;
+  const labelText = entry.kind === "group" ? entry.row.label : entry.row.label;
+  const tooltipSymbols = rowLegs
+    .map((leg) => leg.symbol)
+    .filter((symbol): symbol is string => typeof symbol === "string" && symbol.trim().length > 0);
+  const labelTooltip =
+    tooltipSymbols.length > 0
+      ? tooltipSymbols.join(" • ")
+      : entry.kind === "group"
+        ? labelText
+        : entry.row.id;
 
   return (
     <Fragment>
@@ -289,7 +322,7 @@ const ComboRow = (
               {isExpanded ? "−" : "+"}
             </button>
             <div className="space-y-1">
-              <span>{entry.kind === "group" ? entry.row.label : entry.row.label}</span>
+              <span title={labelTooltip}>{labelText}</span>
               <p className="text-xs font-normal text-slate-400">
                 {entry.kind === "group" ? entry.row.display?.short_ul ?? entry.row.underlying : entry.row.underlying}
               </p>
@@ -401,8 +434,8 @@ const ForwardedComboRow = forwardRef<HTMLTableRowElement, ComboRowProps>(ComboRo
 
 export function CombosTable(): JSX.Element {
   const {
-    data: combos = [],
     groups = [],
+    rawCombos = [],
     groupCombos,
     isLoading,
     isFetching,
@@ -425,7 +458,7 @@ export function CombosTable(): JSX.Element {
 
   const rows = useMemo<TableRowData[]>(() => {
     if (showRaw) {
-      return combos.map((combo) => ({ kind: "combo", id: combo.id, row: combo }));
+      return rawCombos.map((combo) => ({ kind: "combo", id: combo.id, row: combo }));
     }
     return groups.map((group) => ({
       kind: "group" as const,
@@ -433,7 +466,7 @@ export function CombosTable(): JSX.Element {
       row: group,
       combos: groupCombos.get(group.id) ?? [],
     }));
-  }, [showRaw, combos, groups, groupCombos]);
+  }, [showRaw, rawCombos, groups, groupCombos]);
 
   useEffect(() => {
     if (expandedId && !rows.some((entry) => entry.id === expandedId)) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildFriendlyLegDisplay,
   deriveGroupKey,
   formatComboLabel,
   formatLegLabel,
@@ -51,6 +52,16 @@ describe("labels helpers", () => {
   it("parses padded OSI roots with double spaces", () => {
     const parsed = parseOsi("SPX  20241018P00410000");
     expect(parsed).toEqual({ ul: "SPX", expiryISO: "2024-10-18", side: "P", strike: 410 });
+  });
+
+  it("builds friendly labels with OSI tooltips", () => {
+    const compact = buildFriendlyLegDisplay({ symbol: "AAPL251017C00150000" });
+    expect(compact.label).toBe("AAPL 150C • Oct 17 '25");
+    expect(compact.tooltip).toBe("AAPL251017C00150000");
+
+    const spaced = buildFriendlyLegDisplay({ symbol: "AAPL  251017P00150000" });
+    expect(spaced.label).toBe("AAPL 150P • Oct 17 '25");
+    expect(spaced.tooltip).toBe("AAPL251017P00150000");
   });
 
   it("formats leg labels with normalized right codes", () => {

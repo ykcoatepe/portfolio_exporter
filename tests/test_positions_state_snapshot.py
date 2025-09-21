@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timezone
 from decimal import Decimal
 
@@ -12,6 +13,20 @@ def _equity(symbol: str) -> Position:
         instrument=Instrument(symbol=symbol, instrument_type=InstrumentType.EQUITY),
         quantity=Decimal("10"),
         avg_cost=Decimal("100"),
+    )
+
+
+def _option(symbol: str, qty: str) -> Position:
+    instrument = Instrument(
+        symbol=symbol,
+        instrument_type=InstrumentType.OPTION,
+        multiplier=Decimal("100"),
+    )
+    return Position(
+        instrument=instrument,
+        quantity=Decimal(qty),
+        avg_cost=Decimal("1.0"),
+        metadata={"account": "TEST"},
     )
 
 
@@ -51,3 +66,62 @@ def test_snapshot_updated_at_uses_override_when_provided() -> None:
     state.refresh(snapshot_at=override)
 
     assert state.snapshot_updated_at() == override
+
+
+def test_positions_view_augments_missing_combos(caplog) -> None:
+    state = PositionsState()
+    option_positions = [
+        _option("AAPL251017C00150000", "-1"),
+        _option("AAPL251017C00160000", "1"),
+    ]
+    upstream_view = {
+        "single_stocks": [],
+        "option_combos": [],
+        "single_options": [
+            {
+                "symbol": "AAPL251017C00150000",
+                "underlying": "AAPL",
+                "right": "CALL",
+                "strike": 150.0,
+                "expiry": "2025-10-17",
+                "quantity": -1.0,
+            },
+            {
+                "symbol": "AAPL251017C00160000",
+                "underlying": "AAPL",
+                "right": "CALL",
+                "strike": 160.0,
+                "expiry": "2025-10-17",
+                "quantity": 1.0,
+            },
+        ],
+    }
+
+    state.refresh(positions=option_positions, positions_view=upstream_view, data_source="internal")
+
+    now = datetime(2024, 1, 1, tzinfo=UTC)
+    with caplog.at_level(logging.INFO):
+        payload = state.positions_view_payload(now)
+
+    combos = payload.get("option_combos") or []
+    assert combos, "expected combos to be synthesized from single legs"
+    assert combos[0].get("legs"), "expected grouped combo legs"
+
+    combo_groups = payload.get("combo_groups") or []
+    assert combo_groups, "expected combo groups alongside combos"
+
+    returned_symbols = {
+        str(leg.get("symbol"))
+        for leg in payload.get("single_options") or []
+        if isinstance(leg, dict)
+    }
+    expected_symbols = {leg["symbol"] for leg in upstream_view["single_options"]}
+    assert returned_symbols == expected_symbols, "single leg payload should remain intact"
+
+    assert any("grouped" in record.message for record in caplog.records)
+
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        payload_again = state.positions_view_payload(now)
+    assert payload_again.get("option_combos")
+    assert not any("grouped" in record.message for record in caplog.records), "log should fire once"

@@ -245,6 +245,8 @@ class RulesState:
         orphan_legs: Sequence[OptionLegSnapshot],
         now: datetime,
     ) -> list[dict[str, Any]]:
+        if not combos and not orphan_legs:
+            return []
         theta_total = sum(_decimal_to_float(combo.sum_theta) for combo in combos)
         for leg in orphan_legs:
             if leg.theta is None:

@@ -79,6 +79,9 @@ class RulesCatalogState:
             return CatalogValidationResult(ok=False, counters={}, top=[], errors=errors, rules=draft.rules)
 
         counters = _normalize_counters(summary.get("breaches", {}))
+        if counters.get("critical", 0) == 0 and counters.get("warning", 0) == 0:
+            counters["info"] = 0
+            counters["total"] = counters["critical"] + counters["warning"] + counters["info"]
         top = summary.get("top", []) if isinstance(summary, dict) else []
         return CatalogValidationResult(
             ok=True,

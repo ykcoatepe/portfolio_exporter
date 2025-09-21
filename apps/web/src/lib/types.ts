@@ -151,6 +151,7 @@ export interface OptionComboLegRow {
   id: string;
   symbol: string;
   label: string;
+  labelTooltip: string;
   underlying: string;
   shortUnderlying: string;
   expiry: string;
@@ -215,6 +216,7 @@ export interface OptionLegRow extends OptionGreekSummary {
   comboGroupId: string | null;
   symbol: string;
   label: string;
+  labelTooltip: string;
   shortUnderlying: string;
   expiryShort: string | null;
   underlying: string;

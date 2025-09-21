@@ -3,11 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 import {
+  buildFriendlyLegDisplay,
   deriveGroupKey,
   formatComboLabel,
   formatExpiryShort,
   formatLegLabel,
+  normalizeRightCode,
   parseOsi,
+  sanitizeLabel,
 } from "../lib/labels";
 import type {
   OptionComboApi,
@@ -24,25 +27,6 @@ import type {
 
 const OPTIONS_QUERY_KEY = ["positions", "options"] as const;
 const MARK_SOURCE_PRIORITY: Record<string, number> = { MID: 0, LAST: 1, PREV: 2, MISSING: 3 };
-const OSI_SYMBOL_FRAGMENT = /\d{6,8}[CP]\d{8}/;
-
-const sanitizeLabel = (candidate: string | undefined | null, fallback: string): string => {
-  if (typeof candidate !== "string") {
-    return fallback;
-  }
-  const trimmed = candidate.trim();
-  if (!trimmed) {
-    return fallback;
-  }
-  return OSI_SYMBOL_FRAGMENT.test(trimmed) ? fallback : trimmed;
-};
-
-const normalizeRightCode = (value: string | null | undefined): "C" | "P" => {
-  if (typeof value !== "string") {
-    return "C";
-  }
-  return value.toUpperCase().startsWith("P") ? "P" : "C";
-};
 
 const toNumber = (value: unknown, fallback: number | null = null): number | null => {
   const next = Number(value);
@@ -105,33 +89,31 @@ const toComboLegRow = (leg: OptionComboLegApi, asOf?: string | null): OptionComb
       ? (markSourceRaw as MarkSource)
       : "MISSING";
   const rawRight = typeof leg.right === "string" ? leg.right : String(leg.right ?? "");
-  const parsedSymbol = parseOsi(leg.symbol);
-  const parsedLabel = parseOsi(typeof leg.label === "string" ? leg.label : undefined);
-  const normalizedRight = parsedSymbol?.side ?? normalizeRightCode(rawRight);
-  const underlyingRoot = (parsedSymbol?.ul ?? leg.underlying).toUpperCase();
-  const expiryIsoCandidate = parsedSymbol?.expiryISO ?? (typeof leg.expiry === "string" ? leg.expiry : "");
-  const fallbackExpiry = expiryIsoCandidate || leg.expiry || "";
-  const fallbackLabel = formatLegLabel({
-    ul: underlyingRoot,
+  const fallbackExpiry = typeof leg.expiry === "string" ? leg.expiry : "";
+  const friendlyDisplay = buildFriendlyLegDisplay({
+    symbol: leg.symbol,
+    label: typeof leg.label === "string" ? leg.label : undefined,
+    displayLabel: typeof leg.display?.leg_label === "string" ? leg.display.leg_label : undefined,
+    displayShortUl: typeof leg.display?.short_ul === "string" ? leg.display.short_ul : undefined,
+    displayExpiryShort: typeof leg.display?.expiry_short === "string" ? leg.display.expiry_short : undefined,
+    underlying: leg.underlying,
+    right: rawRight,
     strike,
-    side: normalizedRight,
-    expiryISO: fallbackExpiry,
+    expiry: fallbackExpiry,
   });
-  const displayLabelCandidate =
-    typeof leg.display?.leg_label === "string" ? leg.display.leg_label : undefined;
-  const parsedLabelText = parsedLabel ? formatLegLabel(parsedLabel) : undefined;
-  const rawLabelCandidate = typeof leg.label === "string" ? leg.label : undefined;
-  const label = sanitizeLabel(displayLabelCandidate ?? parsedLabelText ?? rawLabelCandidate, fallbackLabel);
-  const shortUnderlying = leg.display?.short_ul ?? underlyingRoot;
-  const expiryShort =
-    leg.display?.expiry_short ?? formatExpiryShort(fallbackExpiry) ?? fallbackExpiry;
-  const legId = leg.id ?? leg.leg_id ?? `${leg.combo_id ?? "orphan"}:${fallbackExpiry}:${normalizedRight}:${strike}`;
-  const expiryValue = fallbackExpiry;
+  const normalizedRight = friendlyDisplay.right;
+  const label = friendlyDisplay.label;
+  const labelTooltip = friendlyDisplay.tooltip;
+  const shortUnderlying = friendlyDisplay.shortUnderlying;
+  const expiryShort = friendlyDisplay.expiryShort ?? friendlyDisplay.expiryISO;
+  const expiryValue = friendlyDisplay.expiryISO || fallbackExpiry;
+  const legId = leg.id ?? leg.leg_id ?? `${leg.combo_id ?? "orphan"}:${expiryValue}:${normalizedRight}:${strike}`;
 
   return {
     id: legId,
     symbol: leg.symbol ?? legId,
-    label: typeof label === "string" ? label : fallbackLabel,
+    label,
+    labelTooltip,
     underlying: leg.underlying,
     shortUnderlying,
     expiry: expiryValue,
@@ -223,6 +205,7 @@ const mapLegToStandaloneRow = (leg: OptionComboLegApi, asOf?: string | null): Op
     comboGroupId: leg.combo_group_id ?? null,
     symbol: legRow.symbol,
     label: legRow.label,
+    labelTooltip: legRow.labelTooltip,
     shortUnderlying: legRow.shortUnderlying,
     expiryShort: legRow.expiryShort,
     underlying: legRow.underlying,
@@ -251,42 +234,33 @@ const buildGroupRowFromApi = (
   group: OptionComboGroupApi,
 ): OptionComboGroupRow => {
   const legs: OptionComboLegRow[] = group.legs.map((leg) => {
-    const parsedSymbol = parseOsi(leg.symbol);
-    const parsedLabel = parseOsi(typeof leg.label === "string" ? leg.label : undefined);
-    const rawRight = typeof leg.right === "string" ? leg.right : String(leg.right ?? "");
-    const normalizedRight = parsedSymbol?.side ?? normalizeRightCode(rawRight);
-    const underlyingRoot = (parsedSymbol?.ul ?? leg.underlying).toUpperCase();
-    const expiryIso = parsedSymbol?.expiryISO ?? (typeof leg.expiry === "string" ? leg.expiry : "");
-    const fallbackExpiry = expiryIso || leg.expiry || "";
-    const fallbackLabel = formatLegLabel({
-      ul: underlyingRoot,
-      strike: toNumber(leg.strike, 0) ?? 0,
-      side: normalizedRight,
-      expiryISO: fallbackExpiry,
+    const strike = toNumber(leg.strike, 0) ?? 0;
+    const fallbackExpiry = typeof leg.expiry === "string" ? leg.expiry : "";
+    const friendlyDisplay = buildFriendlyLegDisplay({
+      symbol: leg.symbol,
+      label: typeof leg.label === "string" ? leg.label : undefined,
+      displayLabel: typeof leg.display?.leg_label === "string" ? leg.display.leg_label : undefined,
+      displayShortUl: typeof leg.display?.short_ul === "string" ? leg.display.short_ul : undefined,
+      displayExpiryShort: typeof leg.display?.expiry_short === "string" ? leg.display.expiry_short : undefined,
+      underlying: leg.underlying,
+      right: leg.right,
+      strike,
+      expiry: fallbackExpiry,
     });
-    const labelCandidate =
-      typeof leg.display?.leg_label === "string"
-        ? leg.display.leg_label
-        : parsedLabel
-          ? formatLegLabel(parsedLabel)
-          : typeof leg.label === "string"
-            ? leg.label
-            : undefined;
-    const label = sanitizeLabel(labelCandidate, fallbackLabel);
-    const shortUnderlying = leg.display?.short_ul ?? underlyingRoot;
-    const expiryShort = leg.display?.expiry_short ?? formatExpiryShort(fallbackExpiry) ?? fallbackExpiry;
+    const normalizedRight = friendlyDisplay.right;
     const markSourceRaw = typeof leg.mark_source === "string" ? leg.mark_source.toUpperCase() : leg.mark_source;
     const markSource: MarkSource =
       markSourceRaw === "MID" || markSourceRaw === "LAST" || markSourceRaw === "PREV"
         ? (markSourceRaw as MarkSource)
         : "MISSING";
-    const symbol = leg.symbol ?? `${group.combo_group_id}:${fallbackExpiry}:${normalizedRight}:${leg.strike}`;
+    const symbol = leg.symbol ?? `${group.combo_group_id}:${friendlyDisplay.expiryISO || fallbackExpiry}:${friendlyDisplay.right}:${strike}`;
     return {
       id: `${group.combo_group_id}:${symbol}`,
       symbol,
-      label,
-      shortUnderlying,
-      expiryShort,
+      label: friendlyDisplay.label,
+      labelTooltip: friendlyDisplay.tooltip,
+      shortUnderlying: friendlyDisplay.shortUnderlying,
+      expiryShort: friendlyDisplay.expiryShort ?? friendlyDisplay.expiryISO,
       strike: toNumber(leg.strike, 0) ?? 0,
       right: normalizedRight,
       quantity: toNumber(leg.quantity, 0) ?? 0,
@@ -371,6 +345,7 @@ const buildGroupsFallback = (
         ...leg,
         id: `${key}:${leg.symbol}:${idx}`,
         label: friendlyLabel,
+        labelTooltip: leg.labelTooltip,
         quantity: totalQuantity,
         markPrice: leg.markPrice,
         comboGroupId: key,

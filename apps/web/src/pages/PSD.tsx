@@ -8,6 +8,7 @@ import StatsRibbon from "../components/StatsRibbon";
 import StocksTable from "../components/StocksTable";
 import { usePsdSnapshot } from "../hooks/usePsdSnapshot";
 import { formatDuration, formatMoney } from "../lib/format";
+import { buildFriendlyLegDisplay } from "../lib/labels";
 import type { PSDLeg, PSDPositionsView } from "../lib/types";
 import { formatSigned, valueTone } from "../components/tableUtils";
 
@@ -41,16 +42,29 @@ const formatQty = (value: number): string => {
 const formatStaleness = (seconds: number | undefined | null) =>
   formatDuration(finiteOrNull(typeof seconds === "number" ? seconds : null));
 
-function LegRow({ leg, tabIndex = -1, className = "" }: { leg: PSDLeg; tabIndex?: number; className?: string }) {
+function LegRow({ leg, tabIndex = -1, className = "", underlyingHint }: { leg: PSDLeg; tabIndex?: number; className?: string; underlyingHint?: string }) {
   const greeks = leg.greeks ?? {};
   const pnlValue = finiteOrNull(leg.pnl_intraday);
+  const isOptionLeg = leg.secType === "OPT" || leg.secType === "FOP";
+  const friendlyDisplay = isOptionLeg
+    ? buildFriendlyLegDisplay({
+        symbol: leg.symbol,
+        underlying: underlyingHint,
+        right: leg.right,
+        strike: leg.strike,
+        expiry: leg.expiry,
+      })
+    : null;
+  const labelText = friendlyDisplay?.label ?? leg.symbol;
+  const labelTooltip = friendlyDisplay?.tooltip ?? leg.symbol;
+
   return (
     <tr
       tabIndex={tabIndex}
       className={clsx("border-b border-slate-800/60 last:border-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60", className)}
     >
       <th scope="row" className="px-4 py-3 text-left font-semibold text-slate-100">
-        {leg.symbol}
+        <span title={labelTooltip}>{labelText}</span>
       </th>
       <td className="px-4 py-3 text-right font-mono text-sm text-slate-300">{formatQty(leg.qty)}</td>
       <td className="px-4 py-3 text-right font-mono text-sm text-slate-200">{formatMoneyMaybe(leg.mark)}</td>
@@ -152,6 +166,7 @@ function CombosSection({ view }: { view: PSDPositionsView }) {
                         leg={leg}
                         className="bg-slate-950/40"
                         tabIndex={index === 0 ? 0 : -1}
+                        underlyingHint={combo.underlier}
                       />
                     ))}
                   </tbody>

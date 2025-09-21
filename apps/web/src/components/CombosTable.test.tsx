@@ -116,7 +116,7 @@ describe("CombosTable", () => {
 
     const legChip = within(detailRow).getByText(/SPX 4600C • Oct 18 '24/i);
     expect(legChip).toBeInTheDocument();
-    expect(legChip).toHaveAttribute("title", "SPX 20241018C00460000");
+    expect(legChip).toHaveAttribute("title", "SPX20241018C00460000");
   });
 
   test("toggle reveals raw combos view", async () => {

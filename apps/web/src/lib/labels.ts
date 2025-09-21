@@ -15,6 +15,8 @@ const MONTH_NAMES = [
   "Dec",
 ];
 
+const OSI_SYMBOL_FRAGMENT = /\d{6,8}[CP]\d{8}/;
+
 function safeParseDate(value: string | null | undefined): Date | null {
   if (!value) {
     return null;
@@ -52,6 +54,22 @@ function normalizeRight(value: string | null | undefined): string {
     return "P";
   }
   return upper.slice(0, 1);
+}
+
+export function normalizeRightCode(value: string | null | undefined): "C" | "P" {
+  const normalized = normalizeRight(value);
+  return normalized === "P" ? "P" : "C";
+}
+
+export function sanitizeLabel(candidate: string | null | undefined, fallback: string): string {
+  if (typeof candidate !== "string") {
+    return fallback;
+  }
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+  return OSI_SYMBOL_FRAGMENT.test(trimmed) ? fallback : trimmed;
 }
 
 export type ParsedOsi = {
@@ -191,6 +209,104 @@ export function formatLegLabel({ ul, strike, side, expiryISO }: FormatLegLabelIn
   const rightCode = normalizeRight(side);
   const expiryShort = formatExpiryShort(expiryISO) ?? expiryISO;
   return `${shortUl} ${strikeText}${rightCode} • ${expiryShort}`;
+}
+
+function normalizeExpiry(expiry: string | null | undefined): string {
+  if (typeof expiry !== "string") {
+    return "";
+  }
+  const trimmed = expiry.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (/^\d{8}$/.test(trimmed)) {
+    return `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6, 8)}`;
+  }
+  if (/^\d{6}$/.test(trimmed)) {
+    const yearPrefix = Number(trimmed.slice(0, 2));
+    const year = yearPrefix >= 70 ? 1900 + yearPrefix : 2000 + yearPrefix;
+    return `${year.toString().padStart(4, "0")}-${trimmed.slice(2, 4)}-${trimmed.slice(4, 6)}`;
+  }
+  return trimmed;
+}
+
+export type FriendlyLegDisplayInput = {
+  symbol?: string | null;
+  label?: string | null;
+  displayLabel?: string | null;
+  displayShortUl?: string | null;
+  displayExpiryShort?: string | null;
+  underlying?: string | null;
+  right?: string | null;
+  strike?: number | string | null;
+  expiry?: string | null;
+};
+
+export type FriendlyLegDisplay = {
+  label: string;
+  tooltip: string;
+  shortUnderlying: string;
+  expiryShort: string | null;
+  expiryISO: string;
+  right: "C" | "P";
+};
+
+export function buildFriendlyLegDisplay(input: FriendlyLegDisplayInput): FriendlyLegDisplay {
+  const parsedSymbol = parseOsi(input.symbol ?? undefined);
+  const sanitizedSymbol = typeof input.symbol === "string" ? input.symbol.replace(/\s+/g, "").toUpperCase() : "";
+
+  const rawUnderlying = typeof input.underlying === "string" ? input.underlying.trim() : "";
+  const displayShort = typeof input.displayShortUl === "string" ? input.displayShortUl.trim() : "";
+  const underlyingFallback = (rawUnderlying || parsedSymbol?.ul || "").toUpperCase();
+  const shortUnderlying = displayShort || underlyingFallback || "?";
+
+  let strikeValue: number | null = null;
+  if (typeof input.strike === "number" && Number.isFinite(input.strike)) {
+    strikeValue = input.strike;
+  } else if (typeof input.strike === "string" && input.strike.trim()) {
+    const numeric = Number(input.strike);
+    if (Number.isFinite(numeric)) {
+      strikeValue = numeric;
+    }
+  }
+  const normalizedStrike = strikeValue ?? parsedSymbol?.strike ?? 0;
+
+  const expiryNormalized = normalizeExpiry(input.expiry) || parsedSymbol?.expiryISO || "";
+  const right = parsedSymbol?.side ?? normalizeRightCode(input.right);
+
+  const labelCandidate =
+    typeof input.displayLabel === "string"
+      ? input.displayLabel
+      : typeof input.label === "string"
+        ? input.label
+        : undefined;
+  const fallbackLabel = formatLegLabel({
+    ul: shortUnderlying,
+    strike: normalizedStrike,
+    side: right,
+    expiryISO: expiryNormalized,
+  });
+  const label = sanitizeLabel(labelCandidate, fallbackLabel);
+
+  const tooltip = sanitizedSymbol && OSI_SYMBOL_FRAGMENT.test(sanitizedSymbol)
+    ? sanitizedSymbol
+    : typeof input.symbol === "string" && input.symbol.trim()
+      ? input.symbol.trim()
+      : fallbackLabel;
+
+  const expiryShort =
+    typeof input.displayExpiryShort === "string" && input.displayExpiryShort.trim()
+      ? input.displayExpiryShort.trim()
+      : formatExpiryShort(expiryNormalized) ?? (expiryNormalized || null);
+
+  return {
+    label,
+    tooltip,
+    shortUnderlying,
+    expiryShort,
+    expiryISO: expiryNormalized,
+    right,
+  };
 }
 
 export function deriveGroupKey(legs: Array<{ right: string; strike: number; expiry: string }>): string {

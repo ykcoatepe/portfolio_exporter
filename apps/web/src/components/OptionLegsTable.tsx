@@ -122,7 +122,7 @@ const LegRow = (
         className="px-3 py-3 text-left text-sm font-semibold text-slate-100"
       >
         <div className="space-y-1">
-          <span title={leg.symbol}>{leg.label}</span>
+          <span title={leg.labelTooltip ?? leg.symbol}>{leg.label}</span>
           <span className="block text-xs text-slate-400">
             {leg.expiryShort ?? leg.expiry} • {leg.dte}d {leg.isOrphan ? "• Orphan" : ""}
           </span>

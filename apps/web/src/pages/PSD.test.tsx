@@ -55,7 +55,7 @@ describe("PSD page", () => {
             legs: [
               {
                 secType: "OPT",
-                symbol: "TSLA",
+                symbol: "TSLA 20240119C00250000",
                 qty: 1,
                 avg_cost: 4,
                 multiplier: 100,
@@ -71,7 +71,7 @@ describe("PSD page", () => {
               },
               {
                 secType: "OPT",
-                symbol: "TSLA",
+                symbol: "TSLA 20240119C00260000",
                 qty: -1,
                 avg_cost: 1,
                 multiplier: 100,
@@ -91,7 +91,7 @@ describe("PSD page", () => {
         single_options: [
           {
             secType: "OPT",
-            symbol: "MSFT",
+            symbol: "MSFT 20240216P00290000",
             qty: -1,
             avg_cost: 1.5,
             multiplier: 100,
@@ -153,12 +153,24 @@ describe("PSD page", () => {
       await user.click(comboToggle);
     });
 
+    const osiPattern = /\d{6,8}[CP]\d{8}/;
     const legsGrid = await within(combosSection).findByRole("grid", { name: /TSLA CALL SPREAD legs/i });
     expect(within(legsGrid).getAllByRole("row").length).toBeGreaterThan(1);
+    const comboRowHeader = within(legsGrid).getAllByRole("rowheader")[0];
+    const comboLabelSpan = comboRowHeader.querySelector("span");
+    expect(comboLabelSpan).not.toBeNull();
+    expect(comboRowHeader.textContent).toMatch(/TSLA 250C/i);
+    expect(comboRowHeader.textContent).not.toMatch(osiPattern);
+    expect(comboLabelSpan?.getAttribute("title")).toMatch(osiPattern);
 
     const singlesSection = await screen.findByRole("region", { name: /Options — Singles/i });
-    expect(within(singlesSection).getByRole("grid", { name: /Options — Singles/i })).toBeInTheDocument();
-    expect(within(singlesSection).getByText("MSFT")).toBeInTheDocument();
+    const singlesGrid = within(singlesSection).getByRole("grid", { name: /Options — Singles/i });
+    const singleRowHeader = within(singlesGrid).getAllByRole("rowheader")[0];
+    const singleLabelSpan = singleRowHeader.querySelector("span");
+    expect(singleLabelSpan).not.toBeNull();
+    expect(singleRowHeader.textContent).toMatch(/MSFT 290P/i);
+    expect(singleRowHeader.textContent).not.toMatch(osiPattern);
+    expect(singleLabelSpan?.getAttribute("title")).toMatch(osiPattern);
   });
 
   test("tabs through ribbon into fallback stocks table", async () => {
@@ -200,7 +212,8 @@ describe("PSD page", () => {
     const stocksGrid = await screen.findByRole("grid", { name: /single stocks positions/i });
     const rows = within(stocksGrid).getAllByRole("row");
     expect(rows.length).toBeGreaterThan(1);
-    expect(rows[1]).toHaveFocus();
+    const clearFilters = within(rows[1]).getByRole("button", { name: /clear filters/i });
+    expect(clearFilters).toHaveFocus();
   });
 
   test("expands combo legs with keyboard control", async () => {

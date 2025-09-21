@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Iterable
 from copy import deepcopy
@@ -26,6 +27,9 @@ from ..core.models import InstrumentType, Position, Quote, TradingSession
 from ..core.pnl import equity_pnl
 
 
+logger = logging.getLogger(__name__)
+
+
 class PositionsState:
     """Cache positions + quotes and emit normalized equity payloads."""
 
@@ -38,6 +42,8 @@ class PositionsState:
         self._options_cache: dict[str, Any] | None = None
         self._positions_view: dict[str, Any] | None = None
         self._positions_view_raw: dict[str, Any] | None = None
+        self._upstream_view_fallback_logged = False
+        self._upstream_view_missing_combos_logged = False
         self._snapshot_override: datetime | None = None
         self._data_source: str = "unknown"
 
@@ -62,13 +68,17 @@ class PositionsState:
         if positions is not None or quotes is not None:
             self._options_cache = None
         if positions_view is not None:
-            self._positions_view = _sanitize_positions_view(positions_view)
+            sanitized_view = _sanitize_positions_view(positions_view)
+            self._positions_view = sanitized_view
             self._positions_view_raw = deepcopy(positions_view)
+            if _positions_view_has_rows(sanitized_view):
+                self._upstream_view_fallback_logged = False
+                self._upstream_view_missing_combos_logged = False
             fallback_needed = False
         elif fallback_needed:
-            fallback_view = self._build_positions_view(snapshot_at)
+            fallback_view = self.build_fallback_positions_view(snapshot_at)
             self._positions_view = fallback_view
-            self._positions_view_raw = deepcopy(fallback_view)
+            self._positions_view_raw = None
         if snapshot_at is not None:
             self._snapshot_override = _ensure_aware(snapshot_at)
         elif quotes is not None:
@@ -98,6 +108,12 @@ class PositionsState:
     def options_payload(self, now: datetime | None = None) -> dict[str, Any]:
         detection, as_of = self._ensure_options_detection(now)
         grouping = group_option_combos(detection.combos)
+        combo_groups_payload = [group.to_payload() for group in grouping.groups]
+        group_lookup = {
+            payload["combo_group_id"]: payload
+            for payload in combo_groups_payload
+            if isinstance(payload, dict) and isinstance(payload.get("combo_group_id"), str)
+        }
 
         combos_payload: list[dict[str, Any]] = []
         for combo in detection.combos:
@@ -106,15 +122,34 @@ class PositionsState:
             if isinstance(combo_id, str):
                 payload.setdefault("id", combo_id)
             extras = grouping.combo_extras.get(combo.combo_id)
-            if extras:
+            if isinstance(extras, dict):
                 payload.update(extras)
+                group_id = extras.get("combo_group_id")
+                if isinstance(group_id, str):
+                    group_payload = group_lookup.get(group_id)
+                    if isinstance(group_payload, dict):
+                        payload.setdefault("group_qty", group_payload.get("group_qty"))
+                        payload.setdefault("group_net_price", group_payload.get("group_net_price"))
+                        payload.setdefault("group_mark_source", group_payload.get("mark_source"))
+                        payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+                        display_payload = group_payload.get("display")
+                        if display_payload and "display" not in payload:
+                            payload["display"] = deepcopy(display_payload)
             for leg_payload in payload.get("legs", []):
                 leg_id = leg_payload.get("leg_id")
                 if isinstance(leg_id, str):
                     leg_payload.setdefault("id", leg_id)
                     leg_extra = grouping.leg_extras.get(leg_id)
-                    if leg_extra:
+                    if isinstance(leg_extra, dict):
                         leg_payload.update(leg_extra)
+                        group_id = leg_extra.get("combo_group_id")
+                        if isinstance(group_id, str):
+                            group_payload = group_lookup.get(group_id)
+                            if isinstance(group_payload, dict):
+                                leg_payload.setdefault("group_qty", group_payload.get("group_qty"))
+                                leg_payload.setdefault("group_net_price", group_payload.get("group_net_price"))
+                                leg_payload.setdefault("group_mark_source", group_payload.get("mark_source"))
+                                leg_payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
             combos_payload.append(payload)
 
         legs_payload: list[dict[str, Any]] = []
@@ -124,8 +159,16 @@ class PositionsState:
             if isinstance(leg_id, str):
                 payload.setdefault("id", leg_id)
             leg_extra = grouping.leg_extras.get(leg.leg_id)
-            if leg_extra:
+            if isinstance(leg_extra, dict):
                 payload.update(leg_extra)
+                group_id = leg_extra.get("combo_group_id")
+                if isinstance(group_id, str):
+                    group_payload = group_lookup.get(group_id)
+                    if isinstance(group_payload, dict):
+                        payload.setdefault("group_qty", group_payload.get("group_qty"))
+                        payload.setdefault("group_net_price", group_payload.get("group_net_price"))
+                        payload.setdefault("group_mark_source", group_payload.get("mark_source"))
+                        payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
             else:
                 display = build_leg_display(leg.underlying, leg.strike, leg.right, leg.expiry)
                 payload["label"] = display.leg_label
@@ -139,7 +182,7 @@ class PositionsState:
         return {
             "as_of": _isoformat(as_of),
             "combos": combos_payload,
-            "combo_groups": [group.to_payload() for group in grouping.groups],
+            "combo_groups": combo_groups_payload,
             "legs": legs_payload,
         }
 
@@ -168,11 +211,28 @@ class PositionsState:
     def positions_view_payload(self, now: datetime | None = None) -> dict[str, Any]:
         """Return the most recent positions_view, computing a fallback if needed."""
 
+        now = _ensure_aware(now)
         if self._positions_view_raw is not None:
-            return deepcopy(self._positions_view_raw)
-        if self._positions_view is not None:
+            sanitized_upstream = _sanitize_positions_view(self._positions_view_raw)
+            payload, sanitized_view = self._augment_upstream_view_if_needed(
+                self._positions_view_raw,
+                sanitized_upstream,
+                now,
+            )
+            self._positions_view = sanitized_view
+            if _positions_view_has_rows(sanitized_view):
+                return payload
+            fallback_view = self.build_fallback_positions_view(now)
+            if _positions_view_has_rows(fallback_view):
+                self._log_upstream_empty_once()
+                self._positions_view = fallback_view
+                return deepcopy(fallback_view)
+            return payload
+        if self._positions_view is not None and _positions_view_has_rows(self._positions_view):
             return deepcopy(self._positions_view)
-        return self._build_positions_view(now)
+        fallback_view = self.build_fallback_positions_view(now)
+        self._positions_view = fallback_view
+        return deepcopy(fallback_view)
 
     def snapshot_payload(self, now: datetime | None = None) -> dict[str, Any]:
         """Return a PSD-style snapshot for /state consumers."""
@@ -225,17 +285,80 @@ class PositionsState:
             )
         return rows, stale
 
+    def build_fallback_positions_view(self, now: datetime | None = None) -> dict[str, Any]:
+        """Construct a synthesized positions_view from the current state."""
+
+        view = self._build_positions_view(now)
+        return _sanitize_positions_view(view)
+
     def _build_positions_view(self, now: datetime | None) -> dict[str, Any]:
         now = _ensure_aware(now)
         equities_view = [_equity_view_from_row(row) for row in self.equities_payload(now)]
         detection, _ = self._ensure_options_detection(now)
-        combos_view = [_combo_view_from_detection(combo) for combo in detection.combos]
-        single_options_view = [_option_leg_view_from_detection(leg) for leg in detection.orphans]
-        return {
+        grouping = group_option_combos(detection.combos)
+        combo_groups_payload = [group.to_payload() for group in grouping.groups]
+        group_lookup = {
+            payload["combo_group_id"]: payload
+            for payload in combo_groups_payload
+            if isinstance(payload, dict) and isinstance(payload.get("combo_group_id"), str)
+        }
+
+        combos_view: list[dict[str, Any]] = []
+        for combo in detection.combos:
+            combo_payload = _combo_view_from_detection(combo)
+            extras = grouping.combo_extras.get(combo.combo_id)
+            if isinstance(extras, dict):
+                combo_payload.update(extras)
+                group_id = extras.get("combo_group_id")
+                if isinstance(group_id, str):
+                    group_payload = group_lookup.get(group_id)
+                    if isinstance(group_payload, dict):
+                        combo_payload.setdefault("group_qty", group_payload.get("group_qty"))
+                        combo_payload.setdefault("group_net_price", group_payload.get("group_net_price"))
+                        combo_payload.setdefault("group_mark_source", group_payload.get("mark_source"))
+                        combo_payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+                        display_payload = group_payload.get("display")
+                        if display_payload and "display" not in combo_payload:
+                            combo_payload["display"] = deepcopy(display_payload)
+            combos_view.append(combo_payload)
+
+        single_options_view: list[dict[str, Any]] = []
+        for leg in detection.orphans:
+            leg_payload = _option_leg_view_from_detection(leg)
+            leg_extras = grouping.leg_extras.get(leg.leg_id)
+            if isinstance(leg_extras, dict):
+                leg_payload.update(leg_extras)
+                group_id = leg_extras.get("combo_group_id")
+                if isinstance(group_id, str):
+                    group_payload = group_lookup.get(group_id)
+                    if isinstance(group_payload, dict):
+                        leg_payload.setdefault("group_qty", group_payload.get("group_qty"))
+                        leg_payload.setdefault("group_net_price", group_payload.get("group_net_price"))
+                        leg_payload.setdefault("group_mark_source", group_payload.get("mark_source"))
+                        leg_payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+            single_options_view.append(leg_payload)
+
+        view: dict[str, Any] = {
             "single_stocks": equities_view,
             "option_combos": combos_view,
             "single_options": single_options_view,
         }
+        if combo_groups_payload:
+            view["combo_groups"] = combo_groups_payload
+        return view
+
+    def _log_upstream_empty_once(self) -> None:
+        if not self._upstream_view_fallback_logged:
+            logger.info("[state] upstream view empty; using synthesized view")
+            self._upstream_view_fallback_logged = True
+
+    def _log_upstream_missing_combos_once(self, combos_count: int) -> None:
+        if not self._upstream_view_missing_combos_logged:
+            logger.info(
+                "[state] upstream view had legs but no combos; grouped %d combos",
+                combos_count,
+            )
+            self._upstream_view_missing_combos_logged = True
 
     def _resolve_session(self) -> str:
         for quote in self._quotes.values():
@@ -245,6 +368,42 @@ class PositionsState:
             if isinstance(session, str) and session:
                 return session
         return TradingSession.CLOSED.value
+
+    def _augment_upstream_view_if_needed(
+        self,
+        raw_view: dict[str, Any],
+        sanitized_view: dict[str, Any],
+        now: datetime,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        option_combos = sanitized_view.get("option_combos")
+        single_options = sanitized_view.get("single_options")
+        if (
+            isinstance(single_options, list)
+            and single_options
+            and isinstance(option_combos, list)
+            and len(option_combos) == 0
+        ):
+            fallback_view = self.build_fallback_positions_view(now)
+            fallback_combos = fallback_view.get("option_combos") or []
+            fallback_groups = fallback_view.get("combo_groups") or []
+            if fallback_combos:
+                augmented_sanitized = deepcopy(sanitized_view)
+                augmented_sanitized["option_combos"] = deepcopy(fallback_combos)
+                if fallback_groups:
+                    augmented_sanitized["combo_groups"] = deepcopy(fallback_groups)
+                elif "combo_groups" in augmented_sanitized:
+                    augmented_sanitized["combo_groups"] = []
+
+                augmented_payload = deepcopy(raw_view)
+                augmented_payload["option_combos"] = deepcopy(fallback_combos)
+                if fallback_groups:
+                    augmented_payload["combo_groups"] = deepcopy(fallback_groups)
+                elif "combo_groups" in augmented_payload:
+                    augmented_payload["combo_groups"] = []
+
+                self._log_upstream_missing_combos_once(len(fallback_combos))
+                return augmented_payload, augmented_sanitized
+        return deepcopy(raw_view), sanitized_view
 
     def _ensure_options_detection(self, now: datetime | None) -> tuple[ComboDetection, datetime]:
         now = _ensure_aware(now)
@@ -276,6 +435,16 @@ class PositionsState:
                 "detection": detection,
             }
         return detection, now
+
+
+def _positions_view_has_rows(view: dict[str, Any] | None) -> bool:
+    if not isinstance(view, dict):
+        return False
+    for key in ("single_stocks", "option_combos", "single_options"):
+        entries = view.get(key)
+        if isinstance(entries, list) and len(entries) > 0:
+            return True
+    return False
 
 
 def _sanitize_positions_view(view: dict[str, Any]) -> dict[str, Any]:
@@ -312,6 +481,13 @@ def _equity_view_from_row(row: dict[str, Any]) -> dict[str, Any]:
     qty = _to_float(row.get("qty"))
     avg_cost = _to_float(row.get("avg_cost"))
     mark = _to_float(row.get("mark"))
+    day_pnl = _to_float(row.get("day_pnl"))
+    day_pnl_percent = _to_float(row.get("day_pnl_percent"))
+    total_pnl = _to_float(row.get("total_pnl"))
+    total_pnl_percent = _to_float(row.get("total_pnl_percent"))
+    stale_seconds = _to_int(row.get("stale_seconds"))
+    mark_source = row.get("mark_source")
+    price_source = _safe_lower(mark_source) or mark_source
     return {
         "secType": "STK",
         "symbol": symbol,
@@ -319,11 +495,16 @@ def _equity_view_from_row(row: dict[str, Any]) -> dict[str, Any]:
         "avg_cost": avg_cost,
         "multiplier": 1,
         "mark": mark,
-        "mark_source": row.get("mark_source"),
-        "price_source": _safe_lower(row.get("mark_source")) or row.get("mark_source"),
-        "stale_s": _to_int(row.get("stale_seconds")),
-        "pnl_intraday": _to_float(row.get("day_pnl")),
-        "pnl_unrealized": _to_float(row.get("total_pnl")),
+        "mark_source": mark_source,
+        "price_source": price_source,
+        "stale_s": stale_seconds,
+        "stale_seconds": stale_seconds,
+        "day_pnl": day_pnl,
+        "day_pnl_percent": day_pnl_percent,
+        "pnl_intraday": day_pnl,
+        "pnl_unrealized": total_pnl,
+        "total_pnl": total_pnl,
+        "total_pnl_percent": total_pnl_percent,
         "greeks": {"delta": None, "gamma": None, "theta": None},
         "previous_close": _to_float(row.get("previous_close")),
     }
@@ -331,6 +512,8 @@ def _equity_view_from_row(row: dict[str, Any]) -> dict[str, Any]:
 
 def _combo_view_from_detection(combo: OptionCombo) -> dict[str, Any]:
     legs = [_option_leg_view_from_detection(leg) for leg in combo.legs]
+    day_pnl = _to_float(combo.day_pnl)
+    total_pnl = _to_float(combo.total_pnl)
     return {
         "combo_id": combo.combo_id,
         "name": strategy_label(combo.strategy),
@@ -339,8 +522,10 @@ def _combo_view_from_detection(combo: OptionCombo) -> dict[str, Any]:
         "account": combo.account,
         "dte": combo.dte,
         "net_price": _to_float(combo.net_price),
-        "pnl_intraday": _to_float(combo.day_pnl),
-        "pnl_unrealized": _to_float(combo.total_pnl),
+        "pnl_intraday": day_pnl,
+        "pnl_unrealized": total_pnl,
+        "day_pnl": day_pnl,
+        "total_pnl": total_pnl,
         "greeks_agg": {
             "delta": _to_float(combo.sum_delta),
             "gamma": _to_float(combo.sum_gamma),
@@ -356,6 +541,11 @@ def _option_leg_view_from_detection(leg: OptionLegSnapshot) -> dict[str, Any]:
     qty = _to_float(leg.quantity)
     avg_cost = _to_float(leg.avg_cost)
     mark = _to_float(leg.mark)
+    day_pnl = _to_float(leg.day_pnl)
+    total_pnl = _to_float(leg.total_pnl)
+    stale_seconds = leg.stale_seconds
+    mark_source = leg.mark_source
+    price_source = _safe_lower(mark_source) or mark_source
     return {
         "secType": "OPT",
         "symbol": leg.instrument_symbol,
@@ -364,11 +554,14 @@ def _option_leg_view_from_detection(leg: OptionLegSnapshot) -> dict[str, Any]:
         "avg_cost": avg_cost,
         "multiplier": _to_float(leg.multiplier),
         "mark": mark,
-        "mark_source": leg.mark_source,
-        "price_source": _safe_lower(leg.mark_source) or leg.mark_source,
-        "stale_s": leg.stale_seconds,
-        "pnl_intraday": _to_float(leg.day_pnl),
-        "pnl_unrealized": _to_float(leg.total_pnl),
+        "mark_source": mark_source,
+        "price_source": price_source,
+        "stale_s": stale_seconds,
+        "stale_seconds": stale_seconds,
+        "pnl_intraday": day_pnl,
+        "pnl_unrealized": total_pnl,
+        "day_pnl": day_pnl,
+        "total_pnl": total_pnl,
         "greeks": {
             "delta": _to_float(leg.delta),
             "gamma": _to_float(leg.gamma),
