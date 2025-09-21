@@ -20,6 +20,16 @@ def test_demo_dataset_populates_positions(tmp_path, monkeypatch) -> None:
     _reload_api_module()
     import apps.api.main as api
 
+    async def _empty_internal_snapshot() -> dict[str, object]:
+        return {}
+
+    monkeypatch.setattr("portfolio_exporter.psd_adapter.snapshot_once", _empty_internal_snapshot, raising=False)
+    monkeypatch.setattr(
+        "positions_engine.ingest.internal.InternalScriptsProvider._load_via_cli",
+        lambda self, module_name: None,
+        raising=False,
+    )
+
     api._state.refresh(positions=[], quotes=[], data_source="live")  # type: ignore[attr-defined]
     api._DEMO_OVERRIDE = None  # type: ignore[attr-defined]
     api._refresh_from_disk()  # type: ignore[attr-defined]
@@ -36,6 +46,10 @@ def test_demo_dataset_populates_positions(tmp_path, monkeypatch) -> None:
         stats = client.get("/stats").json()
         assert stats["data_source"] == "demo"
         assert stats["equity_count"] > 0
+
+        state_snapshot = client.get("/state").json()
+        assert state_snapshot["data_source"] == "demo"
+        assert state_snapshot["positions_view"]
 
 
 def test_csv_priority(tmp_path, monkeypatch) -> None:
@@ -63,6 +77,16 @@ def test_csv_priority(tmp_path, monkeypatch) -> None:
     _reload_api_module()
     import apps.api.main as api
 
+    async def _empty_internal_snapshot() -> dict[str, object]:
+        return {}
+
+    monkeypatch.setattr("portfolio_exporter.psd_adapter.snapshot_once", _empty_internal_snapshot, raising=False)
+    monkeypatch.setattr(
+        "positions_engine.ingest.internal.InternalScriptsProvider._load_via_cli",
+        lambda self, module_name: None,
+        raising=False,
+    )
+
     api._state.refresh(positions=[], quotes=[], data_source="live")  # type: ignore[attr-defined]
     api._DEMO_OVERRIDE = None  # type: ignore[attr-defined]
     api._refresh_from_disk()  # type: ignore[attr-defined]
@@ -76,6 +100,10 @@ def test_csv_priority(tmp_path, monkeypatch) -> None:
         stocks = client.get("/positions/stocks").json()
         assert any(row["symbol"] == "AAPL" for row in stocks)
 
+        state_snapshot = client.get("/state").json()
+        assert state_snapshot["data_source"] == "csv"
+        assert state_snapshot["positions_view"]["single_stocks"]
+
 
 def test_stats_live_when_empty(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("POSITIONS_ENGINE_DATA_DIR", str(tmp_path))
@@ -84,6 +112,16 @@ def test_stats_live_when_empty(tmp_path, monkeypatch) -> None:
 
     _reload_api_module()
     import apps.api.main as api
+
+    async def _empty_internal_snapshot() -> dict[str, object]:
+        return {}
+
+    monkeypatch.setattr("portfolio_exporter.psd_adapter.snapshot_once", _empty_internal_snapshot, raising=False)
+    monkeypatch.setattr(
+        "positions_engine.ingest.internal.InternalScriptsProvider._load_via_cli",
+        lambda self, module_name: None,
+        raising=False,
+    )
 
     api._state.refresh(positions=[], quotes=[], data_source="live")  # type: ignore[attr-defined]
     api._DEMO_OVERRIDE = False  # type: ignore[attr-defined]
@@ -94,3 +132,10 @@ def test_stats_live_when_empty(tmp_path, monkeypatch) -> None:
         assert stats["data_source"] == "live"
         assert stats["equity_count"] == 0
         assert stats["option_legs_count"] == 0
+
+        state_snapshot = client.get("/state").json()
+        assert state_snapshot["data_source"] == "live"
+        view = state_snapshot["positions_view"]
+        assert view["single_stocks"] == []
+        assert view["option_combos"] == []
+        assert view["single_options"] == []

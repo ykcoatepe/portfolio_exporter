@@ -1,4 +1,4 @@
-export type MarkSource = "MID" | "LAST" | "PREV";
+export type MarkSource = "MID" | "LAST" | "PREV" | "MISSING";
 
 export interface StockPositionApi {
   symbol: string;
@@ -26,7 +26,7 @@ export interface StockRow {
   averagePrice: number;
   markPrice: number;
   markSource: MarkSource;
-  markTime: string;
+  markTime: string | null;
   dayPnlAmount: number;
   dayPnlPercent: number;
   totalPnlAmount: number;
@@ -44,13 +44,28 @@ export interface OptionGreekSummary {
   vega: number | null;
 }
 
+export interface OptionComboDisplay {
+  combo_label: string;
+  short_ul: string;
+  expiry_short: string | null;
+}
+
+export interface OptionLegDisplay {
+  leg_label: string;
+  short_ul: string;
+  expiry_short: string | null;
+}
+
 export interface OptionComboLegApi {
-  id: string;
+  id?: string;
+  leg_id?: string;
   combo_id: string | null;
+  combo_group_id?: string | null;
+  symbol?: string;
   underlying: string;
   expiry: string;
   strike: number;
-  right: OptionRight;
+  right: OptionRight | string;
   quantity: number;
   mark_price: number | null;
   mark_source: MarkSource;
@@ -64,38 +79,84 @@ export interface OptionComboLegApi {
   day_pnl_percent: number | null;
   total_pnl_amount: number | null;
   total_pnl_percent: number | null;
-  labels?: string[];
+  label?: string;
+  display?: OptionLegDisplay;
 }
 
 export interface OptionComboApi {
-  id: string;
+  id?: string;
+  combo_id?: string;
   strategy: string;
   underlying: string;
   expiry: string;
   dte: number;
-  side: "credit" | "debit";
-  net_premium: number;
+  side?: "credit" | "debit";
+  net_price?: number;
+  net_premium?: number;
   mark_price: number | null;
   mark_source: MarkSource;
   mark_time: string | null;
-  greeks: OptionGreekSummary;
+  greeks?: OptionGreekSummary;
+  sum_greeks?: OptionGreekSummary;
   day_pnl_amount: number | null;
   day_pnl_percent: number | null;
   total_pnl_amount: number | null;
   total_pnl_percent: number | null;
   legs: OptionComboLegApi[];
+  combo_group_id?: string | null;
+  combo_qty?: number | null;
+  label?: string;
+  display?: OptionComboDisplay;
+}
+
+export interface OptionComboGroupLegApi {
+  symbol: string;
+  underlying: string;
+  right: OptionRight | string;
+  strike: number;
+  expiry: string;
+  quantity: number;
+  sum_greeks: OptionGreekSummary;
+  mark: number | null;
+  mark_source: MarkSource | string;
+  stale_seconds: number | null;
+  combo_group_id: string;
+  label?: string;
+  display?: OptionLegDisplay;
+}
+
+export interface OptionComboGroupApi {
+  combo_group_id: string;
+  strategy: string;
+  underlying: string;
+  group_qty: number;
+  group_net_price: number;
+  dte: number;
+  sum_greeks: OptionGreekSummary;
+  mark_source: MarkSource;
+  stale_seconds: number | null;
+  label?: string;
+  display?: OptionComboDisplay;
+  legs: OptionComboGroupLegApi[];
 }
 
 export interface OptionsApiResponse {
   combos: OptionComboApi[];
   legs: OptionComboLegApi[];
+  combo_groups?: OptionComboGroupApi[];
   as_of?: string | null;
 }
 
 export interface OptionComboLegRow {
   id: string;
+  symbol: string;
+  label: string;
+  underlying: string;
+  shortUnderlying: string;
+  expiry: string;
+  expiryShort: string | null;
   strike: number;
-  right: OptionRight;
+  right: string;
   quantity: number;
   markPrice: number | null;
   markSource: MarkSource;
@@ -108,6 +169,7 @@ export interface OptionComboLegRow {
   dayPnlPercent: number | null;
   totalPnlAmount: number | null;
   totalPnlPercent: number | null;
+  comboGroupId: string | null;
 }
 
 export interface OptionComboRow extends OptionGreekSummary {
@@ -126,16 +188,40 @@ export interface OptionComboRow extends OptionGreekSummary {
   totalPnlAmount: number | null;
   totalPnlPercent: number | null;
   legs: OptionComboLegRow[];
+  label: string;
+  display: OptionComboDisplay | null;
+  comboGroupId: string | null;
+  comboQty: number;
+  groupNetPrice: number;
+}
+
+export interface OptionComboGroupRow extends OptionGreekSummary {
+  id: string;
+  strategy: string;
+  underlying: string;
+  dte: number;
+  groupQty: number;
+  netPrice: number;
+  markSource: MarkSource;
+  staleSeconds: number | null;
+  label: string;
+  display: OptionComboDisplay | null;
+  legs: OptionComboLegRow[];
 }
 
 export interface OptionLegRow extends OptionGreekSummary {
   id: string;
   comboId: string | null;
+  comboGroupId: string | null;
+  symbol: string;
+  label: string;
+  shortUnderlying: string;
+  expiryShort: string | null;
   underlying: string;
   expiry: string;
   dte: number;
   strike: number;
-  right: OptionRight;
+  right: string;
   quantity: number;
   markPrice: number | null;
   markSource: MarkSource;
@@ -204,13 +290,18 @@ export type PSDLeg = {
   avg_cost: number;
   multiplier?: number;
   mark: number;
-  price_source: string;
+  price_source?: string;
+  mark_source?: string;
   stale_s: number;
   pnl_intraday: number;
+  pnl_unrealized?: number;
   greeks?: PSDGreeks;
   right?: string;
   strike?: number;
   expiry?: string;
+  previous_close?: number;
+  updated_at?: string;
+  mark_time?: string;
   conId?: number;
 };
 

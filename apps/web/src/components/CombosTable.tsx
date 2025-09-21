@@ -15,7 +15,8 @@ import clsx from "clsx";
 
 import { useOptionCombos } from "../hooks/useOptions";
 import { formatDuration, formatMoney, formatPercent } from "../lib/format";
-import type { OptionComboLegRow, OptionComboRow } from "../lib/types";
+import type { OptionComboGroupRow, OptionComboLegRow, OptionComboRow } from "../lib/types";
+import { fmtPrice, fmtSide } from "../lib/labels";
 import { MarkBadge } from "./MarkBadge";
 import { deriveStalenessSeconds, formatSigned, stalenessTone, valueTone } from "./tableUtils";
 
@@ -59,10 +60,7 @@ function ComboLegsDetail({ legs }: { legs: OptionComboLegRow[] }) {
         <thead>
           <tr className="text-xs uppercase tracking-wide text-slate-400">
             <th scope="col" className="px-3 py-2 text-left">
-              Strike
-            </th>
-            <th scope="col" className="px-3 py-2 text-left">
-              Right
+              Leg
             </th>
             <th scope="col" className="px-3 py-2 text-left">
               Qty
@@ -88,10 +86,7 @@ function ComboLegsDetail({ legs }: { legs: OptionComboLegRow[] }) {
           {legs.map((leg) => (
             <tr key={leg.id} className="border-b border-slate-900/60 last:border-0">
               <td className="px-3 py-2 text-sm font-semibold text-slate-100">
-                {leg.strike.toFixed(2)}
-              </td>
-              <td className="px-3 py-2 text-xs font-semibold uppercase text-slate-300">
-                {leg.right}
+                <span title={leg.symbol}>{leg.label}</span>
               </td>
               <td className="px-3 py-2 text-sm text-slate-200">{leg.quantity}</td>
               <td className="px-3 py-2 text-sm text-slate-200">
@@ -117,8 +112,61 @@ function ComboLegsDetail({ legs }: { legs: OptionComboLegRow[] }) {
   );
 }
 
+type GroupDetailProps = {
+  group: OptionComboGroupRow;
+  combos: OptionComboRow[];
+};
+
+function GroupDetail({ group, combos }: GroupDetailProps) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Combos</h4>
+        <ul className="mt-2 space-y-2 text-sm text-slate-200">
+          {combos.map((combo) => (
+            <li key={combo.id} className="rounded-lg border border-slate-900/60 bg-slate-950/40 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-semibold text-slate-100" title={combo.id}>
+                  {combo.label}
+                </div>
+                <div className="text-xs uppercase tracking-wide text-slate-400">
+                  {fmtSide(combo.netPremium)} {fmtPrice(combo.netPremium)} • Qty {combo.comboQty}
+                </div>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-4">
+                <span>Δ {formatSigned(combo.delta)}</span>
+                <span>Γ {formatSigned(combo.gamma)}</span>
+                <span>Θ {formatSigned(combo.theta)}</span>
+                <span>ν {formatSigned(combo.vega)}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Legs</h4>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {group.legs.map((leg) => (
+            <span
+              key={leg.id}
+              className="rounded-full border border-slate-800 bg-slate-950 px-3 py-1 text-xs text-slate-200"
+              title={leg.symbol}
+            >
+              {leg.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type TableRowData =
+  | { kind: "group"; id: string; row: OptionComboGroupRow; combos: OptionComboRow[] }
+  | { kind: "combo"; id: string; row: OptionComboRow };
+
 type ComboRowProps = {
-  combo: OptionComboRow;
+  entry: TableRowData;
   isExpanded: boolean;
   isActive: boolean;
   onToggle: (id: string) => void;
@@ -131,7 +179,7 @@ type ComboRowProps = {
 
 const ComboRow = (
   {
-    combo,
+    entry,
     isExpanded,
     isActive,
     onToggle,
@@ -143,49 +191,46 @@ const ComboRow = (
   }: ComboRowProps,
   ref: ForwardedRef<HTMLTableRowElement>,
 ) => {
-  const stalenessSeconds = deriveStalenessSeconds(combo.markTime, now);
-  const stalenessLabel = formatDuration(stalenessSeconds);
-  const stalenessClass = stalenessTone(stalenessSeconds);
+  const base = entry.kind === "group" ? entry.row : entry.row;
+  const stalenessSeconds = entry.kind === "group"
+    ? entry.row.staleSeconds ?? null
+    : deriveStalenessSeconds(entry.row.markTime, now);
+  const stalenessLabel = stalenessSeconds !== null ? formatDuration(stalenessSeconds) : "—";
+  const stalenessClass = stalenessSeconds !== null ? stalenessTone(stalenessSeconds) : "text-slate-400";
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
     if (event.defaultPrevented) {
       return;
     }
     switch (event.key) {
-      case "ArrowDown": {
+      case "ArrowDown":
         event.preventDefault();
         onRequestFocus(Math.min(rowCount - 1, rowIndex + 1));
         break;
-      }
-      case "ArrowUp": {
+      case "ArrowUp":
         event.preventDefault();
         onRequestFocus(Math.max(0, rowIndex - 1));
         break;
-      }
-      case "Home": {
+      case "Home":
         event.preventDefault();
         onRequestFocus(0);
         break;
-      }
-      case "End": {
+      case "End":
         event.preventDefault();
         onRequestFocus(rowCount - 1);
         break;
-      }
       case "Enter":
       case " ":
-      case "ArrowRight": {
+      case "ArrowRight":
         event.preventDefault();
-        onToggle(combo.id);
+        onToggle(entry.id);
         break;
-      }
-      case "ArrowLeft": {
+      case "ArrowLeft":
         if (isExpanded) {
           event.preventDefault();
-          onToggle(combo.id);
+          onToggle(entry.id);
         }
         break;
-      }
       default:
         break;
     }
@@ -195,11 +240,17 @@ const ComboRow = (
     if ((event.target as HTMLElement).closest("button")) {
       return;
     }
-    onToggle(combo.id);
+    onToggle(entry.id);
   };
 
-  const netLabel = combo.side === "credit" ? "Credit" : "Debit";
-  const netValue = formatMoney(Math.abs(combo.netPremium));
+  const quantity = entry.kind === "group" ? entry.row.groupQty : entry.row.comboQty;
+  const netPrice = entry.kind === "group" ? entry.row.netPrice : entry.row.netPremium;
+  const greeks = entry.kind === "group"
+    ? entry.row
+    : entry.row;
+
+  const markPrice = entry.kind === "group" ? null : entry.row.markPrice;
+  const markSource = entry.kind === "group" ? entry.row.markSource : entry.row.markSource;
 
   return (
     <Fragment>
@@ -229,88 +280,98 @@ const ComboRow = (
               )}
               onClick={(event) => {
                 event.stopPropagation();
-                onToggle(combo.id);
+                onToggle(entry.id);
               }}
-              aria-label={`${isExpanded ? "Collapse" : "Expand"} ${combo.strategy}`}
+              aria-label={`${isExpanded ? "Collapse" : "Expand"} ${entry.kind === "group" ? "group" : "combo"}`}
               aria-expanded={isExpanded}
-              aria-controls={`combo-legs-${combo.id}`}
+              aria-controls={`combo-legs-${entry.id}`}
             >
               {isExpanded ? "−" : "+"}
             </button>
             <div className="space-y-1">
-              <span>{combo.strategy}</span>
+              <span>{entry.kind === "group" ? entry.row.label : entry.row.label}</span>
               <p className="text-xs font-normal text-slate-400">
-                {combo.underlying} • Exp {combo.expiry}
+                {entry.kind === "group" ? entry.row.display?.short_ul ?? entry.row.underlying : entry.row.underlying}
               </p>
             </div>
           </div>
         </th>
         <td role="gridcell" className="px-4 py-4 text-sm text-slate-200">
           <div className="space-y-1">
-            <span className="font-medium text-slate-100">{combo.underlying}</span>
+            <span className="font-medium text-slate-100">
+              {entry.kind === "group" ? entry.row.underlying : entry.row.underlying}
+            </span>
             <span className="block text-xs text-slate-400">
-              ΣΔ {formatSigned(combo.delta)}
+              ΣΔ {formatSigned(greeks.delta)}
             </span>
           </div>
         </td>
         <td role="gridcell" className="px-4 py-4 text-sm text-slate-200">
-          {combo.dte}d
+          {entry.kind === "group" ? entry.row.dte : entry.row.dte}d
         </td>
         <td role="gridcell" className="px-4 py-4 text-sm text-slate-200">
           <div className="space-y-1">
-            <span className="text-xs uppercase tracking-wide text-slate-400">{netLabel}</span>
-            <span className="text-sm font-semibold text-slate-100">{netValue}</span>
+            <span className="text-xs uppercase tracking-wide text-slate-400">{fmtSide(netPrice)}</span>
+            <span className="text-sm font-semibold text-slate-100">{fmtPrice(netPrice)}</span>
           </div>
         </td>
         <td role="gridcell" className="px-4 py-4 text-sm text-slate-200">
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             <span className="text-slate-400">Δ</span>
-            <span className={clsx("text-right", valueTone(combo.delta))}>
-              {formatSigned(combo.delta)}
+            <span className={clsx("text-right", valueTone(greeks.delta))}>
+              {formatSigned(greeks.delta)}
             </span>
             <span className="text-slate-400">Γ</span>
-            <span className={clsx("text-right", valueTone(combo.gamma))}>
-              {formatSigned(combo.gamma)}
+            <span className={clsx("text-right", valueTone(greeks.gamma))}>
+              {formatSigned(greeks.gamma)}
             </span>
             <span className="text-slate-400">Θ</span>
-            <span className={clsx("text-right", valueTone(combo.theta))}>
-              {formatSigned(combo.theta)}
+            <span className={clsx("text-right", valueTone(greeks.theta))}>
+              {formatSigned(greeks.theta)}
             </span>
             <span className="text-slate-400">ν</span>
-            <span className={clsx("text-right", valueTone(combo.vega))}>
-              {formatSigned(combo.vega)}
+            <span className={clsx("text-right", valueTone(greeks.vega))}>
+              {formatSigned(greeks.vega)}
             </span>
           </div>
         </td>
         <td role="gridcell" className="px-4 py-4 text-sm">
-          <div className="space-y-1">
-            <div className={clsx("text-sm font-semibold", valueTone(combo.dayPnlAmount))}>
-              {formatMoney(combo.dayPnlAmount)}
-              <span className="ml-2 text-xs text-slate-400">
-                {formatPercent(combo.dayPnlPercent, {
-                  alreadyScaled: true,
-                  signDisplay: "always",
-                })}
-              </span>
+          {entry.kind === "group" ? (
+            <span className="text-xs text-slate-400">—</span>
+          ) : (
+            <div className="space-y-1">
+              <div className={clsx("text-sm font-semibold", valueTone(entry.row.dayPnlAmount))}>
+                {formatMoney(entry.row.dayPnlAmount)}
+                <span className="ml-2 text-xs text-slate-400">
+                  {formatPercent(entry.row.dayPnlPercent, {
+                    alreadyScaled: true,
+                    signDisplay: "always",
+                  })}
+                </span>
+              </div>
+              <div className={clsx("text-xs", valueTone(entry.row.totalPnlAmount))}>
+                {formatMoney(entry.row.totalPnlAmount)}
+                <span className="ml-2 text-[0.7rem] text-slate-400">
+                  {formatPercent(entry.row.totalPnlPercent, {
+                    alreadyScaled: true,
+                    signDisplay: "always",
+                  })}
+                </span>
+              </div>
             </div>
-            <div className={clsx("text-xs", valueTone(combo.totalPnlAmount))}>
-              {formatMoney(combo.totalPnlAmount)}
-              <span className="ml-2 text-[0.7rem] text-slate-400">
-                {formatPercent(combo.totalPnlPercent, {
-                  alreadyScaled: true,
-                  signDisplay: "always",
-                })}
-              </span>
-            </div>
-          </div>
+          )}
         </td>
         <td role="gridcell" className="px-4 py-4 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-slate-100">
-              {formatMoney(combo.markPrice)}
-            </span>
-            <MarkBadge source={combo.markSource} />
-          </div>
+          {entry.kind === "group" ? (
+            <span className="text-xs text-slate-400">—</span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-slate-100">
+                {formatMoney(markPrice)}
+              </span>
+              <MarkBadge source={markSource} />
+            </div>
+          )}
         </td>
         <td role="gridcell" className={clsx("px-4 py-4 text-sm", stalenessClass)}>
           {stalenessLabel}
@@ -320,11 +381,15 @@ const ComboRow = (
         <tr
           role="row"
           aria-label="combo detail row"
-          id={`combo-legs-${combo.id}`}
+          id={`combo-legs-${entry.id}`}
           className="border-b border-slate-900/70 bg-slate-950/40"
         >
           <td role="gridcell" colSpan={COLUMN_COUNT} className="px-6 pb-6 pt-2">
-            <ComboLegsDetail legs={combo.legs} />
+            {entry.kind === "group" ? (
+              <GroupDetail group={entry.row} combos={entry.combos} />
+            ) : (
+              <ComboLegsDetail legs={entry.row.legs} />
+            )}
           </td>
         </tr>
       ) : null}
@@ -335,10 +400,19 @@ const ComboRow = (
 const ForwardedComboRow = forwardRef<HTMLTableRowElement, ComboRowProps>(ComboRow);
 
 export function CombosTable(): JSX.Element {
-  const { data: combos = [], isLoading, isFetching, error, refetch } = useOptionCombos();
+  const {
+    data: combos = [],
+    groups = [],
+    groupCombos,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useOptionCombos();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [activeIndex, setActiveIndex] = useState(0);
+  const [showRaw, setShowRaw] = useState(false);
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
 
   useEffect(() => {
@@ -349,45 +423,48 @@ export function CombosTable(): JSX.Element {
     return () => window.clearInterval(timer);
   }, []);
 
+  const rows = useMemo<TableRowData[]>(() => {
+    if (showRaw) {
+      return combos.map((combo) => ({ kind: "combo", id: combo.id, row: combo }));
+    }
+    return groups.map((group) => ({
+      kind: "group" as const,
+      id: group.id,
+      row: group,
+      combos: groupCombos.get(group.id) ?? [],
+    }));
+  }, [showRaw, combos, groups, groupCombos]);
+
   useEffect(() => {
-    if (expandedId && !combos.some((combo: OptionComboRow) => combo.id === expandedId)) {
+    if (expandedId && !rows.some((entry) => entry.id === expandedId)) {
       setExpandedId(null);
     }
-  }, [combos, expandedId]);
+  }, [rows, expandedId]);
 
   useEffect(() => {
-    if (combos.length === 0) {
+    if (rows.length === 0) {
       return;
     }
-    if (activeIndex >= combos.length) {
+    if (activeIndex >= rows.length) {
       setActiveIndex(0);
     }
-  }, [combos, activeIndex]);
+  }, [rows, activeIndex]);
 
   useEffect(() => {
-    rowRefs.current = rowRefs.current.slice(0, combos.length);
-  }, [combos.length]);
-
-  const rowCount = combos.length;
+    rowRefs.current = rowRefs.current.slice(0, rows.length);
+  }, [rows.length]);
 
   const setFocusByIndex = (targetIndex: number) => {
-    if (rowCount === 0) {
+    if (rows.length === 0) {
       return;
     }
-    const constrained = Math.min(Math.max(targetIndex, 0), rowCount - 1);
+    const constrained = Math.min(Math.max(targetIndex, 0), rows.length - 1);
     setActiveIndex(constrained);
     const row = rowRefs.current[constrained];
     if (row) {
       window.requestAnimationFrame(() => row.focus());
     }
   };
-
-  const gridRowCount = useMemo(() => {
-    if (!rowCount) {
-      return 1;
-    }
-    return rowCount + 1 + (expandedId ? 1 : 0);
-  }, [rowCount, expandedId]);
 
   if (error) {
     return (
@@ -411,22 +488,35 @@ export function CombosTable(): JSX.Element {
     );
   }
 
+  const gridRowCount = rows.length ? rows.length + 1 + (expandedId ? 1 : 0) : 1;
+
   return (
     <div className="rounded-3xl border border-slate-900/60 bg-slate-950/40 backdrop-blur">
-      <div className="flex items-center justify-between border-b border-slate-900/60 px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-900/60 px-6 py-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-100">Options Combos</h2>
           <p className="text-xs text-slate-400">
             Aggregated strategies with keyboard navigation.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <input
+              type="checkbox"
+              checked={showRaw}
+              onChange={(event) => setShowRaw(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            />
+            Show raw combos
+          </label>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -440,7 +530,7 @@ export function CombosTable(): JSX.Element {
           <thead>
             <tr role="row" className="text-xs uppercase tracking-wide text-slate-400">
               <th scope="col" role="columnheader" className="px-4 py-3 text-left">
-                Strategy
+                Label
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-left">
                 Underlying
@@ -449,13 +539,13 @@ export function CombosTable(): JSX.Element {
                 DTE
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-left">
-                Net Credit/Debit
+                Credit/Debit
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-left">
                 ΣΔ/Γ/Θ/ν
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-left">
-                Day/Unrealized P&amp;L
+                P&amp;L
               </th>
               <th scope="col" role="columnheader" className="px-4 py-3 text-left">
                 Mark
@@ -469,14 +559,14 @@ export function CombosTable(): JSX.Element {
             <CombosSkeleton />
           ) : (
             <tbody data-testid="rows-body">
-              {combos.map((combo: OptionComboRow, index: number) => (
+              {rows.map((entry, index) => (
                 <ForwardedComboRow
-                  key={combo.id}
+                  key={entry.id}
                   ref={(node) => {
                     rowRefs.current[index] = node;
                   }}
-                  combo={combo}
-                  isExpanded={expandedId === combo.id}
+                  entry={entry}
+                  isExpanded={expandedId === entry.id}
                   isActive={index === activeIndex}
                   onToggle={(id) =>
                     setExpandedId((current) => (current === id ? null : id))
@@ -484,7 +574,7 @@ export function CombosTable(): JSX.Element {
                   onFocusRow={setActiveIndex}
                   onRequestFocus={setFocusByIndex}
                   rowIndex={index}
-                  rowCount={rowCount}
+                  rowCount={rows.length}
                   now={now}
                 />
               ))}

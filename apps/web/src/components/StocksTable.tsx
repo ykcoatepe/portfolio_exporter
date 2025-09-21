@@ -3,9 +3,11 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import clsx from "clsx";
 
 import { MarkBadge } from "./MarkBadge";
+import { usePsdPositionsView } from "../hooks/usePsdSnapshot";
 import { useStocks } from "../hooks/useStocks";
 import { formatDuration, formatMoney, formatPercent } from "../lib/format";
 import type { StockRow } from "../lib/types";
+import { useStocksFilterStore } from "../state/stocksFilters";
 
 const SKELETON_ROWS = Array.from({ length: 8 }, (_, idx) => idx);
 const COLUMN_COUNT = 7;
@@ -152,7 +154,17 @@ function ExpansionDrawer({ symbol }: { symbol: string }) {
 
 export function StocksTable(): JSX.Element {
   const { data: stocks = [], isLoading, isFetching, error, refetch } = useStocks();
-  const [filter, setFilter] = useState("");
+  const { data: positionsView } = usePsdPositionsView();
+  const totalStocks =
+    positionsView && Array.isArray(positionsView.single_stocks)
+      ? positionsView.single_stocks.length
+      : stocks.length;
+  const hasSourceStocks = totalStocks > 0;
+  const filter = useStocksFilterStore((state) => state.query);
+  const setFilter = useStocksFilterStore((state) => state.setQuery);
+  const resetFilters = useStocksFilterStore((state) => state.reset);
+  const autoCleared = useStocksFilterStore((state) => state.autoCleared);
+  const markAutoCleared = useStocksFilterStore((state) => state.markAutoCleared);
   const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
   const [activeSymbol, setActiveSymbol] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -208,6 +220,15 @@ export function StocksTable(): JSX.Element {
   }, [sortedRows, filter]);
 
   useEffect(() => {
+    if (!autoCleared && hasSourceStocks) {
+      if (filter.trim().length > 0) {
+        resetFilters();
+      }
+      markAutoCleared();
+    }
+  }, [autoCleared, hasSourceStocks, filter, resetFilters, markAutoCleared]);
+
+  useEffect(() => {
     if (!expandedSymbol) {
       return;
     }
@@ -230,8 +251,8 @@ export function StocksTable(): JSX.Element {
   }, [filteredRows, activeSymbol]);
 
   const showSkeleton = isLoading;
-  const showEmpty = !isLoading && !error && filteredRows.length === 0;
-  const bodyRowCount = showSkeleton ? SKELETON_ROWS.length : showEmpty ? 1 : filteredRows.length;
+  const showNoMatches = !isLoading && !error && filteredRows.length === 0;
+  const bodyRowCount = showSkeleton ? SKELETON_ROWS.length : showNoMatches ? 1 : filteredRows.length;
   const totalRowCount = bodyRowCount + 1;
 
   function toggleRow(symbol: string) {
@@ -389,6 +410,27 @@ export function StocksTable(): JSX.Element {
 
           {showSkeleton ? (
             <StocksTableSkeleton />
+          ) : showNoMatches ? (
+            <tbody>
+              <tr role="row">
+                <td
+                  role="gridcell"
+                  colSpan={COLUMN_COUNT}
+                  className="px-4 py-6 text-center text-sm text-slate-300"
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <span>No matching positions.</span>
+                    <button
+                      type="button"
+                      onClick={() => resetFilters()}
+                      className="rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-200 transition hover:bg-sky-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
           ) : (
             <tbody>
               {filteredRows.map((row, orderIndex) => {
@@ -495,17 +537,6 @@ export function StocksTable(): JSX.Element {
                   </Fragment>
                 );
               })}
-              {showEmpty ? (
-                <tr role="row">
-                  <td
-                    role="gridcell"
-                    className="px-4 py-6 text-center text-sm text-slate-400"
-                    colSpan={COLUMN_COUNT}
-                  >
-                    No matching positions. Clear filters to see all symbols.
-                  </td>
-                </tr>
-              ) : null}
             </tbody>
           )}
         </table>

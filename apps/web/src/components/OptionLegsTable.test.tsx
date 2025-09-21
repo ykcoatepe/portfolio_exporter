@@ -10,6 +10,46 @@ import { renderWithClient } from "../test/queryClient";
 
 const mockOptions = () => {
   const payload = buildOptionsResponse();
+
+  payload.legs.forEach((leg) => {
+    leg.label = leg.symbol ?? leg.label;
+    if (leg.display) {
+      leg.display.leg_label = leg.symbol ?? leg.display.leg_label;
+    }
+  });
+
+  payload.combos?.forEach((combo) => {
+    const rawLabel = (combo.legs ?? [])
+      .map((leg) => leg.symbol ?? "")
+      .filter(Boolean)
+      .join(" • ");
+    if (rawLabel) {
+      combo.label = rawLabel;
+      if (combo.display) {
+        combo.display.combo_label = rawLabel;
+      }
+    }
+  });
+
+  payload.combo_groups?.forEach((group) => {
+    const rawGroupLabel = group.legs
+      .map((leg) => leg.symbol ?? "")
+      .filter(Boolean)
+      .join(" + ");
+    if (rawGroupLabel) {
+      group.label = rawGroupLabel;
+      if (group.display) {
+        group.display.combo_label = rawGroupLabel;
+      }
+    }
+    group.legs.forEach((leg) => {
+      leg.label = leg.symbol ?? leg.label;
+      if (leg.display) {
+        leg.display.leg_label = leg.symbol ?? leg.display.leg_label;
+      }
+    });
+  });
+
   server.use(
     http.get("*/positions/options", () => HttpResponse.json(payload)),
   );
@@ -27,6 +67,22 @@ describe("OptionLegsTable", () => {
     vi.useRealTimers();
     vi.setSystemTime(new Date());
     vi.restoreAllMocks();
+  });
+
+  test("renders friendly leg labels with OSI tooltip", async () => {
+    renderWithClient(<OptionLegsTable />);
+
+    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
+    const body = screen.getByTestId("rows-body");
+    const firstRow = within(body).getAllByRole("row", { name: /leg row/i })[0];
+    const rowHeader = within(firstRow).getByRole("rowheader");
+    const labelSpan = rowHeader.querySelector("span");
+    expect(labelSpan).not.toBeNull();
+    if (!labelSpan) {
+      return;
+    }
+    expect(labelSpan.textContent).not.toMatch(/\d{6}[CP]\d{8}/);
+    expect(labelSpan.getAttribute("title")).toMatch(/\d{6}[CP]\d{8}$/);
   });
 
   test("filters to orphan legs and toggles underlyings", async () => {

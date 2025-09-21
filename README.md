@@ -1289,6 +1289,7 @@ PID file lives at `run/psd-pids.json`; logs stream to `run/ingestor.log`, `run/s
 - Access via TUI only: open the app and navigate to "Portfolio Sentinel". The dashboard auto-starts once per session (web + browser + loop).
 - Disable auto-start by setting `psd.auto.start_on_menu: false` in `config/rules.yaml`; then use the menu action `o = Open in browser` to trigger the starter on demand.
 - The server is a minimal FastAPI + WebSocket app; broadcasts are pushed from the in-process scheduler each iteration.
+- PSD now auto-loads positions/quotes via the repo's snapshot normalizer; CSV drops are still picked up when present and demo data remains as the final fallback.
 - Prometheus scrape target: `http://localhost:51127/metrics` (see ingest tick histogram, data age gauge, event counters, and SSE stream gauges).
 - Readiness gate: `GET /ready` returns `{ "ok": true, "data_age_s": <float>, "threshold_s": <float> }` when a snapshot is available and the latest health row is newer than `PSD_READY_MAX_AGE` (default 15s). Missing or stale data yields `503` with `{ "ok": false, "reason": "...", "data_age_s": <float|null> }`.
 

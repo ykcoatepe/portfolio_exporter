@@ -7,7 +7,7 @@ import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
 
 import { StocksTable } from "./StocksTable";
 import { server } from "../mocks/server";
-import type { StocksApiResponse } from "../lib/types";
+import type { MarkSource } from "../lib/types";
 
 const createQueryClient = () =>
   new QueryClient({
@@ -29,8 +29,58 @@ const renderWithClient = (ui: ReactNode) => {
   return { ...result, client };
 };
 
-const mockStocks = (payload: StocksApiResponse) => {
-  server.use(http.get("*/positions/stocks", () => HttpResponse.json(payload)));
+type StockSnapshotInput = {
+  symbol: string;
+  quantity: number;
+  averageCost: number;
+  markPrice: number;
+  markSource: MarkSource;
+  markTime: string;
+  dayPnlAmount: number;
+  totalPnlAmount: number;
+  previousClose: number;
+  staleSeconds: number;
+};
+
+const buildStockEntry = ({
+  symbol,
+  quantity,
+  averageCost,
+  markPrice,
+  markSource,
+  markTime,
+  dayPnlAmount,
+  totalPnlAmount,
+  previousClose,
+  staleSeconds,
+}: StockSnapshotInput) => ({
+  secType: "STK" as const,
+  symbol,
+  qty: quantity,
+  avg_cost: averageCost,
+  multiplier: 1,
+  mark: markPrice,
+  mark_source: markSource,
+  price_source: markSource.toLowerCase(),
+  stale_s: staleSeconds,
+  pnl_intraday: dayPnlAmount,
+  pnl_unrealized: totalPnlAmount,
+  previous_close: previousClose,
+  updated_at: markTime,
+});
+
+const mockStocks = (entries: StockSnapshotInput[]) => {
+  const snapshot = {
+    ts: Date.parse("2024-01-01T12:00:00Z"),
+    session: "RTH",
+    positions_view: {
+      single_stocks: entries.map(buildStockEntry),
+      option_combos: [],
+      single_options: [],
+    },
+  };
+  server.use(http.get("*/state", () => HttpResponse.json(snapshot)));
+  return snapshot;
 };
 
 describe("StocksTable", () => {
@@ -46,37 +96,32 @@ describe("StocksTable", () => {
   });
 
   test("renders fetched stocks sorted by day P&L with mark badge", async () => {
-    mockStocks({
-      data: [
-        {
-          symbol: "MSFT",
-          quantity: 42,
-          average_price: 274.5,
-          mark_price: 290.1,
-          mark_source: "LAST",
-          mark_time: "2024-01-01T11:58:00Z",
-          day_pnl_amount: 420,
-          day_pnl_percent: 0.018,
-          total_pnl_amount: 1230,
-          total_pnl_percent: 0.046,
-          currency: "USD",
-        },
-        {
-          symbol: "AAPL",
-          quantity: 100,
-          average_price: 182.25,
-          mark_price: 190.5,
-          mark_source: "MID",
-          mark_time: "2024-01-01T11:59:00Z",
-          day_pnl_amount: 815,
-          day_pnl_percent: 0.027,
-          total_pnl_amount: 2450,
-          total_pnl_percent: 0.062,
-          currency: "USD",
-        },
-      ],
-      as_of: "2024-01-01T12:00:00Z",
-    });
+    mockStocks([
+      {
+        symbol: "MSFT",
+        quantity: 42,
+        averageCost: 260.8142857142857,
+        markPrice: 290.1,
+        markSource: "LAST",
+        markTime: "2024-01-01T11:58:00Z",
+        dayPnlAmount: 420,
+        totalPnlAmount: 1230,
+        previousClose: 280.1,
+        staleSeconds: 120,
+      },
+      {
+        symbol: "AAPL",
+        quantity: 100,
+        averageCost: 166,
+        markPrice: 190.5,
+        markSource: "MID",
+        markTime: "2024-01-01T11:59:00Z",
+        dayPnlAmount: 815,
+        totalPnlAmount: 2450,
+        previousClose: 182.35,
+        staleSeconds: 60,
+      },
+    ]);
 
     const { client } = renderWithClient(<StocksTable />);
 
@@ -93,23 +138,20 @@ describe("StocksTable", () => {
   });
 
   test("exposes grid semantics and default aria-sort state", async () => {
-    mockStocks({
-      data: [
-        {
-          symbol: "SHOP",
-          quantity: 32,
-          average_price: 68,
-          mark_price: 70.2,
-          mark_source: "MID",
-          mark_time: "2024-01-01T11:58:00Z",
-          day_pnl_amount: 110,
-          day_pnl_percent: 0.019,
-          total_pnl_amount: 240,
-          total_pnl_percent: 0.048,
-          currency: "USD",
-        },
-      ],
-    });
+    mockStocks([
+      {
+        symbol: "SHOP",
+        quantity: 32,
+        averageCost: 61.7,
+        markPrice: 70.2,
+        markSource: "MID",
+        markTime: "2024-01-01T11:58:00Z",
+        dayPnlAmount: 110,
+        totalPnlAmount: 240,
+        previousClose: 66.7625,
+        staleSeconds: 90,
+      },
+    ]);
 
     const { client } = renderWithClient(<StocksTable />);
 
@@ -138,23 +180,20 @@ describe("StocksTable", () => {
   });
 
   test("formats staleness as mm:ss and applies threshold styling", async () => {
-    mockStocks({
-      data: [
-        {
-          symbol: "TSLA",
-          quantity: 25,
-          average_price: 210.0,
-          mark_price: 198.5,
-          mark_source: "PREV",
-          mark_time: "2024-01-01T11:54:45Z",
-          day_pnl_amount: -85,
-          day_pnl_percent: -0.012,
-          total_pnl_amount: -285,
-          total_pnl_percent: -0.057,
-          currency: "USD",
-        },
-      ],
-    });
+    mockStocks([
+      {
+        symbol: "TSLA",
+        quantity: 25,
+        averageCost: 209.9,
+        markPrice: 198.5,
+        markSource: "PREV",
+        markTime: "2024-01-01T11:54:45Z",
+        dayPnlAmount: -85,
+        totalPnlAmount: -285,
+        previousClose: 201.9,
+        staleSeconds: 315,
+      },
+    ]);
 
     const { client } = renderWithClient(<StocksTable />);
 
@@ -165,36 +204,32 @@ describe("StocksTable", () => {
   });
 
   test("supports keyboard navigation and row expansion", async () => {
-    mockStocks({
-      data: [
-        {
-          symbol: "NVDA",
-          quantity: 30,
-          average_price: 440.0,
-          mark_price: 456.5,
-          mark_source: "MID",
-          mark_time: "2024-01-01T11:59:30Z",
-          day_pnl_amount: 620,
-          day_pnl_percent: 0.034,
-          total_pnl_amount: 1800,
-          total_pnl_percent: 0.072,
-          currency: "USD",
-        },
-        {
-          symbol: "AMZN",
-          quantity: 55,
-          average_price: 128.4,
-          mark_price: 130.1,
-          mark_source: "LAST",
-          mark_time: "2024-01-01T11:58:45Z",
-          day_pnl_amount: 180,
-          day_pnl_percent: 0.016,
-          total_pnl_amount: 320,
-          total_pnl_percent: 0.041,
-          currency: "USD",
-        },
-      ],
-    });
+    mockStocks([
+      {
+        symbol: "NVDA",
+        quantity: 30,
+        averageCost: 396.5,
+        markPrice: 456.5,
+        markSource: "MID",
+        markTime: "2024-01-01T11:59:30Z",
+        dayPnlAmount: 620,
+        totalPnlAmount: 1800,
+        previousClose: 435.8333333333333,
+        staleSeconds: 30,
+      },
+      {
+        symbol: "AMZN",
+        quantity: 55,
+        averageCost: 124.291,
+        markPrice: 130.1,
+        markSource: "LAST",
+        markTime: "2024-01-01T11:58:45Z",
+        dayPnlAmount: 180,
+        totalPnlAmount: 320,
+        previousClose: 126.83636363636364,
+        staleSeconds: 75,
+      },
+    ]);
 
     const { client } = renderWithClient(<StocksTable />);
     const user = userEvent.setup();
@@ -261,36 +296,32 @@ describe("StocksTable", () => {
   });
 
   test("toggles day P&L sort direction via header control", async () => {
-    mockStocks({
-      data: [
-        {
-          symbol: "NVDA",
-          quantity: 30,
-          average_price: 440.0,
-          mark_price: 456.5,
-          mark_source: "MID",
-          mark_time: "2024-01-01T11:59:30Z",
-          day_pnl_amount: 620,
-          day_pnl_percent: 0.034,
-          total_pnl_amount: 1800,
-          total_pnl_percent: 0.072,
-          currency: "USD",
-        },
-        {
-          symbol: "AMZN",
-          quantity: 55,
-          average_price: 128.4,
-          mark_price: 130.1,
-          mark_source: "LAST",
-          mark_time: "2024-01-01T11:58:45Z",
-          day_pnl_amount: 180,
-          day_pnl_percent: 0.016,
-          total_pnl_amount: 320,
-          total_pnl_percent: 0.041,
-          currency: "USD",
-        },
-      ],
-    });
+    mockStocks([
+      {
+        symbol: "NVDA",
+        quantity: 30,
+        averageCost: 396.5,
+        markPrice: 456.5,
+        markSource: "MID",
+        markTime: "2024-01-01T11:59:30Z",
+        dayPnlAmount: 620,
+        totalPnlAmount: 1800,
+        previousClose: 435.8333333333333,
+        staleSeconds: 30,
+      },
+      {
+        symbol: "AMZN",
+        quantity: 55,
+        averageCost: 124.291,
+        markPrice: 130.1,
+        markSource: "LAST",
+        markTime: "2024-01-01T11:58:45Z",
+        dayPnlAmount: 180,
+        totalPnlAmount: 320,
+        previousClose: 126.83636363636364,
+        staleSeconds: 75,
+      },
+    ]);
 
     const { client } = renderWithClient(<StocksTable />);
     const user = userEvent.setup();
@@ -319,23 +350,20 @@ describe("StocksTable", () => {
   });
 
   test("focuses the filter input when / is pressed globally", async () => {
-    mockStocks({
-      data: [
-        {
-          symbol: "AMD",
-          quantity: 80,
-          average_price: 102,
-          mark_price: 104.5,
-          mark_source: "MID",
-          mark_time: "2024-01-01T11:57:00Z",
-          day_pnl_amount: 120,
-          day_pnl_percent: 0.015,
-          total_pnl_amount: 310,
-          total_pnl_percent: 0.031,
-          currency: "USD",
-        },
-      ],
-    });
+    mockStocks([
+      {
+        symbol: "AMD",
+        quantity: 80,
+        averageCost: 100.625,
+        markPrice: 104.5,
+        markSource: "MID",
+        markTime: "2024-01-01T11:57:00Z",
+        dayPnlAmount: 120,
+        totalPnlAmount: 310,
+        previousClose: 103.0,
+        staleSeconds: 180,
+      },
+    ]);
 
     const { client } = renderWithClient(<StocksTable />);
     const user = userEvent.setup();

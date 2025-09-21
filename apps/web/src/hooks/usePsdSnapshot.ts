@@ -1,6 +1,8 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
-import type { PSDSnapshot } from "../lib/types";
+import type { PSDSnapshot, PSDPositionsView } from "../lib/types";
+
+export const PSD_SNAPSHOT_QUERY_KEY = ["psd", "snapshot"] as const;
 
 export async function fetchPsdSnapshot(baseUrl = ""): Promise<PSDSnapshot> {
   const origin =
@@ -23,8 +25,18 @@ export async function fetchPsdSnapshot(baseUrl = ""): Promise<PSDSnapshot> {
 
 export function usePsdSnapshot(): UseQueryResult<PSDSnapshot, Error> {
   return useQuery<PSDSnapshot, Error>({
-    queryKey: ["psd", "snapshot"],
+    queryKey: PSD_SNAPSHOT_QUERY_KEY,
     queryFn: () => fetchPsdSnapshot(),
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+}
+
+export function usePsdPositionsView(): UseQueryResult<PSDPositionsView | null, Error> {
+  return useQuery<PSDSnapshot, Error, PSDPositionsView | null>({
+    queryKey: PSD_SNAPSHOT_QUERY_KEY,
+    queryFn: () => fetchPsdSnapshot(),
+    select: (snapshot) => (snapshot.positions_view ?? null),
     refetchInterval: 30_000,
     staleTime: 15_000,
   });

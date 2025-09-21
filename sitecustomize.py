@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 
 def _iter_site_packages(venv_root: Path) -> Iterable[Path]:

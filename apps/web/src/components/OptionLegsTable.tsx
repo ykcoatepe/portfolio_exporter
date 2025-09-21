@@ -18,7 +18,7 @@ import type { OptionLegRow } from "../lib/types";
 import { MarkBadge } from "./MarkBadge";
 import { deriveStalenessSeconds, formatSigned, stalenessTone, valueTone } from "./tableUtils";
 
-const COLUMN_COUNT = 11;
+const COLUMN_COUNT = 8;
 const SKELETON_ROWS = Array.from({ length: 10 }, (_, idx) => idx);
 const DEFAULT_DELTA_RANGE = { min: -1, max: 1 } as const;
 const SHOULD_POLL = import.meta.env.MODE !== "test";
@@ -122,24 +122,12 @@ const LegRow = (
         className="px-3 py-3 text-left text-sm font-semibold text-slate-100"
       >
         <div className="space-y-1">
-          <span>{leg.underlying}</span>
-          <span className="block text-xs uppercase tracking-wide text-slate-400">
-            {leg.isOrphan ? "Orphan" : "Combo"}
+          <span title={leg.symbol}>{leg.label}</span>
+          <span className="block text-xs text-slate-400">
+            {leg.expiryShort ?? leg.expiry} • {leg.dte}d {leg.isOrphan ? "• Orphan" : ""}
           </span>
         </div>
       </th>
-      <td role="gridcell" className="px-3 py-3 text-sm text-slate-200">
-        <div className="space-y-1">
-          <span className="font-medium text-slate-100">{leg.expiry}</span>
-          <span className="block text-xs text-slate-400">{leg.dte}d</span>
-        </div>
-      </td>
-      <td role="gridcell" className="px-3 py-3 text-sm text-slate-200">
-        {leg.strike.toFixed(2)}
-      </td>
-      <td role="gridcell" className="px-3 py-3 text-xs font-semibold uppercase text-slate-300">
-        {leg.right}
-      </td>
       <td role="gridcell" className="px-3 py-3 text-sm text-slate-200">
         {leg.quantity}
       </td>
@@ -204,7 +192,7 @@ const LegRow = (
         {stalenessLabel}
       </td>
       <td role="gridcell" className="px-3 py-3 text-xs text-slate-400">
-        {leg.comboId ? leg.comboId : "—"}
+        {leg.comboGroupId ?? leg.comboId ?? "—"}
       </td>
     </tr>
   );
@@ -287,7 +275,7 @@ export function OptionLegsTable(): JSX.Element {
       if (onlyOrphans && !leg.isOrphan) {
         return false;
       }
-      if (selectedUnderlyings.length > 0 && !selectedUnderlyings.includes(leg.underlying)) {
+      if (selectedUnderlyings.length > 0 && !selectedUnderlyings.includes(leg.shortUnderlying)) {
         return false;
       }
       if (!filterByWindow(leg, selectedWindow)) {
@@ -490,16 +478,7 @@ export function OptionLegsTable(): JSX.Element {
           <thead>
             <tr role="row" className="text-xs uppercase tracking-wide text-slate-400">
               <th scope="col" role="columnheader" className="px-3 py-3 text-left">
-                UL
-              </th>
-              <th scope="col" role="columnheader" className="px-3 py-3 text-left">
-                Expiry
-              </th>
-              <th scope="col" role="columnheader" className="px-3 py-3 text-left">
-                Strike
-              </th>
-              <th scope="col" role="columnheader" className="px-3 py-3 text-left">
-                Right
+                Leg
               </th>
               <th scope="col" role="columnheader" className="px-3 py-3 text-left">
                 Qty
@@ -520,7 +499,7 @@ export function OptionLegsTable(): JSX.Element {
                 Staleness
               </th>
               <th scope="col" role="columnheader" className="px-3 py-3 text-left">
-                Combo ID
+                Group
               </th>
             </tr>
           </thead>

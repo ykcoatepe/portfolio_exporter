@@ -23,10 +23,12 @@ LIBS_PATH = REPO_ROOT / "libs" / "py"
 if str(LIBS_PATH) not in sys.path:
     sys.path.append(str(LIBS_PATH))
 
-logger = logging.getLogger(__name__)
-
 from positions_engine.core.models import InstrumentType, Quote  # noqa: E402
-from positions_engine.ingest import load_csv_records, load_demo_dataset  # noqa: E402
+from positions_engine.ingest import (  # noqa: E402
+    choose_provider,
+    last_provider_info,
+    load_demo_dataset,
+)
 from positions_engine.rules.catalog import CatalogError, CatalogValidationError  # noqa: E402
 from positions_engine.service import (  # noqa: E402
     PositionsState,
@@ -35,6 +37,8 @@ from positions_engine.service import (  # noqa: E402
     positions_from_records,
     quotes_from_records,
 )
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Positions Engine API", version="0.1.0")
 _state = PositionsState()
@@ -142,7 +146,7 @@ class StatsResponse(BaseModel):
 
 @app.on_event("startup")
 async def _on_startup() -> None:  # pragma: no cover - exercised by integration tests
-    _refresh_from_disk()
+    _refresh_from_providers()
 
 
 @app.get("/healthz", tags=["meta"])
@@ -153,8 +157,15 @@ def healthz() -> dict[str, Any]:
 @app.get("/positions/stocks", tags=["positions"])
 def equities() -> list[dict[str, Any]]:
     if _AUTO_REFRESH:
-        _refresh_from_disk()
+        _refresh_from_providers()
     return _state.equities_payload()
+
+
+@app.get("/state", tags=["positions"])
+def state_snapshot() -> dict[str, Any]:
+    if _AUTO_REFRESH:
+        _refresh_from_providers()
+    return _state.snapshot_payload()
 
 
 @app.get(
@@ -165,7 +176,7 @@ def equities() -> list[dict[str, Any]]:
 )
 def stats() -> StatsResponse:
     if _AUTO_REFRESH:
-        _refresh_from_disk()
+        _refresh_from_providers()
     payload: dict[str, Any] = dict(_state.stats())
     evaluation = _rules_state.evaluate()
     payload["rules_count"] = len(_rules_state.rules)
@@ -175,7 +186,7 @@ def stats() -> StatsResponse:
     payload.setdefault("net_liq", None)
     payload.setdefault("var95_1d_pct", None)
     payload.setdefault("margin_used_pct", None)
-    payload.setdefault("data_source", _state.data_source)
+    payload["data_source"] = _state.data_source
 
     snapshot_at = _state.snapshot_updated_at()
     if snapshot_at is not None and not payload.get("updated_at"):
@@ -184,23 +195,49 @@ def stats() -> StatsResponse:
     return StatsResponse(**payload)
 
 
-def _refresh_from_disk() -> None:
+def _refresh_from_providers() -> None:
     data_root = _resolve_data_root()
-    csv_result = load_csv_records(data_root)
-    metadata = csv_result.metadata
-    logger.info(
-        "[ingest] DATA_ROOT=%s positions_rows=%d quotes_rows=%d greeks_rows=%d",
-        metadata.get("data_root"),
-        metadata.get("positions_rows", 0),
-        metadata.get("quotes_rows", 0),
-        metadata.get("greeks_rows", 0),
-    )
+    allow_empty = os.getenv("POSITIONS_ENGINE_ALLOW_EMPTY", "0") == "1"
+    demo_env_enabled = os.getenv("POSITIONS_ENGINE_DEMO", "0") == "1"
+    include_demo = demo_env_enabled or not allow_empty
 
-    positions_records = csv_result.positions
-    quotes_records = csv_result.quotes
+    positions_records, quotes_records, source_name = choose_provider(data_root)
+    provider_info = last_provider_info() or {}
+
+    if _DEMO_OVERRIDE is True:
+        positions_records, quotes_records = load_demo_dataset()
+        source_name = "demo"
+        provider_info = {"name": "demo", "detail": "override"}
+    elif _DEMO_OVERRIDE is False and source_name == "demo":
+        positions_records, quotes_records = [], []
+        source_name = None
+        provider_info = {}
+
+    if (not positions_records and not quotes_records) and include_demo and _DEMO_OVERRIDE is not False:
+        positions_records, quotes_records = load_demo_dataset()
+        source_name = "demo"
+        if "detail" not in provider_info:
+            provider_info = {"name": "demo"}
+
+    data_source = source_name or "live"
 
     positions = positions_from_records(positions_records)
     quotes = _guard_quotes(quotes_from_records(quotes_records))
+
+    if data_source == "live" and not positions and not quotes and include_demo and _DEMO_OVERRIDE is False:
+        logger.info(
+            "[ingest] Live dataset empty; demo override disabled. Provide CSVs or enable POSITIONS_ENGINE_DEMO=1 for fallback"
+        )
+
+    snapshot_at = _latest_quote_timestamp(quotes)
+    positions_view_payload = provider_info.get("positions_view") if isinstance(provider_info, dict) else None
+    _state.refresh(
+        positions=positions,
+        quotes=quotes,
+        snapshot_at=snapshot_at,
+        data_source=data_source,
+        positions_view=positions_view_payload,
+    )
 
     equity_positions = [
         position for position in positions if position.instrument.instrument_type == InstrumentType.EQUITY
@@ -209,49 +246,33 @@ def _refresh_from_disk() -> None:
         position for position in positions if position.instrument.instrument_type == InstrumentType.OPTION
     ]
 
-    demo_env_enabled = os.getenv("POSITIONS_ENGINE_DEMO", "0") == "1"
-    allow_empty = os.getenv("POSITIONS_ENGINE_ALLOW_EMPTY", "0") == "1"
-    apply_demo = False
-    demo_reason: str | None = None
+    detail_hint: str | None = None
+    rows_summary = "-"
+    if data_source == "internal":
+        detail_hint = provider_info.get("detail") or provider_info.get("name")
+    elif data_source == "csv":
+        metadata = provider_info.get("metadata") or {}
+        detail_hint = metadata.get("positions_path") or metadata.get("data_root")
+        rows_summary = f"{metadata.get('positions_rows', 0)}/{metadata.get('quotes_rows', 0)}"
+    elif data_source == "demo":
+        detail_hint = provider_info.get("detail", "demo")
 
-    if _DEMO_OVERRIDE is True:
-        apply_demo = True
-        demo_reason = "debug override"
-    elif _DEMO_OVERRIDE is False:
-        apply_demo = False
-    elif not equity_positions and not option_positions:
-        if demo_env_enabled or not allow_empty:
-            apply_demo = True
-            demo_reason = "POSITIONS_ENGINE_DEMO=1" if demo_env_enabled else "ALLOW_EMPTY disabled"
+    if data_source == "live" and not positions and not quotes and not include_demo:
+        detail_hint = detail_hint or "empty"
 
-    data_source = "csv" if csv_result.has_data else "live"
+    logger.info(
+        "[ingest] data_source=%s equities=%d option_legs=%d quotes=%d detail=%s rows=%s",
+        data_source,
+        len(equity_positions),
+        len(option_positions),
+        len(quotes),
+        detail_hint or "-",
+        rows_summary,
+    )
 
-    if apply_demo:
-        demo_positions, demo_quotes = load_demo_dataset()
-        positions = positions_from_records(demo_positions)
-        quotes = _guard_quotes(quotes_from_records(demo_quotes))
-        equity_positions = [
-            position for position in positions if position.instrument.instrument_type == InstrumentType.EQUITY
-        ]
-        option_positions = [
-            position for position in positions if position.instrument.instrument_type == InstrumentType.OPTION
-        ]
-        data_source = "demo"
-        logger.info(
-            "[demo] Loaded fallback dataset equities=%d option_positions=%d reason=%s",
-            len(equity_positions),
-            len(option_positions),
-            demo_reason or "auto",
-        )
-    elif not positions and not quotes:
-        if not allow_empty and not demo_env_enabled:
-            logger.info(
-                "[ingest] No data available; set POSITIONS_ENGINE_DEMO=1 or POSITIONS_ENGINE_ALLOW_EMPTY=1 to control fallback"
-            )
-        # keep data_source as "live" to indicate no sample was injected
 
-    snapshot_at = _latest_quote_timestamp(quotes)
-    _state.refresh(positions=positions, quotes=quotes, snapshot_at=snapshot_at, data_source=data_source)
+def _refresh_from_disk() -> None:
+    _refresh_from_providers()
 
 
 def _guard_quotes(quotes: list[Quote]) -> list[Quote]:
@@ -284,7 +305,7 @@ def _load_prior_positions_hint() -> str | None:
 @app.get("/positions/options", tags=["positions"])
 def options() -> dict[str, Any]:
     if _AUTO_REFRESH:
-        _refresh_from_disk()
+        _refresh_from_providers()
     return _state.options_payload()
 
 
@@ -292,7 +313,7 @@ def options() -> dict[str, Any]:
 def enable_demo() -> dict[str, bool]:
     global _DEMO_OVERRIDE
     _DEMO_OVERRIDE = True
-    _refresh_from_disk()
+    _refresh_from_providers()
     return {"demo": True}
 
 
@@ -300,14 +321,14 @@ def enable_demo() -> dict[str, bool]:
 def disable_demo() -> dict[str, bool]:
     global _DEMO_OVERRIDE
     _DEMO_OVERRIDE = False
-    _refresh_from_disk()
+    _refresh_from_providers()
     return {"demo": False}
 
 
 @app.get("/rules/summary", tags=["rules"], response_model=RulesSummaryResponseModel)
 def rules_summary() -> RulesSummaryResponseModel:
     if _AUTO_REFRESH:
-        _refresh_from_disk()
+        _refresh_from_providers()
     summary, evaluation = _rules_state.summary()
     breaches_raw = summary.get("breaches", {}) if isinstance(summary, dict) else {}
     breaches_model = BreachCountsModel(
