@@ -56,6 +56,10 @@ export interface OptionLegDisplay {
   expiry_short: string | null;
 }
 
+export type ComboProgress = {
+  pctOfGoal: number | null;
+};
+
 export interface OptionComboLegApi {
   id?: string;
   leg_id?: string;
@@ -79,6 +83,15 @@ export interface OptionComboLegApi {
   day_pnl_percent: number | null;
   total_pnl_amount: number | null;
   total_pnl_percent: number | null;
+  tp_band_pct?: number[] | null;
+  tp_band_low_pct?: number | null;
+  tp_band_high_pct?: number | null;
+  tp_hit?: boolean;
+  tp_done?: boolean;
+  sl_hit?: boolean;
+  next_action?: string;
+  progress_pct_of_goal?: number | null;
+  progress_pct_of_max?: number | null;
   label?: string;
   display?: OptionLegDisplay;
 }
@@ -102,6 +115,17 @@ export interface OptionComboApi {
   day_pnl_percent: number | null;
   total_pnl_amount: number | null;
   total_pnl_percent: number | null;
+  tp_band_pct?: number[] | null;
+  tp_band_low_pct?: number | null;
+  tp_band_high_pct?: number | null;
+  tp_hit?: boolean;
+  tp_done?: boolean;
+  sl_hit?: boolean;
+  sl_r?: number | null;
+  next_action?: string;
+  progress_pct_of_goal?: number | null;
+  progress_pct_of_max?: number | null;
+  progress?: { pct_of_goal?: number | null } | null;
   legs: OptionComboLegApi[];
   combo_group_id?: string | null;
   combo_qty?: number | null;
@@ -131,19 +155,46 @@ export interface OptionComboGroupApi {
   underlying: string;
   group_qty: number;
   group_net_price: number;
+  group_mark_price?: number | null;
+  mark_price?: number | null;
+  mark?: number | null;
   dte: number;
   sum_greeks: OptionGreekSummary;
   mark_source: MarkSource;
   stale_seconds: number | null;
+  tp_band_pct?: number[] | null;
+  tp_band_low_pct?: number | null;
+  tp_band_high_pct?: number | null;
+  tp_hit?: boolean;
+  tp_done?: boolean;
+  sl_hit?: boolean;
+  sl_r?: number | null;
+  next_action?: string | null;
+  progress_pct_of_goal?: number | null;
+  progress?: { pct_of_goal?: number | null } | null;
   label?: string;
   display?: OptionComboDisplay;
   legs: OptionComboGroupLegApi[];
+}
+
+export interface PlaybookApiMeta {
+  vix?: number | null;
+  vix_source?: string | null;
+  tp_band_pct?: number[] | null;
+}
+
+export interface PlaybookMeta {
+  vix: number | null;
+  vixSource: string | null;
+  tpBandLowPct: number | null;
+  tpBandHighPct: number | null;
 }
 
 export interface OptionsApiResponse {
   combos: OptionComboApi[];
   legs: OptionComboLegApi[];
   combo_groups?: OptionComboGroupApi[];
+  playbook?: PlaybookApiMeta | null;
   as_of?: string | null;
 }
 
@@ -151,6 +202,7 @@ export interface OptionComboLegRow {
   id: string;
   symbol: string;
   label: string;
+  labelText: string;
   labelTooltip: string;
   underlying: string;
   shortUnderlying: string;
@@ -171,6 +223,15 @@ export interface OptionComboLegRow {
   totalPnlAmount: number | null;
   totalPnlPercent: number | null;
   comboGroupId: string | null;
+  tpBandLowPct: number | null;
+  tpBandHighPct: number | null;
+  tpHit: boolean;
+  tpDone: boolean;
+  slHit: boolean;
+  nextAction: string;
+  progressPctOfGoal: number | null;
+  progressPctOfMax: number | null;
+  isNearTarget: boolean;
 }
 
 export interface OptionComboRow extends OptionGreekSummary {
@@ -194,6 +255,19 @@ export interface OptionComboRow extends OptionGreekSummary {
   comboGroupId: string | null;
   comboQty: number;
   groupNetPrice: number;
+  tpBandLowPct: number | null;
+  tpBandHighPct: number | null;
+  tpBandPct: readonly [number, number] | null;
+  tpHit: boolean;
+  tpDone: boolean;
+  slHit: boolean;
+  slR: number | null;
+  nextAction: string;
+  progressPctOfGoal: number | null;
+  progressPctOfMax: number | null;
+  progress: ComboProgress | null;
+  isNearTarget: boolean;
+  statusPriority: number;
 }
 
 export interface OptionComboGroupRow extends OptionGreekSummary {
@@ -202,12 +276,24 @@ export interface OptionComboGroupRow extends OptionGreekSummary {
   underlying: string;
   dte: number;
   groupQty: number;
+  groupNetPrice: number;
   netPrice: number;
+  mark: number | null;
   markSource: MarkSource;
   staleSeconds: number | null;
   label: string;
   display: OptionComboDisplay | null;
   legs: OptionComboLegRow[];
+  tpBandLowPct: number | null;
+  tpBandHighPct: number | null;
+  tpBandPct: readonly [number, number] | null;
+  tpHit: boolean;
+  tpDone: boolean;
+  slHit: boolean;
+  slR: number | null;
+  nextAction: string | null;
+  progressPctOfGoal: number | null;
+  progress: ComboProgress | null;
 }
 
 export interface OptionLegRow extends OptionGreekSummary {
@@ -216,6 +302,7 @@ export interface OptionLegRow extends OptionGreekSummary {
   comboGroupId: string | null;
   symbol: string;
   label: string;
+  labelText: string;
   labelTooltip: string;
   shortUnderlying: string;
   expiryShort: string | null;
@@ -233,6 +320,15 @@ export interface OptionLegRow extends OptionGreekSummary {
   dayPnlPercent: number | null;
   totalPnlAmount: number | null;
   totalPnlPercent: number | null;
+  tpBandLowPct: number | null;
+  tpBandHighPct: number | null;
+  tpHit: boolean;
+  tpDone: boolean;
+  slHit: boolean;
+  nextAction: string;
+  progressPctOfGoal: number | null;
+  progressPctOfMax: number | null;
+  isNearTarget: boolean;
   isOrphan: boolean;
 }
 

@@ -61,7 +61,18 @@ describe("labels helpers", () => {
 
     const spaced = buildFriendlyLegDisplay({ symbol: "AAPL  251017P00150000" });
     expect(spaced.label).toBe("AAPL 150P • Oct 17 '25");
-    expect(spaced.tooltip).toBe("AAPL251017P00150000");
+    expect(spaced.tooltip).toBe("AAPL  251017P00150000");
+  });
+
+  it.each([
+    ["double-spaced OSI root", "BKSY  251017C00022500", "BKSY 22.5C • Oct 17 '25"],
+    ["compact OSI symbol", "BKSY20251017P00016000", "BKSY 16P • Oct 17 '25"],
+  ])("omits OSI digits from labelText while preserving original tooltip for %s", (_title, symbol, expectedLabel) => {
+    const { label: labelText, tooltip: labelTooltip } = buildFriendlyLegDisplay({ symbol });
+    expect(labelText).toBe(expectedLabel);
+    expect(labelText).not.toMatch(/\d{6,8}[CP]\d{8}/);
+    expect(labelTooltip).toBe(symbol);
+    expect(labelTooltip).toMatch(/^[A-Z]{1,6}\s{0,5}\d{6,8}[CP]\d{8}$/);
   });
 
   it("formats leg labels with normalized right codes", () => {

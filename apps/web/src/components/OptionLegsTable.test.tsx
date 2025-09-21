@@ -82,7 +82,12 @@ describe("OptionLegsTable", () => {
       return;
     }
     expect(labelSpan.textContent).not.toMatch(/\d{6,8}[CP]\d{8}/);
-    expect(labelSpan.getAttribute("title")).toMatch(/\d{6,8}[CP]\d{8}$/);
+    const title = labelSpan.getAttribute("title");
+    expect(title).not.toBeNull();
+    if (!title) {
+      return;
+    }
+    expect(title).toMatch(/^[A-Z]{1,6}\s{0,5}\d{6,8}[CP]\d{8}$/);
   });
 
   test("filters to orphan legs and toggles underlyings", async () => {

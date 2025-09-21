@@ -7,7 +7,6 @@ import {
   deriveGroupKey,
   formatComboLabel,
   formatExpiryShort,
-  formatLegLabel,
   normalizeRightCode,
   parseOsi,
   sanitizeLabel,
@@ -22,6 +21,7 @@ import type {
   OptionGreekSummary,
   OptionLegRow,
   OptionsApiResponse,
+  PlaybookMeta,
   MarkSource,
 } from "../lib/types";
 
@@ -40,6 +40,26 @@ const toInteger = (value: unknown, fallback: number): number => {
 
 const normalizeMarkTime = (value: unknown): string | null =>
   typeof value === "string" && value.length > 0 ? value : null;
+
+const parsePlaybookMeta = (meta: OptionsApiResponse["playbook"]): PlaybookMeta | null => {
+  if (!meta) {
+    return null;
+  }
+  const [rawLow, rawHigh] = Array.isArray(meta.tp_band_pct) ? meta.tp_band_pct : [];
+  const low = typeof rawLow === "number" && Number.isFinite(rawLow) ? rawLow : null;
+  const high = typeof rawHigh === "number" && Number.isFinite(rawHigh) ? rawHigh : null;
+  const vixValue = typeof meta.vix === "number" && Number.isFinite(meta.vix) ? meta.vix : null;
+  const vixSource = typeof meta.vix_source === "string" && meta.vix_source.length > 0 ? meta.vix_source : null;
+  return {
+    vix: vixValue,
+    vixSource,
+    tpBandLowPct: low,
+    tpBandHighPct: high,
+  };
+};
+
+const toSortableValue = (value: number | null | undefined): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
 
 const computeDte = (expiry: string, asOf?: string | null): number => {
   const baseTs = asOf ? Date.parse(asOf) : Date.now();
@@ -88,6 +108,23 @@ const toComboLegRow = (leg: OptionComboLegApi, asOf?: string | null): OptionComb
     markSourceRaw === "MID" || markSourceRaw === "LAST" || markSourceRaw === "PREV"
       ? (markSourceRaw as MarkSource)
       : "MISSING";
+  const tpBandLowPct = toNumber(leg.tp_band_low_pct);
+  const tpBandHighPct = toNumber(leg.tp_band_high_pct);
+  const tpHit = leg.tp_hit === true;
+  const tpDone = leg.tp_done === true;
+  const slHit = leg.sl_hit === true;
+  const nextActionRaw = typeof leg.next_action === "string" ? leg.next_action.toUpperCase() : "HOLD";
+  const progressPctOfGoal = toNumber(leg.progress_pct_of_goal);
+  const progressPctOfMax = toNumber(leg.progress_pct_of_max);
+  const isShort = quantity < 0;
+  let isNearTarget = false;
+  if (!tpDone && !slHit) {
+    if (isShort && tpBandLowPct !== null && progressPctOfMax !== null && progressPctOfMax >= 0) {
+      isNearTarget = progressPctOfMax >= Math.max(0, tpBandLowPct - 0.1);
+    } else if (!isShort && progressPctOfMax !== null && progressPctOfMax >= 0) {
+      isNearTarget = progressPctOfMax >= 1.8;
+    }
+  }
   const rawRight = typeof leg.right === "string" ? leg.right : String(leg.right ?? "");
   const fallbackExpiry = typeof leg.expiry === "string" ? leg.expiry : "";
   const friendlyDisplay = buildFriendlyLegDisplay({
@@ -102,7 +139,7 @@ const toComboLegRow = (leg: OptionComboLegApi, asOf?: string | null): OptionComb
     expiry: fallbackExpiry,
   });
   const normalizedRight = friendlyDisplay.right;
-  const label = friendlyDisplay.label;
+  const labelText = friendlyDisplay.label;
   const labelTooltip = friendlyDisplay.tooltip;
   const shortUnderlying = friendlyDisplay.shortUnderlying;
   const expiryShort = friendlyDisplay.expiryShort ?? friendlyDisplay.expiryISO;
@@ -112,7 +149,8 @@ const toComboLegRow = (leg: OptionComboLegApi, asOf?: string | null): OptionComb
   return {
     id: legId,
     symbol: leg.symbol ?? legId,
-    label,
+    label: labelText,
+    labelText,
     labelTooltip,
     underlying: leg.underlying,
     shortUnderlying,
@@ -133,6 +171,15 @@ const toComboLegRow = (leg: OptionComboLegApi, asOf?: string | null): OptionComb
     totalPnlAmount: toNumber(leg.total_pnl_amount),
     totalPnlPercent: toNumber(leg.total_pnl_percent),
     comboGroupId: leg.combo_group_id ?? null,
+    tpBandLowPct,
+    tpBandHighPct,
+    tpHit,
+    tpDone,
+    slHit,
+    nextAction: nextActionRaw,
+    progressPctOfGoal,
+    progressPctOfMax,
+    isNearTarget,
   };
 };
 
@@ -168,6 +215,36 @@ const mapComboApiToRow = (
     markSourceRaw === "MID" || markSourceRaw === "LAST" || markSourceRaw === "PREV"
       ? (markSourceRaw as MarkSource)
       : "MISSING";
+  const tpBandArray = Array.isArray(combo.tp_band_pct) ? combo.tp_band_pct : null;
+  const tpBandLowPct = toNumber(combo.tp_band_low_pct ?? tpBandArray?.[0]);
+  const tpBandHighPct = toNumber(combo.tp_band_high_pct ?? tpBandArray?.[1]);
+  const tpBandPct = tpBandLowPct !== null && tpBandHighPct !== null ? ([tpBandLowPct, tpBandHighPct] as const) : null;
+  const tpHit = combo.tp_hit === true;
+  const tpDone = combo.tp_done === true;
+  const slHit = combo.sl_hit === true;
+  const slR = toNumber(combo.sl_r);
+  const nextActionRaw = typeof combo.next_action === "string" ? combo.next_action.toUpperCase() : "HOLD";
+  const progressPctOfGoal = toNumber(combo.progress?.pct_of_goal ?? combo.progress_pct_of_goal);
+  const progressPctOfMax = toNumber(combo.progress_pct_of_max);
+  const progress = progressPctOfGoal !== null ? { pctOfGoal: progressPctOfGoal } : null;
+  const isCredit = side === "credit";
+  let isNearTarget = false;
+  if (!tpDone && !slHit) {
+    if (isCredit && tpBandLowPct !== null && progressPctOfMax !== null && progressPctOfMax >= 0) {
+      isNearTarget = progressPctOfMax >= Math.max(0, tpBandLowPct - 0.1);
+    } else if (!isCredit && progressPctOfMax !== null && progressPctOfMax >= 0) {
+      isNearTarget = progressPctOfMax >= 1.8;
+    }
+  }
+  const statusPriority = slHit
+    ? 0
+    : tpHit && !tpDone
+      ? 1
+      : tpDone
+        ? 2
+        : isNearTarget
+          ? 3
+          : 4;
 
   return {
     id: comboId,
@@ -194,25 +271,55 @@ const mapComboApiToRow = (
     comboGroupId: combo.combo_group_id ?? null,
     comboQty,
     groupNetPrice: netPremium,
+    tpBandLowPct,
+    tpBandHighPct,
+    tpBandPct,
+    tpHit,
+    tpDone,
+    slHit,
+    slR,
+    nextAction: nextActionRaw,
+    progressPctOfGoal,
+    progressPctOfMax,
+    progress,
+    isNearTarget,
+    statusPriority,
   };
 };
 
 const mapLegToStandaloneRow = (leg: OptionComboLegApi, asOf?: string | null): OptionLegRow => {
   const legRow = toComboLegRow(leg, asOf);
+  const friendlyDisplay = buildFriendlyLegDisplay({
+    symbol: leg.symbol,
+    underlying: leg.underlying ?? legRow.underlying,
+    right: leg.right ?? legRow.right,
+    strike: leg.strike ?? legRow.strike,
+    expiry: leg.expiry ?? legRow.expiry,
+  });
+  const expiryISO = friendlyDisplay.expiryISO || legRow.expiry;
+  const expiryShort = friendlyDisplay.expiryShort ?? legRow.expiryShort;
+  const shortUnderlying =
+    friendlyDisplay.shortUnderlying === "?" && legRow.shortUnderlying
+      ? legRow.shortUnderlying
+      : friendlyDisplay.shortUnderlying;
+  const labelText = friendlyDisplay.label;
+  const labelTooltip = friendlyDisplay.tooltip || legRow.labelTooltip || legRow.symbol;
+
   return {
     id: legRow.id,
     comboId: leg.combo_id ?? null,
     comboGroupId: leg.combo_group_id ?? null,
     symbol: legRow.symbol,
-    label: legRow.label,
-    labelTooltip: legRow.labelTooltip,
-    shortUnderlying: legRow.shortUnderlying,
-    expiryShort: legRow.expiryShort,
+    label: labelText,
+    labelText,
+    labelTooltip,
+    shortUnderlying,
+    expiryShort,
     underlying: legRow.underlying,
-    expiry: legRow.expiry,
-    dte: computeDte(legRow.expiry, asOf),
+    expiry: expiryISO,
+    dte: computeDte(expiryISO, asOf),
     strike: legRow.strike,
-    right: legRow.right,
+    right: friendlyDisplay.right,
     quantity: legRow.quantity,
     markPrice: legRow.markPrice,
     markSource: legRow.markSource,
@@ -226,6 +333,15 @@ const mapLegToStandaloneRow = (leg: OptionComboLegApi, asOf?: string | null): Op
     dayPnlPercent: legRow.dayPnlPercent,
     totalPnlAmount: legRow.totalPnlAmount,
     totalPnlPercent: legRow.totalPnlPercent,
+    tpBandLowPct: legRow.tpBandLowPct,
+    tpBandHighPct: legRow.tpBandHighPct,
+    tpHit: legRow.tpHit,
+    tpDone: legRow.tpDone,
+    slHit: legRow.slHit,
+    nextAction: legRow.nextAction,
+    progressPctOfGoal: legRow.progressPctOfGoal,
+    progressPctOfMax: legRow.progressPctOfMax,
+    isNearTarget: legRow.isNearTarget,
     isOrphan: leg.combo_id === null,
   };
 };
@@ -258,6 +374,7 @@ const buildGroupRowFromApi = (
       id: `${group.combo_group_id}:${symbol}`,
       symbol,
       label: friendlyDisplay.label,
+      labelText: friendlyDisplay.label,
       labelTooltip: friendlyDisplay.tooltip,
       shortUnderlying: friendlyDisplay.shortUnderlying,
       expiryShort: friendlyDisplay.expiryShort ?? friendlyDisplay.expiryISO,
@@ -278,7 +395,16 @@ const buildGroupRowFromApi = (
       comboGroupId: group.combo_group_id,
       underlying: leg.underlying,
       expiry: fallbackExpiry,
-    };
+      tpBandLowPct: null,
+      tpBandHighPct: null,
+      tpHit: false,
+      tpDone: false,
+      slHit: false,
+      nextAction: "HOLD",
+      progressPctOfGoal: null,
+      progressPctOfMax: null,
+      isNearTarget: false,
+    } satisfies OptionComboLegRow;
   });
 
   const fallbackLabel = formatComboLabel(
@@ -293,6 +419,24 @@ const buildGroupRowFromApi = (
     group.display != null
       ? { ...group.display, combo_label: sanitizeLabel(group.display.combo_label, fallbackLabel) }
       : null;
+  const markSourceRaw = typeof group.mark_source === "string" ? group.mark_source.toUpperCase() : group.mark_source;
+  const markSource: MarkSource =
+    markSourceRaw === "MID" || markSourceRaw === "LAST" || markSourceRaw === "PREV"
+      ? (markSourceRaw as MarkSource)
+      : "MISSING";
+  const mark = toNumber(group.group_mark_price ?? group.mark_price ?? group.mark);
+  const tpBandArray = Array.isArray(group.tp_band_pct) ? group.tp_band_pct : null;
+  const tpBandLowPct = toNumber(group.tp_band_low_pct ?? tpBandArray?.[0]);
+  const tpBandHighPct = toNumber(group.tp_band_high_pct ?? tpBandArray?.[1]);
+  const tpBandPct = tpBandLowPct !== null && tpBandHighPct !== null ? ([tpBandLowPct, tpBandHighPct] as const) : null;
+  const tpHit = group.tp_hit === true;
+  const tpDone = group.tp_done === true;
+  const slHit = group.sl_hit === true;
+  const slR = toNumber(group.sl_r);
+  const nextAction = typeof group.next_action === "string" ? group.next_action.toUpperCase() : null;
+  const progressPctOfGoal = toNumber(group.progress?.pct_of_goal ?? group.progress_pct_of_goal);
+  const progress = progressPctOfGoal !== null ? { pctOfGoal: progressPctOfGoal } : null;
+  const groupNetPrice = toNumber(group.group_net_price, 0) ?? 0;
 
   return {
     id: group.combo_group_id,
@@ -300,16 +444,28 @@ const buildGroupRowFromApi = (
     underlying: group.underlying,
     dte: toInteger(group.dte, 0),
     groupQty: toNumber(group.group_qty, 0) ?? 0,
-    netPrice: toNumber(group.group_net_price, 0) ?? 0,
+    groupNetPrice,
+    netPrice: groupNetPrice,
+    mark,
     delta: toNumber(group.sum_greeks?.delta),
     gamma: toNumber(group.sum_greeks?.gamma),
     theta: toNumber(group.sum_greeks?.theta),
     vega: toNumber(group.sum_greeks?.vega),
-    markSource: group.mark_source ?? "MID",
+    markSource,
     staleSeconds: group.stale_seconds ?? null,
     label,
     display,
     legs,
+    tpBandLowPct,
+    tpBandHighPct,
+    tpBandPct,
+    tpHit,
+    tpDone,
+    slHit,
+    slR,
+    nextAction,
+    progressPctOfGoal,
+    progress,
   };
 };
 
@@ -332,24 +488,35 @@ const buildGroupsFallback = (
     const weightedNet = entries.reduce((acc, item) => acc + (item.groupNetPrice ?? item.netPremium) * Math.abs(item.comboQty || 1), 0);
     const netPrice = netPriceWeights ? weightedNet / netPriceWeights : 0;
     const groupQty = entries.reduce((acc, item) => acc + (item.comboQty || 0), 0);
-    const legsAggregation = entries[0].legs.map((leg, idx) => {
+    const legsAggregation = entries[0].legs.map((leg, idx): OptionComboLegRow => {
       const totalQuantity = entries.reduce((sum, combo) => sum + (combo.legs[idx]?.quantity ?? 0), 0);
-      const fallbackLabel = formatLegLabel({
-        ul: (leg.shortUnderlying ?? leg.underlying ?? "").toString(),
+      const friendlyDisplay = buildFriendlyLegDisplay({
+        symbol: leg.symbol,
+        underlying: leg.underlying,
+        right: leg.right,
         strike: leg.strike,
-        side: leg.right,
-        expiryISO: leg.expiry,
+        expiry: leg.expiry,
       });
-      const friendlyLabel = sanitizeLabel(leg.label, fallbackLabel);
+      const labelText = friendlyDisplay.label;
+      const labelTooltip = friendlyDisplay.tooltip || leg.labelTooltip || leg.symbol;
+      const shortUnderlying =
+        friendlyDisplay.shortUnderlying === "?" && leg.shortUnderlying
+          ? leg.shortUnderlying
+          : friendlyDisplay.shortUnderlying;
+      const expiryShort = friendlyDisplay.expiryShort ?? leg.expiryShort;
       return {
         ...leg,
         id: `${key}:${leg.symbol}:${idx}`,
-        label: friendlyLabel,
-        labelTooltip: leg.labelTooltip,
+        label: labelText,
+        labelText,
+        labelTooltip,
+        shortUnderlying,
+        expiryShort,
+        right: friendlyDisplay.right,
         quantity: totalQuantity,
         markPrice: leg.markPrice,
         comboGroupId: key,
-      };
+      } satisfies OptionComboLegRow;
     });
     const legsForLabel = entries.flatMap((combo) =>
       combo.legs.map<Partial<OptionComboLegApi>>((legRow) => ({
@@ -386,13 +553,78 @@ const buildGroupsFallback = (
       }
       return max === null ? seconds : Math.max(max, seconds);
     }, null);
+    const markAccumulator = entries.reduce(
+      (acc, combo) => {
+        const markPrice = combo.markPrice;
+        if (markPrice === null || markPrice === undefined || Number.isNaN(markPrice)) {
+          return acc;
+        }
+        const weight = Math.abs(combo.comboQty || 1);
+        return {
+          sum: acc.sum + markPrice * weight,
+          weight: acc.weight + weight,
+        };
+      },
+      { sum: 0, weight: 0 },
+    );
+    const mark = markAccumulator.weight > 0 ? markAccumulator.sum / markAccumulator.weight : null;
+    const tpBandLowPct = entries.reduce<number | null>((acc, combo) => {
+      if (acc !== null) {
+        return acc;
+      }
+      if (combo.tpBandLowPct !== null && combo.tpBandLowPct !== undefined) {
+        return combo.tpBandLowPct;
+      }
+      if (combo.tpBandPct != null) {
+        return combo.tpBandPct[0] ?? null;
+      }
+      return null;
+    }, null);
+    const tpBandHighPct = entries.reduce<number | null>((acc, combo) => {
+      if (acc !== null) {
+        return acc;
+      }
+      if (combo.tpBandHighPct !== null && combo.tpBandHighPct !== undefined) {
+        return combo.tpBandHighPct;
+      }
+      if (combo.tpBandPct != null) {
+        return combo.tpBandPct[1] ?? null;
+      }
+      return null;
+    }, null);
+    const tpBandPct = tpBandLowPct !== null && tpBandHighPct !== null ? ([tpBandLowPct, tpBandHighPct] as const) : null;
+    const tpHit = entries.some((combo) => combo.tpHit);
+    const tpDone = entries.some((combo) => combo.tpDone);
+    const slHit = entries.some((combo) => combo.slHit);
+    const slR = entries.reduce<number | null>((acc, combo) => (acc !== null ? acc : combo.slR ?? null), null);
+    const nextAction = entries.reduce<string | null>((acc, combo) => {
+      if (acc && acc !== "HOLD") {
+        return acc;
+      }
+      const next = combo.nextAction;
+      if (!next || next === "HOLD") {
+        return acc;
+      }
+      return next;
+    }, null);
+    const progressValues = entries
+      .map((combo) => combo.progress?.pctOfGoal ?? combo.progressPctOfGoal)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(value));
+    const progressPctOfGoal = progressValues.length
+      ? progressValues.reduce((acc, value) => acc + value, 0) / progressValues.length
+      : null;
+    const progress = progressPctOfGoal !== null ? { pctOfGoal: progressPctOfGoal } : null;
+    const groupNetPrice = netPrice;
+
     groupRows.set(key, {
       id: key,
       strategy: first.strategy,
       underlying: first.underlying,
       dte: first.dte,
       groupQty,
+      groupNetPrice,
       netPrice,
+      mark,
       delta: entries.reduce((acc, combo) => acc + (combo.delta ?? 0), 0),
       gamma: entries.reduce((acc, combo) => acc + (combo.gamma ?? 0), 0),
       theta: entries.reduce((acc, combo) => acc + (combo.theta ?? 0), 0),
@@ -402,6 +634,16 @@ const buildGroupsFallback = (
       label: formatComboLabel(first.strategy, legsForLabel as OptionComboLegApi[], first.dte, netPrice, first.underlying),
       display: first.display,
       legs: legsAggregation,
+      tpBandLowPct,
+      tpBandHighPct,
+      tpBandPct,
+      tpHit,
+      tpDone,
+      slHit,
+      slR,
+      nextAction,
+      progressPctOfGoal,
+      progress,
     });
   });
 
@@ -429,6 +671,7 @@ async function fetchOptions(baseUrl = ""): Promise<OptionsApiResponse> {
     combos: Array.isArray(payload.combos) ? payload.combos : [],
     legs: Array.isArray(payload.legs) ? payload.legs : [],
     combo_groups: Array.isArray(payload.combo_groups) ? payload.combo_groups : [],
+    playbook: payload.playbook ?? null,
   };
 }
 
@@ -437,6 +680,7 @@ export type OptionCombosResult = UseQueryResult<OptionComboGroupRow[], Error> & 
   groups: OptionComboGroupRow[];
   groupCombos: Map<string, OptionComboRow[]>;
   rawCombos: OptionComboRow[];
+  playbook: PlaybookMeta | null;
 };
 
 export type OptionLegsResult = UseQueryResult<OptionLegRow[], Error> & {
@@ -454,6 +698,8 @@ export function useOptionCombos(): OptionCombosResult {
   });
 
   const { data: rawData } = query;
+
+  const playbookMeta = useMemo(() => parsePlaybookMeta(rawData?.playbook ?? null), [rawData]);
 
   const legMap = useMemo(() => {
     const map = new Map<string, OptionComboLegApi[]>();
@@ -477,7 +723,17 @@ export function useOptionCombos(): OptionCombosResult {
     }
     return rawData.combos
       .map((combo) => mapComboApiToRow(combo, legMap, rawData.as_of))
-      .sort((a, b) => (b.dayPnlAmount ?? 0) - (a.dayPnlAmount ?? 0));
+      .sort((a, b) => {
+        if (a.statusPriority !== b.statusPriority) {
+          return a.statusPriority - b.statusPriority;
+        }
+        const bProgress = toSortableValue(b.progressPctOfGoal ?? b.progressPctOfMax);
+        const aProgress = toSortableValue(a.progressPctOfGoal ?? a.progressPctOfMax);
+        if (bProgress !== aProgress) {
+          return bProgress - aProgress;
+        }
+        return (b.dayPnlAmount ?? 0) - (a.dayPnlAmount ?? 0);
+      });
   }, [rawData, legMap]);
 
   const grouping = useMemo(() => {
@@ -492,7 +748,7 @@ export function useOptionCombos(): OptionCombosResult {
         list.push(combo);
         groupCombos.set(key, list);
       }
-      const groups = rawData.combo_groups.map((group) => buildGroupRowFromApi(group)).sort((a, b) => b.netPrice - a.netPrice);
+      const groups = rawData.combo_groups.map((group) => buildGroupRowFromApi(group)).sort((a, b) => b.groupNetPrice - a.groupNetPrice);
       return { groups, groupCombos };
     }
     return buildGroupsFallback(combos);
@@ -507,6 +763,7 @@ export function useOptionCombos(): OptionCombosResult {
     groups: grouping.groups,
     groupCombos: grouping.groupCombos,
     rawCombos: combos,
+    playbook: playbookMeta,
   } as OptionCombosResult;
 }
 

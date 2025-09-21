@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { CombosTable } from "./CombosTable";
+import { CombosTable, COLUMN_COUNT } from "./CombosTable";
 import { useOptionCombos } from "../hooks/useOptions";
 import { buildOptionsResponse } from "../mocks/handlers";
 import { server } from "../mocks/server";
@@ -89,6 +89,92 @@ describe("CombosTable", () => {
     vi.restoreAllMocks();
   });
 
+  test("renders header and rows with matching column counts", async () => {
+    renderWithClient(<CombosTable />);
+
+    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
+
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers).toHaveLength(COLUMN_COUNT);
+
+    const firstRow = screen.getAllByRole("row", { name: /combo row/i })[0];
+    const headerCell = within(firstRow).getByRole("rowheader");
+    const gridCells = within(firstRow).getAllByRole("gridcell");
+    expect([headerCell, ...gridCells]).toHaveLength(COLUMN_COUNT);
+  });
+
+  test("renders credit, playbook, status, progress, mark, and staleness in the expected columns", async () => {
+    const payload = mockOptions();
+    const group = payload.combo_groups?.[0];
+    if (!group) {
+      throw new Error("expected combo group in payload");
+    }
+    group.group_net_price = 2.5;
+    group.group_qty = -2;
+    group.tp_band_pct = [0.4, 0.6];
+    group.tp_hit = true;
+    group.tp_done = false;
+    group.sl_hit = false;
+    group.progress_pct_of_goal = 0.45;
+    group.group_mark_price = 1.91;
+    group.mark_source = "MID";
+    group.stale_seconds = 90;
+
+    const combo = payload.combos?.find((item) => item.combo_group_id === group.combo_group_id);
+    if (combo) {
+      combo.tp_band_pct = [0.4, 0.6];
+      combo.tp_hit = true;
+      combo.tp_done = false;
+      combo.sl_hit = false;
+      combo.progress_pct_of_goal = 0.45;
+      combo.mark_price = 1.91;
+      combo.mark_source = "MID";
+    }
+
+    server.use(
+      http.get("*/positions/options", () => HttpResponse.json(payload)),
+    );
+
+    renderWithClient(<CombosTable />);
+
+    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
+
+    const rowElement = screen.getAllByRole("row", { name: /combo row/i })[0];
+    const headerCell = within(rowElement).getByRole("rowheader");
+    const gridCells = within(rowElement).getAllByRole("gridcell");
+    const cells = [headerCell, ...gridCells];
+    expect(cells).toHaveLength(COLUMN_COUNT);
+
+    expect(cells[3]).toHaveTextContent("-2");
+    expect(cells[4]).toHaveTextContent(/Credit/i);
+    expect(cells[4]).toHaveTextContent("$2.50");
+    expect(cells[5]).toHaveTextContent("40–60%");
+    expect(cells[6]).toHaveTextContent("TP HIT");
+    expect(within(cells[7]).getByRole("progressbar")).toBeInTheDocument();
+    expect(within(cells[7]).getByText("45%")).toBeInTheDocument();
+    expect(within(cells[8]).getByText("$1.91")).toBeInTheDocument();
+    expect(within(cells[8]).getByText("MID")).toBeInTheDocument();
+    expect(cells[9]).toHaveTextContent("01:30");
+  });
+
+  test("expanded detail row spans all columns", async () => {
+    const user = userEvent.setup();
+    renderWithClient(<CombosTable />);
+
+    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
+
+    const firstRow = screen.getAllByRole("row", { name: /combo row/i })[0];
+    const expandButton = within(firstRow).getByRole("button", { name: /expand group/i });
+
+    await act(async () => {
+      await user.click(expandButton);
+    });
+
+    const detailRow = await screen.findByRole("row", { name: /combo detail row/i });
+    const detailCell = within(detailRow).getByRole("gridcell");
+    expect(detailCell).toHaveAttribute("colspan", String(COLUMN_COUNT));
+  });
+
   test("renders grouped combos with friendly labels and expands details", async () => {
     const user = userEvent.setup();
     renderWithClient(<CombosTable />);
@@ -116,7 +202,7 @@ describe("CombosTable", () => {
 
     const legChip = within(detailRow).getByText(/SPX 4600C • Oct 18 '24/i);
     expect(legChip).toBeInTheDocument();
-    expect(legChip).toHaveAttribute("title", "SPX20241018C00460000");
+    expect(legChip).toHaveAttribute("title", "SPX  20241018C00460000");
   });
 
   test("toggle reveals raw combos view", async () => {

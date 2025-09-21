@@ -252,8 +252,10 @@ export type FriendlyLegDisplay = {
 };
 
 export function buildFriendlyLegDisplay(input: FriendlyLegDisplayInput): FriendlyLegDisplay {
+  const rawSymbol = typeof input.symbol === "string" ? input.symbol.trim() : "";
+  const upperSymbol = rawSymbol.toUpperCase();
+  const sanitizedSymbol = upperSymbol.replace(/\s+/g, "");
   const parsedSymbol = parseOsi(input.symbol ?? undefined);
-  const sanitizedSymbol = typeof input.symbol === "string" ? input.symbol.replace(/\s+/g, "").toUpperCase() : "";
 
   const rawUnderlying = typeof input.underlying === "string" ? input.underlying.trim() : "";
   const displayShort = typeof input.displayShortUl === "string" ? input.displayShortUl.trim() : "";
@@ -289,10 +291,8 @@ export function buildFriendlyLegDisplay(input: FriendlyLegDisplayInput): Friendl
   const label = sanitizeLabel(labelCandidate, fallbackLabel);
 
   const tooltip = sanitizedSymbol && OSI_SYMBOL_FRAGMENT.test(sanitizedSymbol)
-    ? sanitizedSymbol
-    : typeof input.symbol === "string" && input.symbol.trim()
-      ? input.symbol.trim()
-      : fallbackLabel;
+    ? rawSymbol || upperSymbol || sanitizedSymbol
+    : rawSymbol || upperSymbol || fallbackLabel;
 
   const expiryShort =
     typeof input.displayExpiryShort === "string" && input.displayExpiryShort.trim()

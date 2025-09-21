@@ -233,6 +233,26 @@
       "details": "Added shared parse_osi helper, patched ingest to backfill legs, ensured combos group and UI renders friendly labels with fallback tests.",
       "event": "PSD options regroup + UI labels",
       "timestamp": "2025-09-21T06:32:39Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T07:34:21Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T09:17:18Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T09:20:11Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T09:20:22Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T10:59:30Z"
     }
   ],
   "decisions": [

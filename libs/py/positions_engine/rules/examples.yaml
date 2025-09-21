@@ -8,6 +8,34 @@
   filter: dte <= 7
   expr: annualized_premium_pct >= 30
 
+- rule_id: combo__tp_reached
+  name: Playbook TP reached
+  severity: INFO
+  scope: COMBO
+  filter: ""
+  expr: tp_hit
+
+- rule_id: combo__tp_done
+  name: Playbook TP complete
+  severity: INFO
+  scope: COMBO
+  filter: ""
+  expr: tp_done
+
+- rule_id: combo__stop_hit
+  name: Playbook stop hit
+  severity: CRITICAL
+  scope: COMBO
+  filter: ""
+  expr: sl_hit
+
+- rule_id: combo__unit_exit
+  name: Exit as a unit
+  severity: INFO
+  scope: COMBO
+  filter: ""
+  expr: exit_as_unit and tp_done
+
 - rule_id: ul__delta_extreme
   name: Underlying delta beyond +-1.2
   severity: WARNING

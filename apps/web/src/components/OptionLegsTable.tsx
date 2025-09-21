@@ -81,6 +81,7 @@ const LegRow = (
   const stalenessSeconds = deriveStalenessSeconds(leg.markTime, now);
   const stalenessLabel = formatDuration(stalenessSeconds);
   const stalenessClass = stalenessTone(stalenessSeconds);
+  const tooltip = leg.labelTooltip || leg.symbol;
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
     switch (event.key) {
@@ -122,7 +123,7 @@ const LegRow = (
         className="px-3 py-3 text-left text-sm font-semibold text-slate-100"
       >
         <div className="space-y-1">
-          <span title={leg.labelTooltip ?? leg.symbol}>{leg.label}</span>
+          <span title={tooltip}>{leg.labelText}</span>
           <span className="block text-xs text-slate-400">
             {leg.expiryShort ?? leg.expiry} • {leg.dte}d {leg.isOrphan ? "• Orphan" : ""}
           </span>

@@ -79,9 +79,6 @@ class RulesCatalogState:
             return CatalogValidationResult(ok=False, counters={}, top=[], errors=errors, rules=draft.rules)
 
         counters = _normalize_counters(summary.get("breaches", {}))
-        if counters.get("critical", 0) == 0 and counters.get("warning", 0) == 0:
-            counters["info"] = 0
-            counters["total"] = counters["critical"] + counters["warning"] + counters["info"]
         top = summary.get("top", []) if isinstance(summary, dict) else []
         return CatalogValidationResult(
             ok=True,
@@ -165,6 +162,9 @@ def _normalize_counters(raw: dict[str, Any]) -> dict[str, int]:
     for key in counters:
         value = raw.get(key) if isinstance(raw, dict) else 0
         counters[key] = int(value or 0)
+    if counters["critical"] == 0 and counters["warning"] == 0:
+        # Preserve legacy contract: info-only breaches should not increment counters.
+        counters["info"] = 0
     counters["total"] = sum(counters.values())
     return counters
 

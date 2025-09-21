@@ -22,6 +22,7 @@ from ..combos import (
     group_option_combos,
     strategy_label,
 )
+from ..combos.eval import evaluate_playbook_targets
 from ..core.marks import MarkResult, MarkSettings, select_equity_mark
 from ..core.models import InstrumentType, Position, Quote, TradingSession
 from ..core.pnl import equity_pnl
@@ -115,6 +116,8 @@ class PositionsState:
             if isinstance(payload, dict) and isinstance(payload.get("combo_group_id"), str)
         }
 
+        evaluation = evaluate_playbook_targets(detection.combos, detection.orphans, self._quotes)
+
         combos_payload: list[dict[str, Any]] = []
         for combo in detection.combos:
             payload = combo.to_payload()
@@ -135,6 +138,9 @@ class PositionsState:
                         display_payload = group_payload.get("display")
                         if display_payload and "display" not in payload:
                             payload["display"] = deepcopy(display_payload)
+            playbook_fields = evaluation.combo_targets.get(combo.combo_id)
+            if isinstance(playbook_fields, dict):
+                payload.update(playbook_fields)
             for leg_payload in payload.get("legs", []):
                 leg_id = leg_payload.get("leg_id")
                 if isinstance(leg_id, str):
@@ -150,6 +156,9 @@ class PositionsState:
                                 leg_payload.setdefault("group_net_price", group_payload.get("group_net_price"))
                                 leg_payload.setdefault("group_mark_source", group_payload.get("mark_source"))
                                 leg_payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+                    leg_fields = evaluation.leg_targets.get(leg_id)
+                    if isinstance(leg_fields, dict):
+                        leg_payload.update(leg_fields)
             combos_payload.append(payload)
 
         legs_payload: list[dict[str, Any]] = []
@@ -177,14 +186,20 @@ class PositionsState:
                     "short_ul": display.short_ul,
                     "expiry_short": display.expiry_short,
                 }
+            leg_fields = evaluation.leg_targets.get(leg.leg_id)
+            if isinstance(leg_fields, dict):
+                payload.update(leg_fields)
             legs_payload.append(payload)
 
-        return {
+        result = {
             "as_of": _isoformat(as_of),
             "combos": combos_payload,
             "combo_groups": combo_groups_payload,
             "legs": legs_payload,
         }
+        if evaluation.meta:
+            result["playbook"] = evaluation.meta
+        return result
 
     def options_detection(self, now: datetime | None = None) -> ComboDetection:
         detection, _ = self._ensure_options_detection(now)
@@ -303,6 +318,8 @@ class PositionsState:
             if isinstance(payload, dict) and isinstance(payload.get("combo_group_id"), str)
         }
 
+        evaluation = evaluate_playbook_targets(detection.combos, detection.orphans, self._quotes)
+
         combos_view: list[dict[str, Any]] = []
         for combo in detection.combos:
             combo_payload = _combo_view_from_detection(combo)
@@ -320,6 +337,15 @@ class PositionsState:
                         display_payload = group_payload.get("display")
                         if display_payload and "display" not in combo_payload:
                             combo_payload["display"] = deepcopy(display_payload)
+            playbook_fields = evaluation.combo_targets.get(combo.combo_id)
+            if isinstance(playbook_fields, dict):
+                combo_payload.update(playbook_fields)
+            for leg_payload in combo_payload.get("legs", []):
+                leg_id = leg_payload.get("leg_id")
+                if isinstance(leg_id, str):
+                    leg_fields = evaluation.leg_targets.get(leg_id)
+                    if isinstance(leg_fields, dict):
+                        leg_payload.update(leg_fields)
             combos_view.append(combo_payload)
 
         single_options_view: list[dict[str, Any]] = []
@@ -336,6 +362,9 @@ class PositionsState:
                         leg_payload.setdefault("group_net_price", group_payload.get("group_net_price"))
                         leg_payload.setdefault("group_mark_source", group_payload.get("mark_source"))
                         leg_payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+            leg_fields = evaluation.leg_targets.get(leg.leg_id)
+            if isinstance(leg_fields, dict):
+                leg_payload.update(leg_fields)
             single_options_view.append(leg_payload)
 
         view: dict[str, Any] = {
@@ -345,6 +374,8 @@ class PositionsState:
         }
         if combo_groups_payload:
             view["combo_groups"] = combo_groups_payload
+        if evaluation.meta:
+            view["playbook"] = evaluation.meta
         return view
 
     def _log_upstream_empty_once(self) -> None:

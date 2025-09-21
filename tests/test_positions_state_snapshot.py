@@ -70,28 +70,30 @@ def test_snapshot_updated_at_uses_override_when_provided() -> None:
 
 def test_positions_view_augments_missing_combos(caplog) -> None:
     state = PositionsState()
+    padded_symbol = "SPX  20241018C00460000"
+    compact_symbol = "SPX20241018C00465000"
     option_positions = [
-        _option("AAPL251017C00150000", "-1"),
-        _option("AAPL251017C00160000", "1"),
+        _option(padded_symbol, "-1"),
+        _option(compact_symbol, "1"),
     ]
     upstream_view = {
         "single_stocks": [],
         "option_combos": [],
         "single_options": [
             {
-                "symbol": "AAPL251017C00150000",
-                "underlying": "AAPL",
+                "symbol": padded_symbol,
+                "underlying": "SPX",
                 "right": "CALL",
-                "strike": 150.0,
-                "expiry": "2025-10-17",
+                "strike": 4600.0,
+                "expiry": "2024-10-18",
                 "quantity": -1.0,
             },
             {
-                "symbol": "AAPL251017C00160000",
-                "underlying": "AAPL",
+                "symbol": compact_symbol,
+                "underlying": "SPX",
                 "right": "CALL",
-                "strike": 160.0,
-                "expiry": "2025-10-17",
+                "strike": 4650.0,
+                "expiry": "2024-10-18",
                 "quantity": 1.0,
             },
         ],
@@ -105,10 +107,19 @@ def test_positions_view_augments_missing_combos(caplog) -> None:
 
     combos = payload.get("option_combos") or []
     assert combos, "expected combos to be synthesized from single legs"
-    assert combos[0].get("legs"), "expected grouped combo legs"
+    combo_leg_symbols = {
+        str(leg.get("symbol"))
+        for combo in combos
+        for leg in combo.get("legs", [])
+        if isinstance(leg, dict)
+    }
+    assert combo_leg_symbols == {padded_symbol, compact_symbol}, "combo legs should keep original OSI"
 
     combo_groups = payload.get("combo_groups") or []
     assert combo_groups, "expected combo groups alongside combos"
+    first_combo = combos[0]
+    assert first_combo.get("combo_group_id"), "combo grouping metadata missing"
+    assert first_combo.get("group_qty") is not None, "combo group quantity missing"
 
     returned_symbols = {
         str(leg.get("symbol"))
@@ -117,6 +128,14 @@ def test_positions_view_augments_missing_combos(caplog) -> None:
     }
     expected_symbols = {leg["symbol"] for leg in upstream_view["single_options"]}
     assert returned_symbols == expected_symbols, "single leg payload should remain intact"
+
+    snapshot_symbols = {
+        str(leg.get("symbol"))
+        for combo in (state.snapshot_payload(now)["positions_view"].get("option_combos") or [])
+        for leg in combo.get("legs", [])
+        if isinstance(leg, dict)
+    }
+    assert snapshot_symbols == {padded_symbol, compact_symbol}, "snapshot view should preserve OSI"
 
     assert any("grouped" in record.message for record in caplog.records)
 

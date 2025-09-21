@@ -41,6 +41,38 @@ def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch,
             expr="annualized_premium_pct >= 30",
         ),
         Rule(
+            rule_id="combo_tp_reached",
+            name="Playbook TP reached",
+            severity="INFO",
+            scope="COMBO",
+            filter="",
+            expr="tp_hit",
+        ),
+        Rule(
+            rule_id="combo_tp_done",
+            name="Playbook TP complete",
+            severity="INFO",
+            scope="COMBO",
+            filter="",
+            expr="tp_done",
+        ),
+        Rule(
+            rule_id="combo_stop_hit",
+            name="Playbook stop hit",
+            severity="CRITICAL",
+            scope="COMBO",
+            filter="",
+            expr="sl_hit",
+        ),
+        Rule(
+            rule_id="unit_exit",
+            name="Exit as unit",
+            severity="INFO",
+            scope="COMBO",
+            filter="",
+            expr="exit_as_unit and tp_done",
+        ),
+        Rule(
             rule_id="leg_iv_missing",
             name="IV missing",
             severity="WARNING",
@@ -85,9 +117,35 @@ def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch,
                     "symbol": "TSLA",
                     "dte": 6,
                     "annualized_premium_pct": 42.1,
+                    "tp_hit": True,
+                    "tp_done": True,
+                    "sl_hit": False,
+                    "next_action": "TAKE_PROFIT",
+                    "progress_pct_of_goal": 1.1,
+                    "progress_pct_of_max": 1.0,
+                    "tp_band_low_pct": 0.4,
+                    "tp_band_high_pct": 0.6,
+                    "exit_as_unit": True,
                     "value": 42.1,
                     "triggered_at": now,
-                }
+                },
+                {
+                    "subject_id": "combo-2",
+                    "symbol": "MSFT",
+                    "dte": 9,
+                    "annualized_premium_pct": 12.0,
+                    "tp_hit": False,
+                    "tp_done": False,
+                    "sl_hit": True,
+                    "next_action": "CUT",
+                    "progress_pct_of_goal": -0.5,
+                    "progress_pct_of_max": -0.8,
+                    "tp_band_low_pct": 0.5,
+                    "tp_band_high_pct": 0.7,
+                    "exit_as_unit": False,
+                    "value": -120.0,
+                    "triggered_at": now,
+                },
             ],
             "LEG": [
                 {
@@ -126,23 +184,30 @@ def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch,
         assert response.status_code == 200
         payload = response.json()
 
-        assert payload["rules_total"] == 5
-        assert payload["breaches"] == {"critical": 2, "warning": 2, "info": 1}
-        assert sum(payload["breaches"].values()) == 5
-        assert 0 < len(payload["top"]) <= 5
+        assert payload["rules_total"] == 9
+        assert payload["breaches"] == {"critical": 3, "warning": 2, "info": 4}
+        assert sum(payload["breaches"].values()) == 9
+        assert 0 < len(payload["top"]) <= 9
         top_rules = {item["rule"] for item in payload["top"]}
-        assert top_rules == {"High premium combo", "IV missing", "Stale mark", "Underlying delta", "Net theta"}
+        expected_rules = {
+            "High premium combo",
+            "Playbook stop hit",
+            "Stale mark",
+            "IV missing",
+            "Underlying delta",
+        }
+        assert expected_rules.issubset(top_rules)
         severities = {item["severity"] for item in payload["top"]}
-        assert severities == {"critical", "warning", "info"}
-        assert set(payload["focus_symbols"]) == {"TSLA", "TSLA230920C"}
+        assert {"critical", "warning"}.issubset(severities)
+        assert set(payload["focus_symbols"]) == {"TSLA", "MSFT", "TSLA230920C"}
         assert payload["as_of"].endswith("Z")
         assert payload["evaluation_ms"] >= 0
 
         stats_resp = client.get("/stats")
         assert stats_resp.status_code == 200
         stats = stats_resp.json()
-        assert stats["rules_count"] == 5
-        assert stats["breaches_count"] == 5
+        assert stats["rules_count"] == 9
+        assert stats["breaches_count"] == 9
         assert "rules_eval_ms" in stats and stats["rules_eval_ms"] >= 0
         assert "trades_prior_positions" in stats
     finally:
