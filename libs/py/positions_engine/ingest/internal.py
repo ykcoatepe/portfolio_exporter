@@ -11,12 +11,15 @@ import math
 import subprocess
 import sys
 import threading
+from datetime import date, datetime
 from collections.abc import Iterable
 from copy import deepcopy
 from importlib import import_module
 from inspect import isawaitable
 from pathlib import Path
 from typing import Any
+
+from ..core.osi import parse_osi
 
 logger = logging.getLogger(__name__)
 
@@ -550,16 +553,83 @@ class InternalScriptsProvider:
         avg_cost = leg.get("avg_cost")
         if avg_cost is None:
             avg_cost = leg.get("entry_price") or leg.get("mark")
+
+        multiplier = leg.get("multiplier", leg.get("contract_multiplier", 100))
+        parsed_symbol = parse_osi(symbol)
+
+        underlying_value = leg.get("underlying", fallback_underlying)
+        expiry_value = leg.get("expiry")
+        right_value = leg.get("right")
+        strike_value = leg.get("strike")
+
+        def _normalize_right(value: Any) -> str | None:
+            if value in (None, ""):
+                return None
+            text = str(value).strip().upper()
+            if text.startswith("C"):
+                return "CALL"
+            if text.startswith("P"):
+                return "PUT"
+            return text or None
+
+        if parsed_symbol is not None:
+            if underlying_value in (None, ""):
+                underlying_value = parsed_symbol.underlying
+            if expiry_value in (None, ""):
+                expiry_value = parsed_symbol.expiry.isoformat()
+            if right_value in (None, ""):
+                right_value = parsed_symbol.right
+            if strike_value in (None, ""):
+                strike_value = float(parsed_symbol.strike)
+
+        if isinstance(expiry_value, datetime):
+            expiry_value = expiry_value.date().isoformat()
+        elif isinstance(expiry_value, date):
+            expiry_value = expiry_value.isoformat()
+        elif isinstance(expiry_value, str):
+            expiry_text = expiry_value.strip()
+            if not expiry_text:
+                expiry_value = parsed_symbol.expiry.isoformat() if parsed_symbol is not None else None
+            else:
+                digits = "".join(ch for ch in expiry_text if ch.isdigit())
+                if parsed_symbol is not None and digits == expiry_text and len(digits) in (6, 8):
+                    expiry_value = parsed_symbol.expiry.isoformat()
+                else:
+                    expiry_value = expiry_text
+
+        normalized_right = _normalize_right(right_value)
+        if normalized_right is None and parsed_symbol is not None:
+            normalized_right = parsed_symbol.right
+
+        if isinstance(strike_value, str):
+            strike_text = strike_value.strip()
+            if strike_text:
+                try:
+                    strike_value = float(strike_text)
+                except ValueError:
+                    if parsed_symbol is not None:
+                        strike_value = float(parsed_symbol.strike)
+        elif isinstance(strike_value, (int, float)):
+            strike_value = float(strike_value)
+        elif strike_value is None and parsed_symbol is not None:
+            strike_value = float(parsed_symbol.strike)
+
+        underlying_clean = None
+        if underlying_value not in (None, ""):
+            underlying_clean = str(underlying_value).strip().upper()
+        if underlying_clean in (None, "") and fallback_underlying not in (None, ""):
+            underlying_clean = str(fallback_underlying).strip().upper()
+
         record: dict[str, Any] = {
             "symbol": symbol,
             "instrument_type": "option",
             "quantity": quantity if quantity is not None else 0,
             "avg_cost": avg_cost if avg_cost is not None else 0.0,
-            "multiplier": leg.get("multiplier", leg.get("contract_multiplier", 100)),
-            "underlying": leg.get("underlying", fallback_underlying),
-            "right": leg.get("right"),
-            "strike": leg.get("strike"),
-            "expiry": leg.get("expiry"),
+            "multiplier": multiplier if multiplier not in (None, "") else 100,
+            "underlying": underlying_clean,
+            "right": normalized_right,
+            "strike": strike_value,
+            "expiry": expiry_value,
             "delta": greeks.get("delta"),
             "theta": greeks.get("theta"),
         }

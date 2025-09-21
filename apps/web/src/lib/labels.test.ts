@@ -48,6 +48,11 @@ describe("labels helpers", () => {
     expect(parseOsi("INVALID")).toBeNull();
   });
 
+  it("parses padded OSI roots with double spaces", () => {
+    const parsed = parseOsi("SPX  20241018P00410000");
+    expect(parsed).toEqual({ ul: "SPX", expiryISO: "2024-10-18", side: "P", strike: 410 });
+  });
+
   it("formats leg labels with normalized right codes", () => {
     expect(formatLegLabel({ ul: "sp y", strike: 395, side: "put", expiryISO: "2025-10-18" })).toBe(
       "SP Y 395P • Oct 18 '25",

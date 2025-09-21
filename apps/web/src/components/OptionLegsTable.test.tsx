@@ -81,8 +81,8 @@ describe("OptionLegsTable", () => {
     if (!labelSpan) {
       return;
     }
-    expect(labelSpan.textContent).not.toMatch(/\d{6}[CP]\d{8}/);
-    expect(labelSpan.getAttribute("title")).toMatch(/\d{6}[CP]\d{8}$/);
+    expect(labelSpan.textContent).not.toMatch(/\d{6,8}[CP]\d{8}/);
+    expect(labelSpan.getAttribute("title")).toMatch(/\d{6,8}[CP]\d{8}$/);
   });
 
   test("filters to orphan legs and toggles underlyings", async () => {

@@ -145,6 +145,94 @@
       "details": "Ran vitest contract suite against Pact v15, updated response headers/severity matchers, and recorded dependency deprecations after upgrade verification.",
       "event": "Pact contracts trial",
       "timestamp": "2025-09-20T15:53:47Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T16:41:07Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T17:41:33Z"
+    },
+    {
+      "details": "Detect uvicorn crashes/timeout, show error message, and added regression tests.",
+      "event": "Hardened PSD menu startup diagnostics",
+      "timestamp": "2025-09-20T17:45:31Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T18:14:50Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T18:15:50Z"
+    },
+    {
+      "details": "Added state endpoint with positions_view fallback and tests for internal/csv/demo precedence.",
+      "event": "PSD API snapshots",
+      "timestamp": "2025-09-20T18:43:14Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T18:46:39Z"
+    },
+    {
+      "details": "Backend aggregations now merge duplicate option combos with stable IDs, averaged pricing, greeks, and mark metadata, while the web UI consumes the new fields (with a client fallback) and renders friendly combo/leg labels plus a toggle for raw rows.",
+      "event": "PSD combos grouping and labels",
+      "timestamp": "2025-09-20T18:47:28Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-20T18:48:54Z"
+    },
+    {
+      "details": "Corrected combo grouping lot sign by comparing leg cost mix so offsetting long/short spreads aggregate to zero; added regression coverage for opposing verticals.",
+      "event": "PSD combo quantity fix",
+      "timestamp": "2025-09-20T19:17:33Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T03:22:49Z"
+    },
+    {
+      "details": "Fixed client-side mark source helper to prefer lower-ranked sources (MID over LAST/PREV) and added a regression covering fallback combo grouping.",
+      "event": "PSD mark source precedence",
+      "timestamp": "2025-09-21T03:32:43Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T04:07:05Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T04:40:21Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T05:02:50Z"
+    },
+    {
+      "details": "Add backend fallback positions view, default PSD UI to grouped combos, extend tests.",
+      "event": "Wire PSD combos+stocks fallback",
+      "timestamp": "2025-09-21T05:06:55Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T05:16:10Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-21T06:30:04Z"
+    },
+    {
+      "details": "Use leg quantity direction when net price is zero so grouped qty stays non-zero; added regression coverage.",
+      "event": "Fix zero-cost combo net lot sign fallback",
+      "timestamp": "2025-09-21T06:30:11Z"
+    },
+    {
+      "details": "Added shared parse_osi helper, patched ingest to backfill legs, ensured combos group and UI renders friendly labels with fallback tests.",
+      "event": "PSD options regroup + UI labels",
+      "timestamp": "2025-09-21T06:32:39Z"
     }
   ],
   "decisions": [
@@ -253,6 +341,54 @@
       "rationale": "Eliminate manual activation for uvicorn",
       "timestamp": "2025-09-20T15:08:26Z",
       "title": "Auto activate venv"
+    },
+    {
+      "context": null,
+      "decision": "Detected uvicorn startup failures and now surface actionable guidance.",
+      "id": 16,
+      "rationale": "Menu 4 silently failed when uvicorn exited early; adding clear diagnostics prevents confusion.",
+      "timestamp": "2025-09-20T17:45:25Z",
+      "title": "PSD launcher hardening"
+    },
+    {
+      "context": null,
+      "decision": "Refreshed PSD API to pull portfolios via provider registry and surface positions_view snapshots for the SPA.",
+      "id": 17,
+      "rationale": "Internal scripts first, CSV fallback, demo last; keeps UI consistent.",
+      "timestamp": "2025-09-20T18:43:09Z",
+      "title": "PSD provider precedence"
+    },
+    {
+      "context": null,
+      "decision": "Group semantically identical option combos server-side, emit stable grouping IDs, aggregated greeks/pricing, and provide friendly labels for combos and legs consumed by the UI.",
+      "id": 18,
+      "rationale": "Back-end truth avoids duplicate rows, keeps pricing consistent across API/UI, and unlocks the simplified combos table experience.",
+      "timestamp": "2025-09-20T18:47:23Z",
+      "title": "PSD combos grouping"
+    },
+    {
+      "context": "apps/web useOptions fallback",
+      "decision": "Treat missing mark sources as lowest priority so fallback grouping keeps LAST/PREV.",
+      "id": 19,
+      "rationale": null,
+      "timestamp": "2025-09-21T04:12:38Z",
+      "title": "PSD combo mark source"
+    },
+    {
+      "context": null,
+      "decision": "Use PositionsState.build_fallback_positions_view when upstream positions_view is empty so PSD receives grouped combos and equities.",
+      "id": 20,
+      "rationale": "Reports anywhere needing positions_view stay populated without provider support.",
+      "timestamp": "2025-09-21T05:06:49Z",
+      "title": "PSD fallback view"
+    },
+    {
+      "context": null,
+      "decision": "Normalize option legs via OSI parsing before grouping so combos always detect and UI labels stay friendly.",
+      "id": 21,
+      "rationale": "Backend fills underlying/expiry/right/strike from OSI when provider omits them; frontend sanitizes labels with parseOsi fallback; tests cover ingest + UI.",
+      "timestamp": "2025-09-21T06:32:33Z",
+      "title": "PSD options OSI fallback"
     }
   ],
   "preferences": {
@@ -335,6 +471,22 @@
       "status": "closed",
       "title": "Track dependency deprecations",
       "updated_at": "2025-09-20T15:53:40Z"
+    },
+    {
+      "closed_at": "2025-09-20T19:17:28Z",
+      "closed_reason": "Adjusted combo net quantity to account for long vs short cost mix so offsetting verticals cancel in grouping.",
+      "created_at": "2025-09-20T19:12:25Z",
+      "details": "Verify combo group quantity sign handles offsetting long/short verticals; adjust _combo_net_quantity logic.\n\nClosed: Adjusted combo net quantity to account for long vs short cost mix so offsetting verticals cancel in grouping.",
+      "id": 4,
+      "labels": [
+        "psd",
+        "backend"
+      ],
+      "owner": null,
+      "priority": 2,
+      "status": "closed",
+      "title": "QA combo grouping sign",
+      "updated_at": "2025-09-20T19:17:28Z"
     }
   ],
   "workflows": {

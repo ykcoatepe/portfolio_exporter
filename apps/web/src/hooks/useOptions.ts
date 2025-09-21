@@ -24,7 +24,7 @@ import type {
 
 const OPTIONS_QUERY_KEY = ["positions", "options"] as const;
 const MARK_SOURCE_PRIORITY: Record<string, number> = { MID: 0, LAST: 1, PREV: 2, MISSING: 3 };
-const OSI_SYMBOL_FRAGMENT = /\d{6}[CP]\d{8}/;
+const OSI_SYMBOL_FRAGMENT = /\d{6,8}[CP]\d{8}/;
 
 const sanitizeLabel = (candidate: string | undefined | null, fallback: string): string => {
   if (typeof candidate !== "string") {
@@ -360,10 +360,17 @@ const buildGroupsFallback = (
     const groupQty = entries.reduce((acc, item) => acc + (item.comboQty || 0), 0);
     const legsAggregation = entries[0].legs.map((leg, idx) => {
       const totalQuantity = entries.reduce((sum, combo) => sum + (combo.legs[idx]?.quantity ?? 0), 0);
-      const label = leg.label;
+      const fallbackLabel = formatLegLabel({
+        ul: (leg.shortUnderlying ?? leg.underlying ?? "").toString(),
+        strike: leg.strike,
+        side: leg.right,
+        expiryISO: leg.expiry,
+      });
+      const friendlyLabel = sanitizeLabel(leg.label, fallbackLabel);
       return {
         ...leg,
         id: `${key}:${leg.symbol}:${idx}`,
+        label: friendlyLabel,
         quantity: totalQuantity,
         markPrice: leg.markPrice,
         comboGroupId: key,
@@ -450,10 +457,11 @@ async function fetchOptions(baseUrl = ""): Promise<OptionsApiResponse> {
   };
 }
 
-export type OptionCombosResult = UseQueryResult<OptionComboRow[], Error> & {
+export type OptionCombosResult = UseQueryResult<OptionComboGroupRow[], Error> & {
   asOf: string | null;
   groups: OptionComboGroupRow[];
   groupCombos: Map<string, OptionComboRow[]>;
+  rawCombos: OptionComboRow[];
 };
 
 export type OptionLegsResult = UseQueryResult<OptionLegRow[], Error> & {
@@ -515,14 +523,15 @@ export function useOptionCombos(): OptionCombosResult {
     return buildGroupsFallback(combos);
   }, [rawData, combos]);
 
-  const typedQuery = query as unknown as UseQueryResult<OptionComboRow[], Error>;
+  const typedQuery = query as unknown as UseQueryResult<OptionComboGroupRow[], Error>;
 
   return {
     ...typedQuery,
-    data: combos,
+    data: grouping.groups,
     asOf: rawData?.as_of ?? null,
     groups: grouping.groups,
     groupCombos: grouping.groupCombos,
+    rawCombos: combos,
   } as OptionCombosResult;
 }
 

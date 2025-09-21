@@ -10,6 +10,8 @@ import { server } from "../mocks/server";
 import type { MarkSource } from "../lib/types";
 import { renderWithClient } from "../test/queryClient";
 
+const QTY_TOOLTIP = "+ = long (debit), − = short (credit); magnitude = contracts";
+
 const mockOptions = () => {
   const payload = buildOptionsResponse();
 
@@ -97,7 +99,7 @@ describe("CombosTable", () => {
       name: /SPX 4250\/4300P \+ 4600\/4650C • 32d • Credit 2\.21/i,
     });
     expect(groupRowHeader).toBeInTheDocument();
-    expect(groupRowHeader.textContent).not.toMatch(/\d{6}[CP]\d{8}/);
+    expect(groupRowHeader.textContent).not.toMatch(/\d{6,8}[CP]\d{8}/);
 
     const expandButton = within(groupRowHeader.parentElement as HTMLElement).getByRole("button", {
       name: /expand group/i,

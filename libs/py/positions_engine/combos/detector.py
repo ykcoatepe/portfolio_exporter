@@ -15,6 +15,7 @@ from typing import Any
 
 from ..core.marks import MarkSettings, select_equity_mark
 from ..core.models import InstrumentType, Position, Quote
+from ..core.osi import parse_osi
 from ..core.pnl import option_leg_pnl
 from .taxonomy import ComboStrategy
 
@@ -274,17 +275,17 @@ def _normalize_option_metadata(position: Position, now: datetime) -> _Normalized
     strike_raw = metadata.get("strike")
     ratio_raw = metadata.get("ratio")
 
-    parsed_symbol = _parse_option_symbol(position.instrument.symbol)
+    parsed_symbol = parse_osi(position.instrument.symbol)
     notes: list[str] = []
     if parsed_symbol is not None:
-        if underlying is None:
-            underlying = parsed_symbol["underlying"]
-        if expiry_raw is None:
-            expiry_raw = parsed_symbol["expiry"]
-        if right_raw is None:
-            right_raw = parsed_symbol["right"]
-        if strike_raw is None:
-            strike_raw = parsed_symbol["strike"]
+        if underlying in (None, ""):
+            underlying = parsed_symbol.underlying
+        if expiry_raw in (None, ""):
+            expiry_raw = parsed_symbol.expiry
+        if right_raw in (None, ""):
+            right_raw = parsed_symbol.right
+        if strike_raw in (None, ""):
+            strike_raw = parsed_symbol.strike
     else:
         notes.append("symbol_parse_fallback")
 
@@ -809,36 +810,6 @@ def _coerce_expiry(value: Any) -> tuple[str | None, date | None]:
     except ValueError:
         return None, None
     return expiry_date.isoformat(), expiry_date
-
-
-def _parse_option_symbol(symbol: str) -> dict[str, Any] | None:
-    text = symbol.strip()
-    if not text:
-        return None
-    if len(text) >= 15 and text[6:12].isdigit():
-        underlying = text[:6].strip().upper()
-        expiry = text[6:12]
-        right_code = text[12].upper()
-        right = "CALL" if right_code == "C" else "PUT" if right_code == "P" else None
-        try:
-            strike = Decimal(text[13:]) / Decimal("1000")
-        except (InvalidOperation, ValueError):
-            strike = None
-        if right is not None and strike is not None:
-            return {"underlying": underlying, "expiry": expiry, "right": right, "strike": strike}
-    if "-" in text:
-        parts = text.split("-")
-        if len(parts) >= 4:
-            underlying = parts[0].upper()
-            expiry = parts[1]
-            right = _normalize_right(parts[3])
-            try:
-                strike = Decimal(parts[2])
-            except (InvalidOperation, ValueError):
-                strike = None
-            if right is not None and strike is not None:
-                return {"underlying": underlying, "expiry": expiry, "right": right, "strike": strike}
-    return None
 
 
 def _ensure_aware(ts: datetime) -> datetime:
