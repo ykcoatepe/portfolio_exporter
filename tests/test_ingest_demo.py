@@ -23,7 +23,11 @@ def test_demo_dataset_populates_positions(tmp_path, monkeypatch) -> None:
     async def _empty_internal_snapshot() -> dict[str, object]:
         return {}
 
-    monkeypatch.setattr("portfolio_exporter.psd_adapter.snapshot_once", _empty_internal_snapshot, raising=False)
+    monkeypatch.setattr(
+        "portfolio_exporter.psd_adapter.snapshot_once",
+        _empty_internal_snapshot,
+        raising=False,
+    )
     monkeypatch.setattr(
         "positions_engine.ingest.internal.InternalScriptsProvider._load_via_cli",
         lambda self, module_name: None,
@@ -68,7 +72,9 @@ def test_csv_priority(tmp_path, monkeypatch) -> None:
     )
 
     greeks_path = Path(tmp_path) / "portfolio_greeks_totals.csv"
-    greeks_path.write_text("symbol,delta,gamma,theta,vega\nSPY 20250117C00440000,0.25,0.01,-0.02,0.15\n")
+    greeks_path.write_text(
+        "symbol,delta,gamma,theta,vega\nSPY 20250117C00440000,0.25,0.01,-0.02,0.15\n"
+    )
 
     monkeypatch.setenv("POSITIONS_ENGINE_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("POSITIONS_ENGINE_DEMO", "0")
@@ -80,7 +86,11 @@ def test_csv_priority(tmp_path, monkeypatch) -> None:
     async def _empty_internal_snapshot() -> dict[str, object]:
         return {}
 
-    monkeypatch.setattr("portfolio_exporter.psd_adapter.snapshot_once", _empty_internal_snapshot, raising=False)
+    monkeypatch.setattr(
+        "portfolio_exporter.psd_adapter.snapshot_once",
+        _empty_internal_snapshot,
+        raising=False,
+    )
     monkeypatch.setattr(
         "positions_engine.ingest.internal.InternalScriptsProvider._load_via_cli",
         lambda self, module_name: None,
@@ -116,7 +126,11 @@ def test_stats_live_when_empty(tmp_path, monkeypatch) -> None:
     async def _empty_internal_snapshot() -> dict[str, object]:
         return {}
 
-    monkeypatch.setattr("portfolio_exporter.psd_adapter.snapshot_once", _empty_internal_snapshot, raising=False)
+    monkeypatch.setattr(
+        "portfolio_exporter.psd_adapter.snapshot_once",
+        _empty_internal_snapshot,
+        raising=False,
+    )
     monkeypatch.setattr(
         "positions_engine.ingest.internal.InternalScriptsProvider._load_via_cli",
         lambda self, module_name: None,

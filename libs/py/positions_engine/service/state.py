@@ -112,10 +112,13 @@ class PositionsState:
         group_lookup = {
             payload["combo_group_id"]: payload
             for payload in combo_groups_payload
-            if isinstance(payload, dict) and isinstance(payload.get("combo_group_id"), str)
+            if isinstance(payload, dict)
+            and isinstance(payload.get("combo_group_id"), str)
         }
 
-        evaluation = evaluate_playbook_targets(detection.combos, detection.orphans, self._quotes)
+        evaluation = evaluate_playbook_targets(
+            detection.combos, detection.orphans, self._quotes
+        )
 
         combos_payload: list[dict[str, Any]] = []
         for combo in detection.combos:
@@ -131,9 +134,15 @@ class PositionsState:
                     group_payload = group_lookup.get(group_id)
                     if isinstance(group_payload, dict):
                         payload.setdefault("group_qty", group_payload.get("group_qty"))
-                        payload.setdefault("group_net_price", group_payload.get("group_net_price"))
-                        payload.setdefault("group_mark_source", group_payload.get("mark_source"))
-                        payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+                        payload.setdefault(
+                            "group_net_price", group_payload.get("group_net_price")
+                        )
+                        payload.setdefault(
+                            "group_mark_source", group_payload.get("mark_source")
+                        )
+                        payload.setdefault(
+                            "group_stale_seconds", group_payload.get("stale_seconds")
+                        )
                         display_payload = group_payload.get("display")
                         if display_payload and "display" not in payload:
                             payload["display"] = deepcopy(display_payload)
@@ -151,10 +160,21 @@ class PositionsState:
                         if isinstance(group_id, str):
                             group_payload = group_lookup.get(group_id)
                             if isinstance(group_payload, dict):
-                                leg_payload.setdefault("group_qty", group_payload.get("group_qty"))
-                                leg_payload.setdefault("group_net_price", group_payload.get("group_net_price"))
-                                leg_payload.setdefault("group_mark_source", group_payload.get("mark_source"))
-                                leg_payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+                                leg_payload.setdefault(
+                                    "group_qty", group_payload.get("group_qty")
+                                )
+                                leg_payload.setdefault(
+                                    "group_net_price",
+                                    group_payload.get("group_net_price"),
+                                )
+                                leg_payload.setdefault(
+                                    "group_mark_source",
+                                    group_payload.get("mark_source"),
+                                )
+                                leg_payload.setdefault(
+                                    "group_stale_seconds",
+                                    group_payload.get("stale_seconds"),
+                                )
                     leg_fields = evaluation.leg_targets.get(leg_id)
                     if isinstance(leg_fields, dict):
                         leg_payload.update(leg_fields)
@@ -174,11 +194,19 @@ class PositionsState:
                     group_payload = group_lookup.get(group_id)
                     if isinstance(group_payload, dict):
                         payload.setdefault("group_qty", group_payload.get("group_qty"))
-                        payload.setdefault("group_net_price", group_payload.get("group_net_price"))
-                        payload.setdefault("group_mark_source", group_payload.get("mark_source"))
-                        payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+                        payload.setdefault(
+                            "group_net_price", group_payload.get("group_net_price")
+                        )
+                        payload.setdefault(
+                            "group_mark_source", group_payload.get("mark_source")
+                        )
+                        payload.setdefault(
+                            "group_stale_seconds", group_payload.get("stale_seconds")
+                        )
             else:
-                display = build_leg_display(leg.underlying, leg.strike, leg.right, leg.expiry)
+                display = build_leg_display(
+                    leg.underlying, leg.strike, leg.right, leg.expiry
+                )
                 payload["label"] = display.leg_label
                 payload["display"] = {
                     "leg_label": display.leg_label,
@@ -209,7 +237,9 @@ class PositionsState:
     def stats(self, now: datetime | None = None) -> dict[str, int | float]:
         rows, stale = self._rows(now)
         detection, _ = self._ensure_options_detection(now)
-        legs_count = sum(len(combo.legs) for combo in detection.combos) + len(detection.orphans)
+        legs_count = sum(len(combo.legs) for combo in detection.combos) + len(
+            detection.orphans
+        )
         return {
             "equity_count": len(rows),
             "quote_count": len(self._quotes),
@@ -244,7 +274,9 @@ class PositionsState:
                 self._positions_view = fallback_view
                 return deepcopy(fallback_view)
             return payload
-        if self._positions_view is not None and _positions_view_has_rows(self._positions_view):
+        if self._positions_view is not None and _positions_view_has_rows(
+            self._positions_view
+        ):
             return deepcopy(self._positions_view)
         fallback_view = self.build_fallback_positions_view(now)
         self._positions_view = fallback_view
@@ -257,8 +289,13 @@ class PositionsState:
         snapshot_at = self.snapshot_updated_at()
         ts = int(snapshot_at.timestamp() * 1000) if snapshot_at is not None else None
         positions_view = self.positions_view_payload(now)
-        positions_dump = [position.model_dump(mode="json") for position in self._positions.values()]
-        quotes_dump = {symbol: quote.model_dump(mode="json") for symbol, quote in self._quotes.items()}
+        positions_dump = [
+            position.model_dump(mode="json") for position in self._positions.values()
+        ]
+        quotes_dump = {
+            symbol: quote.model_dump(mode="json")
+            for symbol, quote in self._quotes.items()
+        }
         return {
             "ts": ts,
             "session": self._resolve_session(),
@@ -301,7 +338,9 @@ class PositionsState:
             )
         return rows, stale
 
-    def build_fallback_positions_view(self, now: datetime | None = None) -> dict[str, Any]:
+    def build_fallback_positions_view(
+        self, now: datetime | None = None
+    ) -> dict[str, Any]:
         """Construct a synthesized positions_view from the current state."""
 
         view = self._build_positions_view(now)
@@ -309,17 +348,22 @@ class PositionsState:
 
     def _build_positions_view(self, now: datetime | None) -> dict[str, Any]:
         now = _ensure_aware(now)
-        equities_view = [_equity_view_from_row(row) for row in self.equities_payload(now)]
+        equities_view = [
+            _equity_view_from_row(row) for row in self.equities_payload(now)
+        ]
         detection, _ = self._ensure_options_detection(now)
         grouping = group_option_combos(detection.combos)
         combo_groups_payload = [group.to_payload() for group in grouping.groups]
         group_lookup = {
             payload["combo_group_id"]: payload
             for payload in combo_groups_payload
-            if isinstance(payload, dict) and isinstance(payload.get("combo_group_id"), str)
+            if isinstance(payload, dict)
+            and isinstance(payload.get("combo_group_id"), str)
         }
 
-        evaluation = evaluate_playbook_targets(detection.combos, detection.orphans, self._quotes)
+        evaluation = evaluate_playbook_targets(
+            detection.combos, detection.orphans, self._quotes
+        )
 
         combos_view: list[dict[str, Any]] = []
         for combo in detection.combos:
@@ -331,10 +375,18 @@ class PositionsState:
                 if isinstance(group_id, str):
                     group_payload = group_lookup.get(group_id)
                     if isinstance(group_payload, dict):
-                        combo_payload.setdefault("group_qty", group_payload.get("group_qty"))
-                        combo_payload.setdefault("group_net_price", group_payload.get("group_net_price"))
-                        combo_payload.setdefault("group_mark_source", group_payload.get("mark_source"))
-                        combo_payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+                        combo_payload.setdefault(
+                            "group_qty", group_payload.get("group_qty")
+                        )
+                        combo_payload.setdefault(
+                            "group_net_price", group_payload.get("group_net_price")
+                        )
+                        combo_payload.setdefault(
+                            "group_mark_source", group_payload.get("mark_source")
+                        )
+                        combo_payload.setdefault(
+                            "group_stale_seconds", group_payload.get("stale_seconds")
+                        )
                         display_payload = group_payload.get("display")
                         if display_payload and "display" not in combo_payload:
                             combo_payload["display"] = deepcopy(display_payload)
@@ -361,10 +413,18 @@ class PositionsState:
                 if isinstance(group_id, str):
                     group_payload = group_lookup.get(group_id)
                     if isinstance(group_payload, dict):
-                        leg_payload.setdefault("group_qty", group_payload.get("group_qty"))
-                        leg_payload.setdefault("group_net_price", group_payload.get("group_net_price"))
-                        leg_payload.setdefault("group_mark_source", group_payload.get("mark_source"))
-                        leg_payload.setdefault("group_stale_seconds", group_payload.get("stale_seconds"))
+                        leg_payload.setdefault(
+                            "group_qty", group_payload.get("group_qty")
+                        )
+                        leg_payload.setdefault(
+                            "group_net_price", group_payload.get("group_net_price")
+                        )
+                        leg_payload.setdefault(
+                            "group_mark_source", group_payload.get("mark_source")
+                        )
+                        leg_payload.setdefault(
+                            "group_stale_seconds", group_payload.get("stale_seconds")
+                        )
             leg_fields = evaluation.leg_targets.get(leg.leg_id)
             if isinstance(leg_fields, dict):
                 leg_payload.update(leg_fields)
@@ -439,7 +499,9 @@ class PositionsState:
                 return augmented_payload, augmented_sanitized
         return deepcopy(raw_view), sanitized_view
 
-    def _ensure_options_detection(self, now: datetime | None) -> tuple[ComboDetection, datetime]:
+    def _ensure_options_detection(
+        self, now: datetime | None
+    ) -> tuple[ComboDetection, datetime]:
         now = _ensure_aware(now)
         cache = self._options_cache or {}
         cache_day = now.date()
@@ -589,7 +651,11 @@ class _GroupPlaybookAccumulator:
         band_high = self.tp_band_high_pct
         target["tp_band_low_pct"] = band_low
         target["tp_band_high_pct"] = band_high
-        target["tp_band_pct"] = [band_low, band_high] if band_low is not None and band_high is not None else None
+        target["tp_band_pct"] = (
+            [band_low, band_high]
+            if band_low is not None and band_high is not None
+            else None
+        )
         target["tp_hit"] = self.tp_hit
         target["tp_done"] = self.tp_done
         target["sl_hit"] = self.sl_hit
@@ -656,9 +722,15 @@ def _sanitize_positions_view(view: dict[str, Any]) -> dict[str, Any]:
         raw = view.get(key)
         if isinstance(raw, list):
             if key == "option_combos":
-                sanitized[key] = [_sanitize_combo_entry(entry) for entry in raw if isinstance(entry, dict)]
+                sanitized[key] = [
+                    _sanitize_combo_entry(entry)
+                    for entry in raw
+                    if isinstance(entry, dict)
+                ]
             else:
-                sanitized[key] = [deepcopy(entry) for entry in raw if isinstance(entry, dict)]
+                sanitized[key] = [
+                    deepcopy(entry) for entry in raw if isinstance(entry, dict)
+                ]
     for key, value in view.items():
         if key not in sanitized:
             try:

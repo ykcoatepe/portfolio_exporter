@@ -63,20 +63,26 @@ class RulesCatalogState:
     def validate_catalog_text(self, text: str) -> CatalogValidationResult:
         if self._yaml_error is not None:
             message = str(self._yaml_error)
-            return CatalogValidationResult(ok=False, counters={}, top=[], errors=[message], rules=[])
+            return CatalogValidationResult(
+                ok=False, counters={}, top=[], errors=[message], rules=[]
+            )
 
         errors: list[str] = []
         try:
             draft = parse_catalog(text)
         except (CatalogValidationError, CatalogError) as exc:
             errors.append(str(exc))
-            return CatalogValidationResult(ok=False, counters={}, top=[], errors=errors, rules=[])
+            return CatalogValidationResult(
+                ok=False, counters={}, top=[], errors=errors, rules=[]
+            )
 
         try:
             summary, _evaluation = self._summary_for_rules(draft.rules)
         except (RuleParseError, RuleEvaluationError) as exc:
             errors.append(str(exc))
-            return CatalogValidationResult(ok=False, counters={}, top=[], errors=errors, rules=draft.rules)
+            return CatalogValidationResult(
+                ok=False, counters={}, top=[], errors=errors, rules=draft.rules
+            )
 
         counters = _normalize_counters(summary.get("breaches", {}))
         top = summary.get("top", []) if isinstance(summary, dict) else []
@@ -88,7 +94,9 @@ class RulesCatalogState:
             rules=draft.rules,
         )
 
-    def preview_catalog(self, text: str) -> tuple[CatalogValidationResult, dict[str, Any]]:
+    def preview_catalog(
+        self, text: str
+    ) -> tuple[CatalogValidationResult, dict[str, Any]]:
         validation = self.validate_catalog_text(text)
         if not validation.ok:
             return validation, {"added": [], "removed": [], "changed": []}
@@ -125,10 +133,19 @@ class RulesCatalogState:
         catalog = self._catalog
         return {
             "version": catalog.version,
-            "updated_at": catalog.updated_at.isoformat(),
+            "updated_at": self._format_timestamp(catalog.updated_at),
             "updated_by": catalog.updated_by,
             "rules": rules_to_dict(catalog.rules),
         }
+
+    @staticmethod
+    def _format_timestamp(value: datetime | None) -> str | None:
+        if value is None:
+            return None
+        iso = value.astimezone(UTC).isoformat()
+        if iso.endswith("+00:00"):
+            iso = iso[:-6] + "Z"
+        return iso
 
     def _summary_for_rules(self, rules: Iterable[Rule]) -> tuple[dict[str, Any], Any]:
         temp_state = RulesState(self._positions_state, rules=rules)

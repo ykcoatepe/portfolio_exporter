@@ -81,7 +81,10 @@ def get_greeks(ib: IB) -> pd.DataFrame:
         return pd.DataFrame()
 
     # Request streaming data for greeks
-    tickers = [ib.reqMktData(p.contract, "106", snapshot=False, regulatorySnapshot=False) for p in positions]
+    tickers = [
+        ib.reqMktData(p.contract, "106", snapshot=False, regulatorySnapshot=False)
+        for p in positions
+    ]
     log.info(f"Waiting for greeks for {len(tickers)} option positions...")
     ib.sleep(2.5)  # Allow time for streaming greeks to arrive
 
@@ -129,7 +132,11 @@ def get_option_chain(ib: IB, symbol: str) -> pd.DataFrame:
 
     # Select a near-term expiry (e.g., within 45 days)
     expirations = sorted(
-        [exp for exp in chain.expirations if (pd.to_datetime(exp) - pd.Timestamp.now()).days < 45]
+        [
+            exp
+            for exp in chain.expirations
+            if (pd.to_datetime(exp) - pd.Timestamp.now()).days < 45
+        ]
     )
     if not expirations:
         log.warning(f"No near-term expirations found for {symbol}")
@@ -137,7 +144,9 @@ def get_option_chain(ib: IB, symbol: str) -> pd.DataFrame:
     expiry = expirations[0]
 
     # Filter strikes around the money
-    spot_price = ib.reqMktData(stk, "", snapshot=True, regulatorySnapshot=False).marketPrice()
+    spot_price = ib.reqMktData(
+        stk, "", snapshot=True, regulatorySnapshot=False
+    ).marketPrice()
     ib.sleep(0.5)
     if pd.isna(spot_price):
         log.warning(f"Could not get spot price for {symbol}, using all strikes.")
@@ -148,11 +157,15 @@ def get_option_chain(ib: IB, symbol: str) -> pd.DataFrame:
         )  # 15% moneyness
 
     contracts = [
-        Option(symbol, expiry, strike, right, chain.exchange) for strike in strikes for right in ["C", "P"]
+        Option(symbol, expiry, strike, right, chain.exchange)
+        for strike in strikes
+        for right in ["C", "P"]
     ]
     ib.qualifyContracts(*contracts)
 
-    tickers = [ib.reqMktData(c, "", snapshot=True, regulatorySnapshot=False) for c in contracts]
+    tickers = [
+        ib.reqMktData(c, "", snapshot=True, regulatorySnapshot=False) for c in contracts
+    ]
     log.info(f"Fetching option chain for {symbol} with {len(tickers)} contracts...")
     ib.sleep(2)
 
@@ -183,7 +196,9 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
     """
     HIST_DAYS = 300  # enough for SMA200 / ADX
     SPAN_PCT = 0.05  # ±5% strike window
-    N_ATM_STRIKES = 4  # number of strikes on each side of ATM to keep (reduced for speed)
+    N_ATM_STRIKES = (
+        4  # number of strikes on each side of ATM to keep (reduced for speed)
+    )
     ATM_DELTA_BAND = 0.10  # |Δ| <= 0.10
     RISK_FREE_RATE = 0.01
     DATA_DIR = "iv_history"
@@ -212,7 +227,12 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
     spy_ret = pd.Series(dtype=float)
     try:
         spy_bars = ib.reqHistoricalData(
-            Stock("SPY", "SMART", "USD"), "", f"{HIST_DAYS} D", "1 day", "TRADES", useRTH=True
+            Stock("SPY", "SMART", "USD"),
+            "",
+            f"{HIST_DAYS} D",
+            "1 day",
+            "TRADES",
+            useRTH=True,
         )
         if spy_bars:
             _df = util.df(spy_bars)
@@ -225,7 +245,9 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
 
     if spy_ret.empty:
         try:
-            spy_df = yf.download("SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False)
+            spy_df = yf.download(
+                "SPY", period=f"{HIST_DAYS}d", interval="1d", progress=False
+            )
             if not spy_df.empty:
                 spy_df.rename(columns=str.lower, inplace=True)
                 spy_ret = spy_df["close"].pct_change().dropna()
@@ -265,7 +287,9 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
                 bar_type = "TRADES"
 
             try:
-                bars = ib.reqHistoricalData(stk, "", f"{HIST_DAYS} D", "1 day", bar_type, useRTH=True)
+                bars = ib.reqHistoricalData(
+                    stk, "", f"{HIST_DAYS} D", "1 day", bar_type, useRTH=True
+                )
                 df = util.df(bars) if bars else pd.DataFrame()
             except Exception as e:
                 log.warning("IB hist error %s: %s", tk, e)
@@ -275,7 +299,9 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
 
         if df.empty:
             try:
-                yf_df = yf.download(tk, period=f"{HIST_DAYS}d", interval="1d", progress=False)
+                yf_df = yf.download(
+                    tk, period=f"{HIST_DAYS}d", interval="1d", progress=False
+                )
                 yf_df.rename(columns=str.lower, inplace=True)
                 yf_df.reset_index(inplace=True)
                 yf_df.rename(columns={"date": "date"}, inplace=True)
@@ -336,7 +362,9 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
 
                 trading_classes = getattr(chains[0], "tradingClasses", [])
                 root_tc = trading_classes[0] if trading_classes else tk
-                expiry = _first_valid_expiry(ib, tk, expirations, c_ff.iloc[-1], root_tc)
+                expiry = _first_valid_expiry(
+                    ib, tk, expirations, c_ff.iloc[-1], root_tc
+                )
                 log.info("Selected validated expiry %s for %s", expiry, tk)
 
                 strikes_full = sorted(chains[0].strikes)
@@ -350,7 +378,8 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
 
                 atm = round(spot / tick) * tick
                 candidate_strikes = [
-                    round(atm + i * tick, 2) for i in range(-N_ATM_STRIKES, N_ATM_STRIKES + 1)
+                    round(atm + i * tick, 2)
+                    for i in range(-N_ATM_STRIKES, N_ATM_STRIKES + 1)
                 ]
                 strikes = [s for s in candidate_strikes if s in strikes_full]
 
@@ -361,7 +390,9 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
                 for s in strikes:
                     s_float = float(s)
                     for r in ("C", "P"):
-                        opt = Option(tk, expiry, s_float, r, exchange="SMART", currency="USD")
+                        opt = Option(
+                            tk, expiry, s_float, r, exchange="SMART", currency="USD"
+                        )
                         try:
                             det = ib.reqContractDetails(opt)
                             if det and det[0].contract.conId:
@@ -385,7 +416,13 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
                 ib.sleep(0.1)
 
                 min_diff = 1e9
-                T = max((datetime.strptime(expiry, "%Y%m%d") - datetime.utcnow()).days, 1) / 365
+                T = (
+                    max(
+                        (datetime.strptime(expiry, "%Y%m%d") - datetime.utcnow()).days,
+                        1,
+                    )
+                    / 365
+                )
                 oi_sum = 0
                 for con in qual:
                     tk_data = ib.ticker(con)
@@ -396,7 +433,9 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
                     diff = abs(con.strike - spot)
                     if con.right == "C" and diff < min_diff:
                         min_diff, iv_now = diff, iv_
-                    delta_bs = _bs_delta(spot, con.strike, T, RISK_FREE_RATE, iv_, con.right == "C")
+                    delta_bs = _bs_delta(
+                        spot, con.strike, T, RISK_FREE_RATE, iv_, con.right == "C"
+                    )
                     if abs(delta_bs) <= ATM_DELTA_BAND:
                         oi_sum += oi_
                 oi_near = oi_sum
@@ -410,22 +449,33 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
                 if yft.options:
                     yf_expiry = min(
                         yft.options,
-                        key=lambda d: abs((pd.to_datetime(d) - pd.to_datetime("today")).days),
+                        key=lambda d: abs(
+                            (pd.to_datetime(d) - pd.to_datetime("today")).days
+                        ),
                     )
                     oc = yft.option_chain(yf_expiry)
 
                     spot = c_ff.iloc[-1]
 
                     def _near(df_yf):
-                        return df_yf.loc[(df_yf["strike"] - spot).abs() / spot <= SPAN_PCT]
+                        return df_yf.loc[
+                            (df_yf["strike"] - spot).abs() / spot <= SPAN_PCT
+                        ]
 
                     calls, puts = _near(oc.calls), _near(oc.puts)
 
-                    if (np.isnan(oi_near) or oi_near == 0) and (not calls.empty or not puts.empty):
-                        oi_near = calls["openInterest"].fillna(0).sum() + puts["openInterest"].fillna(0).sum()
+                    if (np.isnan(oi_near) or oi_near == 0) and (
+                        not calls.empty or not puts.empty
+                    ):
+                        oi_near = (
+                            calls["openInterest"].fillna(0).sum()
+                            + puts["openInterest"].fillna(0).sum()
+                        )
 
                     if np.isnan(iv_now) and not calls.empty:
-                        iv_now = calls.loc[(calls["strike"] - spot).abs().idxmin(), "impliedVolatility"]
+                        iv_now = calls.loc[
+                            (calls["strike"] - spot).abs().idxmin(), "impliedVolatility"
+                        ]
             except Exception as e:
                 log.debug("yfinance option fallback error for %s: %s", tk, e)
 
@@ -436,7 +486,9 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
                 fn, mode="a", header=not os.path.exists(fn), index=False
             )
         iv_hist = (
-            pd.read_csv(fn).drop_duplicates("date").tail(252)["iv"] if os.path.exists(fn) else pd.Series()
+            pd.read_csv(fn).drop_duplicates("date").tail(252)["iv"]
+            if os.path.exists(fn)
+            else pd.Series()
         )
         iv_rank = (
             np.nan
@@ -449,13 +501,20 @@ def get_technical_signals(ib: IB, tickers: list[str]) -> pd.DataFrame:
             ret = c_ff.pct_change().dropna()
             common = spy_ret.index.intersection(ret.index)
             if len(common) > 10:
-                beta = np.cov(ret.loc[common], spy_ret.loc[common])[0, 1] / spy_ret.loc[common].var()
+                beta = (
+                    np.cov(ret.loc[common], spy_ret.loc[common])[0, 1]
+                    / spy_ret.loc[common].var()
+                )
 
         if earn_dt is np.nan or pd.isna(earn_dt):
             try:
                 ed_df = yf.Ticker(tk).get_earnings_dates(limit=1)
                 if not ed_df.empty:
-                    earn_dt = pd.to_datetime(ed_df["Earnings Date"].iloc[0]).date().isoformat()
+                    earn_dt = (
+                        pd.to_datetime(ed_df["Earnings Date"].iloc[0])
+                        .date()
+                        .isoformat()
+                    )
             except Exception:
                 try:
                     cal = yf.Ticker(tk).calendar

@@ -22,18 +22,24 @@ def test_auto_preflight_runs_portfolio_greeks(monkeypatch):
                 ],
                 "meta": {"script": "daily_report"},
             }
-        return {"ok": True, "outputs": [], "warnings": [], "meta": {"script": "daily_report"}}
+        return {
+            "ok": True,
+            "outputs": [],
+            "warnings": [],
+            "meta": {"script": "daily_report"},
+        }
 
     def fake_pg(argv):
         calls["pg"] += 1
-        return {"ok": True, "outputs": [], "warnings": [], "meta": {"script": "portfolio_greeks"}}
+        return {
+            "ok": True,
+            "outputs": [],
+            "warnings": [],
+            "meta": {"script": "portfolio_greeks"},
+        }
 
-    monkeypatch.setattr(
-        "portfolio_exporter.scripts.daily_report.main", fake_daily
-    )
-    monkeypatch.setattr(
-        "portfolio_exporter.scripts.portfolio_greeks.main", fake_pg
-    )
+    monkeypatch.setattr("portfolio_exporter.scripts.daily_report.main", fake_daily)
+    monkeypatch.setattr("portfolio_exporter.scripts.portfolio_greeks.main", fake_pg)
 
     # Drive menu: 3 (Trades) → f (Preflight Daily Report) → r → 0
     importlib.reload(main)
@@ -52,4 +58,3 @@ def test_auto_preflight_runs_portfolio_greeks(monkeypatch):
     )
     main.main()
     assert calls["daily"] >= 2 and calls["pg"] == 1
-

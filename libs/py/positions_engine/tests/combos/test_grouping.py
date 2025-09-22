@@ -9,7 +9,13 @@ from positions_engine.combos import (
     OptionLegSnapshot,
     group_option_combos,
 )
-from positions_engine.core.models import Instrument, InstrumentType, Position, Quote, TradingSession
+from positions_engine.core.models import (
+    Instrument,
+    InstrumentType,
+    Position,
+    Quote,
+    TradingSession,
+)
 from positions_engine.service.state import PositionsState
 
 NOW = datetime(2025, 2, 15, 15, 30, tzinfo=UTC)
@@ -342,7 +348,10 @@ def test_group_option_combos_merges_duplicate_condors() -> None:
     assert len(result.groups) == 1
 
     group = result.groups[0]
-    assert group.combo_group_id == "IRON_CONDOR|SPY|C:440/445@2025-10-18|P:395/400@2025-10-18"
+    assert (
+        group.combo_group_id
+        == "IRON_CONDOR|SPY|C:440/445@2025-10-18|P:395/400@2025-10-18"
+    )
     assert group.group_qty == Decimal("-2")
     assert group.mark_source == "MID"
 
@@ -353,7 +362,10 @@ def test_group_option_combos_merges_duplicate_condors() -> None:
     assert payload["mark_source"] == "MID"
     assert payload["stale_seconds"] == 195
 
-    leg_labels = {leg_payload["symbol"]: leg_payload["display"]["leg_label"] for leg_payload in payload["legs"]}
+    leg_labels = {
+        leg_payload["symbol"]: leg_payload["display"]["leg_label"]
+        for leg_payload in payload["legs"]
+    }
     assert leg_labels["SPY 20251018P00395000"] == "SPY 395P • Oct 18 '25"
     assert leg_labels["SPY 20251018C00445000"] == "SPY 445C • Oct 18 '25"
 
@@ -517,15 +529,29 @@ def test_combo_labels_for_various_strategies() -> None:
     )
 
     result = group_option_combos((vertical, calendar, straddle))
-    labels = {group.combo_group_id: group.to_payload()["label"] for group in result.groups}
+    labels = {
+        group.combo_group_id: group.to_payload()["label"] for group in result.groups
+    }
 
-    assert labels["VERTICAL|MSFT|C:315/320@2024-05-17"] == "MSFT 315/320C • 30d • Credit 0.60"
-    assert labels["CALENDAR|AAPL|C:180@2024-05-17|C:180@2024-07-19"] == "AAPL 180C CAL • May→Jul • Debit 2.40"
-    assert labels["STRADDLE|TSLA|C:240@2024-03-08|P:240@2024-03-08"] == "TSLA 240C+P • 7d"
+    assert (
+        labels["VERTICAL|MSFT|C:315/320@2024-05-17"]
+        == "MSFT 315/320C • 30d • Credit 0.60"
+    )
+    assert (
+        labels["CALENDAR|AAPL|C:180@2024-05-17|C:180@2024-07-19"]
+        == "AAPL 180C CAL • May→Jul • Debit 2.40"
+    )
+    assert (
+        labels["STRADDLE|TSLA|C:240@2024-03-08|P:240@2024-03-08"] == "TSLA 240C+P • 7d"
+    )
 
 
 def test_options_payload_exposes_group_data() -> None:
-    instrument = Instrument(symbol="MSFT 20240517C00320000", instrument_type=InstrumentType.OPTION, multiplier=Decimal("100"))
+    instrument = Instrument(
+        symbol="MSFT 20240517C00320000",
+        instrument_type=InstrumentType.OPTION,
+        multiplier=Decimal("100"),
+    )
     position = Position(
         instrument=instrument,
         quantity=Decimal("-1"),
@@ -538,7 +564,11 @@ def test_options_payload_exposes_group_data() -> None:
         },
     )
     hedge = Position(
-        instrument=Instrument(symbol="MSFT 20240517C00315000", instrument_type=InstrumentType.OPTION, multiplier=Decimal("100")),
+        instrument=Instrument(
+            symbol="MSFT 20240517C00315000",
+            instrument_type=InstrumentType.OPTION,
+            multiplier=Decimal("100"),
+        ),
         quantity=Decimal("1"),
         avg_cost=Decimal("1.40"),
         metadata={

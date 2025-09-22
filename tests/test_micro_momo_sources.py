@@ -18,4 +18,3 @@ def test_load_chain_csv() -> None:
     assert any(r.right == "C" for r in rows)
     assert any(r.right == "P" for r in rows)
     assert all(r.symbol == "ABC" for r in rows)
-

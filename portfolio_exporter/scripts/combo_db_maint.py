@@ -72,7 +72,9 @@ def _load_df(path: Path) -> pd.DataFrame:
 
 def _analyse(df: pd.DataFrame) -> dict[str, Any]:
     broken_mask = df["underlying"].isna() | df["structure"].isna()
-    repair_mask = ~broken_mask & (df[["type", "width", "credit_debit"]].isna().any(axis=1))
+    repair_mask = ~broken_mask & (
+        df[["type", "width", "credit_debit"]].isna().any(axis=1)
+    )
     unknown_mask = ~(broken_mask | repair_mask)
     return {
         "broken_count": int(broken_mask.sum()),
@@ -97,7 +99,9 @@ def _fix_df(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _run_core(ns: argparse.Namespace, outdir: Path, formats: dict[str, bool]) -> dict[str, Any]:
+def _run_core(
+    ns: argparse.Namespace, outdir: Path, formats: dict[str, bool]
+) -> dict[str, Any]:
     db_path = _ensure_db(get_combo_db_path())
     written: list[Path] = []
     outputs = {"before": "", "after": ""}
@@ -159,7 +163,9 @@ def _run_core(ns: argparse.Namespace, outdir: Path, formats: dict[str, bool]) ->
 
 def cli(ns: argparse.Namespace) -> dict[str, Any]:
     outdir = cli_helpers.resolve_output_dir(ns.output_dir)
-    formats = cli_helpers.decide_file_writes(ns, json_only_default=True, defaults={"csv": True})
+    formats = cli_helpers.decide_file_writes(
+        ns, json_only_default=True, defaults={"csv": True}
+    )
     return _run_core(ns, outdir, formats)
 
 

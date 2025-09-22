@@ -56,12 +56,23 @@ def test_internal_provider_precedence(monkeypatch):
         }
 
     def _empty_csv(_base_dir: object) -> CsvLoadResult:
-        return CsvLoadResult(positions=[], quotes=[], metadata={"data_root": "test", "positions_rows": 0, "quotes_rows": 0, "greeks_rows": 0})
+        return CsvLoadResult(
+            positions=[],
+            quotes=[],
+            metadata={
+                "data_root": "test",
+                "positions_rows": 0,
+                "quotes_rows": 0,
+                "greeks_rows": 0,
+            },
+        )
 
     monkeypatch.setenv("POSITIONS_ENGINE_ALLOW_EMPTY", "1")
     monkeypatch.setenv("POSITIONS_ENGINE_DEMO", "0")
     monkeypatch.setattr("positions_engine.ingest.csv.load_csv_records", _empty_csv)
-    monkeypatch.setattr("portfolio_exporter.psd_adapter.snapshot_once", _fake_snapshot_once)
+    monkeypatch.setattr(
+        "portfolio_exporter.psd_adapter.snapshot_once", _fake_snapshot_once
+    )
 
     api._DEMO_OVERRIDE = None
     api._state.refresh(positions=[], quotes=[], data_source="unknown")
@@ -78,7 +89,9 @@ def test_internal_provider_precedence(monkeypatch):
         assert "total_pnl" in stock_row
         options_payload = client.get("/positions/options").json()
         assert options_payload["legs"]
-        assert any(leg["symbol"] == "TSLA 20251018C00750000" for leg in options_payload["legs"])
+        assert any(
+            leg["symbol"] == "TSLA 20251018C00750000" for leg in options_payload["legs"]
+        )
 
         state_snapshot = client.get("/state").json()
         assert state_snapshot["data_source"] == "internal"

@@ -91,7 +91,8 @@ def main(argv: list[str] | None = None) -> int:
                     result_R = "-1.0"
                 else:
                     r = (entry_price - px) / max(
-                        1e-9, (entry_price - (tp if tp is not None else entry_price - 1))
+                        1e-9,
+                        (entry_price - (tp if tp is not None else entry_price - 1)),
                     )
                     result_R = f"{r:.2f}"
 

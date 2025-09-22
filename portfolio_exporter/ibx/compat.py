@@ -48,7 +48,9 @@ async def _to_thread(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     return await asyncio.to_thread(runner)
 
 
-async def connect(host: str, port: int, client_id: int, timeout: float | None = None) -> IB:
+async def connect(
+    host: str, port: int, client_id: int, timeout: float | None = None
+) -> IB:
     """Return a connected IB instance; serialize concurrent connects and respect timeout."""
 
     global _connecting, _ib_singleton
@@ -77,11 +79,22 @@ async def connect(host: str, port: int, client_id: int, timeout: float | None = 
             async def _do_connect() -> IB:
                 try:
                     try:
-                        await ib.connectAsync(host, port, clientId=client_id, timeout=timeout_value)
+                        await ib.connectAsync(
+                            host, port, clientId=client_id, timeout=timeout_value
+                        )
                     except (RuntimeError, NotImplementedError) as exc:
-                        log.debug("connectAsync not available here (%s), falling back to sync connect", exc)
+                        log.debug(
+                            "connectAsync not available here (%s), falling back to sync connect",
+                            exc,
+                        )
                         _mark_sync("connect")
-                        await _to_thread(ib.connect, host, port, clientId=client_id, timeout=timeout_value)
+                        await _to_thread(
+                            ib.connect,
+                            host,
+                            port,
+                            clientId=client_id,
+                            timeout=timeout_value,
+                        )
                     return ib
                 except Exception:
                     with contextlib.suppress(Exception):
@@ -173,7 +186,9 @@ async def req_contract_details(ib: IB, contract: Any) -> Any:
                 _ASYNC_SUPPORT[method] = True
                 return result
             except (RuntimeError, NotImplementedError) as exc:
-                log.debug("reqContractDetailsAsync unsupported (%s) → sync fallback", exc)
+                log.debug(
+                    "reqContractDetailsAsync unsupported (%s) → sync fallback", exc
+                )
                 _mark_sync(method)
         else:
             _mark_sync(method)

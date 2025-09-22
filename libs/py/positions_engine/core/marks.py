@@ -72,7 +72,9 @@ def select_equity_mark(
     if quote is not None:
         mark, source = _pick_mark(quote)
     stale_seconds = _compute_staleness(quote, now)
-    return MarkResult(mark=mark, source=source, stale_seconds=stale_seconds, threshold=threshold)
+    return MarkResult(
+        mark=mark, source=source, stale_seconds=stale_seconds, threshold=threshold
+    )
 
 
 _MARK_SOURCE_MID = "MID"
@@ -93,7 +95,9 @@ def _pick_mark(quote: Quote) -> tuple[Decimal | None, str]:
     return _first_present(candidates)
 
 
-def _first_present(candidates: list[tuple[Decimal | None, str]]) -> tuple[Decimal | None, str]:
+def _first_present(
+    candidates: list[tuple[Decimal | None, str]],
+) -> tuple[Decimal | None, str]:
     for value, label in candidates:
         if value is not None:
             return value, label

@@ -10,4 +10,3 @@ def test_budget_warns():
     # hedge monthly > 0.35%
     hd = hedge_monthly_carry(nav=100_000.0, hedge_cost_mtd=360.0, cap=0.0035)
     assert hd["warn"] is True
-

@@ -33,4 +33,3 @@ def test_eod_updates_offline(tmp_path: Path) -> None:
     assert rc == 0
     rows = list(csv.DictReader(open(j, encoding="utf-8")))
     assert rows[0]["status"] in ("Expired", "Stopped", "Profit")
-

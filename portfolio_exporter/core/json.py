@@ -34,7 +34,11 @@ def time_series_summary(
 ) -> dict[str, Any]:
     """Build a standardised summary for time‑series exports."""
 
-    meta = {**(meta or {}), "schema_id": "time_series_summary", "schema_version": SCHEMA_VERSION}
+    meta = {
+        **(meta or {}),
+        "schema_id": "time_series_summary",
+        "schema_version": SCHEMA_VERSION,
+    }
     base = _base(outputs, warnings, meta)
     base.update({"rows": rows, "start": start, "end": end})
     return base
@@ -48,7 +52,11 @@ def report_summary(
 ) -> dict[str, Any]:
     """Build a summary for multi‑section reports."""
 
-    meta = {**(meta or {}), "schema_id": "report_summary", "schema_version": SCHEMA_VERSION}
+    meta = {
+        **(meta or {}),
+        "schema_id": "report_summary",
+        "schema_version": SCHEMA_VERSION,
+    }
     base = _base(outputs, warnings, meta)
     base.update({"sections": dict(sections)})
     return base

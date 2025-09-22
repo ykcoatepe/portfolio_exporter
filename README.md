@@ -17,6 +17,14 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
 | `daily_report.py` | Render a one-page HTML/PDF snapshot from the latest portfolio greeks CSVs. |
 
+## Session Detection & Overrides
+
+- `GET /session` returns a canonical market session (`RTH`, `ETH`, or `CLOSED`) with `as_of`, `rth_open`, `rth_close`, and timezone metadata in `America/New_York`.
+- `/stats` now surfaces `session` in the root payload, while `/state` keeps the legacy string field and adds a structured `session_info` (and mirrors it under `meta.session`).
+- Detection prefers `exchange_calendars` (or `pandas_market_calendars`) for the XNYS schedule, falling back to fixed weekday windows (04:00–09:30, 09:30–16:00, 16:00–20:00 ET) when calendars are unavailable.
+- Development override: set `FORCE_SESSION_STATE=RTH|ETH|CLOSED` or hit `/debug/session/override/{state}` and `/debug/session/clear` to pin the backend state during local testing.
+- The PSD Stats ribbon consumes the same object through `useSession`, so the UI reflects overrides instantly and shows an `updated …` timer derived from `as_of`.
+
 ### Utilities → Sentinel (Micro‑MOMO)
 
 A lightweight background watcher that monitors scored Micro‑MOMO candidates and posts triggers.

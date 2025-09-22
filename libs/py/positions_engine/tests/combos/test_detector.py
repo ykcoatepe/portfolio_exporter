@@ -3,9 +3,19 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from positions_engine.combos import ComboStrategy, build_option_leg_snapshot, detect_option_combos
+from positions_engine.combos import (
+    ComboStrategy,
+    build_option_leg_snapshot,
+    detect_option_combos,
+)
 from positions_engine.core.marks import MarkSettings
-from positions_engine.core.models import Instrument, InstrumentType, Position, Quote, TradingSession
+from positions_engine.core.models import (
+    Instrument,
+    InstrumentType,
+    Position,
+    Quote,
+    TradingSession,
+)
 from positions_engine.service.state import PositionsState
 
 NOW = datetime(2024, 1, 5, 15, 30, tzinfo=UTC)
@@ -13,10 +23,14 @@ MARK_SETTINGS = MarkSettings()
 
 
 def _make_instrument(symbol: str) -> Instrument:
-    return Instrument(symbol=symbol, instrument_type=InstrumentType.OPTION, multiplier=Decimal("100"))
+    return Instrument(
+        symbol=symbol, instrument_type=InstrumentType.OPTION, multiplier=Decimal("100")
+    )
 
 
-def _make_quote(symbol: str, bid: float = 1.0, ask: float = 1.2, last: float = 1.1) -> Quote:
+def _make_quote(
+    symbol: str, bid: float = 1.0, ask: float = 1.2, last: float = 1.1
+) -> Quote:
     return Quote(
         symbol=symbol,
         bid=Decimal(str(bid)),
@@ -95,7 +109,9 @@ def test_detect_vertical_combo() -> None:
             metadata={**base_metadata, "strike": Decimal("260")},
         ),
     ]
-    legs = [build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in positions]
+    legs = [
+        build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in positions
+    ]
     detection = detect_option_combos([leg for leg in legs if leg is not None])
     assert len(detection.combos) == 1
     combo = detection.combos[0]
@@ -109,16 +125,28 @@ def test_detect_calendar_combo() -> None:
             instrument=_make_instrument("MSFT  20240315C00300000"),
             quantity=Decimal("1"),
             avg_cost=Decimal("3.5"),
-            metadata={"underlying": "MSFT", "expiry": "2024-03-15", "right": "C", "strike": Decimal("300")},
+            metadata={
+                "underlying": "MSFT",
+                "expiry": "2024-03-15",
+                "right": "C",
+                "strike": Decimal("300"),
+            },
         ),
         Position(
             instrument=_make_instrument("MSFT  20240419C00300000"),
             quantity=Decimal("-1"),
             avg_cost=Decimal("2.1"),
-            metadata={"underlying": "MSFT", "expiry": "2024-04-19", "right": "C", "strike": Decimal("300")},
+            metadata={
+                "underlying": "MSFT",
+                "expiry": "2024-04-19",
+                "right": "C",
+                "strike": Decimal("300"),
+            },
         ),
     ]
-    legs = [build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in positions]
+    legs = [
+        build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in positions
+    ]
     detection = detect_option_combos([leg for leg in legs if leg is not None])
     assert len(detection.combos) == 1
     assert detection.combos[0].strategy == ComboStrategy.CALENDAR
@@ -130,17 +158,32 @@ def test_detect_straddle_and_strangle() -> None:
             instrument=_make_instrument("QQQ   20240216C00390000"),
             quantity=Decimal("1"),
             avg_cost=Decimal("1.8"),
-            metadata={"underlying": "QQQ", "expiry": "2024-02-16", "right": "C", "strike": Decimal("390")},
+            metadata={
+                "underlying": "QQQ",
+                "expiry": "2024-02-16",
+                "right": "C",
+                "strike": Decimal("390"),
+            },
         ),
         Position(
             instrument=_make_instrument("QQQ   20240216P00390000"),
             quantity=Decimal("1"),
             avg_cost=Decimal("2.0"),
-            metadata={"underlying": "QQQ", "expiry": "2024-02-16", "right": "P", "strike": Decimal("390")},
+            metadata={
+                "underlying": "QQQ",
+                "expiry": "2024-02-16",
+                "right": "P",
+                "strike": Decimal("390"),
+            },
         ),
     ]
-    straddle_legs = [build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in straddle_positions]
-    detection_straddle = detect_option_combos([leg for leg in straddle_legs if leg is not None])
+    straddle_legs = [
+        build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS)
+        for pos in straddle_positions
+    ]
+    detection_straddle = detect_option_combos(
+        [leg for leg in straddle_legs if leg is not None]
+    )
     assert detection_straddle.combos[0].strategy == ComboStrategy.STRADDLE
 
     strangle_positions = [
@@ -148,17 +191,32 @@ def test_detect_straddle_and_strangle() -> None:
             instrument=_make_instrument("QQQ   20240216C00395000"),
             quantity=Decimal("-1"),
             avg_cost=Decimal("1.0"),
-            metadata={"underlying": "QQQ", "expiry": "2024-02-16", "right": "C", "strike": Decimal("395")},
+            metadata={
+                "underlying": "QQQ",
+                "expiry": "2024-02-16",
+                "right": "C",
+                "strike": Decimal("395"),
+            },
         ),
         Position(
             instrument=_make_instrument("QQQ   20240216P00385000"),
             quantity=Decimal("-1"),
             avg_cost=Decimal("1.1"),
-            metadata={"underlying": "QQQ", "expiry": "2024-02-16", "right": "P", "strike": Decimal("385")},
+            metadata={
+                "underlying": "QQQ",
+                "expiry": "2024-02-16",
+                "right": "P",
+                "strike": Decimal("385"),
+            },
         ),
     ]
-    strangle_legs = [build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in strangle_positions]
-    detection_strangle = detect_option_combos([leg for leg in strangle_legs if leg is not None])
+    strangle_legs = [
+        build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS)
+        for pos in strangle_positions
+    ]
+    detection_strangle = detect_option_combos(
+        [leg for leg in strangle_legs if leg is not None]
+    )
     assert detection_strangle.combos[0].strategy == ComboStrategy.STRANGLE
 
 
@@ -190,7 +248,9 @@ def test_detect_iron_condor_combo() -> None:
             metadata={**metadata, "right": "P", "strike": Decimal("405")},
         ),
     ]
-    legs = [build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in positions]
+    legs = [
+        build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in positions
+    ]
     detection = detect_option_combos([leg for leg in legs if leg is not None])
     assert len(detection.combos) == 1
     assert detection.combos[0].strategy == ComboStrategy.IRON_CONDOR
@@ -212,7 +272,9 @@ def test_detect_ratio_combo() -> None:
             metadata={**metadata, "strike": Decimal("125")},
         ),
     ]
-    legs = [build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in positions]
+    legs = [
+        build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in positions
+    ]
     detection = detect_option_combos([leg for leg in legs if leg is not None])
     assert detection.combos[0].strategy == ComboStrategy.RATIO
 
@@ -228,7 +290,12 @@ def test_options_payload_and_stats_integration() -> None:
             instrument=_make_instrument("TSLA  20240315C00250000"),
             quantity=Decimal("1"),
             avg_cost=Decimal("2.0"),
-            metadata={"underlying": "TSLA", "expiry": "2024-03-15", "right": "C", "strike": Decimal("250")},
+            metadata={
+                "underlying": "TSLA",
+                "expiry": "2024-03-15",
+                "right": "C",
+                "strike": Decimal("250"),
+            },
         )
     )
     positions.append(
@@ -236,7 +303,12 @@ def test_options_payload_and_stats_integration() -> None:
             instrument=_make_instrument("TSLA  20240315C00260000"),
             quantity=Decimal("-1"),
             avg_cost=Decimal("1.2"),
-            metadata={"underlying": "TSLA", "expiry": "2024-03-15", "right": "C", "strike": Decimal("260")},
+            metadata={
+                "underlying": "TSLA",
+                "expiry": "2024-03-15",
+                "right": "C",
+                "strike": Decimal("260"),
+            },
         )
     )
 
@@ -246,7 +318,12 @@ def test_options_payload_and_stats_integration() -> None:
             instrument=_make_instrument("TSLA  20240315P00240000"),
             quantity=Decimal("-1"),
             avg_cost=Decimal("0.9"),
-            metadata={"underlying": "TSLA", "expiry": "2024-03-15", "right": "P", "strike": Decimal("240")},
+            metadata={
+                "underlying": "TSLA",
+                "expiry": "2024-03-15",
+                "right": "P",
+                "strike": Decimal("240"),
+            },
         )
     )
 
@@ -286,7 +363,9 @@ def test_detection_performance_for_large_leg_set() -> None:
                 metadata={**base_meta, "strike": Decimal(105 + idx)},
             )
         )
-    snapshots = [build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in legs]
+    snapshots = [
+        build_option_leg_snapshot(pos, None, NOW, MARK_SETTINGS) for pos in legs
+    ]
     detection = detect_option_combos([leg for leg in snapshots if leg is not None])
     assert len(detection.combos) == 250
     assert detection.detection_ms < 150.0

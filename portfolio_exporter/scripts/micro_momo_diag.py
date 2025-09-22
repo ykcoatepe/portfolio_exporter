@@ -124,7 +124,9 @@ def _resolve_input(path_arg: str | None, pe_test: bool) -> str | None:
     return None
 
 
-def _resolve_symbols(args: argparse.Namespace, alias_map: dict[str, str]) -> tuple[list[str], str | None]:
+def _resolve_symbols(
+    args: argparse.Namespace, alias_map: dict[str, str]
+) -> tuple[list[str], str | None]:
     if args.symbols:
         raw = [s.strip().upper() for s in str(args.symbols).split(",") if s.strip()]
         return normalize_symbols(raw, alias_map), None
@@ -163,11 +165,17 @@ def _format_ts(ts: Any) -> str | None:
         return None
     try:
         if isinstance(ts, (int, float)):
-            return datetime.fromtimestamp(float(ts), TZ_UTC).astimezone(TZ_TR).strftime("%Y-%m-%d %H:%M:%S")
+            return (
+                datetime.fromtimestamp(float(ts), TZ_UTC)
+                .astimezone(TZ_TR)
+                .strftime("%Y-%m-%d %H:%M:%S")
+            )
         if isinstance(ts, str):
             if ts.isdigit():
                 return (
-                    datetime.fromtimestamp(float(ts), TZ_UTC).astimezone(TZ_TR).strftime("%Y-%m-%d %H:%M:%S")
+                    datetime.fromtimestamp(float(ts), TZ_UTC)
+                    .astimezone(TZ_TR)
+                    .strftime("%Y-%m-%d %H:%M:%S")
                 )
             # Attempt ISO parse
             try:
@@ -201,7 +209,11 @@ def _build_effective_cfg(
     existing = data_cfg.get("artifact_dirs")
     if isinstance(existing, (list, tuple)):
         existing_artifacts = [str(x) for x in existing if x]
-    artifact_dirs = list(dict.fromkeys(list(existing_artifacts) + [os.path.join(out_dir, ".cache"), out_dir]))
+    artifact_dirs = list(
+        dict.fromkeys(
+            list(existing_artifacts) + [os.path.join(out_dir, ".cache"), out_dir]
+        )
+    )
     providers = [
         s
         for s in (
@@ -213,11 +225,17 @@ def _build_effective_cfg(
         if s
     ]
     halts_source = (
-        None if offline_flag else (os.getenv("MOMO_HALTS_SOURCE") or data_cfg.get("halts_source") or "nasdaq")
+        None
+        if offline_flag
+        else (
+            os.getenv("MOMO_HALTS_SOURCE") or data_cfg.get("halts_source") or "nasdaq"
+        )
     )
     data_cfg.update(
         {
-            "mode": data_mode_arg or os.getenv("MOMO_DATA_MODE") or data_cfg.get("mode", "enrich"),
+            "mode": data_mode_arg
+            or os.getenv("MOMO_DATA_MODE")
+            or data_cfg.get("mode", "enrich"),
             "providers": providers,
             "offline": offline_flag
             or _env_true(os.getenv("MOMO_OFFLINE"))
@@ -225,16 +243,22 @@ def _build_effective_cfg(
             "halts_source": halts_source,
             "artifact_dirs": artifact_dirs,
             "chains_dir": chains_dir or data_cfg.get("chains_dir"),
-            "auto_producers": bool(data_cfg.get("auto_producers", False)) or auto_producers_flag,
+            "auto_producers": bool(data_cfg.get("auto_producers", False))
+            or auto_producers_flag,
             "upstream_timeout_sec": int(
-                os.getenv("MOMO_UPSTREAM_TIMEOUT") or data_cfg.get("upstream_timeout_sec", upstream_timeout)
+                os.getenv("MOMO_UPSTREAM_TIMEOUT")
+                or data_cfg.get("upstream_timeout_sec", upstream_timeout)
             ),
         }
     )
     cache_cfg = data_cfg.get("cache") or {}
     cache_dir = cache_cfg.get("dir") or os.path.join(out_dir, ".cache")
     ttl = cache_cfg.get("ttl_sec", 60)
-    cache_cfg = {"enabled": True, "dir": cache_dir, "ttl_sec": int(os.getenv("MOMO_CACHE_TTL") or ttl)}
+    cache_cfg = {
+        "enabled": True,
+        "dir": cache_dir,
+        "ttl_sec": int(os.getenv("MOMO_CACHE_TTL") or ttl),
+    }
     data_cfg["cache"] = cache_cfg
     env_force = _env_true(os.getenv("MOMO_FORCE_LIVE"))
     if env_force or force_live_flag:
@@ -264,7 +288,9 @@ def _vwap_guard(
     market_window = sched.open_tr <= now_tr <= sched.close_tr
     grace = sched.open_tr <= now_tr <= (sched.open_tr + timedelta(minutes=3))
     premarket_window_active = pre_window.start_tr <= now_tr < sched.open_tr
-    allow_premarket = session_mode == "premarket" or (session_mode == "auto" and premarket_window_active)
+    allow_premarket = session_mode == "premarket" or (
+        session_mode == "auto" and premarket_window_active
+    )
     no_intraday = (vwap is None) and (rvol1 == 0.0) and (rvol5 == 0.0)
     if market_window:
         if not no_intraday:
@@ -413,7 +439,9 @@ def _print_header(title: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser("micro-momo-diag")
     parser.add_argument("--symbols", help="Comma-separated symbols", default="")
-    parser.add_argument("--cfg", help="Config path (defaults to auto-discovery)", default="")
+    parser.add_argument(
+        "--cfg", help="Config path (defaults to auto-discovery)", default=""
+    )
     parser.add_argument("--input", help="Scan CSV path (fallback)")
     parser.add_argument("--chains_dir", help="Chains directory")
     parser.add_argument("--out_dir", default="out")
@@ -423,7 +451,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--auto-producers", action="store_true")
     parser.add_argument("--force-live", action="store_true")
     parser.add_argument(
-        "--session", choices=["auto", "rth", "premarket"], help="Session guard for diagnostics"
+        "--session",
+        choices=["auto", "rth", "premarket"],
+        help="Session guard for diagnostics",
     )
     args = parser.parse_args(argv)
 
@@ -446,7 +476,10 @@ def main(argv: list[str] | None = None) -> int:
     alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])
     symbols, input_csv = _resolve_symbols(args, alias_map)
     if not symbols:
-        print("no symbols resolved (set MOMO_SYMBOLS, memory preference, or pass --symbols)", flush=True)
+        print(
+            "no symbols resolved (set MOMO_SYMBOLS, memory preference, or pass --symbols)",
+            flush=True,
+        )
         if input_csv and not Path(input_csv).exists():
             print(f"hint: expected input CSV {input_csv} not found", flush=True)
         return 2
@@ -516,8 +549,12 @@ def main(argv: list[str] | None = None) -> int:
         bars, bars_source = _gather_bars(sym, cfg, notes)
         patterns = compute_patterns(bars) if bars else {}
         vwap = patterns.get("vwap") if isinstance(patterns, dict) else None
-        rvol1 = float(patterns.get("rvol_1m", 0.0)) if isinstance(patterns, dict) else 0.0
-        rvol5 = float(patterns.get("rvol_5m", 0.0)) if isinstance(patterns, dict) else 0.0
+        rvol1 = (
+            float(patterns.get("rvol_1m", 0.0)) if isinstance(patterns, dict) else 0.0
+        )
+        rvol5 = (
+            float(patterns.get("rvol_5m", 0.0)) if isinstance(patterns, dict) else 0.0
+        )
         last_ts = _format_ts(bars[-1].get("ts")) if bars else None
         spot = None
         try:
@@ -525,16 +562,22 @@ def main(argv: list[str] | None = None) -> int:
                 spot = float(bars[-1].get("close", 0.0))
         except Exception:
             spot = None
-        chain_rows, near_oi, chain_source = _gather_chain(sym, cfg, spot, chains_dir, notes)
+        chain_rows, near_oi, chain_source = _gather_chain(
+            sym, cfg, spot, chains_dir, notes
+        )
         sch = rth_window_tr()
         pre_window = premarket_window_tr()
         market_window = sch.open_tr <= now_tr <= sch.close_tr
         premarket_window_active = pre_window.start_tr <= now_tr < sch.open_tr
-        allow_premarket = session_mode == "premarket" or (session_mode == "auto" and premarket_window_active)
+        allow_premarket = session_mode == "premarket" or (
+            session_mode == "auto" and premarket_window_active
+        )
         session_state = (
             "rth"
             if market_window
-            else ("premarket" if allow_premarket and premarket_window_active else "closed")
+            else (
+                "premarket" if allow_premarket and premarket_window_active else "closed"
+            )
         )
         guard = _vwap_guard(
             now_tr,

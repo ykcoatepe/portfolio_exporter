@@ -33,4 +33,3 @@ def test_run_loop_web_broadcast(monkeypatch: Any) -> None:
     for dto in captured:
         assert isinstance(dto, dict)
         json.dumps(dto)
-

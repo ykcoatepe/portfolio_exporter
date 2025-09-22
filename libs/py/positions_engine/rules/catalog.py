@@ -91,7 +91,10 @@ def dump_catalog(catalog: RulesCatalog) -> str:
     """Serialize a catalog to YAML text."""
 
     payload = catalog.model_dump(mode="python")
-    payload["updated_at"] = catalog.updated_at.isoformat()
+    updated_at = catalog.updated_at.astimezone(UTC).isoformat()
+    if updated_at.endswith("+00:00"):
+        updated_at = updated_at[:-6] + "Z"
+    payload["updated_at"] = updated_at
     yaml_module = _ensure_yaml()
     return yaml_module.safe_dump(payload, sort_keys=False, allow_unicode=False)
 
@@ -103,7 +106,9 @@ def atomic_write(text: str, path: Path = CATALOG_PATH) -> None:
     tmp_fd: int | None = None
     tmp_path: str | None = None
     try:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=str(path.parent), delete=False) as handle:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=str(path.parent), delete=False
+        ) as handle:
             tmp_fd = handle.fileno()
             tmp_path = handle.name
             handle.write(text)

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import clsx from "clsx";
 
 import { usePortfolioMetrics } from "../hooks/usePortfolioMetrics";
+import { useSession } from "../hooks/useSession";
 import { useStats } from "../hooks/useStats";
 import { formatDuration, formatMoney, formatPercent } from "../lib/format";
 import { formatSigned, stalenessTone, valueTone } from "./tableUtils";
@@ -56,6 +57,8 @@ function formatRelativeFromNow(timestamp: number, now: number): string {
 export default function StatsRibbon(): JSX.Element {
   const { data: stats } = useStats();
   const metrics = usePortfolioMetrics();
+  const sessionResult = useSession(stats?.session ?? null);
+  const session = sessionResult.data ?? stats?.session ?? null;
 
   const now = Date.now();
 
@@ -86,7 +89,15 @@ export default function StatsRibbon(): JSX.Element {
   const stalenessLabel = stalenessSeconds !== null ? formatDuration(stalenessSeconds) : null;
   const stalenessClassName = stalenessTone(stalenessSeconds);
 
-  const sessionLabel = metrics.session ? metrics.session.toUpperCase() : "—";
+  const sessionLabel = session?.state ?? "—";
+  const sessionUpdatedTimestamp = session?.asOf ? Date.parse(session.asOf) : NaN;
+  const hasSessionTimestamp = Number.isFinite(sessionUpdatedTimestamp);
+  const sessionUpdatedLabel = hasSessionTimestamp
+    ? formatRelativeFromNow(sessionUpdatedTimestamp, now)
+    : "—";
+  const sessionUpdatedTitle = hasSessionTimestamp
+    ? new Date(sessionUpdatedTimestamp).toLocaleString()
+    : undefined;
 
   const cards = [
     {
@@ -151,10 +162,18 @@ export default function StatsRibbon(): JSX.Element {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
           Portfolio Stats
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-slate-700/70 bg-slate-900/70 px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-slate-300">
-            session: {sessionLabel}
-          </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col items-end text-right">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+              SESSION: {sessionLabel}
+            </span>
+            <span
+              className="text-[11px] uppercase tracking-wide text-slate-500"
+              title={sessionUpdatedTitle}
+            >
+              updated {sessionUpdatedLabel}
+            </span>
+          </div>
           {isStale && stalenessLabel ? (
             <span
               className={clsx(

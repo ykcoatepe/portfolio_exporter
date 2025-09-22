@@ -54,10 +54,18 @@ class _LegAccumulator:
 
     def add(self, leg: OptionLegSnapshot) -> None:
         self.quantity += leg.quantity
-        self.delta += leg.delta * leg.quantity * leg.multiplier if leg.delta is not None else ZERO
-        self.gamma += leg.gamma * leg.quantity * leg.multiplier if leg.gamma is not None else ZERO
-        self.theta += leg.theta * leg.quantity * leg.multiplier if leg.theta is not None else ZERO
-        self.vega += leg.vega * leg.quantity * leg.multiplier if leg.vega is not None else ZERO
+        self.delta += (
+            leg.delta * leg.quantity * leg.multiplier if leg.delta is not None else ZERO
+        )
+        self.gamma += (
+            leg.gamma * leg.quantity * leg.multiplier if leg.gamma is not None else ZERO
+        )
+        self.theta += (
+            leg.theta * leg.quantity * leg.multiplier if leg.theta is not None else ZERO
+        )
+        self.vega += (
+            leg.vega * leg.quantity * leg.multiplier if leg.vega is not None else ZERO
+        )
         if leg.mark is not None:
             weight = abs(leg.quantity)
             self.mark_sum += leg.mark * weight
@@ -116,20 +124,32 @@ class ComboGroup:
     vega: Decimal
     mark_source: str
     stale_seconds: int | None
-    leg_accumulators: dict[tuple[str, str, Decimal], _LegAccumulator] = field(default_factory=dict)
+    leg_accumulators: dict[tuple[str, str, Decimal], _LegAccumulator] = field(
+        default_factory=dict
+    )
     display: ComboDisplay | None = None
 
     def to_payload(self) -> dict[str, Any]:
-        net_price = self.net_price_weighted / self.weight_total if self.weight_total else ZERO
+        net_price = (
+            self.net_price_weighted / self.weight_total if self.weight_total else ZERO
+        )
         label_legs = [
             _LabelLeg(right=acc.right, strike=acc.strike, expiry=acc.expiry)
             for acc in self.leg_accumulators.values()
         ]
-        label_text = format_combo_label(self.strategy, label_legs, self.dte_min, net_price, self.underlying)
+        label_text = format_combo_label(
+            self.strategy, label_legs, self.dte_min, net_price, self.underlying
+        )
         short_ul = self.display.short_ul if self.display else self.underlying.upper()
         expiry_short = self.display.expiry_short if self.display else None
         if expiry_short is None:
-            expiry_short = next((format_expiry_short(acc.expiry) for acc in self.leg_accumulators.values()), None)
+            expiry_short = next(
+                (
+                    format_expiry_short(acc.expiry)
+                    for acc in self.leg_accumulators.values()
+                ),
+                None,
+            )
 
         payload = {
             "combo_group_id": self.combo_group_id,
@@ -155,7 +175,9 @@ class ComboGroup:
         }
         legs_payload: list[dict[str, Any]] = []
         for acc in self.leg_accumulators.values():
-            leg_display = build_leg_display(self.underlying, acc.strike, acc.right, acc.expiry)
+            leg_display = build_leg_display(
+                self.underlying, acc.strike, acc.right, acc.expiry
+            )
             legs_payload.append(acc.to_payload(leg_display, self.combo_group_id))
         payload["legs"] = sorted(
             legs_payload,
@@ -214,7 +236,9 @@ def group_option_combos(combos: Sequence[OptionCombo]) -> GroupingResult:
 
         combo_mark_source = _combo_mark_source(combo)
         group.mark_source = _choose_mark_source(group.mark_source, combo_mark_source)
-        group.stale_seconds = _max_staleness(group.stale_seconds, _combo_staleness(combo))
+        group.stale_seconds = _max_staleness(
+            group.stale_seconds, _combo_staleness(combo)
+        )
 
         # Accumulate leg analytics
         for leg in combo.legs:
@@ -229,7 +253,9 @@ def group_option_combos(combos: Sequence[OptionCombo]) -> GroupingResult:
                 )
                 group.leg_accumulators[leg_key] = acc
             acc.add(leg)
-            leg_display = build_leg_display(combo.underlying, leg.strike, leg.right, leg.expiry)
+            leg_display = build_leg_display(
+                combo.underlying, leg.strike, leg.right, leg.expiry
+            )
             leg_extras[leg.leg_id] = {
                 "combo_group_id": group_id,
                 "label": leg_display.leg_label,
@@ -253,11 +279,10 @@ def group_option_combos(combos: Sequence[OptionCombo]) -> GroupingResult:
         }
         group.display = _combine_displays(group.display, combo_display)
 
-    groups_payload = tuple(
-        grouped[group_id]
-        for group_id in sorted(grouped.keys())
+    groups_payload = tuple(grouped[group_id] for group_id in sorted(grouped.keys()))
+    return GroupingResult(
+        groups=groups_payload, combo_extras=combo_extras, leg_extras=leg_extras
     )
-    return GroupingResult(groups=groups_payload, combo_extras=combo_extras, leg_extras=leg_extras)
 
 
 def build_combo_group_id(combo: OptionCombo) -> str:
@@ -287,7 +312,9 @@ def build_leg_display(
     short_ul = underlying.upper()
     expiry_short = format_expiry_short(expiry)
     strike_text = _decimal_to_str(abs(strike))
-    leg_label = f"{short_ul} {strike_text}{_right_code(right)} • {expiry_short or expiry}"
+    leg_label = (
+        f"{short_ul} {strike_text}{_right_code(right)} • {expiry_short or expiry}"
+    )
     return LegDisplay(leg_label=leg_label, short_ul=short_ul, expiry_short=expiry_short)
 
 
@@ -295,7 +322,9 @@ def build_combo_display(combo: OptionCombo, combo_qty: Decimal) -> ComboDisplay:
     short_ul = combo.underlying.upper()
     expiry_short = _combo_expiry_short(combo)
     net_price = combo.net_price
-    label = format_combo_label(combo.strategy, combo.legs, combo.dte, net_price, short_ul)
+    label = format_combo_label(
+        combo.strategy, combo.legs, combo.dte, net_price, short_ul
+    )
     return ComboDisplay(combo_label=label, short_ul=short_ul, expiry_short=expiry_short)
 
 
@@ -307,14 +336,22 @@ def format_combo_label(
     underlying: str,
 ) -> str:
     dte_text = f"{dte}d" if dte >= 0 else "0d"
-    credit_or_debit = "Credit" if net_price > ZERO else "Debit" if net_price < ZERO else "Even"
+    credit_or_debit = (
+        "Credit" if net_price > ZERO else "Debit" if net_price < ZERO else "Even"
+    )
     price_text = f"{abs(float(net_price)):.2f}"
     if strategy == ComboStrategy.VERTICAL:
-        return _format_vertical_label(legs, underlying, dte_text, credit_or_debit, price_text)
+        return _format_vertical_label(
+            legs, underlying, dte_text, credit_or_debit, price_text
+        )
     if strategy == ComboStrategy.IRON_CONDOR:
-        return _format_condor_label(legs, underlying, dte_text, credit_or_debit, price_text)
+        return _format_condor_label(
+            legs, underlying, dte_text, credit_or_debit, price_text
+        )
     if strategy == ComboStrategy.CALENDAR:
-        return _format_calendar_label(legs, underlying, dte_text, credit_or_debit, price_text)
+        return _format_calendar_label(
+            legs, underlying, dte_text, credit_or_debit, price_text
+        )
     if strategy == ComboStrategy.STRADDLE:
         return _format_straddle_label(legs, underlying, dte_text)
     if strategy == ComboStrategy.STRANGLE:
@@ -355,7 +392,11 @@ def _combo_net_quantity(combo: OptionCombo) -> Decimal:
         if fallback_sign is None:
             fallback_sign = Decimal("1") if quantity > ZERO else Decimal("-1")
         magnitude = abs(quantity)
-        fallback_magnitude = magnitude if fallback_magnitude is None else min(fallback_magnitude, magnitude)
+        fallback_magnitude = (
+            magnitude
+            if fallback_magnitude is None
+            else min(fallback_magnitude, magnitude)
+        )
     if fallback_sign is None:
         return ZERO
     if fallback_magnitude is None or fallback_magnitude == ZERO:
@@ -441,11 +482,21 @@ def _format_condor_label(
     credit_or_debit: str,
     price_text: str,
 ) -> str:
-    puts = sorted(_decimal_to_str(abs(leg.strike)) for leg in legs if _right_code(leg.right) == "P")
-    calls = sorted(_decimal_to_str(abs(leg.strike)) for leg in legs if _right_code(leg.right) == "C")
+    puts = sorted(
+        _decimal_to_str(abs(leg.strike))
+        for leg in legs
+        if _right_code(leg.right) == "P"
+    )
+    calls = sorted(
+        _decimal_to_str(abs(leg.strike))
+        for leg in legs
+        if _right_code(leg.right) == "C"
+    )
     left = f"{puts[0]}/{puts[-1]}P" if puts else "P"
     right = f"{calls[0]}/{calls[-1]}C" if calls else "C"
-    return f"{underlying} {left} + {right} • {dte_text} • {credit_or_debit} {price_text}"
+    return (
+        f"{underlying} {left} + {right} • {dte_text} • {credit_or_debit} {price_text}"
+    )
 
 
 def _format_calendar_label(
@@ -456,7 +507,11 @@ def _format_calendar_label(
     price_text: str,
 ) -> str:
     strikes = {abs(leg.strike) for leg in legs}
-    strike_text = _decimal_to_str(next(iter(strikes))) if len(strikes) == 1 else _decimal_to_str(min(strikes))
+    strike_text = (
+        _decimal_to_str(next(iter(strikes)))
+        if len(strikes) == 1
+        else _decimal_to_str(min(strikes))
+    )
     rights = {_right_code(leg.right) for leg in legs}
     right_text = next(iter(rights)) if len(rights) == 1 else "?"
     sorted_months: list[str] = []
@@ -488,15 +543,23 @@ def _format_strangle_label(
     dte_text: str,
 ) -> str:
     call_strike = _decimal_to_str(
-        max((abs(leg.strike) for leg in legs if _right_code(leg.right) == "C"), default=ZERO)
+        max(
+            (abs(leg.strike) for leg in legs if _right_code(leg.right) == "C"),
+            default=ZERO,
+        )
     )
     put_strike = _decimal_to_str(
-        min((abs(leg.strike) for leg in legs if _right_code(leg.right) == "P"), default=ZERO)
+        min(
+            (abs(leg.strike) for leg in legs if _right_code(leg.right) == "P"),
+            default=ZERO,
+        )
     )
     return f"{underlying} {put_strike}P/{call_strike}C • {dte_text}"
 
 
-def _combine_displays(existing: ComboDisplay | None, latest: ComboDisplay) -> ComboDisplay:
+def _combine_displays(
+    existing: ComboDisplay | None, latest: ComboDisplay
+) -> ComboDisplay:
     return latest if existing is None else existing
 
 

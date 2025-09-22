@@ -84,7 +84,9 @@ def get_pref(key: str, default: str | None = None) -> str | None:
 def set_pref(key: str, value: Any) -> None:
     """Set a preference under preferences.* using dot notation and save atomically."""
     data = _load()
-    prefs: dict[str, Any] = data.setdefault("preferences", {}) if isinstance(data, dict) else {}
+    prefs: dict[str, Any] = (
+        data.setdefault("preferences", {}) if isinstance(data, dict) else {}
+    )
     node: dict[str, Any] = prefs
     parts = key.split(".")
     for part in parts[:-1]:

@@ -88,7 +88,9 @@ def load_minute_bars(symbol: str, artifact_dirs: Iterable[str]) -> list[dict[str
                             try:
                                 out.append(
                                     {
-                                        "ts": row.get("ts") or row.get("timestamp") or row.get("time"),
+                                        "ts": row.get("ts")
+                                        or row.get("timestamp")
+                                        or row.get("time"),
                                         "open": float(row.get("open", 0) or 0),
                                         "high": float(row.get("high", 0) or 0),
                                         "low": float(row.get("low", 0) or 0),
@@ -128,7 +130,9 @@ def load_option_chain(symbol: str, search_dirs: Iterable[str]) -> list[ChainRow]
     return []
 
 
-def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1 with artifacts
+def enrich_inplace(
+    _rows: list[ScanRow], _cfg: dict[str, object]
+) -> None:  # v1 with artifacts
     cfg: dict[str, Any] = dict(_cfg)  # shallow copy only for typing
     data = cfg.get("data", {})
     mode = data.get("mode", "csv-only")
@@ -137,7 +141,9 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
     cache_dir = None
     try:
         cache_dir = (
-            (data.get("cache", {}) or {}).get("dir") if isinstance(data.get("cache", {}), dict) else None
+            (data.get("cache", {}) or {}).get("dir")
+            if isinstance(data.get("cache", {}), dict)
+            else None
         )
     except Exception:
         cache_dir = None
@@ -163,7 +169,7 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
             setattr(row, name, value)
             prov = getattr(row, "_provenance", None) or {}
             prov[src_key] = src
-            setattr(row, "_provenance", prov)
+            row._provenance = prov
 
     def try_ib(sym: str) -> dict[str, Any]:
         try:
@@ -208,7 +214,7 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
             return {"available": None, "fee_rate": None}
 
     for row in _rows:
-        sym = getattr(row, "symbol").upper()
+        sym = row.symbol.upper()
         errors: list[str] = []
         prov = getattr(row, "_provenance", None) or {}
 
@@ -220,14 +226,30 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
                 q = try_ib(sym)
                 if q:
                     set_field(row, "last_price", q.get("last"), "src_last", "ib")
-                    set_field(row, "prev_close", q.get("prev_close"), "src_prev_close", "ib")
+                    set_field(
+                        row, "prev_close", q.get("prev_close"), "src_prev_close", "ib"
+                    )
             if p == "yahoo" and not ysum:
                 ysum = try_yf_summary(sym)
                 if ysum:
-                    if getattr(row, "last_price", None) in (None, "") and ysum.get("last") is not None:
-                        set_field(row, "last_price", ysum.get("last"), "src_last", "yahoo")
-                    if getattr(row, "prev_close", None) in (None, "") and ysum.get("prev_close") is not None:
-                        set_field(row, "prev_close", ysum.get("prev_close"), "src_prev_close", "yahoo")
+                    if (
+                        getattr(row, "last_price", None) in (None, "")
+                        and ysum.get("last") is not None
+                    ):
+                        set_field(
+                            row, "last_price", ysum.get("last"), "src_last", "yahoo"
+                        )
+                    if (
+                        getattr(row, "prev_close", None) in (None, "")
+                        and ysum.get("prev_close") is not None
+                    ):
+                        set_field(
+                            row,
+                            "prev_close",
+                            ysum.get("prev_close"),
+                            "src_prev_close",
+                            "yahoo",
+                        )
 
         # Premarket gap
         if getattr(row, "premkt_gap_pct", None) in (None, ""):
@@ -283,16 +305,32 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
                 last_close = float(bars[-1].get("close", 0.0))
                 if getattr(row, "last_price", None) in (None, "") and last_close > 0:
                     set_field(
-                        row, "last_price", last_close, "src_last", bars_src or prov.get("src_last", "yahoo")
+                        row,
+                        "last_price",
+                        last_close,
+                        "src_last",
+                        bars_src or prov.get("src_last", "yahoo"),
                     )
             except Exception:
                 pass
 
             # Fill computed fields
             if patt.get("rvol_1m"):
-                set_field(row, "rvol_1m", float(patt["rvol_1m"]), "src_rvol", bars_src or "yahoo")
+                set_field(
+                    row,
+                    "rvol_1m",
+                    float(patt["rvol_1m"]),
+                    "src_rvol",
+                    bars_src or "yahoo",
+                )
             if patt.get("rvol_5m"):
-                set_field(row, "rvol_5m", float(patt["rvol_5m"]), "src_rvol5", bars_src or "yahoo")
+                set_field(
+                    row,
+                    "rvol_5m",
+                    float(patt["rvol_5m"]),
+                    "src_rvol5",
+                    bars_src or "yahoo",
+                )
             if patt.get("vwap") is not None:
                 set_field(
                     row,
@@ -319,7 +357,11 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
                 )
             if patt.get("above_vwap_now"):
                 set_field(
-                    row, "above_vwap_now", patt["above_vwap_now"], "src_above_vwap", bars_src or "yahoo"
+                    row,
+                    "above_vwap_now",
+                    patt["above_vwap_now"],
+                    "src_above_vwap",
+                    bars_src or "yahoo",
                 )
             if patt.get("vwap_distance_pct") is not None:
                 set_field(
@@ -331,7 +373,11 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
                 )
             if patt.get("pattern_signal") is not None:
                 set_field(
-                    row, "pattern_signal", str(patt["pattern_signal"]), "src_pattern", bars_src or "yahoo"
+                    row,
+                    "pattern_signal",
+                    str(patt["pattern_signal"]),
+                    "src_pattern",
+                    bars_src or "yahoo",
                 )
         else:
             errors.append("bars_missing")
@@ -349,16 +395,30 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
                 set_field(row, "adv_usd_millions", adv, "src_adv", "yahoo")
             spf = ysum.get("short_percent_float")
             if spf is not None:
-                set_field(row, "short_interest_pct", float(spf), "src_short_interest", "yahoo")
+                set_field(
+                    row, "short_interest_pct", float(spf), "src_short_interest", "yahoo"
+                )
 
         # Shortable
         if "ib" in providers and not offline:
             sdat = try_ib_shortable(sym)
             if sdat:
                 if sdat.get("available") is not None:
-                    set_field(row, "borrow_available", sdat.get("available"), "src_borrow", "ib")
+                    set_field(
+                        row,
+                        "borrow_available",
+                        sdat.get("available"),
+                        "src_borrow",
+                        "ib",
+                    )
                 if sdat.get("fee_rate") is not None:
-                    set_field(row, "borrow_rate_pct", sdat.get("fee_rate"), "src_borrow_rate", "ib")
+                    set_field(
+                        row,
+                        "borrow_rate_pct",
+                        sdat.get("fee_rate"),
+                        "src_borrow_rate",
+                        "ib",
+                    )
 
         # Option chains → optionable + near money stats (artifacts → auto‑producers → providers)
         chain: list[dict[str, Any]] = []
@@ -422,7 +482,7 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
                     )
             # Expose fetched chain rows to downstream consumers (e.g., structure picker)
             try:
-                setattr(row, "_chain_rows", chain)
+                row._chain_rows = chain
             except Exception:
                 pass
         else:
@@ -430,16 +490,18 @@ def enrich_inplace(_rows: list[ScanRow], _cfg: dict[str, object]) -> None:  # v1
 
         # Halts
         if halts:
-            set_field(row, "halts_count_today", int(halts.get(sym, 0)), "src_halts", "nasdaq")
+            set_field(
+                row, "halts_count_today", int(halts.get(sym, 0)), "src_halts", "nasdaq"
+            )
 
         if errors:
             uniq_errors = []
             for err in errors:
                 if err not in uniq_errors:
                     uniq_errors.append(err)
-            setattr(row, "_data_errors", uniq_errors)
+            row._data_errors = uniq_errors
         if prov:
-            setattr(row, "_provenance", {**prov, **getattr(row, "_provenance", {})})
+            row._provenance = {**prov, **getattr(row, "_provenance", {})}
 
     return None
 
@@ -454,7 +516,9 @@ def near_money_stats(
     for r in chain_rows:
         # support both dataclass and plain dict rows without evaluating defaults eagerly
         strike = float(
-            getattr(r, "strike", float(r["strike"])) if isinstance(r, dict) else getattr(r, "strike", 0.0)
+            getattr(r, "strike", float(r["strike"]))
+            if isinstance(r, dict)
+            else getattr(r, "strike", 0.0)
         )  # type: ignore[index]
         if lo <= strike <= hi:
             if isinstance(r, dict):

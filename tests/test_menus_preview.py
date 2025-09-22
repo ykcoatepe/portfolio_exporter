@@ -6,7 +6,9 @@ import types
 import main
 
 # stub optional dependencies for import-time side effects
-sys.modules.setdefault("prompt_toolkit", types.SimpleNamespace(prompt=lambda *a, **k: ""))
+sys.modules.setdefault(
+    "prompt_toolkit", types.SimpleNamespace(prompt=lambda *a, **k: "")
+)
 sys.modules.setdefault("dateparser", types.SimpleNamespace(parse=lambda *a, **k: None))
 sys.modules.setdefault(
     "ib_insync",

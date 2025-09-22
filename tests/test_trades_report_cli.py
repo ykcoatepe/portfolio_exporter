@@ -2,6 +2,7 @@ import json
 import subprocess
 import sys
 
+
 def _make_exec_csv(tmp_path):
     path = tmp_path / "exec.csv"
     path.write_text(

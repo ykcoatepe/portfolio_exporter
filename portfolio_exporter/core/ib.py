@@ -33,7 +33,11 @@ def _ib():
         from ib_insync import IB  # type: ignore
     except Exception:
         IB = None  # type: ignore
-    if _ib_singleton and hasattr(_ib_singleton, "isConnected") and _ib_singleton.isConnected():
+    if (
+        _ib_singleton
+        and hasattr(_ib_singleton, "isConnected")
+        and _ib_singleton.isConnected()
+    ):
         return _ib_singleton
     if IB is None:
         return None
@@ -41,7 +45,9 @@ def _ib():
 
     async def _try_connect():
         try:
-            await _ib_singleton.connectAsync(_IB_HOST, _IB_PORT, clientId=_IB_CID, timeout=2)
+            await _ib_singleton.connectAsync(
+                _IB_HOST, _IB_PORT, clientId=_IB_CID, timeout=2
+            )
         except Exception:
             pass
 
@@ -85,7 +91,11 @@ def quote_stock(symbol: str) -> dict[str, Any]:
     except Exception:
         yf = None  # type: ignore
     yf_tkr = yf.Ticker(symbol) if yf else None
-    price = yf_tkr.history(period="1d")["Close"].iloc[-1] if yf_tkr is not None else float("nan")
+    price = (
+        yf_tkr.history(period="1d")["Close"].iloc[-1]
+        if yf_tkr is not None
+        else float("nan")
+    )
     return {"mid": price, "bid": price, "ask": price}
 
 
@@ -109,7 +119,11 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> dict[st
         except Exception:
             Option = None  # type: ignore
         # IB expects yyyymmdd string for lastTradeDateOrContractMonth
-        opt = Option(symbol, expiry.replace("-", ""), strike, right, "SMART", "USD") if Option else None
+        opt = (
+            Option(symbol, expiry.replace("-", ""), strike, right, "SMART", "USD")
+            if Option
+            else None
+        )
         ticker = ib.reqMktData(opt, "", snapshot=True) if opt else None
         ib.sleep(0.3)
         mid = (
@@ -141,7 +155,11 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> dict[st
         yf = None  # type: ignore
     yf_tkr = yf.Ticker(symbol) if yf else None
     chain = yf_tkr.option_chain(expiry) if yf_tkr is not None else None
-    tbl = chain.calls if (chain is not None and right == "C") else (chain.puts if chain is not None else None)
+    tbl = (
+        chain.calls
+        if (chain is not None and right == "C")
+        else (chain.puts if chain is not None else None)
+    )
     row = tbl.loc[tbl["strike"] == strike] if tbl is not None else None
     if row.empty:
         raise ValueError("Strike not found in yfinance chain")
@@ -160,7 +178,10 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> dict[st
         "iv": iv,
     }
     if (
-        (q["delta"] is None or (isinstance(q["delta"], float) and math.isnan(q["delta"])))
+        (
+            q["delta"] is None
+            or (isinstance(q["delta"], float) and math.isnan(q["delta"]))
+        )
         and iv
         and not math.isnan(iv)
     ):
@@ -169,7 +190,9 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> dict[st
         from portfolio_exporter.core.greeks import bs_greeks
 
         hist = yf_tkr.history(period="1d") if yf_tkr is not None else None
-        spot = hist["Close"].iloc[-1] if (hist is not None and not hist.empty) else strike
+        spot = (
+            hist["Close"].iloc[-1] if (hist is not None and not hist.empty) else strike
+        )
         expiry_dt = date.fromisoformat(expiry)
         t = (expiry_dt - date.today()).days / 365
         mult = 100

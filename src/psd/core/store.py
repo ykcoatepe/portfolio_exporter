@@ -101,7 +101,9 @@ def init() -> None:
             """
         )
         conn.commit()
-    raw_pages = os.getenv("PSD_WAL_AUTOCHECKPOINT", str(_DEFAULT_AUTOCHECKPOINT_PAGES)).strip()
+    raw_pages = os.getenv(
+        "PSD_WAL_AUTOCHECKPOINT", str(_DEFAULT_AUTOCHECKPOINT_PAGES)
+    ).strip()
     try:
         pages = int(raw_pages) if raw_pages else _DEFAULT_AUTOCHECKPOINT_PAGES
     except ValueError:
@@ -112,7 +114,9 @@ def init() -> None:
 def latest_snapshot() -> dict[str, Any] | None:
     """Return the most recent snapshot payload, if any."""
     with _connect() as conn:
-        row = conn.execute("SELECT data FROM snapshots ORDER BY id DESC LIMIT 1").fetchone()
+        row = conn.execute(
+            "SELECT data FROM snapshots ORDER BY id DESC LIMIT 1"
+        ).fetchone()
     if row is None:
         return None
     return json.loads(row["data"])
@@ -211,7 +215,9 @@ def append_event(kind: str, payload: dict[str, Any]) -> int:
     return int(event_id)
 
 
-def tail_events(last_id: int = 0, limit: int = 200) -> list[tuple[int, str, dict[str, Any]]]:
+def tail_events(
+    last_id: int = 0, limit: int = 200
+) -> list[tuple[int, str, dict[str, Any]]]:
     """Return events newer than ``last_id`` up to ``limit`` rows."""
     with _connect() as conn:
         rows: Iterable[sqlite3.Row] = conn.execute(
@@ -224,7 +230,9 @@ def tail_events(last_id: int = 0, limit: int = 200) -> list[tuple[int, str, dict
             """,
             (last_id, limit),
         )
-        result = [(int(row["id"]), row["kind"], json.loads(row["payload"])) for row in rows]
+        result = [
+            (int(row["id"]), row["kind"], json.loads(row["payload"])) for row in rows
+        ]
     return result
 
 

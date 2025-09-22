@@ -13,20 +13,22 @@ def _run(args):
 
 
 def test_bull_put_preset():
-    data = _run([
-        "--preset",
-        "bull_put",
-        "--symbol",
-        "XYZ",
-        "--expiry",
-        "2025-01-17",
-        "--qty",
-        "1",
-        "--width",
-        "5",
-        "--json",
-        "--no-files",
-    ])
+    data = _run(
+        [
+            "--preset",
+            "bull_put",
+            "--symbol",
+            "XYZ",
+            "--expiry",
+            "2025-01-17",
+            "--qty",
+            "1",
+            "--width",
+            "5",
+            "--json",
+            "--no-files",
+        ]
+    )
     assert data["ok"] is True
     assert data.get("ticket")
     rs = data.get("risk_summary")
@@ -34,20 +36,22 @@ def test_bull_put_preset():
 
 
 def test_iron_condor_preset():
-    data = _run([
-        "--preset",
-        "iron_condor",
-        "--symbol",
-        "XYZ",
-        "--expiry",
-        "2025-01-17",
-        "--qty",
-        "1",
-        "--wings",
-        "5",
-        "--json",
-        "--no-files",
-    ])
+    data = _run(
+        [
+            "--preset",
+            "iron_condor",
+            "--symbol",
+            "XYZ",
+            "--expiry",
+            "2025-01-17",
+            "--qty",
+            "1",
+            "--wings",
+            "5",
+            "--json",
+            "--no-files",
+        ]
+    )
     assert data["ok"] is True
     assert data.get("ticket")
     rs = data.get("risk_summary")
@@ -55,18 +59,20 @@ def test_iron_condor_preset():
 
 
 def test_calendar_preset():
-    data = _run([
-        "--preset",
-        "calendar",
-        "--symbol",
-        "XYZ",
-        "--expiry",
-        "2025-02-14",
-        "--qty",
-        "1",
-        "--json",
-        "--no-files",
-    ])
+    data = _run(
+        [
+            "--preset",
+            "calendar",
+            "--symbol",
+            "XYZ",
+            "--expiry",
+            "2025-02-14",
+            "--qty",
+            "1",
+            "--json",
+            "--no-files",
+        ]
+    )
     assert data["ok"] is True
     assert data.get("ticket")
     assert "risk_summary" not in data or data.get("risk_summary") is not None

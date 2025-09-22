@@ -537,6 +537,15 @@ export const buildStatsResponse = (
   overrides: Partial<PortfolioStatsApiResponse> = {},
 ): PortfolioStatsApiResponse => {
   const nowIso = new Date().toISOString();
+  const baseSession: PortfolioStatsApiResponse["session"] = {
+    exchange: "XNYS",
+    tz: "America/New_York",
+    state: "RTH",
+    as_of: nowIso,
+    source: "fallback",
+    rth_open: nowIso,
+    rth_close: nowIso,
+  };
   const base: PortfolioStatsApiResponse = {
     equity_count: 24,
     option_legs_count: 68,
@@ -546,7 +555,15 @@ export const buildStatsResponse = (
     var95_1d_pct: 58_320.12,
     margin_used_pct: 0.37,
     updated_at: nowIso,
+    session: baseSession,
   };
+
+  const sessionOverride =
+    overrides.session !== undefined
+      ? overrides.session
+      : overrides.session_info !== undefined
+        ? overrides.session_info
+        : undefined;
 
   return {
     equity_count: overrides.equity_count ?? base.equity_count,
@@ -560,6 +577,7 @@ export const buildStatsResponse = (
       overrides.margin_used_pct ?? overrides.margin_pct ?? overrides.marginPct ?? base.margin_used_pct,
     margin_pct: overrides.margin_pct ?? overrides.marginPct ?? base.margin_used_pct,
     updated_at: overrides.updated_at ?? overrides.updatedAt ?? base.updated_at,
+    session: sessionOverride !== undefined ? sessionOverride : base.session,
   };
 };
 
@@ -657,6 +675,18 @@ export const buildPsdSnapshot = (overrides: Partial<PSDSnapshot> = {}): PSDSnaps
   return {
     ts: overrides.ts ?? now,
     session: (overrides.session as PSDSnapshot["session"]) ?? "RTH",
+    session_info:
+      overrides.session_info ??
+      ({
+        exchange: "XNYS",
+        tz: "America/New_York",
+        state: "RTH",
+        asOf: new Date(now).toISOString(),
+        rthOpen: null,
+        rthClose: null,
+        source: "fallback",
+        note: null,
+      } satisfies PSDSnapshot["session_info"]),
     positions: overrides.positions ?? [],
     quotes: overrides.quotes ?? {},
     risk: overrides.risk ?? {},

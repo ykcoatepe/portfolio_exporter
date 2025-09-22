@@ -34,7 +34,9 @@ def _append_logbook(md: str) -> None:
 def cmd_add(args: argparse.Namespace) -> int:
     now = datetime.now(UTC).astimezone().isoformat(timespec="seconds")
     files = [s.strip() for s in (args.files or "").split(",") if s.strip()]
-    interfaces_raw = [s.strip() for s in (args.interfaces or "").split(",") if s.strip()]
+    interfaces_raw = [
+        s.strip() for s in (args.interfaces or "").split(",") if s.strip()
+    ]
     interfaces: dict[str, str] = {}
     for kv in interfaces_raw:
         if ":" in kv:
@@ -91,11 +93,15 @@ def logbook_on_success(
     if str(os.getenv("LOGBOOK_AUTO", "")).lower() not in ("1", "true", "yes"):
         return
     try:
-        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
+        ).strip()
     except Exception:
         branch = ""
     try:
-        commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], text=True
+        ).strip()
     except Exception:
         commit = ""
     files_str = ",".join(files or [])

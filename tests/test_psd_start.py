@@ -15,10 +15,13 @@ def test_psd_start_opens_browser_and_broadcasts(monkeypatch: Any) -> None:
     # Force server.start to return a fixed host/port immediately
     import src.psd.web.server as web_server
 
-    def fake_start(host: str = "127.0.0.1", port: int = 0, *, background: bool = True) -> tuple[str, int]:
+    def fake_start(
+        host: str = "127.0.0.1", port: int = 0, *, background: bool = True
+    ) -> tuple[str, int]:
         return host, 8123
 
     monkeypatch.setattr(web_server, "start", fake_start)
+    monkeypatch.setattr("psd.web.server.start", fake_start, raising=False)
 
     # Probe: first 2 tries empty, then non-empty
     import src.psd.datasources.ibkr as ibkr
@@ -41,6 +44,7 @@ def test_psd_start_opens_browser_and_broadcasts(monkeypatch: Any) -> None:
         captured.append(dto)
 
     monkeypatch.setattr(web_server, "broadcast", fake_broadcast)
+    monkeypatch.setattr("psd.web.server.broadcast", fake_broadcast, raising=False)
 
     from psd.runner import start_psd
 

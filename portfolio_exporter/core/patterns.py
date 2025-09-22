@@ -80,7 +80,9 @@ def compute_patterns(bars: list[dict[str, Any]]) -> dict[str, Any]:
     lod = min(_safe_float(b.get("low", b.get("close", 0.0))) for b in bars)
 
     last_close = _safe_float(bars[-1].get("close", 0.0))
-    prev_close = _safe_float(bars[-2].get("close", last_close)) if len(bars) >= 2 else last_close
+    prev_close = (
+        _safe_float(bars[-2].get("close", last_close)) if len(bars) >= 2 else last_close
+    )
 
     # Above VWAP now + distance
     if isinstance(vwap, (int, float)) and vwap and vwap > 0:
@@ -94,7 +96,9 @@ def compute_patterns(bars: list[dict[str, Any]]) -> dict[str, Any]:
     # ORB break / retest logic (highest priority)
     if isinstance(out.get("orb_high"), (int, float)) and out["orb_high"]:
         orb_high = float(out["orb_high"])  # type: ignore[assignment]
-        broke_orb_before = any(_safe_float(b.get("close", 0.0)) > orb_high for b in bars[:-1])
+        broke_orb_before = any(
+            _safe_float(b.get("close", 0.0)) > orb_high for b in bars[:-1]
+        )
         near_retest = abs(prev_close - orb_high) / orb_high <= 0.0015
         if last_close > orb_high and broke_orb_before and near_retest:
             patt = "ORB Retest"
@@ -106,10 +110,16 @@ def compute_patterns(bars: list[dict[str, Any]]) -> dict[str, Any]:
         vwap_f = float(vwap)
         n = min(5, len(bars))
         first_n = bars[:n]
-        below_cnt = sum(1 for b in first_n if _safe_float(b.get("close", 0.0)) < vwap_f * (1.0 - eps))
+        below_cnt = sum(
+            1
+            for b in first_n
+            if _safe_float(b.get("close", 0.0)) < vwap_f * (1.0 - eps)
+        )
         mostly_below = below_cnt >= max(1, int(0.6 * n))
         rising_tail = len(bars) >= 3 and (
-            _safe_float(bars[-3].get("close")) < _safe_float(bars[-2].get("close")) < last_close
+            _safe_float(bars[-3].get("close"))
+            < _safe_float(bars[-2].get("close"))
+            < last_close
         )
         if mostly_below and last_close >= vwap_f * (1.0 - eps) and rising_tail:
             patt = "VWAP Reclaim"
@@ -122,8 +132,16 @@ def compute_patterns(bars: list[dict[str, Any]]) -> dict[str, Any]:
         window = bars[max(0, len(bars) - 6) : -1] if len(bars) > 1 else []
         if not window:
             window = bars[:-1]
-        prior_hod = max(_safe_float(b.get("high", b.get("close", 0.0))) for b in window) if window else hod
-        prior_lod = min(_safe_float(b.get("low", b.get("close", 0.0))) for b in window) if window else lod
+        prior_hod = (
+            max(_safe_float(b.get("high", b.get("close", 0.0))) for b in window)
+            if window
+            else hod
+        )
+        prior_lod = (
+            min(_safe_float(b.get("low", b.get("close", 0.0))) for b in window)
+            if window
+            else lod
+        )
         if last_close > prior_hod * (1.0 + eps):
             patt = "HOD Reclaim"
         elif last_close < prior_lod * (1.0 - eps):

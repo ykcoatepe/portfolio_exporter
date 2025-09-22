@@ -111,7 +111,10 @@ def test_leg_staleness_triggers_multiple_rules() -> None:
 
     result = evaluate_rules(rules, rows, as_of=_ts())
 
-    assert {breach.rule_id for breach in result.breaches} == {"leg_warning", "leg_critical"}
+    assert {breach.rule_id for breach in result.breaches} == {
+        "leg_warning",
+        "leg_critical",
+    }
 
 
 def test_expression_rejects_dangerous_strings() -> None:

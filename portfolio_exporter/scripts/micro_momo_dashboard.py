@@ -20,7 +20,9 @@ CSS = (
 
 
 def _count_post_halt(triggers: list[dict[str, Any]]) -> int:
-    return sum(1 for r in triggers if (str(r.get("event_type") or "").lower() == "post_halt"))
+    return sum(
+        1 for r in triggers if (str(r.get("event_type") or "").lower() == "post_halt")
+    )
 
 
 def _count_tiers(rows: list[dict[str, Any]]) -> dict[str, int]:
@@ -32,7 +34,9 @@ def _count_tiers(rows: list[dict[str, Any]]) -> dict[str, int]:
     return out
 
 
-def _count_provenance(rows: list[dict[str, Any]], field: str = "src_vwap") -> dict[str, int]:
+def _count_provenance(
+    rows: list[dict[str, Any]], field: str = "src_vwap"
+) -> dict[str, int]:
     out: dict[str, int] = {"artifact": 0, "yahoo": 0, "csv": 0, "": 0}
     for r in rows:
         v = (r.get(field) or "").strip().lower()
@@ -84,7 +88,9 @@ def _summary_block(scored: list[dict[str, Any]]) -> str:
         "</div>",
     ]
     if errors:
-        err_bits = " · ".join(f"{html.escape(k)} {v}" for k, v in sorted(errors.items()))
+        err_bits = " · ".join(
+            f"{html.escape(k)} {v}" for k, v in sorted(errors.items())
+        )
         html_parts.append(f"<div class='small'>Data issues: {err_bits}</div>")
     warn_warmup = any(
         "warming up" in str(r.get("entry_trigger", "")).lower()
@@ -146,7 +152,9 @@ def _section(title: str, rows: list[dict[str, Any]], anchor: str) -> str:
         for c in cols:
             val = r.get(c, "")
             if c == "tier" and val:
-                tds.append(f"<td><span class='badge {html.escape(val)}'>{html.escape(val)}</span></td>")
+                tds.append(
+                    f"<td><span class='badge {html.escape(val)}'>{html.escape(val)}</span></td>"
+                )
             else:
                 tds.append(f"<td>{html.escape(str(val))}</td>")
         body_rows.append("<tr>" + "".join(tds) + "</tr>")
@@ -168,11 +176,17 @@ def main(argv: list[str] | None = None) -> int:
     eod = _read_csv(out / "micro_momo_eod_summary.csv")
     triggers = _read_csv(out / "micro_momo_triggers_log.csv")
 
-    summary = _summary_block(scored) if scored else "<div class='small'>No scored rows to summarize.</div>"
+    summary = (
+        _summary_block(scored)
+        if scored
+        else "<div class='small'>No scored rows to summarize.</div>"
+    )
     # Add post-halt re-arm count when trigger log present
     try:
         post_halt_n = _count_post_halt(triggers)
-        summary += f"<div class='small'>Post-halt re-arms used: <kbd>{post_halt_n}</kbd></div>"
+        summary += (
+            f"<div class='small'>Post-halt re-arms used: <kbd>{post_halt_n}</kbd></div>"
+        )
     except Exception:
         pass
 

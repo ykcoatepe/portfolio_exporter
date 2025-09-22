@@ -9,9 +9,7 @@ def _parsers():
         if modinfo.ispkg:
             continue
         try:
-            module = importlib.import_module(
-                f"{scripts_pkg.__name__}.{modinfo.name}"
-            )
+            module = importlib.import_module(f"{scripts_pkg.__name__}.{modinfo.name}")
         except Exception:
             continue
         if hasattr(module, "get_arg_parser"):

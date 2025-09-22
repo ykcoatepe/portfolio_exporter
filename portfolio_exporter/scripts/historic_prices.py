@@ -48,17 +48,24 @@ IB_CID = _cid("historic_prices", default=3)  # separate clientId for historic pu
 EXTRA_TICKERS = ["SPY", "QQQ", "IWM", "^VIX", "DX-Y.NYB"]  # core indices
 PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}
 
+_EVENT_LOOP: asyncio.AbstractEventLoop | None = None
+
 
 def _ensure_event_loop() -> asyncio.AbstractEventLoop:
     """Ensure ib_insync has an event loop ready before initiating any async connect."""
+    global _EVENT_LOOP
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        if _EVENT_LOOP is None or _EVENT_LOOP.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+        asyncio.set_event_loop(_EVENT_LOOP)
+        loop = _EVENT_LOOP
+    else:
+        if loop.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+            asyncio.set_event_loop(_EVENT_LOOP)
+            loop = _EVENT_LOOP
     return loop
 
 
@@ -77,7 +84,9 @@ def _tickers_from_ib() -> list[str]:
     if not positions:
         return []
     # extract underlying symbol for stocks only
-    tickers = {p.contract.symbol.upper() for p in positions if p.contract.secType == "STK"}
+    tickers = {
+        p.contract.symbol.upper() for p in positions if p.contract.secType == "STK"
+    }
     return sorted(tickers)
 
 
@@ -103,7 +112,8 @@ def load_tickers() -> list[str]:
 
     # 2) fallback to file
     candidates = [
-        os.path.join(os.path.expanduser(settings.output_dir), name) for name in PORTFOLIO_FILES
+        os.path.join(os.path.expanduser(settings.output_dir), name)
+        for name in PORTFOLIO_FILES
     ] + PORTFOLIO_FILES
     path = next((p for p in candidates if os.path.exists(p)), None)
     user_tickers = []
@@ -175,7 +185,9 @@ def save_to_csv(df: pd.DataFrame):
 
 
 def save_to_excel(df: pd.DataFrame, path: str) -> None:
-    with pd.ExcelWriter(path, engine="xlsxwriter", datetime_format="yyyy-mm-dd") as writer:
+    with pd.ExcelWriter(
+        path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
+    ) as writer:
         df.to_excel(
             writer,
             sheet_name="Prices",

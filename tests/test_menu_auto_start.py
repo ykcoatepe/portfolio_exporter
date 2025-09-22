@@ -31,7 +31,9 @@ def test_menu_auto_start_called_once(monkeypatch: Any) -> None:
     assert calls == {"start": 1, "open": 1}
 
 
-def test_start_psd_dashboard_raises_when_process_exits(monkeypatch: Any, tmp_path: Any) -> None:
+def test_start_psd_dashboard_raises_when_process_exits(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
     import portfolio_exporter.menus.psd as psd_menu
 
     dist_path = tmp_path / "dist" / "index.html"

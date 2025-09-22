@@ -13,9 +13,17 @@ def _bs_delta(S, K, T, r, sigma, call=True):
     return norm_cdf(d1) if call else norm_cdf(d1) - 1.0
 
 
-def bs_greeks(S: float, K: float, T: float, r: float, sigma: float, call: bool = True) -> dict[str, float]:
+def bs_greeks(
+    S: float, K: float, T: float, r: float, sigma: float, call: bool = True
+) -> dict[str, float]:
     """Closed-form Black–Scholes Greeks per contract."""
-    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0 or any(map(math.isnan, (S, K, T, sigma))):
+    if (
+        S <= 0
+        or K <= 0
+        or T <= 0
+        or sigma <= 0
+        or any(map(math.isnan, (S, K, T, sigma)))
+    ):
         return dict(delta=math.nan, gamma=math.nan, vega=math.nan, theta=math.nan)
 
     d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
@@ -24,10 +32,16 @@ def bs_greeks(S: float, K: float, T: float, r: float, sigma: float, call: bool =
 
     if call:
         delta = norm_cdf(d1)
-        theta = (-S * pdf_d1 * sigma / (2 * math.sqrt(T)) - r * K * math.exp(-r * T) * norm_cdf(d2)) / 365.0
+        theta = (
+            -S * pdf_d1 * sigma / (2 * math.sqrt(T))
+            - r * K * math.exp(-r * T) * norm_cdf(d2)
+        ) / 365.0
     else:
         delta = norm_cdf(d1) - 1.0
-        theta = (-S * pdf_d1 * sigma / (2 * math.sqrt(T)) + r * K * math.exp(-r * T) * norm_cdf(-d2)) / 365.0
+        theta = (
+            -S * pdf_d1 * sigma / (2 * math.sqrt(T))
+            + r * K * math.exp(-r * T) * norm_cdf(-d2)
+        ) / 365.0
 
     gamma = pdf_d1 / (S * sigma * math.sqrt(T))
     vega = S * pdf_d1 * math.sqrt(T) / 100.0

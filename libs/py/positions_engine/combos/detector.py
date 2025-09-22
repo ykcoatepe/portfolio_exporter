@@ -189,8 +189,12 @@ def build_option_leg_snapshot(
 
     mark_result = select_equity_mark(quote, now, mark_settings)
     pnl = option_leg_pnl(position, mark_result.mark, normalized.previous_close)
-    day_basis = _day_basis(position.quantity, position.instrument.multiplier, normalized.previous_close)
-    total_basis = _total_basis(position.avg_cost, position.quantity, position.instrument.multiplier)
+    day_basis = _day_basis(
+        position.quantity, position.instrument.multiplier, normalized.previous_close
+    )
+    total_basis = _total_basis(
+        position.avg_cost, position.quantity, position.instrument.multiplier
+    )
 
     leg_id = _leg_hash(
         normalized.account,
@@ -256,16 +260,24 @@ def detect_option_combos(legs: Sequence[OptionLegSnapshot]) -> ComboDetection:
         remaining_ids.difference_update(consumed)
 
     detection_ms = (perf_counter() - start) * 1000.0
-    orphans = tuple(sorted((leg for leg in legs if leg.leg_id in remaining_ids), key=_leg_sort_key))
-    combos_sorted = tuple(sorted(combos, key=lambda combo: (combo.underlying, combo.dte, combo.combo_id)))
-    return ComboDetection(combos=combos_sorted, orphans=orphans, detection_ms=detection_ms)
+    orphans = tuple(
+        sorted((leg for leg in legs if leg.leg_id in remaining_ids), key=_leg_sort_key)
+    )
+    combos_sorted = tuple(
+        sorted(combos, key=lambda combo: (combo.underlying, combo.dte, combo.combo_id))
+    )
+    return ComboDetection(
+        combos=combos_sorted, orphans=orphans, detection_ms=detection_ms
+    )
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 
 
-def _normalize_option_metadata(position: Position, now: datetime) -> _NormalizedMetadata | None:
+def _normalize_option_metadata(
+    position: Position, now: datetime
+) -> _NormalizedMetadata | None:
     metadata = position.metadata or {}
     account = str(metadata.get("account") or "UNKNOWN").strip() or "UNKNOWN"
 
@@ -370,7 +382,9 @@ def _group_feed_combos(
         if len({leg.underlying for leg in bucket}) != 1:
             continue
         strategy = _classify_strategy(bucket)
-        combo = _build_combo(account, bucket[0].underlying, bucket, strategy, notes=("feed_group",))
+        combo = _build_combo(
+            account, bucket[0].underlying, bucket, strategy, notes=("feed_group",)
+        )
         combos.append(combo)
         used.update(leg.leg_id for leg in bucket)
     return combos, used
@@ -382,7 +396,9 @@ def _match_condors_and_butterflies(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry))
+    buckets = _group_by(
+        legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry)
+    )
     for (account, underlying, _expiry), bucket in buckets.items():
         if len(bucket) != 4:
             continue
@@ -401,7 +417,11 @@ def _match_verticals(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry, leg.right))
+    buckets = _group_by(
+        legs,
+        remaining_ids,
+        lambda leg: (leg.account, leg.underlying, leg.expiry, leg.right),
+    )
     for (account, underlying, _expiry, _right), bucket in buckets.items():
         if len(bucket) < 2:
             continue
@@ -420,7 +440,11 @@ def _match_calendars(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.right, leg.strike))
+    buckets = _group_by(
+        legs,
+        remaining_ids,
+        lambda leg: (leg.account, leg.underlying, leg.right, leg.strike),
+    )
     for (account, underlying, _right, _strike), bucket in buckets.items():
         if len(bucket) < 2:
             continue
@@ -439,14 +463,20 @@ def _match_straddles_and_strangles(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry))
+    buckets = _group_by(
+        legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry)
+    )
     for (account, underlying, _expiry), bucket in buckets.items():
         if len(bucket) < 2:
             continue
         pair = _find_straddle_or_strangle(bucket)
         if pair is None:
             continue
-        strategy = ComboStrategy.STRADDLE if pair[0].strike == pair[1].strike else ComboStrategy.STRANGLE
+        strategy = (
+            ComboStrategy.STRADDLE
+            if pair[0].strike == pair[1].strike
+            else ComboStrategy.STRANGLE
+        )
         combo = _build_combo(account, underlying, pair, strategy)
         combos.append(combo)
         consumed.update(leg.leg_id for leg in pair)
@@ -459,7 +489,11 @@ def _match_ratios(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry, leg.right))
+    buckets = _group_by(
+        legs,
+        remaining_ids,
+        lambda leg: (leg.account, leg.underlying, leg.expiry, leg.right),
+    )
     for (account, underlying, _expiry, _right), bucket in buckets.items():
         if len(bucket) < 2:
             continue
@@ -512,7 +546,9 @@ def _looks_like_condor(legs: Sequence[OptionLegSnapshot]) -> ComboStrategy | Non
     if len(quantities) != 1:
         return None
     return (
-        ComboStrategy.IRON_BUTTERFLY if call_short.strike == put_short.strike else ComboStrategy.IRON_CONDOR
+        ComboStrategy.IRON_BUTTERFLY
+        if call_short.strike == put_short.strike
+        else ComboStrategy.IRON_CONDOR
     )
 
 
@@ -570,7 +606,9 @@ def _pick_short_long(
     legs: Sequence[OptionLegSnapshot],
     right: str,
 ) -> tuple[OptionLegSnapshot | None, OptionLegSnapshot | None]:
-    short = next((leg for leg in legs if leg.right == right and leg.direction < 0), None)
+    short = next(
+        (leg for leg in legs if leg.right == right and leg.direction < 0), None
+    )
     long = next((leg for leg in legs if leg.right == right and leg.direction > 0), None)
     return short, long
 
@@ -582,7 +620,10 @@ def _find_vertical_pair(
     shorts = [leg for leg in legs if leg.direction < 0]
     for long_leg in sorted(longs, key=_leg_sort_key):
         for short_leg in sorted(shorts, key=_leg_sort_key):
-            if abs(long_leg.quantity) == abs(short_leg.quantity) and long_leg.strike != short_leg.strike:
+            if (
+                abs(long_leg.quantity) == abs(short_leg.quantity)
+                and long_leg.strike != short_leg.strike
+            ):
                 return (short_leg, long_leg)
     return None
 
@@ -673,7 +714,9 @@ def _build_combo(
     )
 
 
-def _combo_hash(account: str, underlying: str, legs: Sequence[OptionLegSnapshot]) -> str:
+def _combo_hash(
+    account: str, underlying: str, legs: Sequence[OptionLegSnapshot]
+) -> str:
     leg_signatures = sorted(leg.signature() for leg in legs)
     payload = "PSD|" + account + "|" + underlying + "|" + "|".join(leg_signatures)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()
@@ -714,13 +757,17 @@ def _sum_optionals(values: Iterable[Decimal | None]) -> Decimal | None:
     return total if has_value else None
 
 
-def _day_basis(quantity: Decimal, multiplier: Decimal, previous_close: Decimal | None) -> Decimal | None:
+def _day_basis(
+    quantity: Decimal, multiplier: Decimal, previous_close: Decimal | None
+) -> Decimal | None:
     if previous_close is None:
         return None
     return previous_close * quantity * multiplier
 
 
-def _total_basis(avg_cost: Decimal, quantity: Decimal, multiplier: Decimal) -> Decimal | None:
+def _total_basis(
+    avg_cost: Decimal, quantity: Decimal, multiplier: Decimal
+) -> Decimal | None:
     return avg_cost * quantity * multiplier
 
 

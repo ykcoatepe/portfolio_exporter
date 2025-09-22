@@ -10,14 +10,20 @@ def test_micro_momo_go_stops_when_analyzer_fails(monkeypatch, tmp_path) -> None:
     def _fail_dashboard(argv):  # pragma: no cover - executed only on regression
         raise AssertionError("dashboard should not run when analyzer fails")
 
-    def _fail_publish(*args, **kwargs):  # pragma: no cover - executed only on regression
+    def _fail_publish(
+        *args, **kwargs
+    ):  # pragma: no cover - executed only on regression
         raise AssertionError("publish should not run when analyzer fails")
 
     def _fail_open(*args, **kwargs):  # pragma: no cover - executed only on regression
         raise AssertionError("open_dashboard should not run when analyzer fails")
 
-    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_analyzer.main", lambda argv: 2)
-    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_dashboard.main", _fail_dashboard)
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.micro_momo_analyzer.main", lambda argv: 2
+    )
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.micro_momo_dashboard.main", _fail_dashboard
+    )
     monkeypatch.setattr("portfolio_exporter.core.publish.publish_pack", _fail_publish)
     monkeypatch.setattr("portfolio_exporter.core.publish.open_dashboard", _fail_open)
 
@@ -33,8 +39,13 @@ def test_task_runner_passes_memory_symbols(monkeypatch) -> None:
         return 0
 
     monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_go.main", _fake_go)
-    monkeypatch.setattr("portfolio_exporter.core.memory.get_pref", lambda key: "Ford, tsla" if key == "micro_momo.symbols" else "")
-    monkeypatch.setattr("portfolio_exporter.core.symbols.load_alias_map", lambda paths: {})
+    monkeypatch.setattr(
+        "portfolio_exporter.core.memory.get_pref",
+        lambda key: "Ford, tsla" if key == "micro_momo.symbols" else "",
+    )
+    monkeypatch.setattr(
+        "portfolio_exporter.core.symbols.load_alias_map", lambda paths: {}
+    )
     monkeypatch.setattr(
         "portfolio_exporter.core.symbols.normalize_symbols",
         lambda symbols, alias_map: [s.strip().upper() for s in symbols if s.strip()],
@@ -69,8 +80,12 @@ def test_micro_momo_go_respects_no_publish(monkeypatch, tmp_path) -> None:
     out_dir = tmp_path / "out"
     publish_called = {"publish": False, "open": False}
 
-    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_analyzer.main", lambda argv: 0)
-    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_dashboard.main", lambda argv: 0)
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.micro_momo_analyzer.main", lambda argv: 0
+    )
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.micro_momo_dashboard.main", lambda argv: 0
+    )
 
     def _fake_publish(out_dir_arg: str, publish_dir: str) -> Path:
         publish_called["publish"] = True
@@ -92,8 +107,12 @@ def test_micro_momo_go_default_publishes(monkeypatch, tmp_path) -> None:
     out_dir = tmp_path / "out"
     publish_called = {"publish": False, "open": False}
 
-    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_analyzer.main", lambda argv: 0)
-    monkeypatch.setattr("portfolio_exporter.scripts.micro_momo_dashboard.main", lambda argv: 0)
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.micro_momo_analyzer.main", lambda argv: 0
+    )
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.micro_momo_dashboard.main", lambda argv: 0
+    )
 
     def _fake_publish(out_dir_arg: str, publish_dir: str) -> Path:
         publish_called["publish"] = True

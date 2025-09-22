@@ -33,7 +33,9 @@ def emit_alerts(
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
                 )
-                with urllib.request.urlopen(req, timeout=5) as resp:  # nosec - caller controls URL
+                with urllib.request.urlopen(
+                    req, timeout=5
+                ) as resp:  # nosec - caller controls URL
                     if 200 <= resp.status < 300:
                         result["sent"] += 1
                     else:
@@ -44,7 +46,9 @@ def emit_alerts(
                 data=json.dumps(alerts).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec - caller controls URL
+            with urllib.request.urlopen(
+                req, timeout=5
+            ) as resp:  # nosec - caller controls URL
                 if 200 <= resp.status < 300:
                     result["sent"] = len(alerts)
                 else:

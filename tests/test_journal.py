@@ -3,7 +3,11 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from portfolio_exporter.core.journal import JOURNAL_COLS, update_journal, write_journal_template
+from portfolio_exporter.core.journal import (
+    JOURNAL_COLS,
+    update_journal,
+    write_journal_template,
+)
 
 
 def test_journal_roundtrip(tmp_path: Path) -> None:
@@ -31,8 +35,13 @@ def test_journal_roundtrip(tmp_path: Path) -> None:
     # update
     update_journal(
         str(out),
-        {"ABC": {"status": "Triggered", "status_ts": "2025-01-01 10:00:00", "result_R": "0.5"}},
+        {
+            "ABC": {
+                "status": "Triggered",
+                "status_ts": "2025-01-01 10:00:00",
+                "result_R": "0.5",
+            }
+        },
     )
     rows2 = list(csv.DictReader(open(out, encoding="utf-8")))
     assert rows2[0]["status"] == "Triggered" and rows2[0]["result_R"] == "0.5"
-

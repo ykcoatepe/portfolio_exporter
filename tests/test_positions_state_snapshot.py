@@ -34,8 +34,18 @@ def test_snapshot_updated_at_returns_latest_quote() -> None:
     state = PositionsState()
     positions = [_equity("AAPL"), _equity("MSFT")]
     quotes = [
-        Quote(symbol="AAPL", bid=Decimal("1"), ask=Decimal("2"), updated_at=datetime(2024, 1, 1, tzinfo=timezone.utc)),
-        Quote(symbol="MSFT", bid=Decimal("1"), ask=Decimal("2"), updated_at=datetime(2024, 1, 2, tzinfo=timezone.utc)),
+        Quote(
+            symbol="AAPL",
+            bid=Decimal("1"),
+            ask=Decimal("2"),
+            updated_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        ),
+        Quote(
+            symbol="MSFT",
+            bid=Decimal("1"),
+            ask=Decimal("2"),
+            updated_at=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        ),
     ]
 
     state.refresh(positions=positions, quotes=quotes)
@@ -47,7 +57,12 @@ def test_snapshot_updated_at_handles_naive_datetimes() -> None:
     state = PositionsState()
     positions = [_equity("SPY")]
     quotes = [
-        Quote(symbol="SPY", bid=Decimal("1"), ask=Decimal("2"), updated_at=datetime(2024, 2, 1, 15, 30)),
+        Quote(
+            symbol="SPY",
+            bid=Decimal("1"),
+            ask=Decimal("2"),
+            updated_at=datetime(2024, 2, 1, 15, 30),
+        ),
     ]
 
     state.refresh(positions=positions, quotes=quotes)
@@ -99,7 +114,9 @@ def test_positions_view_augments_missing_combos(caplog) -> None:
         ],
     }
 
-    state.refresh(positions=option_positions, positions_view=upstream_view, data_source="internal")
+    state.refresh(
+        positions=option_positions, positions_view=upstream_view, data_source="internal"
+    )
 
     now = datetime(2024, 1, 1, tzinfo=UTC)
     with caplog.at_level(logging.INFO):
@@ -113,7 +130,10 @@ def test_positions_view_augments_missing_combos(caplog) -> None:
         for leg in combo.get("legs", [])
         if isinstance(leg, dict)
     }
-    assert combo_leg_symbols == {padded_symbol, compact_symbol}, "combo legs should keep original OSI"
+    assert combo_leg_symbols == {
+        padded_symbol,
+        compact_symbol,
+    }, "combo legs should keep original OSI"
 
     combo_groups = payload.get("combo_groups") or []
     assert combo_groups, "expected combo groups alongside combos"
@@ -127,15 +147,22 @@ def test_positions_view_augments_missing_combos(caplog) -> None:
         if isinstance(leg, dict)
     }
     expected_symbols = {leg["symbol"] for leg in upstream_view["single_options"]}
-    assert returned_symbols == expected_symbols, "single leg payload should remain intact"
+    assert (
+        returned_symbols == expected_symbols
+    ), "single leg payload should remain intact"
 
     snapshot_symbols = {
         str(leg.get("symbol"))
-        for combo in (state.snapshot_payload(now)["positions_view"].get("option_combos") or [])
+        for combo in (
+            state.snapshot_payload(now)["positions_view"].get("option_combos") or []
+        )
         for leg in combo.get("legs", [])
         if isinstance(leg, dict)
     }
-    assert snapshot_symbols == {padded_symbol, compact_symbol}, "snapshot view should preserve OSI"
+    assert snapshot_symbols == {
+        padded_symbol,
+        compact_symbol,
+    }, "snapshot view should preserve OSI"
 
     assert any("grouped" in record.message for record in caplog.records)
 
@@ -143,4 +170,6 @@ def test_positions_view_augments_missing_combos(caplog) -> None:
     with caplog.at_level(logging.INFO):
         payload_again = state.positions_view_payload(now)
     assert payload_again.get("option_combos")
-    assert not any("grouped" in record.message for record in caplog.records), "log should fire once"
+    assert not any(
+        "grouped" in record.message for record in caplog.records
+    ), "log should fire once"

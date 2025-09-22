@@ -42,9 +42,13 @@ def snapshot(tickers: Sequence[str]) -> dict[str, float]:
 # Placeholders for test monkeypatching compatibility.
 # These are not used in normal execution but allow tests to attach fakes
 # without AttributeError on setattr.
-def _ibkr_quotes(_tickers: Sequence[str]) -> dict[str, float]:  # pragma: no cover - test hook
+def _ibkr_quotes(
+    _tickers: Sequence[str],
+) -> dict[str, float]:  # pragma: no cover - test hook
     raise ConnectionError("IBKR not available in core.quotes stub")
 
 
-def _yf_quotes(_tickers: Sequence[str]) -> dict[str, float]:  # pragma: no cover - test hook
+def _yf_quotes(
+    _tickers: Sequence[str],
+) -> dict[str, float]:  # pragma: no cover - test hook
     return {}

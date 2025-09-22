@@ -48,12 +48,16 @@ def rth_window_tr(
     close_tr = _combine(ny_day, et_close.hour, et_close.minute, TZ_NY).astimezone(TZ_TR)
 
     aft_tr = (
-        _combine(ny_day, et_afternoon_rearm.hour, et_afternoon_rearm.minute, TZ_NY).astimezone(TZ_TR)
+        _combine(
+            ny_day, et_afternoon_rearm.hour, et_afternoon_rearm.minute, TZ_NY
+        ).astimezone(TZ_TR)
         if et_afternoon_rearm
         else None
     )
     cutoff_tr = (
-        _combine(ny_day, et_no_new_after.hour, et_no_new_after.minute, TZ_NY).astimezone(TZ_TR)
+        _combine(
+            ny_day, et_no_new_after.hour, et_no_new_after.minute, TZ_NY
+        ).astimezone(TZ_TR)
         if et_no_new_after
         else None
     )

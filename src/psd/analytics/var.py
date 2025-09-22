@@ -12,7 +12,11 @@ def var95_1d_from_closes(closes: Sequence[float], nav_exposed: float) -> float:
     Returns a non-negative float representing absolute VaR (currency units).
     Parametric fallback is used if not enough history is available.
     """
-    xs = [float(x) for x in closes if isinstance(x, (int, float)) and math.isfinite(float(x))]
+    xs = [
+        float(x)
+        for x in closes
+        if isinstance(x, (int, float)) and math.isfinite(float(x))
+    ]
     if len(xs) < 2:
         return 0.0
     rets = []

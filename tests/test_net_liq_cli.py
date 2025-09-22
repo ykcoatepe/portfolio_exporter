@@ -10,7 +10,12 @@ import pytest
 
 def _run_cli(args, env):
     result = subprocess.run(
-        [sys.executable, "-m", "portfolio_exporter.scripts.net_liq_history_export", *args],
+        [
+            sys.executable,
+            "-m",
+            "portfolio_exporter.scripts.net_liq_history_export",
+            *args,
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -29,7 +34,14 @@ def _have_reportlab() -> bool:
 
 def test_json_no_write(tmp_path):
     env = os.environ.copy()
-    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_OUTPUT_DIR": str(tmp_path)})
+    env.update(
+        {
+            "PYTHONPATH": ".",
+            "PE_TEST_MODE": "1",
+            "PE_OUTPUT_DIR": str(tmp_path),
+            "PE_QUIET": "0",
+        }
+    )
     out = _run_cli(
         [
             "--source",
@@ -52,7 +64,7 @@ def test_json_no_write(tmp_path):
 @pytest.mark.skipif(not _have_reportlab(), reason="reportlab not installed")
 def test_file_writes(tmp_path):
     env = os.environ.copy()
-    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1"})
+    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_QUIET": "0"})
     outdir = tmp_path / ".tmp_nlh"
     out = _run_cli(
         [
@@ -72,7 +84,7 @@ def test_file_writes(tmp_path):
     csv_path = Path(data["outputs"][0])
     assert csv_path.exists()
     # Only CSV is written by default; ensure no PDF path
-    assert all(not p.endswith(".pdf") for p in data["outputs"]) 
+    assert all(not p.endswith(".pdf") for p in data["outputs"])
     df = pd.read_csv(csv_path)
     assert list(df.columns) == ["date", "NetLiq"]
     assert len(df) == 10
@@ -80,7 +92,14 @@ def test_file_writes(tmp_path):
 
 def test_date_filter(tmp_path):
     env = os.environ.copy()
-    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_OUTPUT_DIR": str(tmp_path)})
+    env.update(
+        {
+            "PYTHONPATH": ".",
+            "PE_TEST_MODE": "1",
+            "PE_OUTPUT_DIR": str(tmp_path),
+            "PE_QUIET": "0",
+        }
+    )
     out = _run_cli(
         [
             "--source",
@@ -103,7 +122,14 @@ def test_date_filter(tmp_path):
 
 def test_quiet_suppresses_table(tmp_path):
     env = os.environ.copy()
-    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_OUTPUT_DIR": str(tmp_path)})
+    env.update(
+        {
+            "PYTHONPATH": ".",
+            "PE_TEST_MODE": "1",
+            "PE_OUTPUT_DIR": str(tmp_path),
+            "PE_QUIET": "0",
+        }
+    )
     loud = _run_cli(
         [
             "--source",
@@ -129,7 +155,14 @@ def test_quiet_suppresses_table(tmp_path):
 
 def test_debug_timings_json(tmp_path):
     env = os.environ.copy()
-    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_OUTPUT_DIR": str(tmp_path)})
+    env.update(
+        {
+            "PYTHONPATH": ".",
+            "PE_TEST_MODE": "1",
+            "PE_OUTPUT_DIR": str(tmp_path),
+            "PE_QUIET": "0",
+        }
+    )
     out = _run_cli(
         [
             "--source",
@@ -150,7 +183,7 @@ def test_debug_timings_json(tmp_path):
 @pytest.mark.skipif(not _have_reportlab(), reason="reportlab not installed")
 def test_debug_timings_file(tmp_path):
     env = os.environ.copy()
-    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1"})
+    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_QUIET": "0"})
     outdir = tmp_path / ".tmp_nlh"
     out = _run_cli(
         [

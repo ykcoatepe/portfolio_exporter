@@ -65,9 +65,13 @@ _DEFAULT_RULES_FALLBACK: list[dict[str, Any]] = [
 class RulesState:
     """Evaluate configured rules against the current positions snapshot."""
 
-    def __init__(self, positions_state: PositionsState, rules: Sequence[Rule] | None = None) -> None:
+    def __init__(
+        self, positions_state: PositionsState, rules: Sequence[Rule] | None = None
+    ) -> None:
         self._positions_state = positions_state
-        self._rules: tuple[Rule, ...] = tuple(rules) if rules is not None else tuple(_load_default_rules())
+        self._rules: tuple[Rule, ...] = (
+            tuple(rules) if rules is not None else tuple(_load_default_rules())
+        )
         self._severity_by_rule = {rule.rule_id: rule.severity for rule in self._rules}
 
     @property
@@ -86,7 +90,9 @@ class RulesState:
         rows = self._build_rows(timestamp)
         return evaluate_rules(self._rules, rows, as_of=timestamp)
 
-    def summary(self, now: datetime | None = None) -> tuple[dict[str, Any], EvaluationResult]:
+    def summary(
+        self, now: datetime | None = None
+    ) -> tuple[dict[str, Any], EvaluationResult]:
         timestamp = _ensure_aware(now)
         result = self.evaluate(timestamp)
         summary = {
@@ -113,23 +119,33 @@ class RulesState:
         ordered = sorted(
             breaches,
             key=lambda breach: (
-                _SEVERITY_ORDER.get(self._severity_by_rule.get(breach.rule_id, "INFO"), 99),
+                _SEVERITY_ORDER.get(
+                    self._severity_by_rule.get(breach.rule_id, "INFO"), 99
+                ),
                 -breach.triggered_at.timestamp(),
             ),
         )
         top: list[dict[str, Any]] = []
         for breach in ordered[:5]:
-            payload = breach.model_dump(mode="json") if hasattr(breach, "model_dump") else dict(breach)
+            payload = (
+                breach.model_dump(mode="json")
+                if hasattr(breach, "model_dump")
+                else dict(breach)
+            )
             top.append(payload)
         return top
 
     def _build_rows(self, now: datetime) -> Mapping[Scope, Iterable[Mapping[str, Any]]]:
         equities = self._positions_state.equities_payload(now)
-        equities_by_symbol = {row.get("symbol"): row for row in equities if row.get("symbol")}
+        equities_by_symbol = {
+            row.get("symbol"): row for row in equities if row.get("symbol")
+        }
         detection = self._positions_state.options_detection(now)
         combos = detection.combos
         orphan_legs = list(detection.orphans)
-        combo_legs: list[OptionLegSnapshot] = [leg for combo in combos for leg in combo.legs]
+        combo_legs: list[OptionLegSnapshot] = [
+            leg for combo in combos for leg in combo.legs
+        ]
         all_legs = combo_legs + orphan_legs
 
         rows: dict[Scope, list[dict[str, Any]]] = {
@@ -166,7 +182,9 @@ class RulesState:
             )
         return rows
 
-    def _leg_rows(self, legs: Sequence[OptionLegSnapshot], now: datetime) -> list[dict[str, Any]]:
+    def _leg_rows(
+        self, legs: Sequence[OptionLegSnapshot], now: datetime
+    ) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for leg in legs:
             notes_parts: list[str] = []
@@ -203,13 +221,18 @@ class RulesState:
             entry = aggregates[combo.underlying]
             entry["delta_shares"] += _decimal_to_float(combo.sum_delta)
             entry["gross_shares"] += sum(
-                abs(_decimal_to_float(leg.quantity * leg.multiplier)) for leg in combo.legs
+                abs(_decimal_to_float(leg.quantity * leg.multiplier))
+                for leg in combo.legs
             )
         for leg in orphan_legs:
             entry = aggregates[leg.underlying]
             if leg.delta is not None:
-                entry["delta_shares"] += _decimal_to_float(leg.delta * leg.quantity * leg.multiplier)
-            entry["gross_shares"] += abs(_decimal_to_float(leg.quantity * leg.multiplier))
+                entry["delta_shares"] += _decimal_to_float(
+                    leg.delta * leg.quantity * leg.multiplier
+                )
+            entry["gross_shares"] += abs(
+                _decimal_to_float(leg.quantity * leg.multiplier)
+            )
         for equity in equities:
             symbol = equity.get("symbol")
             if not symbol:
@@ -317,7 +340,9 @@ def _decimal_to_float(value: Decimal | float | int) -> float:
     return float(value)
 
 
-def _annualized_premium_pct(combo: OptionCombo, underlying_mark: float | None) -> float | None:
+def _annualized_premium_pct(
+    combo: OptionCombo, underlying_mark: float | None
+) -> float | None:
     if combo.dte <= 0 or underlying_mark is None or underlying_mark <= 0:
         return None
     if not combo.legs:

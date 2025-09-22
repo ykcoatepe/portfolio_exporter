@@ -12,7 +12,12 @@ from src.psd.sentinel.sched import run_loop
 def main() -> None:
     ap = argparse.ArgumentParser(description="Run Portfolio Sentinel Dashboard")
     ap.add_argument("--loop", action="store_true", help="Run continuous intraday loop")
-    ap.add_argument("--interval", type=int, default=60, help="Loop interval in seconds (default: 60)")
+    ap.add_argument(
+        "--interval",
+        type=int,
+        default=60,
+        help="Loop interval in seconds (default: 60)",
+    )
     args = ap.parse_args()
 
     cfg: dict[str, Any] = {}

@@ -31,7 +31,11 @@ def fetch_ib_tickers() -> list[str]:
         return []
     positions = ib.positions()
     ib.disconnect()
-    tickers = {p.contract.symbol.upper() for p in positions if getattr(p.contract, "secType", "") == "STK"}
+    tickers = {
+        p.contract.symbol.upper()
+        for p in positions
+        if getattr(p.contract, "secType", "") == "STK"
+    }
     return sorted(tickers)
 
 

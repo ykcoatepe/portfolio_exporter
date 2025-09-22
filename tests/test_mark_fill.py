@@ -40,7 +40,9 @@ def test_equity_mark_backfills_from_yfinance(monkeypatch) -> None:
 
     monkeypatch.setattr(pg, "_load_positions", fake_loader)
     monkeypatch.setattr(pg, "load_positions_sync", lambda: _snapshot(None))
-    monkeypatch.setattr(yfin, "fill_equity_marks_from_yf", lambda symbols: {"AAPL": 197.25})
+    monkeypatch.setattr(
+        yfin, "fill_equity_marks_from_yf", lambda symbols: {"AAPL": 197.25}
+    )
     ibkr.consume_mark_backfills()
 
     positions = ibkr.get_positions({"fill": {"allow_yf_equity_marks": True}})
@@ -57,7 +59,9 @@ def test_none_mark_renders_dash_placeholder(monkeypatch) -> None:
 
     monkeypatch.setattr(pg, "_load_positions", fake_loader)
     monkeypatch.setattr(pg, "load_positions_sync", lambda: _snapshot(None))
-    monkeypatch.setattr(yfin, "fill_equity_marks_from_yf", lambda symbols: {"AAPL": None})
+    monkeypatch.setattr(
+        yfin, "fill_equity_marks_from_yf", lambda symbols: {"AAPL": None}
+    )
     ibkr.consume_mark_backfills()
 
     positions = ibkr.get_positions({"fill": {"allow_yf_equity_marks": True}})

@@ -16,7 +16,9 @@ def compute_1r(qty: int, entry: float, risk_per_unit: float | None = None) -> fl
     return abs(qty) * float(risk_per_unit)
 
 
-def oco_levels(entry: float, one_r: float, stop_R: float, target_R: float) -> tuple[float, float]:
+def oco_levels(
+    entry: float, one_r: float, stop_R: float, target_R: float
+) -> tuple[float, float]:
     """Return stop and target prices given entry, 1R and R-multipliers."""
     # Simplified: price change per R is proportional to one_r/qty; here we treat
     # one_r as the absolute risk currency and map to price deltas heuristically.
@@ -26,7 +28,9 @@ def oco_levels(entry: float, one_r: float, stop_R: float, target_R: float) -> tu
     return (stop, target)
 
 
-def credit_spread_tp_sl(credit: float, width: float, tp_capture: float) -> dict[str, float]:
+def credit_spread_tp_sl(
+    credit: float, width: float, tp_capture: float
+) -> dict[str, float]:
     """Defined-risk credit spread TP/SL levels based on capture.
 
     - max_loss = width - credit
@@ -40,7 +44,9 @@ def credit_spread_tp_sl(credit: float, width: float, tp_capture: float) -> dict[
     return {"tp_debit": tp_debit, "sl_debit": sl_debit, "max_loss": max_loss}
 
 
-def liquidity_guard(bid: float, ask: float, max_spread_mid: float) -> dict[str, float | bool]:
+def liquidity_guard(
+    bid: float, ask: float, max_spread_mid: float
+) -> dict[str, float | bool]:
     mid = (float(bid) + float(ask)) / 2.0 if (bid or ask) else 0.0
     spread = float(ask) - float(bid)
     if mid <= 0:

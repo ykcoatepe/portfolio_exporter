@@ -22,7 +22,9 @@ log = logging.getLogger("psd.ingestor")
 HEARTBEAT_S = float(os.getenv("PSD_HEARTBEAT_S", "2.0"))
 DEFAULT_CHECKPOINT_EVERY = 300
 
-INGEST_TICK_SECONDS = Histogram("psd_ingest_tick_seconds", "Ingest loop tick duration (s)")
+INGEST_TICK_SECONDS = Histogram(
+    "psd_ingest_tick_seconds", "Ingest loop tick duration (s)"
+)
 DATA_AGE_SECONDS = Gauge("psd_data_age_seconds", "Age of last good snapshot (s)")
 EVENTS_WRITTEN = Counter("psd_events_total", "Events appended", ["kind"])
 

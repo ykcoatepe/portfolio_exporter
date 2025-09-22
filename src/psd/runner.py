@@ -63,7 +63,9 @@ def load_auto_defaults() -> dict[str, Any]:
         return defaults
 
 
-def start_psd(*, loops: int | None = None, interval_override: float | None = None) -> tuple[str, int]:
+def start_psd(
+    *, loops: int | None = None, interval_override: float | None = None
+) -> tuple[str, int]:
     """One-step PSD starter: web + browser(optional) + IB probe + scheduler.
 
     - Starts the web server on a free port (when 0) in background.
@@ -82,23 +84,33 @@ def start_psd(*, loops: int | None = None, interval_override: float | None = Non
     _sys_modules = _sys.modules
     if "psd.web.server" not in _sys_modules and "src.psd.web.server" in _sys_modules:
         _sys_modules["psd.web.server"] = _sys_modules["src.psd.web.server"]
-    if "psd.sentinel.sched" not in _sys_modules and "src.psd.sentinel.sched" in _sys_modules:
+    if (
+        "psd.sentinel.sched" not in _sys_modules
+        and "src.psd.sentinel.sched" in _sys_modules
+    ):
         _sys_modules["psd.sentinel.sched"] = _sys_modules["src.psd.sentinel.sched"]
-    if "psd.datasources.ibkr" not in _sys_modules and "src.psd.datasources.ibkr" in _sys_modules:
+    if (
+        "psd.datasources.ibkr" not in _sys_modules
+        and "src.psd.datasources.ibkr" in _sys_modules
+    ):
         _sys_modules["psd.datasources.ibkr"] = _sys_modules["src.psd.datasources.ibkr"]
 
     web = _importlib.import_module(
         "psd.web.server" if "psd.web.server" in _sys_modules else "src.psd.web.server"
     )
     sched = _importlib.import_module(
-        "psd.sentinel.sched" if "psd.sentinel.sched" in _sys_modules else "src.psd.sentinel.sched"
+        "psd.sentinel.sched"
+        if "psd.sentinel.sched" in _sys_modules
+        else "src.psd.sentinel.sched"
     )
 
     # IBKR datasource is optional; tests will monkeypatch as needed
     ib_get_positions = None
     try:
         ds_module = (
-            "psd.datasources.ibkr" if "psd.datasources.ibkr" in _sys_modules else "src.psd.datasources.ibkr"
+            "psd.datasources.ibkr"
+            if "psd.datasources.ibkr" in _sys_modules
+            else "src.psd.datasources.ibkr"
         )
         ib_mod = _importlib.import_module(ds_module)
         ib_get_positions = getattr(ib_mod, "get_positions", None)
@@ -108,7 +120,11 @@ def start_psd(*, loops: int | None = None, interval_override: float | None = Non
     cfg = load_auto_defaults()
     host = str(cfg.get("web_host", "127.0.0.1"))
     port = int(cfg.get("web_port", 0))
-    interval = float(interval_override if interval_override is not None else cfg.get("interval_sec", 60))
+    interval = float(
+        interval_override
+        if interval_override is not None
+        else cfg.get("interval_sec", 60)
+    )
 
     # Start web server in background and open browser if requested
     web_started = True

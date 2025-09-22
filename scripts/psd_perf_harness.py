@@ -9,7 +9,9 @@ from typing import Any
 
 from psd.analytics.stats import compute_stats
 
-FIXTURE_PATH = Path(__file__).resolve().parent.parent / "tests" / "data" / "psd_snapshot_500.json"
+FIXTURE_PATH = (
+    Path(__file__).resolve().parent.parent / "tests" / "data" / "psd_snapshot_500.json"
+)
 DEFAULT_THRESHOLD_MS = 200.0
 
 
@@ -66,8 +68,12 @@ def run_benchmark(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="PSD performance micro-benchmark")
-    parser.add_argument("--iterations", type=int, default=15, help="benchmark iterations (default: 15)")
-    parser.add_argument("--fixture", type=Path, default=FIXTURE_PATH, help="path to snapshot fixture")
+    parser.add_argument(
+        "--iterations", type=int, default=15, help="benchmark iterations (default: 15)"
+    )
+    parser.add_argument(
+        "--fixture", type=Path, default=FIXTURE_PATH, help="path to snapshot fixture"
+    )
     parser.add_argument(
         "--threshold-ms",
         type=float,

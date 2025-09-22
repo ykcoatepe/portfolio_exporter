@@ -8,6 +8,7 @@ import pytest
 
 FIXTURES = Path("tests/data")
 
+
 @pytest.mark.parametrize(
     "mod_path, argv, needs_env",
     [

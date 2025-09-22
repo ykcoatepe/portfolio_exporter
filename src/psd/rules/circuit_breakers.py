@@ -26,15 +26,26 @@ def derive_state(
     """
     t = thresholds or {"soft_pre": -0.010, "freeze_1d": -0.015, "cut_var": -0.025}
     if day_pl <= float(t.get("cut_var", -0.025)):
-        return {"state": "cut_var", "reason": f"day {day_pl:.2%} <= {t.get('cut_var'):.2%}"}
+        return {
+            "state": "cut_var",
+            "reason": f"day {day_pl:.2%} <= {t.get('cut_var'):.2%}",
+        }
     if day_pl <= float(t.get("freeze_1d", -0.015)):
-        return {"state": "freeze_1d", "reason": f"day {day_pl:.2%} <= {t.get('freeze_1d'):.2%}"}
+        return {
+            "state": "freeze_1d",
+            "reason": f"day {day_pl:.2%} <= {t.get('freeze_1d'):.2%}",
+        }
     if day_pl <= float(t.get("soft_pre", -0.010)):
-        return {"state": "soft_pre", "reason": f"day {day_pl:.2%} <= {t.get('soft_pre'):.2%}"}
+        return {
+            "state": "soft_pre",
+            "reason": f"day {day_pl:.2%} <= {t.get('soft_pre'):.2%}",
+        }
     return {"state": "ok", "reason": ""}
 
 
-def produce_actions(risk_snapshot: dict[str, object], top_frac: float = 0.15) -> list[str]:
+def produce_actions(
+    risk_snapshot: dict[str, object], top_frac: float = 0.15
+) -> list[str]:
     """Produce suggested trims under cut_var: top-15% VaR names.
 
     risk_snapshot may contain key 'by_symbol_var' -> list of {symbol, var}.

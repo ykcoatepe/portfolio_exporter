@@ -81,7 +81,9 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     ensure_dirs(path)
     json_text = json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True)
     json_text += "\n"
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=str(path.parent), delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=str(path.parent), delete=False
+    ) as handle:
         handle.write(json_text)
         handle.flush()
         os.fsync(handle.fileno())
@@ -157,7 +159,9 @@ def validate_document(document: dict[str, Any]) -> ValidationResult:
                 errors.append("questions entries require integer id")
             status = question.get("status", "open")
             if status not in QUESTION_STATUSES:
-                errors.append(f"question {question.get('id', '?')}: invalid status '{status}'")
+                errors.append(
+                    f"question {question.get('id', '?')}: invalid status '{status}'"
+                )
 
     decisions = document.get("decisions", [])
     if not isinstance(decisions, list):
@@ -347,8 +351,12 @@ def cmd_view(path: Path, document: dict[str, Any], args: argparse.Namespace) -> 
     return 0
 
 
-def cmd_list_tasks(path: Path, document: dict[str, Any], args: argparse.Namespace) -> int:
-    tasks: list[dict[str, Any]] = [t for t in document.get("tasks", []) if isinstance(t, dict)]
+def cmd_list_tasks(
+    path: Path, document: dict[str, Any], args: argparse.Namespace
+) -> int:
+    tasks: list[dict[str, Any]] = [
+        t for t in document.get("tasks", []) if isinstance(t, dict)
+    ]
     tasks.sort(key=lambda item: item.get("id", 0))
 
     if args.status:
@@ -384,8 +392,12 @@ def cmd_list_tasks(path: Path, document: dict[str, Any], args: argparse.Namespac
     return 0
 
 
-def cmd_list_questions(path: Path, document: dict[str, Any], args: argparse.Namespace) -> int:
-    questions: list[dict[str, Any]] = [q for q in document.get("questions", []) if isinstance(q, dict)]
+def cmd_list_questions(
+    path: Path, document: dict[str, Any], args: argparse.Namespace
+) -> int:
+    questions: list[dict[str, Any]] = [
+        q for q in document.get("questions", []) if isinstance(q, dict)
+    ]
     questions.sort(key=lambda item: item.get("id", 0))
 
     if args.status:
@@ -432,7 +444,9 @@ def cmd_add_task(path: Path, document: dict[str, Any], args: argparse.Namespace)
     return 0
 
 
-def cmd_update_task(path: Path, document: dict[str, Any], args: argparse.Namespace) -> int:
+def cmd_update_task(
+    path: Path, document: dict[str, Any], args: argparse.Namespace
+) -> int:
     require_writable()
     tasks: list[dict[str, Any]] = document.setdefault("tasks", [])
     selected = _find_by_id(tasks, args.id)
@@ -465,7 +479,9 @@ def cmd_update_task(path: Path, document: dict[str, Any], args: argparse.Namespa
     return 0
 
 
-def _find_by_id(entries: Iterable[dict[str, Any]], entry_id: int) -> dict[str, Any] | None:
+def _find_by_id(
+    entries: Iterable[dict[str, Any]], entry_id: int
+) -> dict[str, Any] | None:
     for entry in entries:
         try:
             if int(entry.get("id")) == int(entry_id):
@@ -475,7 +491,9 @@ def _find_by_id(entries: Iterable[dict[str, Any]], entry_id: int) -> dict[str, A
     return None
 
 
-def cmd_close_task(path: Path, document: dict[str, Any], args: argparse.Namespace) -> int:
+def cmd_close_task(
+    path: Path, document: dict[str, Any], args: argparse.Namespace
+) -> int:
     require_writable()
     tasks: list[dict[str, Any]] = document.setdefault("tasks", [])
     task = _find_by_id(tasks, args.id)
@@ -495,7 +513,9 @@ def cmd_close_task(path: Path, document: dict[str, Any], args: argparse.Namespac
     return 0
 
 
-def cmd_add_decision(path: Path, document: dict[str, Any], args: argparse.Namespace) -> int:
+def cmd_add_decision(
+    path: Path, document: dict[str, Any], args: argparse.Namespace
+) -> int:
     require_writable()
     decisions: list[dict[str, Any]] = document.setdefault("decisions", [])
     entry = {
@@ -512,7 +532,9 @@ def cmd_add_decision(path: Path, document: dict[str, Any], args: argparse.Namesp
     return 0
 
 
-def cmd_changelog(path: Path, document: dict[str, Any], args: argparse.Namespace) -> int:
+def cmd_changelog(
+    path: Path, document: dict[str, Any], args: argparse.Namespace
+) -> int:
     require_writable()
     event = args.event
     if event == "session-end":
@@ -554,7 +576,9 @@ def cmd_digest(path: Path, document: dict[str, Any], args: argparse.Namespace) -
     if open_questions:
         print("open questions:")
         for question in open_questions:
-            detail = f"- [{question['id']}] {question['question']} ({question['status']})"
+            detail = (
+                f"- [{question['id']}] {question['question']} ({question['status']})"
+            )
             if question.get("owner"):
                 detail += f" owner={question['owner']}"
             print(detail)
@@ -578,10 +602,18 @@ def cmd_digest(path: Path, document: dict[str, Any], args: argparse.Namespace) -
 
 
 def build_digest(document: dict[str, Any]) -> dict[str, Any]:
-    tasks: list[dict[str, Any]] = [t for t in document.get("tasks", []) if isinstance(t, dict)]
-    questions: list[dict[str, Any]] = [q for q in document.get("questions", []) if isinstance(q, dict)]
-    decisions: list[dict[str, Any]] = [d for d in document.get("decisions", []) if isinstance(d, dict)]
-    changelog: list[dict[str, Any]] = [c for c in document.get("changelog", []) if isinstance(c, dict)]
+    tasks: list[dict[str, Any]] = [
+        t for t in document.get("tasks", []) if isinstance(t, dict)
+    ]
+    questions: list[dict[str, Any]] = [
+        q for q in document.get("questions", []) if isinstance(q, dict)
+    ]
+    decisions: list[dict[str, Any]] = [
+        d for d in document.get("decisions", []) if isinstance(d, dict)
+    ]
+    changelog: list[dict[str, Any]] = [
+        c for c in document.get("changelog", []) if isinstance(c, dict)
+    ]
 
     open_tasks = [t for t in tasks if t.get("status") != "closed"]
     open_questions = [q for q in questions if q.get("status") != "closed"]
@@ -621,7 +653,8 @@ def build_digest(document: dict[str, Any]) -> dict[str, Any]:
             for d in decisions[:5]
         ],
         "recent_changelog": [
-            {"event": c.get("event"), "timestamp": c.get("timestamp")} for c in changelog[-5:]
+            {"event": c.get("event"), "timestamp": c.get("timestamp")}
+            for c in changelog[-5:]
         ],
         "counts": {
             "tasks_total": len(tasks),
@@ -683,7 +716,9 @@ def atomic_write_json_list(path: Path, entries: list[dict[str, Any]]) -> None:
     ensure_dirs(path)
     json_text = json.dumps(entries, ensure_ascii=True, indent=2, sort_keys=True)
     json_text += "\n"
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=str(path.parent), delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=str(path.parent), delete=False
+    ) as handle:
         handle.write(json_text)
         handle.flush()
         os.fsync(handle.fileno())
@@ -721,25 +756,37 @@ COMMANDS: dict[str, Callable[..., int]] = {
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Assistant memory CLI")
-    parser.add_argument("--path", default=str(DEFAULT_PATH), help="Path to memory JSON file")
+    parser.add_argument(
+        "--path", default=str(DEFAULT_PATH), help="Path to memory JSON file"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    bootstrap = subparsers.add_parser("bootstrap", help="Ensure memory file exists and log session start")
-    bootstrap.add_argument("--session-note", help="Optional note for the session_start changelog entry")
+    bootstrap = subparsers.add_parser(
+        "bootstrap", help="Ensure memory file exists and log session start"
+    )
+    bootstrap.add_argument(
+        "--session-note", help="Optional note for the session_start changelog entry"
+    )
 
     validate = subparsers.add_parser("validate", help="Validate memory schema")
     validate.add_argument("--json", action="store_true", help="Emit JSON result")
 
     view = subparsers.add_parser("view", help="View memory document or a section")
-    view.add_argument("--section", choices=list(DEFAULT_DOCUMENT.keys()), help="Section to display")
+    view.add_argument(
+        "--section", choices=list(DEFAULT_DOCUMENT.keys()), help="Section to display"
+    )
     view.add_argument("--json", action="store_true", help="Emit JSON output")
 
-    list_tasks = subparsers.add_parser("list-tasks", help="List tasks with optional filters")
+    list_tasks = subparsers.add_parser(
+        "list-tasks", help="List tasks with optional filters"
+    )
     list_tasks.add_argument("--status", choices=sorted(TASK_STATUSES))
     list_tasks.add_argument("--owner", help="Filter by owner")
     list_tasks.add_argument("--json", action="store_true", help="Emit JSON output")
 
-    list_questions = subparsers.add_parser("list-questions", help="List questions with optional filters")
+    list_questions = subparsers.add_parser(
+        "list-questions", help="List questions with optional filters"
+    )
     list_questions.add_argument("--status", choices=sorted(QUESTION_STATUSES))
     list_questions.add_argument("--owner", help="Filter by owner")
     list_questions.add_argument("--json", action="store_true", help="Emit JSON output")
@@ -755,13 +802,17 @@ def build_parser() -> argparse.ArgumentParser:
     update_task.add_argument("id", type=int)
     update_task.add_argument("--title")
     update_task.add_argument("--details")
-    update_task.add_argument("--append", action="store_true", help="Append details instead of replacing")
+    update_task.add_argument(
+        "--append", action="store_true", help="Append details instead of replacing"
+    )
     update_task.add_argument("--labels", help="Comma-separated labels")
     update_task.add_argument("--priority", type=int)
     update_task.add_argument("--owner")
     update_task.add_argument("--status", choices=sorted(TASK_STATUSES))
 
-    close_task = subparsers.add_parser("close-task", help="Close a task with optional reason")
+    close_task = subparsers.add_parser(
+        "close-task", help="Close a task with optional reason"
+    )
     close_task.add_argument("id", type=int)
     close_task.add_argument("--reason")
 

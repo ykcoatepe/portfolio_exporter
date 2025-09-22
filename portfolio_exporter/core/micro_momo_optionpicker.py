@@ -74,7 +74,9 @@ def _pick_expiry_by_dte(
         # Prefer higher near-money OI
         in_win.sort(key=lambda t: (_near_money_oi(chain, spot, t[0]), -t[1]))
         # highest OI last if we use ascending; switch to descending explicitly
-        best = sorted(in_win, key=lambda t: _near_money_oi(chain, spot, t[0]), reverse=True)[0][0]
+        best = sorted(
+            in_win, key=lambda t: _near_money_oi(chain, spot, t[0]), reverse=True
+        )[0][0]
         return best
 
     # Prefer nearest weekly strictly above max within 7 days
@@ -113,7 +115,9 @@ def _call_at_strike(strike: float, calls: dict[float, ChainRow]) -> ChainRow | N
 
 
 def _get(r: Any, name: str, default: Any = None) -> Any:
-    return getattr(r, name, default) if not isinstance(r, dict) else r.get(name, default)
+    return (
+        getattr(r, name, default) if not isinstance(r, dict) else r.get(name, default)
+    )
 
 
 def _mid(r: Any) -> float:
@@ -192,7 +196,10 @@ def pick_bull_put_credit(
     distance = float("inf")
     for r in puts:
         st = float(_get(r, "strike", 0.0))
-        if st < float(_get(short_put, "strike", 0.0)) and spot * 0.82 <= st <= spot * 0.97:
+        if (
+            st < float(_get(short_put, "strike", 0.0))
+            and spot * 0.82 <= st <= spot * 0.97
+        ):
             d = abs(st - long_target)
             if d < distance:
                 lp, distance = r, d
@@ -211,7 +218,9 @@ def pick_bull_put_credit(
         )
 
     # Check OI and spreads
-    sp1 = spread_pct(float(_get(short_put, "bid", 0.0)), float(_get(short_put, "ask", 0.0)))
+    sp1 = spread_pct(
+        float(_get(short_put, "bid", 0.0)), float(_get(short_put, "ask", 0.0))
+    )
     sp2 = spread_pct(float(_get(lp, "bid", 0.0)), float(_get(lp, "ask", 0.0)))
     per_leg_spread = None
     if sp1 is not None and sp2 is not None:
@@ -221,7 +230,13 @@ def pick_bull_put_credit(
 
     credit = max(
         0.01,
-        float(_get(short_put, "mid", (_get(short_put, "bid", 0.0) + _get(short_put, "ask", 0.0)) / 2))
+        float(
+            _get(
+                short_put,
+                "mid",
+                (_get(short_put, "bid", 0.0) + _get(short_put, "ask", 0.0)) / 2,
+            )
+        )
         - float(_get(lp, "mid", (_get(lp, "bid", 0.0) + _get(lp, "ask", 0.0)) / 2)),
     )
     width = abs(float(_get(short_put, "strike", 0.0)) - float(_get(lp, "strike", 0.0)))
@@ -253,7 +268,11 @@ def pick_structure(
     d_max = int(cfg.get("options", {}).get("dte_max", 10))  # type: ignore[union-attr]
     expiry = _pick_expiry_by_dte(chain, scan.price, d_min, d_max)
     calls = _calls_by_strike(
-        [r for r in chain if hasattr(r, "right") or (isinstance(r, dict) and r.get("right"))]
+        [
+            r
+            for r in chain
+            if hasattr(r, "right") or (isinstance(r, dict) and r.get("right"))
+        ]
     )
 
     min_width = float(cfg.get("options", {}).get("min_width", 5.0))  # type: ignore[union-attr]
@@ -319,14 +338,21 @@ def pick_structure(
             return dc
 
         leg_spreads = [
-            spread_pct(float(_get(long_call, "bid", 0.0)), float(_get(long_call, "ask", 0.0))),
-            spread_pct(float(_get(short_call, "bid", 0.0)), float(_get(short_call, "ask", 0.0))),
+            spread_pct(
+                float(_get(long_call, "bid", 0.0)), float(_get(long_call, "ask", 0.0))
+            ),
+            spread_pct(
+                float(_get(short_call, "bid", 0.0)), float(_get(short_call, "ask", 0.0))
+            ),
         ]
         # If any leg has no reliable spread, treat as failing spread check
         per_leg_spread = None
         if all(v is not None for v in leg_spreads):
             per_leg_spread = max([v for v in leg_spreads if v is not None])  # type: ignore[arg-type]
-        oi_ok = int(_get(long_call, "oi", 0)) >= min_oi and int(_get(short_call, "oi", 0)) >= min_oi
+        oi_ok = (
+            int(_get(long_call, "oi", 0)) >= min_oi
+            and int(_get(short_call, "oi", 0)) >= min_oi
+        )
         spread_ok = per_leg_spread is not None and per_leg_spread <= max_spread
         limit_price = max(0.01, _mid(long_call) - _mid(short_call))
         dc_struct = Structure(
@@ -335,7 +361,10 @@ def pick_structure(
             long_strike=float(_get(long_call, "strike", 0.0)),
             short_strike=float(_get(short_call, "strike", 0.0)),
             debit_or_credit="debit",
-            width=abs(float(_get(short_call, "strike", 0.0)) - float(_get(long_call, "strike", 0.0))),
+            width=abs(
+                float(_get(short_call, "strike", 0.0))
+                - float(_get(long_call, "strike", 0.0))
+            ),
             per_leg_oi_ok=bool(oi_ok),
             per_leg_spread_pct=per_leg_spread,
             needs_chain=not (oi_ok and spread_ok),
@@ -381,13 +410,20 @@ def pick_structure(
         )
 
     leg_spreads2 = [
-        spread_pct(float(_get(short_call, "bid", 0.0)), float(_get(short_call, "ask", 0.0))),
-        spread_pct(float(_get(long_protect, "bid", 0.0)), float(_get(long_protect, "ask", 0.0))),
+        spread_pct(
+            float(_get(short_call, "bid", 0.0)), float(_get(short_call, "ask", 0.0))
+        ),
+        spread_pct(
+            float(_get(long_protect, "bid", 0.0)), float(_get(long_protect, "ask", 0.0))
+        ),
     ]
     per_leg_spread2 = None
     if all(v is not None for v in leg_spreads2):
         per_leg_spread2 = max([v for v in leg_spreads2 if v is not None])  # type: ignore[arg-type]
-    oi_ok2 = int(_get(short_call, "oi", 0)) >= min_oi and int(_get(long_protect, "oi", 0)) >= min_oi
+    oi_ok2 = (
+        int(_get(short_call, "oi", 0)) >= min_oi
+        and int(_get(long_protect, "oi", 0)) >= min_oi
+    )
     spread_ok2 = per_leg_spread2 is not None and per_leg_spread2 <= max_spread
     limit_price2 = max(0.01, _mid(short_call) - _mid(long_protect))
     return Structure(
@@ -396,7 +432,10 @@ def pick_structure(
         long_strike=float(_get(long_protect, "strike", 0.0)),
         short_strike=float(_get(short_call, "strike", 0.0)),
         debit_or_credit="credit",
-        width=abs(float(_get(long_protect, "strike", 0.0)) - float(_get(short_call, "strike", 0.0))),
+        width=abs(
+            float(_get(long_protect, "strike", 0.0))
+            - float(_get(short_call, "strike", 0.0))
+        ),
         per_leg_oi_ok=bool(oi_ok2),
         per_leg_spread_pct=per_leg_spread2,
         needs_chain=not (oi_ok2 and spread_ok2),

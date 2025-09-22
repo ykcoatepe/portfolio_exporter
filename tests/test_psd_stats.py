@@ -26,10 +26,38 @@ def fixture_sample_snapshot() -> dict[str, object]:
                 "qty": -1,
                 "mark": 1.25,
                 "legs": [
-                    {"symbol": "SPY", "expiry": "20250117", "right": "C", "strike": 430.0, "qty": -1, "price": 2.50},
-                    {"symbol": "SPY", "expiry": "20250117", "right": "C", "strike": 435.0, "qty": 1, "price": 1.05},
-                    {"symbol": "SPY", "expiry": "20250117", "right": "P", "strike": 410.0, "qty": -1, "price": 2.30},
-                    {"symbol": "SPY", "expiry": "20250117", "right": "P", "strike": 405.0, "qty": 1, "price": 1.10},
+                    {
+                        "symbol": "SPY",
+                        "expiry": "20250117",
+                        "right": "C",
+                        "strike": 430.0,
+                        "qty": -1,
+                        "price": 2.50,
+                    },
+                    {
+                        "symbol": "SPY",
+                        "expiry": "20250117",
+                        "right": "C",
+                        "strike": 435.0,
+                        "qty": 1,
+                        "price": 1.05,
+                    },
+                    {
+                        "symbol": "SPY",
+                        "expiry": "20250117",
+                        "right": "P",
+                        "strike": 410.0,
+                        "qty": -1,
+                        "price": 2.30,
+                    },
+                    {
+                        "symbol": "SPY",
+                        "expiry": "20250117",
+                        "right": "P",
+                        "strike": 405.0,
+                        "qty": 1,
+                        "price": 1.10,
+                    },
                 ],
             },
             {
@@ -48,7 +76,9 @@ def fixture_sample_snapshot() -> dict[str, object]:
     }
 
 
-def test_compute_stats_detects_combos_and_staleness(sample_snapshot: dict[str, object]) -> None:
+def test_compute_stats_detects_combos_and_staleness(
+    sample_snapshot: dict[str, object],
+) -> None:
     stats = compute_stats(sample_snapshot)
     assert stats["positions_count"] == 2
     assert stats["option_legs_count"] == 4
@@ -57,7 +87,9 @@ def test_compute_stats_detects_combos_and_staleness(sample_snapshot: dict[str, o
     assert stats["stale_threshold_seconds"] >= 0
 
 
-def test_stats_endpoint_returns_payload(monkeypatch: pytest.MonkeyPatch, tmp_path, sample_snapshot: dict[str, object]) -> None:
+def test_stats_endpoint_returns_payload(
+    monkeypatch: pytest.MonkeyPatch, tmp_path, sample_snapshot: dict[str, object]
+) -> None:
     db_path = tmp_path / "stats.db"
     monkeypatch.setenv("PSD_DB", str(db_path))
     store.init()
@@ -75,7 +107,9 @@ def test_stats_endpoint_returns_payload(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert payload["stale_quotes_count"] == 2
 
 
-def test_stats_endpoint_empty_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_stats_endpoint_empty_snapshot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
     db_path = tmp_path / "stats-empty.db"
     monkeypatch.setenv("PSD_DB", str(db_path))
     store.init()

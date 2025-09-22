@@ -18,7 +18,9 @@ def _iter_site_packages(venv_root: Path) -> Iterable[Path]:
 
     unix_lib = venv_root / "lib"
     if unix_lib.is_dir():
-        yield from (path for path in unix_lib.glob("python*/site-packages") if path.is_dir())
+        yield from (
+            path for path in unix_lib.glob("python*/site-packages") if path.is_dir()
+        )
 
     direct_site_packages = venv_root / "site-packages"
     if direct_site_packages.is_dir():

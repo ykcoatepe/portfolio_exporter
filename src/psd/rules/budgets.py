@@ -30,7 +30,10 @@ def hedge_monthly_carry(
 
 
 def footer_dto(
-    nav: float, fees_wtd: float, hedge_mtd: float, thresholds: dict[str, float] | None = None
+    nav: float,
+    fees_wtd: float,
+    hedge_mtd: float,
+    thresholds: dict[str, float] | None = None,
 ) -> dict[str, object]:
     t = thresholds or {}
     th = theta_weekly_fees(nav, fees_wtd, t.get("theta_weekly"))

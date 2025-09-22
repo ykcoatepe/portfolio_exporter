@@ -51,7 +51,9 @@ def _copy_positions_view(view: dict[str, Any]) -> dict[str, Any]:
     for key in ("single_stocks", "option_combos", "single_options"):
         raw = view.get(key)
         if isinstance(raw, list):
-            sanitized[key] = [deepcopy(entry) for entry in raw if isinstance(entry, dict)]
+            sanitized[key] = [
+                deepcopy(entry) for entry in raw if isinstance(entry, dict)
+            ]
         else:
             sanitized[key] = []
     for key, value in view.items():
@@ -59,7 +61,9 @@ def _copy_positions_view(view: dict[str, Any]) -> dict[str, Any]:
             continue
         try:
             sanitized[key] = deepcopy(value)
-        except Exception:  # pragma: no cover - defensive fallback for unserializable values
+        except (
+            Exception
+        ):  # pragma: no cover - defensive fallback for unserializable values
             sanitized[key] = value
     return sanitized
 
@@ -107,11 +111,19 @@ def _derive_single_stock_rows(
         symbol = _clean_symbol(position.get("symbol") or position.get("ticker"))
         if not symbol:
             continue
-        inst_type = str(position.get("instrument_type") or position.get("secType") or "").strip().lower()
+        inst_type = (
+            str(position.get("instrument_type") or position.get("secType") or "")
+            .strip()
+            .lower()
+        )
         if inst_type and inst_type not in {"equity", "stock", "stk"}:
             continue
-        quantity = position.get("quantity", position.get("qty", position.get("position")))
-        avg_cost = position.get("avg_cost", position.get("average_cost", position.get("avgCost")))
+        quantity = position.get(
+            "quantity", position.get("qty", position.get("position"))
+        )
+        avg_cost = position.get(
+            "avg_cost", position.get("average_cost", position.get("avgCost"))
+        )
         base_entry = rows.setdefault(
             symbol,
             {
@@ -146,12 +158,19 @@ def _derive_single_stock_rows(
             )
             if previous_close is not None:
                 base_entry["previous_close"] = previous_close
-            updated_at = _first_present(quote.get("updated_at"), quote.get("ts"), quote.get("timestamp"))
+            updated_at = _first_present(
+                quote.get("updated_at"), quote.get("ts"), quote.get("timestamp")
+            )
             if updated_at is not None:
                 base_entry["updated_at"] = updated_at
             bid_float = _to_float_or_none(bid_value)
             ask_float = _to_float_or_none(ask_value)
-            if bid_float is not None and ask_float is not None and bid_float > 0 and ask_float > 0:
+            if (
+                bid_float is not None
+                and ask_float is not None
+                and bid_float > 0
+                and ask_float > 0
+            ):
                 mark_source = "MID"
             elif mark_candidate is not None:
                 mark_source = "LAST"
@@ -253,7 +272,10 @@ class InternalScriptsProvider:
                     self.source_detail = f"{module_name}.{attr_name}"
                     return result
 
-        for module_name in ("portfolio_exporter.psd_adapter", "src.psd.ingestor.normalize"):
+        for module_name in (
+            "portfolio_exporter.psd_adapter",
+            "src.psd.ingestor.normalize",
+        ):
             snapshot = self._load_via_cli(module_name)
             if isinstance(snapshot, dict) and snapshot:
                 self.source_detail = f"{module_name} (cli)"
@@ -301,7 +323,10 @@ class InternalScriptsProvider:
                 cwd=str(self._repo_root),
                 timeout=30,
             )
-        except (FileNotFoundError, subprocess.SubprocessError):  # pragma: no cover - defensive logging
+        except (
+            FileNotFoundError,
+            subprocess.SubprocessError,
+        ):  # pragma: no cover - defensive logging
             return None
         stdout = proc.stdout.strip()
         if not stdout:
@@ -311,7 +336,9 @@ class InternalScriptsProvider:
         except json.JSONDecodeError:  # pragma: no cover - defensive logging
             return None
 
-    def _normalize_snapshot(self, snapshot: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def _normalize_snapshot(
+        self, snapshot: dict[str, Any]
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         positions: list[dict[str, Any]] = []
         derived_quotes: list[dict[str, Any]] = []
         normalized_positions: list[dict[str, Any]] = []
@@ -326,7 +353,9 @@ class InternalScriptsProvider:
 
         raw_positions = snapshot.get("positions")
         if isinstance(raw_positions, list):
-            normalized_positions = [row for row in raw_positions if isinstance(row, dict)]
+            normalized_positions = [
+                row for row in raw_positions if isinstance(row, dict)
+            ]
             if normalized_positions and not positions:
                 positions = normalized_positions.copy()
 
@@ -367,7 +396,9 @@ class InternalScriptsProvider:
         elif not any(True for _ in _iter_dicts(sanitized_view.get("single_stocks"))):
             if enriched_stocks:
                 fallback_stocks = enriched_stocks
-                sanitized_view["single_stocks"] = [deepcopy(row) for row in enriched_stocks]
+                sanitized_view["single_stocks"] = [
+                    deepcopy(row) for row in enriched_stocks
+                ]
         else:
             if enriched_stocks:
                 lookup = {
@@ -417,9 +448,13 @@ class InternalScriptsProvider:
                     stock["mark_source"] = "MISSING"
                 if "price_source" not in stock and stock.get("mark_source"):
                     stock["price_source"] = str(stock["mark_source"]).lower()
-                if stock.get("day_pnl") in (None, "") and stock.get("pnl_intraday") not in (None, ""):
+                if stock.get("day_pnl") in (None, "") and stock.get(
+                    "pnl_intraday"
+                ) not in (None, ""):
                     stock["day_pnl"] = stock["pnl_intraday"]
-                if stock.get("total_pnl") in (None, "") and stock.get("pnl_unrealized") not in (None, ""):
+                if stock.get("total_pnl") in (None, "") and stock.get(
+                    "pnl_unrealized"
+                ) not in (None, ""):
                     stock["total_pnl"] = stock["pnl_unrealized"]
                 if stock.get("stale_seconds") in (None, ""):
                     stale_candidate = stock.get("stale_s")
@@ -432,7 +467,9 @@ class InternalScriptsProvider:
                 "option_combos": [],
                 "single_options": [],
             }
-            fallback_positions, fallback_quote_rows = self._from_positions_view(fallback_view_payload)
+            fallback_positions, fallback_quote_rows = self._from_positions_view(
+                fallback_view_payload
+            )
             if fallback_positions:
                 existing_equity_symbols = {
                     row.get("symbol")
@@ -465,7 +502,9 @@ class InternalScriptsProvider:
         self.positions_view = view_for_logging
 
         if self.positions_view is not None:
-            stocks_count, combos_count, singles_count = _positions_view_counts(self.positions_view)
+            stocks_count, combos_count, singles_count = _positions_view_counts(
+                self.positions_view
+            )
             detail = self.source_detail or "snapshot"
             if fallback_stocks:
                 logger.info(
@@ -489,7 +528,9 @@ class InternalScriptsProvider:
 
         return positions, quotes
 
-    def _from_positions_view(self, view: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def _from_positions_view(
+        self, view: dict[str, Any]
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         positions: list[dict[str, Any]] = []
         quotes: list[dict[str, Any]] = []
 
@@ -532,7 +573,9 @@ class InternalScriptsProvider:
                     quotes.append(leg_quote)
 
         for single_leg in _iter_dicts(view.get("single_options")):
-            record, leg_quote = self._option_leg_record(single_leg, single_leg.get("underlying"))
+            record, leg_quote = self._option_leg_record(
+                single_leg, single_leg.get("underlying")
+            )
             if record:
                 positions.append(record)
             if leg_quote:
@@ -589,10 +632,18 @@ class InternalScriptsProvider:
         elif isinstance(expiry_value, str):
             expiry_text = expiry_value.strip()
             if not expiry_text:
-                expiry_value = parsed_symbol.expiry.isoformat() if parsed_symbol is not None else None
+                expiry_value = (
+                    parsed_symbol.expiry.isoformat()
+                    if parsed_symbol is not None
+                    else None
+                )
             else:
                 digits = "".join(ch for ch in expiry_text if ch.isdigit())
-                if parsed_symbol is not None and digits == expiry_text and len(digits) in (6, 8):
+                if (
+                    parsed_symbol is not None
+                    and digits == expiry_text
+                    and len(digits) in (6, 8)
+                ):
                     expiry_value = parsed_symbol.expiry.isoformat()
                 else:
                     expiry_value = expiry_text

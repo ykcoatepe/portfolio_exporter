@@ -82,18 +82,26 @@ def _parse_hhmm(s: str) -> dt_time:
     return dt_time(int(hh), int(mm))
 
 
-def _check_trigger_long(snapshot: dict[str, Any], confirm_rvol: float, levels: dict[str, Any]) -> bool:
+def _check_trigger_long(
+    snapshot: dict[str, Any], confirm_rvol: float, levels: dict[str, Any]
+) -> bool:
     # Simplified stateless check
     p = snapshot.get("last")
     vwap = levels.get("vwap")
     orb = levels.get("orb_high")
     rvol = float(snapshot.get("rvol", 0.0) or 0.0)
     if vwap and orb and p is not None:
-        return (p >= orb) and (abs(p - vwap) / vwap <= 0.002 or p >= vwap) and (rvol >= confirm_rvol)
+        return (
+            (p >= orb)
+            and (abs(p - vwap) / vwap <= 0.002 or p >= vwap)
+            and (rvol >= confirm_rvol)
+        )
     return False
 
 
-def _check_trigger_short(snapshot: dict[str, Any], confirm_rvol: float, levels: dict[str, Any]) -> bool:
+def _check_trigger_short(
+    snapshot: dict[str, Any], confirm_rvol: float, levels: dict[str, Any]
+) -> bool:
     p = snapshot.get("last")
     vwap = levels.get("vwap")
     rvol = float(snapshot.get("rvol", 0.0) or 0.0)
@@ -135,7 +143,9 @@ def main(argv: list[str] | None = None) -> int:
     schedule = rth_window_tr(
         et_open=dt_time(9, 30),
         et_close=et_close_time,
-        et_afternoon_rearm=et_rearm if cfg_sen.get("allow_afternoon_rearm", True) else None,
+        et_afternoon_rearm=(
+            et_rearm if cfg_sen.get("allow_afternoon_rearm", True) else None
+        ),
         et_no_new_after=et_cutoff,
     )
     # Log today's TR-local schedule
@@ -152,7 +162,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.cfg and os.path.exists(args.cfg):
             c = json.loads(open(args.cfg, encoding="utf-8").read())
-            confirm = float(c.get("rvol_confirm_entry", c.get("targets", {}).get("rvol_confirm_entry", 1.3)))
+            confirm = float(
+                c.get(
+                    "rvol_confirm_entry",
+                    c.get("targets", {}).get("rvol_confirm_entry", 1.3),
+                )
+            )
     except Exception:
         pass
 
@@ -162,10 +177,19 @@ def main(argv: list[str] | None = None) -> int:
     for row in scored:
         sym0 = row.get("symbol")
         if sym0:
-            state[sym0] = {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None}
+            state[sym0] = {
+                "fired": False,
+                "cooldown": 0,
+                "last_side": None,
+                "last_bar_ts": None,
+            }
     # Post-halt single re-arm trackers
-    post_halt_used: dict[str, bool] = {row.get("symbol"): False for row in scored if row.get("symbol")}
-    halts_seen: dict[str, int] = {row.get("symbol"): 0 for row in scored if row.get("symbol")}
+    post_halt_used: dict[str, bool] = {
+        row.get("symbol"): False for row in scored if row.get("symbol")
+    }
+    halts_seen: dict[str, int] = {
+        row.get("symbol"): 0 for row in scored if row.get("symbol")
+    }
     last_halts_check = 0.0
     HALTS_POLL_SEC = 30
     armed_afternoon = False  # optional single re-arm flip in the afternoon
@@ -175,12 +199,17 @@ def main(argv: list[str] | None = None) -> int:
         updates: dict[str, dict[str, Any]] = {}
         # Time-based gates (TR-local)
         allow_new = True
-        if schedule.no_new_signals_after_tr and is_after(schedule.no_new_signals_after_tr):
+        if schedule.no_new_signals_after_tr and is_after(
+            schedule.no_new_signals_after_tr
+        ):
             # Hard “no-new” guard late day — do not ARM new names
             allow_new = False
         # Halts polling (ET feed → convert to TR)
         now_ts = time.time()
-        if cfg_sen.get("halt_rearm", True) and (now_ts - last_halts_check) >= HALTS_POLL_SEC:
+        if (
+            cfg_sen.get("halt_rearm", True)
+            and (now_ts - last_halts_check) >= HALTS_POLL_SEC
+        ):
             last_halts_check = now_ts
             try:
                 from ..core.providers.halts_nasdaq import (
@@ -205,7 +234,9 @@ def main(argv: list[str] | None = None) -> int:
                     hh = int(parts[0])
                     mm = int(parts[1])
                     ss = int(parts[2]) if len(parts) > 2 else 0
-                    dt_ny = datetime(y, m, d, hh, mm, ss, tzinfo=ZoneInfo("America/New_York"))
+                    dt_ny = datetime(
+                        y, m, d, hh, mm, ss, tzinfo=ZoneInfo("America/New_York")
+                    )
                     return dt_ny.astimezone(TZ_TR)
 
                 for sym, ev in resumes.items():
@@ -214,13 +245,18 @@ def main(argv: list[str] | None = None) -> int:
                     if post_halt_used.get(sym):
                         continue
                     # skip if exceeded per-day max
-                    if halts_seen.get(sym, 0) >= int(cfg_sen.get("max_halts_per_day", 1)):
+                    if halts_seen.get(sym, 0) >= int(
+                        cfg_sen.get("max_halts_per_day", 1)
+                    ):
                         continue
                     rq_tr = _et_to_tr(ev.get("resume_quote_et", ""))
                     if not rq_tr:
                         continue
                     # Apply schedule gates: only re-arm if before our TR cutoff and after open
-                    if schedule.no_new_signals_after_tr and rq_tr >= schedule.no_new_signals_after_tr:
+                    if (
+                        schedule.no_new_signals_after_tr
+                        and rq_tr >= schedule.no_new_signals_after_tr
+                    ):
                         continue
                     if rq_tr < schedule.open_tr:
                         continue
@@ -231,12 +267,18 @@ def main(argv: list[str] | None = None) -> int:
                     st["halt_rearm_not_before"] = rq_tr.timestamp() + int(
                         cfg_sen.get("halt_rearm_grace_sec", 45)
                     )
-                    st["halt_mini_orb_bars_target"] = int(cfg_sen.get("halt_mini_orb_minutes", 3))
+                    st["halt_mini_orb_bars_target"] = int(
+                        cfg_sen.get("halt_mini_orb_minutes", 3)
+                    )
                     st["halt_mini_orb_bars"] = 0
                     halts_seen[sym] = halts_seen.get(sym, 0) + 1
             except Exception:
                 pass
-        if (not armed_afternoon) and schedule.afternoon_rearm_tr and is_after(schedule.afternoon_rearm_tr):
+        if (
+            (not armed_afternoon)
+            and schedule.afternoon_rearm_tr
+            and is_after(schedule.afternoon_rearm_tr)
+        ):
             if cfg_sen.get("allow_afternoon_rearm", True):
                 # simplest: allow one extra bite by clearing fired flags once
                 fired = {}
@@ -278,13 +320,16 @@ def main(argv: list[str] | None = None) -> int:
             levels = {"vwap": vwap, "orb_high": orb}
             # Cooldown + VWAP recross gating
             st = state.setdefault(
-                sym, {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None}
+                sym,
+                {"fired": False, "cooldown": 0, "last_side": None, "last_bar_ts": None},
             )
             # Decrement cooldown only on a new bar; also track mini-ORB bar accrual
             last_ts = None
             if bars:
                 lb = bars[-1]
-                last_ts = lb.get("ts") or lb.get("time") or lb.get("t") or lb.get("date")
+                last_ts = (
+                    lb.get("ts") or lb.get("time") or lb.get("t") or lb.get("date")
+                )
             if last_ts is None:
                 # Coarse fallback to minute clock if bars lack a timestamp field
                 try:
@@ -304,7 +349,9 @@ def main(argv: list[str] | None = None) -> int:
                     continue
                 if changed and bars:
                     st["halt_mini_orb_bars"] = int(st.get("halt_mini_orb_bars", 0)) + 1
-                if int(st.get("halt_mini_orb_bars", 0)) < int(st.get("halt_mini_orb_bars_target", 0)):
+                if int(st.get("halt_mini_orb_bars", 0)) < int(
+                    st.get("halt_mini_orb_bars_target", 0)
+                ):
                     continue
 
             side_now = _side_vs_vwap(snap.get("last"), vwap)
@@ -360,7 +407,10 @@ def main(argv: list[str] | None = None) -> int:
                         "levels": levels,
                     }
                 )
-                updates[sym] = {"status": "Triggered", "status_ts": time.strftime("%Y-%m-%d %H:%M:%S")}
+                updates[sym] = {
+                    "status": "Triggered",
+                    "status_ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
             else:
                 # Put on cooldown to avoid flapping
                 try:

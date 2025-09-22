@@ -24,7 +24,9 @@ def main() -> None:
     p.add_argument(
         "--symbol-expiries",
         type=str,
-        help=("Semi-colon separated SYM:EXP list, e.g. 'TSLA:20250620,20250703;AAPL:20250620'"),
+        help=(
+            "Semi-colon separated SYM:EXP list, e.g. 'TSLA:20250620,20250703;AAPL:20250620'"
+        ),
     )
     fmt_grp = p.add_mutually_exclusive_group()
     fmt_grp.add_argument(

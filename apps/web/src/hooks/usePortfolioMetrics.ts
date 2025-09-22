@@ -16,7 +16,6 @@ export type PortfolioMetrics = {
   sumTheta: number | null;
   updatedAt: number | null;
   stalenessSeconds: number | null;
-  session: PSDSnapshot["session"] | null;
 };
 
 function toFiniteNumber(value: unknown): number | null {
@@ -181,7 +180,6 @@ export function usePortfolioMetrics(): PortfolioMetrics {
     const updatedAt = typeof snapshot?.ts === "number" && Number.isFinite(snapshot.ts)
       ? snapshot.ts
       : null;
-    const session = snapshot?.session ?? null;
 
     return {
       dayPnl: hasDayPnl ? dayPnl : null,
@@ -190,7 +188,6 @@ export function usePortfolioMetrics(): PortfolioMetrics {
       sumTheta: hasTheta ? sumTheta : null,
       updatedAt,
       stalenessSeconds,
-      session,
     };
   }, [snapshot]);
 }

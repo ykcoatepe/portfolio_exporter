@@ -22,8 +22,6 @@ idna==3.10
     # via requests
 iniconfig==2.1.0
     # via pytest
-jsonschema==4.25.0
-    # via -r requirements-dev.in
 mypy-extensions==1.1.0
     # via black
 numpy==2.3.2
@@ -36,8 +34,6 @@ packaging==25.0
     #   build
     #   pytest
 pandas==2.3.1
-    # via -r requirements-dev.in
-pandera==0.26.0
     # via -r requirements-dev.in
 pathspec==0.12.1
     # via black
@@ -54,6 +50,10 @@ pyproject-hooks==1.2.0
     #   build
     #   pip-tools
 pytest==8.4.1
+    # via
+    #   -r requirements-dev.in
+    #   pytest-timeout
+pytest-timeout==2.4.0
     # via -r requirements-dev.in
 python-dateutil==2.9.0.post0
     # via pandas

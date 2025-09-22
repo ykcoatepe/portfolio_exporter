@@ -353,6 +353,8 @@ export interface PortfolioStatsApiResponse {
   margin_used_pct?: number | null;
   updated_at?: string | null;
   updatedAt?: string | null;
+  session?: MarketSessionApiResponse | null;
+  session_info?: MarketSessionApiResponse | null;
 }
 
 export interface PortfolioStatsCounts {
@@ -365,6 +367,33 @@ export interface PortfolioStatsCounts {
   breaches?: number;
 }
 
+export type MarketSessionState = "RTH" | "ETH" | "CLOSED";
+
+export interface MarketSessionApiResponse {
+  exchange?: string | null;
+  tz?: string | null;
+  state?: string | null;
+  as_of?: string | null;
+  asOf?: string | null;
+  rth_open?: string | null;
+  rthOpen?: string | null;
+  rth_close?: string | null;
+  rthClose?: string | null;
+  source?: string | null;
+  note?: string | null;
+}
+
+export interface MarketSession {
+  exchange: string;
+  tz: string;
+  state: MarketSessionState;
+  asOf: string;
+  rthOpen: string | null;
+  rthClose: string | null;
+  source: string;
+  note: string | null;
+}
+
 export interface PortfolioStats {
   netLiq: number | null;
   var95: number | null;
@@ -373,6 +402,7 @@ export interface PortfolioStats {
   counts: PortfolioStatsCounts;
   rulesEvalMs: number | null;
   tradesPriorPositions: boolean;
+  session: MarketSession | null;
 }
 
 export type PSDGreeks = {
@@ -421,6 +451,11 @@ export type PSDPositionsView = {
 export type PSDSnapshot = {
   ts?: number | null;
   session: "RTH" | "EXT" | "CLOSED";
+  session_info?: MarketSession;
+  meta?: {
+    session?: MarketSession;
+    [key: string]: unknown;
+  };
   positions?: unknown[];
   positions_view?: PSDPositionsView;
   quotes?: Record<string, unknown>;

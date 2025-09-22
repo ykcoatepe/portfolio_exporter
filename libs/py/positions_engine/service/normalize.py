@@ -33,8 +33,16 @@ def positions_from_records(records: Iterable[dict[str, Any]]) -> list[Position]:
         out.append(
             Position(
                 instrument=instrument,
-                quantity=Decimal(str(row.get("quantity", row.get("qty", row.get("position", 0))))),
-                avg_cost=Decimal(str(row.get("avg_cost", row.get("average_cost", row.get("avgCost", 0))))),
+                quantity=Decimal(
+                    str(row.get("quantity", row.get("qty", row.get("position", 0))))
+                ),
+                avg_cost=Decimal(
+                    str(
+                        row.get(
+                            "avg_cost", row.get("average_cost", row.get("avgCost", 0))
+                        )
+                    )
+                ),
                 cost_basis=_to_decimal(row.get("cost_basis")),
                 metadata=metadata,
             )
@@ -54,8 +62,12 @@ def quotes_from_records(records: Iterable[dict[str, Any]]) -> list[Quote]:
                 bid=_to_decimal(row.get("bid")),
                 ask=_to_decimal(row.get("ask")),
                 last=_to_decimal(row.get("last", row.get("close"))),
-                previous_close=_to_decimal(row.get("previous_close", row.get("priorClose"))),
-                session=_safe_session(str(row.get("session", TradingSession.CLOSED.value))),
+                previous_close=_to_decimal(
+                    row.get("previous_close", row.get("priorClose"))
+                ),
+                session=_safe_session(
+                    str(row.get("session", TradingSession.CLOSED.value))
+                ),
                 updated_at=_extract_quote_timestamp(row),
                 extended_last=_to_decimal(row.get("extended_last")),
             )
@@ -137,7 +149,9 @@ def _extract_metadata(row: dict[str, Any], inst_type: InstrumentType) -> dict[st
         )
         if expiry is not None:
             metadata["expiry"] = str(expiry).strip()
-        right = _normalize_right(_get_value("right", "option_right", "call_put", "cp", "optionRight", "side"))
+        right = _normalize_right(
+            _get_value("right", "option_right", "call_put", "cp", "optionRight", "side")
+        )
         if right is not None:
             metadata["right"] = right
         strike = _get_value("strike", "option_strike", "strike_price", "strikePrice")
@@ -153,7 +167,9 @@ def _extract_metadata(row: dict[str, Any], inst_type: InstrumentType) -> dict[st
         if combo_id is not None:
             metadata["combo_id"] = str(combo_id).strip()
 
-    previous_close = _get_value("previous_close", "prior_close", "prev_close", "prevClose")
+    previous_close = _get_value(
+        "previous_close", "prior_close", "prev_close", "prevClose"
+    )
     if previous_close is not None:
         metadata["previous_close"] = _to_decimal(previous_close)
 

@@ -48,11 +48,18 @@ def test_connect_async_calls_are_awaited():
             stripped = line.lstrip()
             if stripped.startswith("#"):
                 continue
-            if "await" not in line.split("connectAsync", 1)[0]:
+            if stripped.startswith(("def ", "async def ")):
+                continue
+            prefix, _ = line.split("connectAsync", 1)
+            if prefix.count('"') % 2 == 1 or prefix.count("'") % 2 == 1:
+                # Literal string containing connectAsync; ignore.
+                continue
+            if "await" not in prefix:
                 violations.append(f"{path}:{lineno}")
-    assert not violations, (
-        "Found connectAsync invocations without an explicit await: "
-        + ", ".join(violations)
+    assert (
+        not violations
+    ), "Found connectAsync invocations without an explicit await: " + ", ".join(
+        violations
     )
 
 
@@ -60,8 +67,11 @@ def test_ban_asyncio_get_event_loop():
     violations: list[str] = []
     for path in _iter_python_files():
         text = path.read_text(encoding="utf-8", errors="ignore")
-        if "asyncio.get_event_loop(" in text or "get_event_loop_policy().get_event_loop(" in text:
+        if (
+            "asyncio.get_event_loop(" in text
+            or "get_event_loop_policy().get_event_loop(" in text
+        ):
             violations.append(str(path))
-    assert not violations, (
-        "Detected asyncio.get_event_loop usage in: " + ", ".join(violations)
+    assert not violations, "Detected asyncio.get_event_loop usage in: " + ", ".join(
+        violations
     )

@@ -1,6 +1,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import type { PortfolioStats, PortfolioStatsApiResponse } from "../lib/types";
+import { normalizeSession } from "../lib/session";
 
 const toNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) {
@@ -43,6 +44,8 @@ export async function fetchStats(baseUrl = ""): Promise<PortfolioStats> {
 
   const payload = (await response.json()) as PortfolioStatsApiResponse | null;
 
+  const session = normalizeSession(payload?.session ?? payload?.session_info ?? null);
+
   return {
     netLiq: toNumber(payload?.net_liq ?? payload?.netLiq),
     var95: toNumber(payload?.var95_1d_pct ?? payload?.var95 ?? payload?.var_95),
@@ -60,6 +63,7 @@ export async function fetchStats(baseUrl = ""): Promise<PortfolioStats> {
     rulesEvalMs:
       toNumber(payload?.rules_eval_ms ?? payload?.combos_detection_ms) ?? null,
     tradesPriorPositions: normalizeBoolean(payload?.trades_prior_positions),
+    session,
   };
 }
 

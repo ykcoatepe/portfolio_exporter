@@ -17,7 +17,9 @@ def _coerce_tick_value(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def choose_mark(tick: dict[str, Any] | None, session: Session) -> tuple[float, str, float]:
+def choose_mark(
+    tick: dict[str, Any] | None, session: Session
+) -> tuple[float, str, float]:
     """Select an appropriate mark price for the given tick snapshot."""
     snapshot = tick or {}
     try:
@@ -28,7 +30,11 @@ def choose_mark(tick: dict[str, Any] | None, session: Session) -> tuple[float, s
     now = time.time()
     stale_s = float(max(0.0, now - ts_value))
 
-    order = ["mid", "model", "yahoo"] if session != "RTH" else ["last", "mid", "model", "yahoo"]
+    order = (
+        ["mid", "model", "yahoo"]
+        if session != "RTH"
+        else ["last", "mid", "model", "yahoo"]
+    )
 
     for key in order:
         candidate = _coerce_tick_value(snapshot.get(key))

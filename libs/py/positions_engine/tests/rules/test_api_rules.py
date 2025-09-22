@@ -29,7 +29,9 @@ def _fixed_now() -> datetime:
     return datetime(2025, 9, 19, 9, 0, tzinfo=UTC)
 
 
-def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+def test_rules_summary_returns_counters_and_top(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     now = _fixed_now()
     rules = [
         Rule(
@@ -109,7 +111,9 @@ def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch,
     original_rules = api_main._rules_state.rules
     api_main._rules_state.set_rules(rules)
 
-    def fake_build_rows(self: RulesState, _timestamp: datetime) -> dict[str, list[dict[str, object]]]:
+    def fake_build_rows(
+        self: RulesState, _timestamp: datetime
+    ) -> dict[str, list[dict[str, object]]]:
         return {
             "COMBO": [
                 {

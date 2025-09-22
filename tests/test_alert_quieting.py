@@ -10,10 +10,22 @@ def _make_positions():
     from src.psd.models import Position, OptionLeg
 
     legs = [
-        OptionLeg(symbol="SPY", expiry="20300117", right="C", strike=410, qty=-1, price=2.0),
-        OptionLeg(symbol="SPY", expiry="20300117", right="C", strike=415, qty=1, price=1.0),
+        OptionLeg(
+            symbol="SPY", expiry="20300117", right="C", strike=410, qty=-1, price=2.0
+        ),
+        OptionLeg(
+            symbol="SPY", expiry="20300117", right="C", strike=415, qty=1, price=1.0
+        ),
     ]
-    pos = Position(uid="pos1", symbol="SPY", sleeve="theta", kind="option", qty=0, mark=0.0, legs=legs)
+    pos = Position(
+        uid="pos1",
+        symbol="SPY",
+        sleeve="theta",
+        kind="option",
+        qty=0,
+        mark=0.0,
+        legs=legs,
+    )
     return [pos]
 
 
@@ -32,7 +44,9 @@ def test_debounce_duplicate_alerts(tmp_path: Path, monkeypatch) -> None:
 
     _reset_engine_state()
     # Patch positions source
-    monkeypatch.setattr(ib, "get_positions", lambda cfg=None: _make_positions(), raising=True)
+    monkeypatch.setattr(
+        ib, "get_positions", lambda cfg=None: _make_positions(), raising=True
+    )
 
     # Control time
     t0 = 1_700_000_000
@@ -65,7 +79,9 @@ def test_snooze_blocks_alert_and_writes_memo(tmp_path: Path, monkeypatch) -> Non
     import src.psd.datasources.ibkr as ib
 
     _reset_engine_state()
-    monkeypatch.setattr(ib, "get_positions", lambda cfg=None: _make_positions(), raising=True)
+    monkeypatch.setattr(
+        ib, "get_positions", lambda cfg=None: _make_positions(), raising=True
+    )
 
     t0 = 1_700_100_000
     monkeypatch.setattr(eng, "_now_ts", lambda: t0, raising=True)
@@ -95,7 +111,9 @@ def test_after_windows_alert_emits_again(tmp_path: Path, monkeypatch) -> None:
     import src.psd.datasources.ibkr as ib
 
     _reset_engine_state()
-    monkeypatch.setattr(ib, "get_positions", lambda cfg=None: _make_positions(), raising=True)
+    monkeypatch.setattr(
+        ib, "get_positions", lambda cfg=None: _make_positions(), raising=True
+    )
 
     t0 = 1_700_200_000
     memo_path = tmp_path / "memos.jsonl"

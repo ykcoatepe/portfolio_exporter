@@ -5,14 +5,24 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from positions_engine.core.models import Instrument, InstrumentType, Position, Quote, TradingSession
+from positions_engine.core.models import (
+    Instrument,
+    InstrumentType,
+    Position,
+    Quote,
+    TradingSession,
+)
 from positions_engine.service.state import PositionsState
 
 
 def test_equities_payload_emits_pnl_and_percentages() -> None:
     state = PositionsState()
-    instrument = Instrument(symbol="AAPL", instrument_type=InstrumentType.EQUITY, multiplier=Decimal("1"))
-    position = Position(instrument=instrument, quantity=Decimal("200"), avg_cost=Decimal("10"))
+    instrument = Instrument(
+        symbol="AAPL", instrument_type=InstrumentType.EQUITY, multiplier=Decimal("1")
+    )
+    position = Position(
+        instrument=instrument, quantity=Decimal("200"), avg_cost=Decimal("10")
+    )
     now = datetime(2024, 1, 2, 14, 30, tzinfo=UTC)
     quote = Quote(
         symbol="AAPL",
@@ -39,8 +49,12 @@ def test_equities_payload_emits_pnl_and_percentages() -> None:
 
 def test_equities_payload_percentages_handle_zero_denominators() -> None:
     state = PositionsState()
-    instrument = Instrument(symbol="TSLA", instrument_type=InstrumentType.EQUITY, multiplier=Decimal("1"))
-    position = Position(instrument=instrument, quantity=Decimal("50"), avg_cost=Decimal("0"))
+    instrument = Instrument(
+        symbol="TSLA", instrument_type=InstrumentType.EQUITY, multiplier=Decimal("1")
+    )
+    position = Position(
+        instrument=instrument, quantity=Decimal("50"), avg_cost=Decimal("0")
+    )
     now = datetime(2024, 1, 2, 16, 0, tzinfo=UTC)
     quote = Quote(
         symbol="TSLA",

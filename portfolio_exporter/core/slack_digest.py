@@ -35,7 +35,10 @@ def build_blocks(scored: list[dict[str, Any]], published_dir: str) -> dict[str, 
             "type": "section",
             "fields": [
                 {"type": "mrkdwn", "text": f"*Published*\n`{published_dir}`"},
-                {"type": "mrkdwn", "text": "*Open locally*\n`make momo-dashboard-open`"},
+                {
+                    "type": "mrkdwn",
+                    "text": "*Open locally*\n`make momo-dashboard-open`",
+                },
             ],
         },
         {"type": "divider"},

@@ -9,11 +9,13 @@ import json
 
 def test_json_summary_no_files(tmp_path):
     env = os.environ.copy()
-    env.update({
-        "PYTHONPATH": ".",
-        "PE_TEST_MODE": "1",
-        "PE_OUTPUT_DIR": str(tmp_path),
-    })
+    env.update(
+        {
+            "PYTHONPATH": ".",
+            "PE_TEST_MODE": "1",
+            "PE_OUTPUT_DIR": str(tmp_path),
+        }
+    )
     result = subprocess.run(
         [
             sys.executable,
@@ -78,7 +80,14 @@ def test_lazy_deps(monkeypatch, tmp_path, capsys):
 
 def test_debug_timings_json(tmp_path):
     env = os.environ.copy()
-    env.update({"PYTHONPATH": ".", "PE_TEST_MODE": "1", "PE_OUTPUT_DIR": str(tmp_path), "PE_QUIET": "1"})
+    env.update(
+        {
+            "PYTHONPATH": ".",
+            "PE_TEST_MODE": "1",
+            "PE_OUTPUT_DIR": str(tmp_path),
+            "PE_QUIET": "1",
+        }
+    )
     result = subprocess.run(
         [
             sys.executable,

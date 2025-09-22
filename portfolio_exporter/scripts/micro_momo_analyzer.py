@@ -84,7 +84,11 @@ def _count_active_journal(out_dir: str) -> int:
     try:
         with open(j, newline="", encoding="utf-8") as f:
             rows = list(_csv.DictReader(f))
-        return sum(1 for r in rows if (r.get("status") or "").lower() in ("pending", "triggered"))
+        return sum(
+            1
+            for r in rows
+            if (r.get("status") or "").lower() in ("pending", "triggered")
+        )
     except Exception:
         return 0
 
@@ -146,7 +150,12 @@ def run(
             "offline": bool(offline),
             "halts_source": halts_source or cfg["data"].get("halts_source", "nasdaq"),
             "cache": cfg["data"].get(
-                "cache", {"enabled": True, "dir": os.path.join(out_dir, ".cache"), "ttl_sec": 60}
+                "cache",
+                {
+                    "enabled": True,
+                    "dir": os.path.join(out_dir, ".cache"),
+                    "ttl_sec": 60,
+                },
             ),
             # new: expose artifact/chains dirs and auto‑producers toggle to sources
             "artifact_dirs": list(
@@ -158,8 +167,11 @@ def run(
                 )
             ),
             "chains_dir": chains_dir,
-            "auto_producers": bool(cfg["data"].get("auto_producers", False)) or bool(auto_producers),
-            "upstream_timeout_sec": int(cfg["data"].get("upstream_timeout_sec", upstream_timeout_sec)),
+            "auto_producers": bool(cfg["data"].get("auto_producers", False))
+            or bool(auto_producers),
+            "upstream_timeout_sec": int(
+                cfg["data"].get("upstream_timeout_sec", upstream_timeout_sec)
+            ),
         }
     )
     # ENV/flag overlay for live refresh
@@ -167,7 +179,9 @@ def run(
     force_live = bool(env_force or force_live_flag)
     if force_live:
         # Force fetch with TTL=0 and offline disabled; preserve providers if already set
-        cache_dir = cfg.get("data", {}).get("cache", {}).get("dir") or os.path.join(out_dir, ".cache")
+        cache_dir = cfg.get("data", {}).get("cache", {}).get("dir") or os.path.join(
+            out_dir, ".cache"
+        )
         cfg.setdefault("data", {}).update(
             {
                 "mode": "fetch",
@@ -220,7 +234,11 @@ def run(
             if best:
                 chain_file = best
         if not chain_file:
-            chain_file = find_chain_file_for_symbol(chains_dir, scan.symbol) if chains_dir else None
+            chain_file = (
+                find_chain_file_for_symbol(chains_dir, scan.symbol)
+                if chains_dir
+                else None
+            )
         if chain_file:
             chain_rows = load_chain_csv(chain_file)
         # Fallback to provider-fetched chain attached during enrichment
@@ -231,8 +249,11 @@ def run(
         # Ensure price is usable for structure picking (prefer last_price if present)
         try:
             lp = getattr(scan, "last_price", None)
-            if lp and (not getattr(scan, "price", None) or float(getattr(scan, "price", 0.0)) <= 0):
-                setattr(scan, "price", float(lp))
+            if lp and (
+                not getattr(scan, "price", None)
+                or float(getattr(scan, "price", 0.0)) <= 0
+            ):
+                scan.price = float(lp)
         except Exception:
             pass
         struct = pick_structure(scan, chain_rows, direction, cfg, tier=tier)
@@ -264,7 +285,9 @@ def run(
         session_state = (
             "rth"
             if market_window
-            else ("premarket" if allow_premarket and premarket_window_active else "closed")
+            else (
+                "premarket" if allow_premarket and premarket_window_active else "closed"
+            )
         )
 
         if market_window:
@@ -325,7 +348,9 @@ def run(
         risk_value = _risk_proxy(struct, contracts)
         cap_breach = 1 if risk_value > 0.03 * nav else 0
         # mark overflow when admitting this row would exceed batch cap
-        concurrency_guard = 1 if (base_active + len(results) + 1) > max_concurrent else 0
+        concurrency_guard = (
+            1 if (base_active + len(results) + 1) > max_concurrent else 0
+        )
 
         res = ResultRow(
             symbol=scan.symbol,
@@ -345,7 +370,9 @@ def run(
             width=struct.width,
             per_leg_oi_ok=struct.per_leg_oi_ok,
             per_leg_spread_pct=(
-                round(struct.per_leg_spread_pct, 4) if struct.per_leg_spread_pct is not None else None
+                round(struct.per_leg_spread_pct, 4)
+                if struct.per_leg_spread_pct is not None
+                else None
             ),
             needs_chain=struct.needs_chain,
         )
@@ -378,7 +405,11 @@ def run(
         levels = {
             "orb_high": r.get("orb_high"),
             "vwap": r.get("vwap"),
-            "stop": (r.get("vwap") * 0.97 if isinstance(r.get("vwap"), (int, float)) else None),
+            "stop": (
+                r.get("vwap") * 0.97
+                if isinstance(r.get("vwap"), (int, float))
+                else None
+            ),
         }
         alerts.append(
             {
@@ -392,11 +423,17 @@ def run(
 
     # Always write alerts JSON
     os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "micro_momo_alerts.json"), "w", encoding="utf-8") as f:
+    with open(
+        os.path.join(out_dir, "micro_momo_alerts.json"), "w", encoding="utf-8"
+    ) as f:
         json.dump(alerts, f, indent=2)
 
     # Optional webhook
-    if webhook and not alerts_json_only and not cfg.get("data", {}).get("offline", False):
+    if (
+        webhook
+        and not alerts_json_only
+        and not cfg.get("data", {}).get("offline", False)
+    ):
         emit_alerts(alerts, webhook, dry_run=False, offline=False)
 
     if not no_files:
@@ -497,10 +534,14 @@ def run(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="micro-momo", description="Micro-MOMO Analyzer (CSV-only v1)")
+    p = argparse.ArgumentParser(
+        prog="micro-momo", description="Micro-MOMO Analyzer (CSV-only v1)"
+    )
     p.add_argument("--input", required=False, help="Path to shortlist scan CSV")
     p.add_argument("--cfg", help="Path to config JSON")
-    p.add_argument("--chains_dir", help="Directory with SYMBOL_YYYYMMDD.csv chain files")
+    p.add_argument(
+        "--chains_dir", help="Directory with SYMBOL_YYYYMMDD.csv chain files"
+    )
     p.add_argument("--out_dir", default="out", help="Output directory for CSVs")
     p.add_argument(
         "--symbols",
@@ -514,10 +555,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Session guard (auto picks based on clock; premarket allows pre-open structures)",
     )
     # v1.1 data flags
-    p.add_argument("--data-mode", choices=["csv-only", "enrich", "fetch"], default="enrich")
-    p.add_argument("--providers", default="ib,yahoo", help="Comma-separated providers in priority order")
-    p.add_argument("--offline", action="store_true", help="Disable all live fetches and halts")
-    p.add_argument("--halts-source", default="nasdaq", help="Halts source (nasdaq); ignored when --offline")
+    p.add_argument(
+        "--data-mode", choices=["csv-only", "enrich", "fetch"], default="enrich"
+    )
+    p.add_argument(
+        "--providers",
+        default="ib,yahoo",
+        help="Comma-separated providers in priority order",
+    )
+    p.add_argument(
+        "--offline", action="store_true", help="Disable all live fetches and halts"
+    )
+    p.add_argument(
+        "--halts-source",
+        default="nasdaq",
+        help="Halts source (nasdaq); ignored when --offline",
+    )
     # force-live refresh
     p.add_argument(
         "--force-live",
@@ -534,13 +587,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--auto-upstream", action="store_true", help=argparse.SUPPRESS)
     # v1.2 outputs
     p.add_argument("--webhook", help="Webhook URL for alerts (e.g., Slack)")
-    p.add_argument("--alerts-json-only", action="store_true", help="Build alerts JSON but do not POST")
     p.add_argument(
-        "--ib-basket-out", help="Path to write IB Basket CSV; notes saved alongside with _ib_notes.txt suffix"
+        "--alerts-json-only",
+        action="store_true",
+        help="Build alerts JSON but do not POST",
+    )
+    p.add_argument(
+        "--ib-basket-out",
+        help="Path to write IB Basket CSV; notes saved alongside with _ib_notes.txt suffix",
     )
     # v1.3 journal
     p.add_argument(
-        "--journal-template", action="store_true", help="Write a journal template CSV (Pending rows)"
+        "--journal-template",
+        action="store_true",
+        help="Write a journal template CSV (Pending rows)",
     )
     return p
 
@@ -562,9 +622,11 @@ def main(argv: list[str] | None = None) -> int:
                 sym_source = ""
         if sym_source:
             alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])
-            normalized = normalize_symbols([s for s in sym_source.split(",") if s.strip()], alias_map)
+            normalized = normalize_symbols(
+                [s for s in sym_source.split(",") if s.strip()], alias_map
+            )
             if normalized:
-                setattr(args, "symbols", ",".join(normalized))
+                args.symbols = ",".join(normalized)
     # friendly input validation
     if not getattr(args, "symbols", None):
         if not getattr(args, "input", None):
@@ -581,8 +643,12 @@ def main(argv: list[str] | None = None) -> int:
     # Note: when both --input and --symbols are present, --symbols takes precedence.
     scans: list[ScanRow] = []
     if getattr(args, "symbols", None):
-        alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])  # env-provided path has priority
-        syms = normalize_symbols([s for s in str(args.symbols).split(",") if s.strip()], alias_map)
+        alias_map = load_alias_map(
+            [os.getenv("MOMO_ALIASES_PATH") or ""]
+        )  # env-provided path has priority
+        syms = normalize_symbols(
+            [s for s in str(args.symbols).split(",") if s.strip()], alias_map
+        )
         # Synthesize minimal ScanRow entries; enrichment/fetch can fill fields later.
         scans = [
             ScanRow(
@@ -606,7 +672,9 @@ def main(argv: list[str] | None = None) -> int:
         # Inject: temporarily monkeypatch load_scan_csv to return our scans.
         _orig = load_scan_csv
 
-        def _fake_load_scan_csv(_path: str) -> list[ScanRow]:  # pragma: no cover (tiny shim)
+        def _fake_load_scan_csv(
+            _path: str,
+        ) -> list[ScanRow]:  # pragma: no cover (tiny shim)
             return list(scans)
 
         try:
