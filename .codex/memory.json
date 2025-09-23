@@ -281,6 +281,69 @@
     {
       "event": "session_start",
       "timestamp": "2025-09-22T14:31:33Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-22T15:45:01Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-22T15:49:49Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-22T16:16:13Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-22T16:16:29Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-22T16:17:43Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-22T16:45:53Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T05:08:59Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T05:15:19Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T07:31:00Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T08:00:18Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T14:46:46Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T14:54:12Z"
+    },
+    {
+      "details": "update_tickers now writes options_live.txt alongside equities; added tests and docs",
+      "event": "Extended ticker sync",
+      "timestamp": "2025-09-23T15:03:25Z"
+    },
+    {
+      "details": "merged options into tickers_live.txt and updated tests/docs",
+      "event": "Consolidated ticker sync",
+      "timestamp": "2025-09-23T15:10:04Z"
+    },
+    {
+      "details": "ticker sync now writes unique equities/underlyings only",
+      "event": "Deduped tickers list",
+      "timestamp": "2025-09-23T15:14:12Z"
     }
   ],
   "decisions": [
@@ -437,6 +500,30 @@
       "rationale": "Backend fills underlying/expiry/right/strike from OSI when provider omits them; frontend sanitizes labels with parseOsi fallback; tests cover ingest + UI.",
       "timestamp": "2025-09-21T06:32:33Z",
       "title": "PSD options OSI fallback"
+    },
+    {
+      "context": "portfolio_exporter/scripts/update_tickers.py",
+      "decision": "update_tickers.py now exports stock underlyings plus option contracts (options_live.txt) for downstream scripts",
+      "id": 22,
+      "rationale": null,
+      "timestamp": "2025-09-23T15:03:18Z",
+      "title": "Extend ticker sync"
+    },
+    {
+      "context": "portfolio_exporter/scripts/update_tickers.py",
+      "decision": "update_tickers.py now writes equities and option contracts into tickers_live.txt only",
+      "id": 23,
+      "rationale": null,
+      "timestamp": "2025-09-23T15:09:57Z",
+      "title": "Consolidate ticker output"
+    },
+    {
+      "context": "portfolio_exporter/scripts/update_tickers.py",
+      "decision": "update_tickers.py now collapses options to their underlyings so tickers_live.txt only lists unique symbols",
+      "id": 24,
+      "rationale": null,
+      "timestamp": "2025-09-23T15:14:05Z",
+      "title": "Deduplicate option underlyings"
     }
   ],
   "preferences": {
