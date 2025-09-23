@@ -27,10 +27,10 @@ export interface StockRow {
   markPrice: number;
   markSource: MarkSource;
   markTime: string | null;
-  dayPnlAmount: number;
-  dayPnlPercent: number;
-  totalPnlAmount: number;
-  totalPnlPercent: number;
+  dayPnlAmount: number | null;
+  dayPnlPercent: number | null;
+  totalPnlAmount: number | null;
+  totalPnlPercent: number | null;
   currency: string;
   exposure?: number;
 }
@@ -56,8 +56,10 @@ export interface OptionLegDisplay {
   expiry_short: string | null;
 }
 
+/** @deprecated use OptionComboRow.progressPct */
 export type ComboProgress = {
   pctOfGoal: number | null;
+  pctOfR: number | null;
 };
 
 export interface OptionComboLegApi {
@@ -90,7 +92,13 @@ export interface OptionComboLegApi {
   tp_done?: boolean;
   sl_hit?: boolean;
   next_action?: string;
+  /** Canonical progress toward target in [0..1]. */
+  progress_pct?: number | null;
+  /** @deprecated use progress_pct */
   progress_pct_of_goal?: number | null;
+  /** @deprecated use progress_pct */
+  progress_pct_of_r?: number | null;
+  /** @deprecated use progress_pct */
   progress_pct_of_max?: number | null;
   label?: string;
   display?: OptionLegDisplay;
@@ -123,14 +131,21 @@ export interface OptionComboApi {
   sl_hit?: boolean;
   sl_r?: number | null;
   next_action?: string;
+  /** Canonical progress toward target in [0..1]. */
+  progress_pct?: number | null;
+  /** @deprecated use progress_pct */
   progress_pct_of_goal?: number | null;
+  /** @deprecated use progress_pct */
+  progress_pct_of_r?: number | null;
+  /** @deprecated use progress_pct */
   progress_pct_of_max?: number | null;
-  progress?: { pct_of_goal?: number | null } | null;
+  /** @deprecated use progress_pct */
+  progress?: { pct_of_goal?: number | null; pct_of_r?: number | null } | null;
   legs: OptionComboLegApi[];
   combo_group_id?: string | null;
   combo_qty?: number | null;
   label?: string;
-  display?: OptionComboDisplay;
+  display?: OptionComboDisplay | null;
 }
 
 export interface OptionComboGroupLegApi {
@@ -155,7 +170,9 @@ export interface OptionComboGroupApi {
   underlying: string;
   group_qty: number;
   group_net_price: number;
+  group_mark?: number | null;
   group_mark_price?: number | null;
+  group_pnl_unrealized?: number | null;
   mark_price?: number | null;
   mark?: number | null;
   dte: number;
@@ -170,10 +187,16 @@ export interface OptionComboGroupApi {
   sl_hit?: boolean;
   sl_r?: number | null;
   next_action?: string | null;
+  /** Canonical progress toward target in [0..1]. */
+  progress_pct?: number | null;
+  /** @deprecated use progress_pct */
   progress_pct_of_goal?: number | null;
-  progress?: { pct_of_goal?: number | null } | null;
+  /** @deprecated use progress_pct */
+  progress_pct_of_r?: number | null;
+  /** @deprecated use progress_pct */
+  progress?: { pct_of_goal?: number | null; pct_of_r?: number | null } | null;
   label?: string;
-  display?: OptionComboDisplay;
+  display?: OptionComboDisplay | null;
   legs: OptionComboGroupLegApi[];
 }
 
@@ -229,8 +252,14 @@ export interface OptionComboLegRow {
   tpDone: boolean;
   slHit: boolean;
   nextAction: string;
-  progressPctOfGoal: number | null;
-  progressPctOfMax: number | null;
+  /** Canonical progress toward target in [0..1]. */
+  progressPct: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfGoal?: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfR?: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfMax?: number | null;
   isNearTarget: boolean;
 }
 
@@ -263,9 +292,16 @@ export interface OptionComboRow extends OptionGreekSummary {
   slHit: boolean;
   slR: number | null;
   nextAction: string;
-  progressPctOfGoal: number | null;
-  progressPctOfMax: number | null;
-  progress: ComboProgress | null;
+  /** Canonical progress toward target in [0..1]. */
+  progressPct: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfGoal?: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfR?: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfMax?: number | null;
+  /** @deprecated use progressPct */
+  progress?: ComboProgress | null;
   isNearTarget: boolean;
   statusPriority: number;
 }
@@ -284,6 +320,7 @@ export interface OptionComboGroupRow extends OptionGreekSummary {
   label: string;
   display: OptionComboDisplay | null;
   legs: OptionComboLegRow[];
+  pnlUnrealized: number | null;
   tpBandLowPct: number | null;
   tpBandHighPct: number | null;
   tpBandPct: readonly [number, number] | null;
@@ -292,8 +329,14 @@ export interface OptionComboGroupRow extends OptionGreekSummary {
   slHit: boolean;
   slR: number | null;
   nextAction: string | null;
-  progressPctOfGoal: number | null;
-  progress: ComboProgress | null;
+  /** Canonical progress toward target in [0..1]. */
+  progressPct: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfGoal?: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfR?: number | null;
+  /** @deprecated use progressPct */
+  progress?: ComboProgress | null;
 }
 
 export interface OptionLegRow extends OptionGreekSummary {
@@ -326,8 +369,14 @@ export interface OptionLegRow extends OptionGreekSummary {
   tpDone: boolean;
   slHit: boolean;
   nextAction: string;
-  progressPctOfGoal: number | null;
-  progressPctOfMax: number | null;
+  /** Canonical progress toward target in [0..1]. */
+  progressPct: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfGoal?: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfR?: number | null;
+  /** @deprecated use progressPct */
+  progressPctOfMax?: number | null;
   isNearTarget: boolean;
   isOrphan: boolean;
 }
@@ -343,6 +392,8 @@ export interface PortfolioStatsApiResponse {
   rules_eval_ms?: number | null;
   combos_detection_ms?: number | null;
   trades_prior_positions?: boolean | null;
+  data_source?: string | null;
+  dataSource?: string | null;
   net_liq?: number | null;
   netLiq?: number | null;
   var95?: number | null;
@@ -355,6 +406,10 @@ export interface PortfolioStatsApiResponse {
   updatedAt?: string | null;
   session?: MarketSessionApiResponse | null;
   session_info?: MarketSessionApiResponse | null;
+  meta?: {
+    latest_ts?: string | null;
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface PortfolioStatsCounts {
@@ -402,7 +457,10 @@ export interface PortfolioStats {
   counts: PortfolioStatsCounts;
   rulesEvalMs: number | null;
   tradesPriorPositions: boolean;
+  dataSource: string | null;
   session: MarketSession | null;
+  sessionInfo?: MarketSession | null;
+  latestTs: string | null;
 }
 
 export type PSDGreeks = {
@@ -421,8 +479,15 @@ export type PSDLeg = {
   price_source?: string;
   mark_source?: string;
   stale_s: number;
+  day_pnl?: number;
+  day_pnl_percent?: number;
+  day_pnl_pct?: number;
   pnl_intraday: number;
   pnl_unrealized?: number;
+  pnl_unrealized_percent?: number;
+  pnl_unrealized_pct?: number;
+  total_pnl?: number;
+  total_pnl_percent?: number;
   greeks?: PSDGreeks;
   right?: string;
   strike?: number;
@@ -439,6 +504,13 @@ export type PSDCombo = {
   underlier?: string;
   legs: PSDLeg[];
   pnl_intraday: number;
+  pnl_unrealized?: number;
+  day_pnl_percent?: number;
+  day_pnl_pct?: number;
+  pnl_unrealized_percent?: number;
+  pnl_unrealized_pct?: number;
+  total_pnl?: number;
+  total_pnl_percent?: number;
   greeks_agg?: PSDGreeks;
 };
 

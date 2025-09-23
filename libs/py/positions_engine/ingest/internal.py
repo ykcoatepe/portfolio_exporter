@@ -253,6 +253,32 @@ class InternalScriptsProvider:
             logger.info("Internal ingest skipped: %s", exc)
             return [], []
 
+    def load_greeks_snapshot(self) -> dict[str, Any] | None:
+        """Return a lightweight greeks payload when available from project helpers."""
+
+        _ensure_repo_root()
+        for module_name, attr_candidates in (
+            ("portfolio_exporter.psd_adapter", ("greeks_snapshot_once", "greeks_snapshot")),
+            ("src.psd.ingestor.normalize", ("greeks_snapshot_once",)),
+        ):
+            module = self._import_optional(module_name)
+            if module is None:
+                continue
+            for attr_name in attr_candidates:
+                fn = getattr(module, attr_name, None)
+                if not callable(fn):
+                    continue
+                try:
+                    result = self._invoke_callable(fn)
+                except Exception:  # pragma: no cover - defensive logging
+                    logger.debug("[internal] greeks snapshot via %s.%s failed", module_name, attr_name, exc_info=True)
+                    continue
+                if isinstance(result, dict) and result:
+                    return result
+                if isinstance(result, list) and result:
+                    return {"rows": [entry for entry in result if isinstance(entry, dict)]}
+        return None
+
     def _load_snapshot(self) -> dict[str, Any] | None:
         _ensure_repo_root()
 

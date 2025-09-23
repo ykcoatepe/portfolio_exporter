@@ -37,6 +37,14 @@ function normalizeEpochMs(value: number | null | undefined): number | null {
   return numeric < 1e12 ? Math.trunc(numeric * 1000) : Math.trunc(numeric);
 }
 
+function parseIsoToMs(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function formatRelativeFromNow(timestamp: number, now: number): string {
   const diffMs = timestamp - now;
   const diffSeconds = Math.round(diffMs / 1000);
@@ -57,25 +65,39 @@ function formatRelativeFromNow(timestamp: number, now: number): string {
 export default function StatsRibbon(): JSX.Element {
   const { data: stats } = useStats();
   const metrics = usePortfolioMetrics();
-  const sessionResult = useSession(stats?.session ?? null);
-  const session = sessionResult.data ?? stats?.session ?? null;
+  const sessionSeed = stats?.session ?? stats?.sessionInfo ?? null;
+  const sessionResult = useSession(sessionSeed);
+  const session = sessionSeed ?? sessionResult.data ?? null;
 
   const now = Date.now();
 
   const updatedTimestamp = useMemo(() => {
+    const preferred = parseIsoToMs(stats?.latestTs);
+    if (preferred !== null) {
+      return preferred;
+    }
+
     const candidates: number[] = [];
+    const sessionTimestamp = parseIsoToMs(stats?.session?.asOf ?? stats?.sessionInfo?.asOf);
+    if (sessionTimestamp !== null) {
+      candidates.push(sessionTimestamp);
+    }
     const normalizedMetricsTimestamp = normalizeEpochMs(metrics.updatedAt);
     if (normalizedMetricsTimestamp !== null) {
       candidates.push(normalizedMetricsTimestamp);
     }
-    if (stats?.updatedAt) {
-      const parsed = Date.parse(stats.updatedAt);
-      if (!Number.isNaN(parsed)) {
-        candidates.push(parsed);
-      }
+    const statsUpdatedTimestamp = parseIsoToMs(stats?.updatedAt);
+    if (statsUpdatedTimestamp !== null) {
+      candidates.push(statsUpdatedTimestamp);
     }
     return selectLatestTimestamp(candidates);
-  }, [metrics.updatedAt, stats?.updatedAt]);
+  }, [
+    metrics.updatedAt,
+    stats?.latestTs,
+    stats?.session?.asOf,
+    stats?.sessionInfo?.asOf,
+    stats?.updatedAt,
+  ]);
 
   const updatedLabel = updatedTimestamp
     ? formatRelativeFromNow(updatedTimestamp, now)
@@ -98,6 +120,8 @@ export default function StatsRibbon(): JSX.Element {
   const sessionUpdatedTitle = hasSessionTimestamp
     ? new Date(sessionUpdatedTimestamp).toLocaleString()
     : undefined;
+
+  const dataSourceLabel = stats?.dataSource ?? "—";
 
   const cards = [
     {
@@ -174,6 +198,12 @@ export default function StatsRibbon(): JSX.Element {
               updated {sessionUpdatedLabel}
             </span>
           </div>
+          <span
+            data-testid="data-source-chip"
+            className="rounded-full border border-slate-800/70 bg-slate-900/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300"
+          >
+            DATA • {dataSourceLabel}
+          </span>
           {isStale && stalenessLabel ? (
             <span
               className={clsx(

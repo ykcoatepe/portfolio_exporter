@@ -28,7 +28,186 @@ import type {
 const OPTIONS_QUERY_KEY = ["positions", "options"] as const;
 const MARK_SOURCE_PRIORITY: Record<string, number> = { MID: 0, LAST: 1, PREV: 2, MISSING: 3 };
 
+export type ComboFilterKey =
+  | "tpHit"
+  | "tpDone"
+  | "slHit"
+  | "nearTp"
+  | "credit"
+  | "debit"
+  | "dteLt14";
+
+type ComboFilterDefinition = {
+  key: ComboFilterKey;
+  label: string;
+  combo: (combo: OptionComboRow) => boolean;
+  group: (group: OptionComboGroupRow) => boolean;
+};
+
+const toSideFromNet = (netPrice: number | null | undefined): "credit" | "debit" | null => {
+  if (netPrice === null || netPrice === undefined || Number.isNaN(netPrice) || netPrice === 0) {
+    return null;
+  }
+  return netPrice > 0 ? "credit" : "debit";
+};
+
+type ProgressSourceRow = {
+  groupNetPrice?: number | null;
+  progressPct?: number | null;
+  progressPctOfMax?: number | null;
+  progress?: { pctOfGoal?: number | null; pctOfR?: number | null } | null;
+  progressPctOfR?: number | null;
+};
+
+const coerceProgressValue = (value: number | null | undefined): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+function toProgressPct(row: ProgressSourceRow): number | null {
+  const canonical = coerceProgressValue(row.progressPct);
+  if (canonical !== null) {
+    return canonical;
+  }
+  const credit = coerceProgressValue(row.progress?.pctOfGoal ?? row.progressPctOfMax);
+  const debit = coerceProgressValue(row.progress?.pctOfR ?? row.progressPctOfR);
+  if (row.groupNetPrice != null) {
+    if (row.groupNetPrice > 0) {
+      return credit ?? null;
+    }
+    if (row.groupNetPrice < 0) {
+      return debit ?? null;
+    }
+  }
+  return credit ?? debit ?? null;
+}
+
+type NearTargetInput = {
+  tpHit: boolean;
+  tpDone: boolean;
+  slHit: boolean;
+  tpBandPct: readonly [number, number] | null;
+  tpBandLowPct: number | null;
+  netPrice: number | null;
+  progressPct: number | null;
+};
+
+const isNearTakeProfit = ({
+  tpHit,
+  tpDone,
+  slHit,
+  tpBandPct,
+  tpBandLowPct,
+  netPrice,
+  progressPct,
+}: NearTargetInput): boolean => {
+  if (tpHit || tpDone || slHit) {
+    return false;
+  }
+  if (progressPct == null) {
+    return false;
+  }
+  const side = toSideFromNet(netPrice);
+  const bandLow = tpBandPct?.[0] ?? tpBandLowPct;
+  if (side === "credit" && bandLow != null) {
+    return progressPct >= bandLow - 0.1 && progressPct < bandLow;
+  }
+  return progressPct >= 0.8 && progressPct < 1.0;
+};
+
+const COMBO_FILTER_ITEMS_INTERNAL: readonly ComboFilterDefinition[] = [
+  {
+    key: "tpHit",
+    label: "TP Hit",
+    combo: (combo) => combo.tpHit,
+    group: (group) => group.tpHit,
+  },
+  {
+    key: "tpDone",
+    label: "TP Done",
+    combo: (combo) => combo.tpDone,
+    group: (group) => group.tpDone,
+  },
+  {
+    key: "slHit",
+    label: "Stop",
+    combo: (combo) => combo.slHit,
+    group: (group) => group.slHit,
+  },
+  {
+    key: "nearTp",
+    label: "Near TP",
+    combo: (combo) =>
+      isNearTakeProfit({
+        tpHit: combo.tpHit,
+        tpDone: combo.tpDone,
+        slHit: combo.slHit,
+        tpBandPct: combo.tpBandPct,
+        tpBandLowPct: combo.tpBandLowPct,
+        netPrice: combo.groupNetPrice ?? combo.netPremium,
+        progressPct: combo.progressPct,
+      }),
+    group: (group) =>
+      isNearTakeProfit({
+        tpHit: group.tpHit,
+        tpDone: group.tpDone,
+        slHit: group.slHit,
+        tpBandPct: group.tpBandPct,
+        tpBandLowPct: group.tpBandLowPct,
+        netPrice: group.groupNetPrice,
+        progressPct: group.progressPct,
+      }),
+  },
+  {
+    key: "credit",
+    label: "Credit",
+    combo: (combo) => (combo.groupNetPrice ?? combo.netPremium) > 0,
+    group: (group) => group.groupNetPrice > 0,
+  },
+  {
+    key: "debit",
+    label: "Debit",
+    combo: (combo) => (combo.groupNetPrice ?? combo.netPremium) < 0,
+    group: (group) => group.groupNetPrice < 0,
+  },
+  {
+    key: "dteLt14",
+    label: "DTE < 14d",
+    combo: (combo) => combo.dte !== null && combo.dte < 14,
+    group: (group) => group.dte !== null && group.dte < 14,
+  },
+] as const;
+
+export const COMBO_FILTER_ITEMS = COMBO_FILTER_ITEMS_INTERNAL;
+
+export const COMBO_FILTER_DEFINITIONS: Record<ComboFilterKey, ComboFilterDefinition> = COMBO_FILTER_ITEMS_INTERNAL.reduce(
+  (acc, definition) => {
+    acc[definition.key] = definition;
+    return acc;
+  },
+  {} as Record<ComboFilterKey, ComboFilterDefinition>,
+);
+
+export const COMBO_FILTER_ORDER: readonly ComboFilterKey[] = COMBO_FILTER_ITEMS_INTERNAL.map((item) => item.key);
+
+export const buildComboPredicate = (keys: readonly ComboFilterKey[]): ((combo: OptionComboRow) => boolean) => {
+  if (!keys.length) {
+    return () => true;
+  }
+  const predicates = keys.map((key) => COMBO_FILTER_DEFINITIONS[key].combo);
+  return (combo) => predicates.every((predicate) => predicate(combo));
+};
+
+export const buildGroupPredicate = (keys: readonly ComboFilterKey[]): ((group: OptionComboGroupRow) => boolean) => {
+  if (!keys.length) {
+    return () => true;
+  }
+  const predicates = keys.map((key) => COMBO_FILTER_DEFINITIONS[key].group);
+  return (group) => predicates.every((predicate) => predicate(group));
+};
+
 const toNumber = (value: unknown, fallback: number | null = null): number | null => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
   const next = Number(value);
   return Number.isFinite(next) ? next : fallback;
 };
@@ -115,16 +294,30 @@ const toComboLegRow = (leg: OptionComboLegApi, asOf?: string | null): OptionComb
   const slHit = leg.sl_hit === true;
   const nextActionRaw = typeof leg.next_action === "string" ? leg.next_action.toUpperCase() : "HOLD";
   const progressPctOfGoal = toNumber(leg.progress_pct_of_goal);
+  const progressPctOfR = toNumber(leg.progress_pct_of_r);
   const progressPctOfMax = toNumber(leg.progress_pct_of_max);
-  const isShort = quantity < 0;
-  let isNearTarget = false;
-  if (!tpDone && !slHit) {
-    if (isShort && tpBandLowPct !== null && progressPctOfMax !== null && progressPctOfMax >= 0) {
-      isNearTarget = progressPctOfMax >= Math.max(0, tpBandLowPct - 0.1);
-    } else if (!isShort && progressPctOfMax !== null && progressPctOfMax >= 0) {
-      isNearTarget = progressPctOfMax >= 1.8;
-    }
-  }
+  const legacyProgress =
+    progressPctOfGoal !== null || progressPctOfR !== null
+      ? { pctOfGoal: progressPctOfGoal ?? undefined, pctOfR: progressPctOfR ?? undefined }
+      : null;
+  const pseudoNet = quantity < 0 ? 1 : quantity > 0 ? -1 : null;
+  const progressPct = toProgressPct({
+    groupNetPrice: pseudoNet,
+    progressPct: toNumber(leg.progress_pct),
+    progressPctOfMax,
+    progressPctOfR,
+    progress: legacyProgress,
+  });
+  const tpBandPct = tpBandLowPct !== null && tpBandHighPct !== null ? ([tpBandLowPct, tpBandHighPct] as const) : null;
+  const isNearTarget = isNearTakeProfit({
+    tpHit,
+    tpDone,
+    slHit,
+    tpBandPct,
+    tpBandLowPct,
+    netPrice: pseudoNet,
+    progressPct,
+  });
   const rawRight = typeof leg.right === "string" ? leg.right : String(leg.right ?? "");
   const fallbackExpiry = typeof leg.expiry === "string" ? leg.expiry : "";
   const friendlyDisplay = buildFriendlyLegDisplay({
@@ -177,7 +370,9 @@ const toComboLegRow = (leg: OptionComboLegApi, asOf?: string | null): OptionComb
     tpDone,
     slHit,
     nextAction: nextActionRaw,
+    progressPct,
     progressPctOfGoal,
+    progressPctOfR,
     progressPctOfMax,
     isNearTarget,
   };
@@ -224,18 +419,29 @@ const mapComboApiToRow = (
   const slHit = combo.sl_hit === true;
   const slR = toNumber(combo.sl_r);
   const nextActionRaw = typeof combo.next_action === "string" ? combo.next_action.toUpperCase() : "HOLD";
-  const progressPctOfGoal = toNumber(combo.progress?.pct_of_goal ?? combo.progress_pct_of_goal);
+  const progressPctOfGoal = toNumber(combo.progress_pct_of_goal ?? combo.progress?.pct_of_goal);
+  const progressPctOfR = toNumber(combo.progress_pct_of_r ?? combo.progress?.pct_of_r);
   const progressPctOfMax = toNumber(combo.progress_pct_of_max);
-  const progress = progressPctOfGoal !== null ? { pctOfGoal: progressPctOfGoal } : null;
-  const isCredit = side === "credit";
-  let isNearTarget = false;
-  if (!tpDone && !slHit) {
-    if (isCredit && tpBandLowPct !== null && progressPctOfMax !== null && progressPctOfMax >= 0) {
-      isNearTarget = progressPctOfMax >= Math.max(0, tpBandLowPct - 0.1);
-    } else if (!isCredit && progressPctOfMax !== null && progressPctOfMax >= 0) {
-      isNearTarget = progressPctOfMax >= 1.8;
-    }
-  }
+  const progress =
+    progressPctOfGoal !== null || progressPctOfR !== null
+      ? { pctOfGoal: progressPctOfGoal, pctOfR: progressPctOfR }
+      : null;
+  const progressPct = toProgressPct({
+    groupNetPrice: netPremium,
+    progressPct: toNumber(combo.progress_pct),
+    progressPctOfMax,
+    progressPctOfR,
+    progress,
+  });
+  const isNearTarget = isNearTakeProfit({
+    tpHit,
+    tpDone,
+    slHit,
+    tpBandPct,
+    tpBandLowPct,
+    netPrice: netPremium,
+    progressPct,
+  });
   const statusPriority = slHit
     ? 0
     : tpHit && !tpDone
@@ -279,7 +485,9 @@ const mapComboApiToRow = (
     slHit,
     slR,
     nextAction: nextActionRaw,
+    progressPct,
     progressPctOfGoal,
+    progressPctOfR,
     progressPctOfMax,
     progress,
     isNearTarget,
@@ -339,7 +547,9 @@ const mapLegToStandaloneRow = (leg: OptionComboLegApi, asOf?: string | null): Op
     tpDone: legRow.tpDone,
     slHit: legRow.slHit,
     nextAction: legRow.nextAction,
+    progressPct: legRow.progressPct,
     progressPctOfGoal: legRow.progressPctOfGoal,
+    progressPctOfR: legRow.progressPctOfR,
     progressPctOfMax: legRow.progressPctOfMax,
     isNearTarget: legRow.isNearTarget,
     isOrphan: leg.combo_id === null,
@@ -401,7 +611,9 @@ const buildGroupRowFromApi = (
       tpDone: false,
       slHit: false,
       nextAction: "HOLD",
+      progressPct: null,
       progressPctOfGoal: null,
+      progressPctOfR: null,
       progressPctOfMax: null,
       isNearTarget: false,
     } satisfies OptionComboLegRow;
@@ -424,7 +636,8 @@ const buildGroupRowFromApi = (
     markSourceRaw === "MID" || markSourceRaw === "LAST" || markSourceRaw === "PREV"
       ? (markSourceRaw as MarkSource)
       : "MISSING";
-  const mark = toNumber(group.group_mark_price ?? group.mark_price ?? group.mark);
+  const mark = toNumber(group.group_mark ?? group.group_mark_price ?? group.mark_price ?? group.mark);
+  const pnlUnrealized = toNumber(group.group_pnl_unrealized);
   const tpBandArray = Array.isArray(group.tp_band_pct) ? group.tp_band_pct : null;
   const tpBandLowPct = toNumber(group.tp_band_low_pct ?? tpBandArray?.[0]);
   const tpBandHighPct = toNumber(group.tp_band_high_pct ?? tpBandArray?.[1]);
@@ -434,9 +647,21 @@ const buildGroupRowFromApi = (
   const slHit = group.sl_hit === true;
   const slR = toNumber(group.sl_r);
   const nextAction = typeof group.next_action === "string" ? group.next_action.toUpperCase() : null;
-  const progressPctOfGoal = toNumber(group.progress?.pct_of_goal ?? group.progress_pct_of_goal);
-  const progress = progressPctOfGoal !== null ? { pctOfGoal: progressPctOfGoal } : null;
-  const groupNetPrice = toNumber(group.group_net_price, 0) ?? 0;
+  const progressPctOfGoal = toNumber(group.progress_pct_of_goal ?? group.progress?.pct_of_goal);
+  const progressPctOfR = toNumber(group.progress_pct_of_r ?? group.progress?.pct_of_r);
+  const progress =
+    progressPctOfGoal !== null || progressPctOfR !== null
+      ? { pctOfGoal: progressPctOfGoal, pctOfR: progressPctOfR }
+      : null;
+  const rawGroupNetPrice = toNumber(group.group_net_price);
+  const progressPct = toProgressPct({
+    groupNetPrice: rawGroupNetPrice,
+    progressPct: toNumber(group.progress_pct),
+    progressPctOfMax: null,
+    progressPctOfR,
+    progress,
+  });
+  const groupNetPrice = rawGroupNetPrice ?? 0;
 
   return {
     id: group.combo_group_id,
@@ -456,6 +681,7 @@ const buildGroupRowFromApi = (
     label,
     display,
     legs,
+    pnlUnrealized,
     tpBandLowPct,
     tpBandHighPct,
     tpBandPct,
@@ -464,7 +690,9 @@ const buildGroupRowFromApi = (
     slHit,
     slR,
     nextAction,
+    progressPct,
     progressPctOfGoal,
+    progressPctOfR,
     progress,
   };
 };
@@ -568,6 +796,15 @@ const buildGroupsFallback = (
       { sum: 0, weight: 0 },
     );
     const mark = markAccumulator.weight > 0 ? markAccumulator.sum / markAccumulator.weight : null;
+    const pnlValues = entries
+      .map((combo) => combo.totalPnlAmount)
+      .filter(
+        (value): value is number =>
+          value !== null && value !== undefined && Number.isFinite(value),
+      );
+    const pnlUnrealized = pnlValues.length
+      ? pnlValues.reduce((acc, value) => acc + value, 0)
+      : null;
     const tpBandLowPct = entries.reduce<number | null>((acc, combo) => {
       if (acc !== null) {
         return acc;
@@ -608,12 +845,27 @@ const buildGroupsFallback = (
       return next;
     }, null);
     const progressValues = entries
-      .map((combo) => combo.progress?.pctOfGoal ?? combo.progressPctOfGoal)
+      .map((combo) => combo.progressPct)
       .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(value));
-    const progressPctOfGoal = progressValues.length
+    const progressPct = progressValues.length
       ? progressValues.reduce((acc, value) => acc + value, 0) / progressValues.length
       : null;
-    const progress = progressPctOfGoal !== null ? { pctOfGoal: progressPctOfGoal } : null;
+    const progressGoalValues = entries
+      .map((combo) => combo.progressPctOfGoal ?? combo.progress?.pctOfGoal)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(value));
+    const progressPctOfGoal = progressGoalValues.length
+      ? progressGoalValues.reduce((acc, value) => acc + value, 0) / progressGoalValues.length
+      : null;
+    const progressRValues = entries
+      .map((combo) => combo.progressPctOfR ?? combo.progress?.pctOfR)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(value));
+    const progressPctOfR = progressRValues.length
+      ? progressRValues.reduce((acc, value) => acc + value, 0) / progressRValues.length
+      : null;
+    const progress =
+      progressPctOfGoal !== null || progressPctOfR !== null
+        ? { pctOfGoal: progressPctOfGoal, pctOfR: progressPctOfR }
+        : null;
     const groupNetPrice = netPrice;
 
     groupRows.set(key, {
@@ -634,6 +886,7 @@ const buildGroupsFallback = (
       label: formatComboLabel(first.strategy, legsForLabel as OptionComboLegApi[], first.dte, netPrice, first.underlying),
       display: first.display,
       legs: legsAggregation,
+      pnlUnrealized,
       tpBandLowPct,
       tpBandHighPct,
       tpBandPct,
@@ -642,7 +895,9 @@ const buildGroupsFallback = (
       slHit,
       slR,
       nextAction,
+      progressPct,
       progressPctOfGoal,
+      progressPctOfR,
       progress,
     });
   });
@@ -727,8 +982,8 @@ export function useOptionCombos(): OptionCombosResult {
         if (a.statusPriority !== b.statusPriority) {
           return a.statusPriority - b.statusPriority;
         }
-        const bProgress = toSortableValue(b.progressPctOfGoal ?? b.progressPctOfMax);
-        const aProgress = toSortableValue(a.progressPctOfGoal ?? a.progressPctOfMax);
+        const bProgress = toSortableValue(b.progressPct);
+        const aProgress = toSortableValue(a.progressPct);
         if (bProgress !== aProgress) {
           return bProgress - aProgress;
         }

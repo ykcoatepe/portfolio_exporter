@@ -20,8 +20,6 @@ import psd.plugins.micro_momo_adapter  # noqa: F401
 from psd.analyzers.base import AnalyzerResult, Candidate, Signal
 from psd.runtime.registry import create_analyzer
 
-JsonObject = Mapping[str, Any]
-
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(

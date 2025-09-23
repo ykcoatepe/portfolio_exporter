@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
+import math
 
 from .detector import OptionCombo, OptionLegSnapshot
 from .taxonomy import ComboStrategy
@@ -51,30 +52,53 @@ class _LegAccumulator:
     mark_weight: Decimal = ZERO
     mark_source: str = "MISSING"
     stale_seconds: int | None = None
+    total_pnl: Decimal = ZERO
+    has_delta: bool = False
+    has_gamma: bool = False
+    has_theta: bool = False
+    has_vega: bool = False
+    has_total_pnl: bool = False
+    mark_components: dict[str, tuple[Decimal, Decimal]] = field(default_factory=dict)
 
     def add(self, leg: OptionLegSnapshot) -> None:
         self.quantity += leg.quantity
-        self.delta += (
-            leg.delta * leg.quantity * leg.multiplier if leg.delta is not None else ZERO
-        )
-        self.gamma += (
-            leg.gamma * leg.quantity * leg.multiplier if leg.gamma is not None else ZERO
-        )
-        self.theta += (
-            leg.theta * leg.quantity * leg.multiplier if leg.theta is not None else ZERO
-        )
-        self.vega += (
-            leg.vega * leg.quantity * leg.multiplier if leg.vega is not None else ZERO
-        )
+        if leg.delta is not None:
+            self.delta += leg.delta * leg.quantity * leg.multiplier
+            self.has_delta = True
+        if leg.gamma is not None:
+            self.gamma += leg.gamma * leg.quantity * leg.multiplier
+            self.has_gamma = True
+        if leg.theta is not None:
+            self.theta += leg.theta * leg.quantity * leg.multiplier
+            self.has_theta = True
+        if leg.vega is not None:
+            self.vega += leg.vega * leg.quantity * leg.multiplier
+            self.has_vega = True
+        if leg.total_pnl is not None:
+            self.total_pnl += leg.total_pnl
+            self.has_total_pnl = True
         if leg.mark is not None:
             weight = abs(leg.quantity)
             self.mark_sum += leg.mark * weight
             self.mark_weight += weight
+            source_key = _canonical_mark_source(leg.mark_source)
+            if source_key is not None:
+                sum_value, weight_value = self.mark_components.get(source_key, (ZERO, ZERO))
+                self.mark_components[source_key] = (
+                    sum_value + leg.mark * weight,
+                    weight_value + weight,
+                )
         self.mark_source = _choose_mark_source(self.mark_source, leg.mark_source)
         self.stale_seconds = _max_staleness(self.stale_seconds, leg.stale_seconds)
 
     def to_payload(self, display: LegDisplay, combo_group_id: str) -> dict[str, Any]:
         mark = (self.mark_sum / self.mark_weight) if self.mark_weight > 0 else None
+        sum_greeks = {
+            "delta": _to_float(self.delta) if self.has_delta else None,
+            "gamma": _to_float(self.gamma) if self.has_gamma else None,
+            "theta": _to_float(self.theta) if self.has_theta else None,
+            "vega": _to_float(self.vega) if self.has_vega else None,
+        }
         return {
             "symbol": self.symbol,
             "underlying": display.short_ul,
@@ -82,12 +106,7 @@ class _LegAccumulator:
             "strike": _to_float(self.strike),
             "expiry": self.expiry,
             "quantity": _to_float(self.quantity),
-            "sum_greeks": {
-                "delta": _to_float(self.delta),
-                "gamma": _to_float(self.gamma),
-                "theta": _to_float(self.theta),
-                "vega": _to_float(self.vega),
-            },
+            "sum_greeks": sum_greeks,
             "mark": _to_float(mark),
             "mark_source": self.mark_source,
             "stale_seconds": self.stale_seconds,
@@ -151,21 +170,75 @@ class ComboGroup:
                 None,
             )
 
+        delta_total = ZERO
+        gamma_total = ZERO
+        theta_total = ZERO
+        vega_total = ZERO
+        has_delta = False
+        has_gamma = False
+        has_theta = False
+        has_vega = False
+        pnl_unrealized: Decimal | None = None
+        best_mark_source: str | None = None
+        best_mark_value: Decimal | None = None
+        best_mark_rank = math.inf
+        best_stale: int | None = None
+        for accumulator in self.leg_accumulators.values():
+            if accumulator.has_delta:
+                delta_total += accumulator.delta
+                has_delta = True
+            if accumulator.has_gamma:
+                gamma_total += accumulator.gamma
+                has_gamma = True
+            if accumulator.has_theta:
+                theta_total += accumulator.theta
+                has_theta = True
+            if accumulator.has_vega:
+                vega_total += accumulator.vega
+                has_vega = True
+            if accumulator.has_total_pnl:
+                pnl_unrealized = (
+                    accumulator.total_pnl
+                    if pnl_unrealized is None
+                    else pnl_unrealized + accumulator.total_pnl
+                )
+            for source_key, (sum_value, weight_value) in accumulator.mark_components.items():
+                if weight_value <= ZERO:
+                    continue
+                mark_value = sum_value / weight_value
+                rank = _MARK_SOURCE_PRIORITY.get(source_key, math.inf)
+                if rank < best_mark_rank:
+                    best_mark_rank = rank
+                    best_mark_source = source_key
+                    best_mark_value = mark_value
+            best_stale = _max_staleness(best_stale, accumulator.stale_seconds)
+
+        delta_value = delta_total if has_delta else None
+        gamma_value = gamma_total if has_gamma else None
+        theta_value = theta_total if has_theta else None
+        vega_value = vega_total if has_vega else None
+
+        self.mark_source = best_mark_source or "MISSING"
+        aggregate_stale = _max_staleness(self.stale_seconds, best_stale)
+        self.stale_seconds = aggregate_stale
+
         payload = {
             "combo_group_id": self.combo_group_id,
             "strategy": self.strategy.value,
             "underlying": self.underlying,
             "group_qty": _to_float(self.group_qty),
             "group_net_price": _to_float(net_price),
+            "group_mark": _to_float(best_mark_value),
+            "group_pnl_unrealized": _to_float(pnl_unrealized),
             "dte": self.dte_min,
             "sum_greeks": {
-                "delta": _to_float(self.delta),
-                "gamma": _to_float(self.gamma),
-                "theta": _to_float(self.theta),
-                "vega": _to_float(self.vega),
+                "delta": _to_float(delta_value),
+                "gamma": _to_float(gamma_value),
+                "theta": _to_float(theta_value),
+                "vega": _to_float(vega_value),
             },
-            "mark_source": self.mark_source,
-            "stale_seconds": self.stale_seconds,
+            "mark_source": best_mark_source,
+            "stale_seconds": aggregate_stale,
             "label": label_text,
             "display": {
                 "combo_label": label_text,
@@ -173,6 +246,7 @@ class ComboGroup:
                 "expiry_short": expiry_short,
             },
         }
+        payload["group_mark_price"] = payload["group_mark"]
         legs_payload: list[dict[str, Any]] = []
         for acc in self.leg_accumulators.values():
             leg_display = build_leg_display(
@@ -428,6 +502,17 @@ def _choose_mark_source(current: str, candidate: str) -> str:
     if candidate_rank < current_rank:
         return candidate_key
     return current_key
+
+
+def _canonical_mark_source(value: str | None) -> str | None:
+    if value is None:
+        return None
+    key = value.strip().upper()
+    if not key:
+        return None
+    if key == "LAST_CLOSE":
+        return "PREV"
+    return key
 
 
 def _max_staleness(existing: int | None, candidate: int | None) -> int | None:

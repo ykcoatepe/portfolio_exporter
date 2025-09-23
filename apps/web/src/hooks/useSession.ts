@@ -30,15 +30,21 @@ async function fetchSession(baseUrl = ""): Promise<MarketSession> {
 }
 
 export function useSession(
-  initialSession?: MarketSession | null,
+  sessionSeed?: MarketSession | null,
 ): UseQueryResult<MarketSession | null, Error> {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (initialSession) {
-      queryClient.setQueryData(SESSION_QUERY_KEY, initialSession);
+    if (sessionSeed === undefined) {
+      return;
     }
-  }, [initialSession, queryClient]);
+    if (sessionSeed === null) {
+      queryClient.setQueryData(SESSION_QUERY_KEY, null);
+      queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY, refetchType: "active" });
+      return;
+    }
+    queryClient.setQueryData(SESSION_QUERY_KEY, sessionSeed);
+  }, [queryClient, sessionSeed]);
 
   return useQuery<MarketSession | null, Error>({
     queryKey: SESSION_QUERY_KEY,
@@ -46,7 +52,5 @@ export function useSession(
     staleTime: 15_000,
     refetchInterval: 30_000,
     retry: false,
-    enabled: !initialSession,
-    initialData: initialSession ?? undefined,
   });
 }

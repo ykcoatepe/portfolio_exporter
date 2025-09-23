@@ -16,7 +16,6 @@ from typing import Any
 from ..core.marks import MarkSettings, select_equity_mark
 from ..core.models import InstrumentType, Position, Quote
 from ..core.osi import parse_osi
-from ..core.pnl import option_leg_pnl
 from .taxonomy import ComboStrategy
 
 ZERO = Decimal("0")
@@ -47,8 +46,8 @@ class OptionLegSnapshot:
     theta: Decimal | None
     vega: Decimal | None
     iv: Decimal | None
-    day_pnl: Decimal
-    total_pnl: Decimal
+    day_pnl: Decimal | None
+    total_pnl: Decimal | None
     day_basis: Decimal | None
     total_basis: Decimal | None
     feed_strategy_id: str | None = None
@@ -108,8 +107,8 @@ class OptionCombo:
     sum_gamma: Decimal
     sum_theta: Decimal
     sum_vega: Decimal
-    day_pnl: Decimal
-    total_pnl: Decimal
+    day_pnl: Decimal | None
+    total_pnl: Decimal | None
     day_pnl_percent: Decimal | None
     total_pnl_percent: Decimal | None
     legs: tuple[OptionLegSnapshot, ...]
@@ -188,13 +187,21 @@ def build_option_leg_snapshot(
         return None
 
     mark_result = select_equity_mark(quote, now, mark_settings)
-    pnl = option_leg_pnl(position, mark_result.mark, normalized.previous_close)
-    day_basis = _day_basis(
-        position.quantity, position.instrument.multiplier, normalized.previous_close
-    )
-    total_basis = _total_basis(
-        position.avg_cost, position.quantity, position.instrument.multiplier
-    )
+
+    multiplier = position.instrument.multiplier
+    quantity = position.quantity
+    mark_value = mark_result.mark
+
+    day_basis = _day_basis(quantity, multiplier, normalized.previous_close)
+    total_basis = _total_basis(position.avg_cost, quantity, multiplier)
+
+    day_pnl: Decimal | None = None
+    if mark_value is not None and normalized.previous_close is not None:
+        day_pnl = (mark_value - normalized.previous_close) * quantity * multiplier
+
+    total_pnl: Decimal | None = None
+    if mark_value is not None and position.avg_cost is not None:
+        total_pnl = (mark_value - position.avg_cost) * quantity * multiplier
 
     leg_id = _leg_hash(
         normalized.account,
@@ -227,8 +234,8 @@ def build_option_leg_snapshot(
         theta=normalized.theta,
         vega=normalized.vega,
         iv=normalized.iv,
-        day_pnl=pnl.day,
-        total_pnl=pnl.total,
+        day_pnl=day_pnl,
+        total_pnl=total_pnl,
         day_basis=day_basis,
         total_basis=total_basis,
         feed_strategy_id=normalized.feed_strategy_id,
@@ -686,12 +693,12 @@ def _build_combo(
     sum_gamma = _sum_greek(ordered, "gamma")
     sum_theta = _sum_greek(ordered, "theta")
     sum_vega = _sum_greek(ordered, "vega")
-    day_pnl = sum((leg.day_pnl for leg in ordered), ZERO)
-    total_pnl = sum((leg.total_pnl for leg in ordered), ZERO)
+    day_pnl = _sum_optionals(leg.day_pnl for leg in ordered)
+    total_pnl = _sum_optionals(leg.total_pnl for leg in ordered)
     day_basis = _sum_optionals(leg.day_basis for leg in ordered)
     total_basis = _sum_optionals(leg.total_basis for leg in ordered)
-    day_pct = _percent(day_pnl, day_basis)
-    total_pct = _percent(total_pnl, total_basis)
+    day_pct = _percent(day_pnl, day_basis) if day_pnl is not None else None
+    total_pct = _percent(total_pnl, total_basis) if total_pnl is not None else None
     combo_notes = tuple(notes) if notes else tuple()
     dte = min((leg.dte for leg in ordered), default=0)
     return OptionCombo(

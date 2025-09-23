@@ -182,6 +182,8 @@ def _normalize_counters(raw: dict[str, Any]) -> dict[str, int]:
     if counters["critical"] == 0 and counters["warning"] == 0:
         # Preserve legacy contract: info-only breaches should not increment counters.
         counters["info"] = 0
+        counters["total"] = 0
+        return counters
     counters["total"] = sum(counters.values())
     return counters
 

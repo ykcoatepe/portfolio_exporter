@@ -344,6 +344,22 @@
       "details": "ticker sync now writes unique equities/underlyings only",
       "event": "Deduped tickers list",
       "timestamp": "2025-09-23T15:14:12Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T16:20:18Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T16:34:45Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T16:39:28Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-23T16:58:58Z"
     }
   ],
   "decisions": [

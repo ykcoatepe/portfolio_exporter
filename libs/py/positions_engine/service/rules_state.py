@@ -12,6 +12,7 @@ from decimal import Decimal
 from typing import Any
 
 from ..combos.detector import OptionCombo, OptionLegSnapshot
+from ..combos.eval import evaluate_playbook_targets
 from ..rules import EvaluationResult, Rule, evaluate_rules
 from ..rules.schema import Scope
 from .state import PositionsState
@@ -148,8 +149,14 @@ class RulesState:
         ]
         all_legs = combo_legs + orphan_legs
 
+        evaluation = evaluate_playbook_targets(
+            combos, detection.orphans, self._positions_state.quotes_snapshot()
+        )
+
         rows: dict[Scope, list[dict[str, Any]]] = {
-            "COMBO": self._combo_rows(combos, equities_by_symbol, now),
+            "COMBO": self._combo_rows(
+                combos, equities_by_symbol, now, evaluation.combo_targets
+            ),
             "LEG": self._leg_rows(all_legs, now),
             "UL": self._underlying_rows(combos, orphan_legs, equities, now),
             "PORT": self._portfolio_rows(combos, orphan_legs, now),
@@ -161,6 +168,7 @@ class RulesState:
         combos: Sequence[OptionCombo],
         equities_by_symbol: Mapping[str | None, Mapping[str, Any]],
         now: datetime,
+        combo_targets: Mapping[str, Mapping[str, Any]],
     ) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for combo in combos:
@@ -169,17 +177,40 @@ class RulesState:
             notes = None
             if annualized_pct is not None:
                 notes = f"annualized premium {annualized_pct:.1f}%"
-            rows.append(
-                {
-                    "subject_id": combo.combo_id,
-                    "symbol": combo.underlying,
-                    "dte": combo.dte,
-                    "annualized_premium_pct": annualized_pct,
-                    "value": annualized_pct,
-                    "triggered_at": now,
-                    "notes": notes,
-                }
-            )
+            targets = combo_targets.get(combo.combo_id, {})
+            tp_hit = bool(targets.get("tp_hit"))
+            tp_done = bool(targets.get("tp_done"))
+            sl_hit = bool(targets.get("sl_hit"))
+            exit_as_unit = bool(targets.get("exit_as_unit"))
+            row: dict[str, Any] = {
+                "subject_id": combo.combo_id,
+                "symbol": combo.underlying,
+                "dte": combo.dte,
+                "annualized_premium_pct": annualized_pct,
+                "value": annualized_pct,
+                "triggered_at": now,
+                "notes": notes,
+                "tp_hit": tp_hit,
+                "tp_done": tp_done,
+                "sl_hit": sl_hit,
+                "exit_as_unit": exit_as_unit,
+            }
+            for key in (
+                "progress_pct_of_goal",
+                "progress_pct_of_max",
+                "tp_band_low_pct",
+                "tp_band_high_pct",
+                "tp_band_pct",
+                "sl_r",
+            ):
+                if key in targets and targets.get(key) is not None:
+                    row[key] = targets.get(key)
+            if "next_action" in targets and targets.get("next_action") is not None:
+                row["next_action"] = targets.get("next_action")
+            progress = targets.get("progress")
+            if isinstance(progress, dict):
+                row["progress"] = progress
+            rows.append(row)
         return rows
 
     def _leg_rows(

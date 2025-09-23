@@ -34,8 +34,11 @@ def _make_quote(
     return Quote(
         symbol=symbol,
         bid=Decimal(str(bid)),
+        bid_ts=NOW,
         ask=Decimal(str(ask)),
+        ask_ts=NOW,
         last=Decimal(str(last)),
+        last_ts=NOW,
         previous_close=Decimal("1.0"),
         session=TradingSession.RTH,
         updated_at=NOW,

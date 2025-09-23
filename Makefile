@@ -43,8 +43,8 @@ ci-home: lint test build
 	@echo "✅  ci-home complete"
 
 fmt:
-	ruff check . --fix
-	python3 -m black .
+	ruff check . --select I --fix
+	ruff format .
 
 lint:
 	# Ruff + Black share configuration in pyproject.toml

@@ -8,7 +8,7 @@ import json
 import math
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, DivisionByZero, InvalidOperation
 from typing import Any
 
 from ..core.models import Instrument, InstrumentType, Position, Quote, TradingSession
@@ -60,11 +60,15 @@ def quotes_from_records(records: Iterable[dict[str, Any]]) -> list[Quote]:
             Quote(
                 symbol=symbol,
                 bid=_to_decimal(row.get("bid")),
+                bid_ts=_extract_bid_timestamp(row),
                 ask=_to_decimal(row.get("ask")),
+                ask_ts=_extract_ask_timestamp(row),
                 last=_to_decimal(row.get("last", row.get("close"))),
+                last_ts=_extract_last_timestamp(row),
                 previous_close=_to_decimal(
                     row.get("previous_close", row.get("priorClose"))
                 ),
+                previous_close_ts=_extract_previous_close_timestamp(row),
                 session=_safe_session(
                     str(row.get("session", TradingSession.CLOSED.value))
                 ),
@@ -74,40 +78,124 @@ def quotes_from_records(records: Iterable[dict[str, Any]]) -> list[Quote]:
         )
     return out
 
+_TIMESTAMP_CONTAINER_KEYS: tuple[str, ...] = ("tick", "quote", "mark")
 
-def _extract_quote_timestamp(row: dict[str, Any]) -> datetime | None:
-    candidates = (
-        "updated_at",
-        "updatedAt",
-        "quote_ts",
-        "quote_timestamp",
-        "quoteTimestamp",
-        "timestamp",
-        "ts",
-        "last_update",
-        "last_updated",
-        "lastUpdate",
-        "lastUpdated",
-        "as_of",
-        "asOf",
-    )
 
+def _extract_timestamp_field(
+    row: dict[str, Any], candidates: tuple[str, ...]
+) -> datetime | None:
     for key in candidates:
         if key in row:
             ts = _parse_timestamp(row.get(key))
             if ts is not None:
                 return ts
 
-    for nested_key in ("tick", "quote", "mark"):
+    for nested_key in _TIMESTAMP_CONTAINER_KEYS:
         nested = row.get(nested_key)
-        if not isinstance(nested, dict):
-            continue
-        for key in ("updated_at", "timestamp", "ts", "quote_ts"):
-            ts = _parse_timestamp(nested.get(key))
-            if ts is not None:
-                return ts
+        if isinstance(nested, dict):
+            for key in candidates:
+                ts = _parse_timestamp(nested.get(key))
+                if ts is not None:
+                    return ts
 
     return None
+
+
+def _extract_quote_timestamp(row: dict[str, Any]) -> datetime | None:
+    return _extract_timestamp_field(
+        row,
+        (
+            "updated_at",
+            "updatedAt",
+            "quote_ts",
+            "quote_timestamp",
+            "quoteTimestamp",
+            "timestamp",
+            "ts",
+            "last_update",
+            "last_updated",
+            "lastUpdate",
+            "lastUpdated",
+            "as_of",
+            "asOf",
+        ),
+    )
+
+
+def _extract_previous_close_timestamp(row: dict[str, Any]) -> datetime | None:
+    return _extract_timestamp_field(
+        row,
+        (
+            "previous_close_ts",
+            "previousCloseTs",
+            "prior_close_ts",
+            "priorCloseTs",
+            "prev_close_ts",
+            "prevCloseTs",
+            "previous_close_at",
+            "previousCloseAt",
+            "prior_close_at",
+            "priorCloseAt",
+            "prev_close_at",
+            "prevCloseAt",
+        ),
+    )
+
+
+def _extract_bid_timestamp(row: dict[str, Any]) -> datetime | None:
+    return _extract_timestamp_field(
+        row,
+        (
+            "bid_ts",
+            "bidTs",
+            "bid_timestamp",
+            "bidTimestamp",
+            "bid_time",
+            "bidTime",
+            "bid_quote_time",
+            "bidQuoteTime",
+        ),
+    )
+
+
+def _extract_ask_timestamp(row: dict[str, Any]) -> datetime | None:
+    return _extract_timestamp_field(
+        row,
+        (
+            "ask_ts",
+            "askTs",
+            "ask_timestamp",
+            "askTimestamp",
+            "ask_time",
+            "askTime",
+            "ask_quote_time",
+            "askQuoteTime",
+        ),
+    )
+
+
+def _extract_last_timestamp(row: dict[str, Any]) -> datetime | None:
+    return _extract_timestamp_field(
+        row,
+        (
+            "last_ts",
+            "lastTs",
+            "last_timestamp",
+            "lastTimestamp",
+            "last_trade_ts",
+            "lastTradeTs",
+            "last_trade_timestamp",
+            "lastTradeTimestamp",
+            "last_trade_time",
+            "lastTradeTime",
+            "last_time",
+            "lastTime",
+            "trade_timestamp",
+            "tradeTimestamp",
+            "trade_ts",
+        ),
+    )
+
 
 
 def _resolve_symbol(row: dict[str, Any]) -> str | None:
@@ -230,6 +318,78 @@ def _safe_session(value: str) -> TradingSession:
     except ValueError:
         upper = value.upper()
         return TradingSession.__members__.get(upper, TradingSession.CLOSED)
+
+
+def compute_equity_pnl_fields(
+    position: Position,
+    mark: Decimal | None,
+    previous_close: Decimal | None,
+) -> dict[str, float | None]:
+    """Compute realized metrics for an equity position row."""
+
+    multiplier = position.instrument.multiplier
+    quantity = position.quantity
+
+    day_pnl_float: float | None = None
+    day_percent_float: float | None = None
+    if (
+        mark is not None
+        and previous_close is not None
+        and quantity is not None
+    ):
+        day_basis = previous_close * quantity * multiplier
+        day_pnl = (mark - previous_close) * quantity * multiplier
+        day_pnl_float = float(day_pnl)
+        day_percent = _percent_decimal(day_pnl, day_basis)
+        day_percent_float = _decimal_to_float(day_percent)
+
+    total_pnl_float: float | None = None
+    total_percent_float: float | None = None
+    if (
+        mark is not None
+        and position.avg_cost is not None
+        and position.avg_cost != 0
+        and quantity is not None
+    ):
+        total_basis = position.avg_cost * quantity * multiplier
+        total_pnl = (mark - position.avg_cost) * quantity * multiplier
+        total_pnl_float = float(total_pnl)
+        total_percent = _percent_decimal(total_pnl, total_basis)
+        total_percent_float = _decimal_to_float(total_percent)
+
+    return {
+        "day_pnl": day_pnl_float,
+        "day_pnl_percent": day_percent_float,
+        "day_pnl_pct": day_percent_float,
+        "pnl_unrealized": total_pnl_float,
+        "pnl_unrealized_percent": total_percent_float,
+        "pnl_unrealized_pct": total_percent_float,
+        "total_pnl": total_pnl_float,
+        "total_pnl_percent": total_percent_float,
+    }
+
+
+def _percent_decimal(numerator: Decimal, basis: Decimal | None) -> Decimal | None:
+    if basis is None:
+        return None
+    if basis == 0:
+        return None
+    denominator = abs(basis)
+    if denominator == 0:
+        return None
+    try:
+        return (numerator / denominator) * Decimal("100")
+    except (DivisionByZero, InvalidOperation):
+        return None
+
+
+def _decimal_to_float(value: Decimal | None) -> float | None:
+    if value is None:
+        return None
+    result = float(value)
+    if math.isnan(result):
+        return None
+    return result
 
 
 def _to_decimal(value: Any) -> Decimal | None:

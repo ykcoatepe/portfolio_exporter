@@ -65,7 +65,14 @@ def _make_leg(
 
 
 def _make_quote(symbol: str, value: str) -> Quote:
-    return Quote(symbol=symbol, last=Decimal(value), session=TradingSession.RTH)
+    now = datetime.now(tz=UTC)
+    return Quote(
+        symbol=symbol,
+        last=Decimal(value),
+        last_ts=now,
+        session=TradingSession.RTH,
+        updated_at=now,
+    )
 
 
 def test_credit_vertical_tp_flags() -> None:

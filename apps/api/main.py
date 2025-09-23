@@ -4,11 +4,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 import sys
 from dataclasses import asdict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -37,6 +38,7 @@ from positions_engine.rules.catalog import (  # noqa: E402
 )
 from positions_engine.service import (  # noqa: E402
     PositionsState,
+    RefreshLoop,
     RulesCatalogState,
     RulesState,
     positions_from_records,
@@ -49,6 +51,17 @@ app = FastAPI(title="Positions Engine API", version="0.1.0")
 _state = PositionsState()
 _rules_state = RulesState(_state)
 _catalog_state = RulesCatalogState(_state, _rules_state)
+refresh_loop = RefreshLoop(tick=_state.refresh_live_snapshot)
+_greeks_interval = int(os.getenv("PSD_GREEKS_INTERVAL_S", "60"))
+_greeks_refresh_loop = (
+    RefreshLoop(
+        tick=_state.refresh_live_greeks,
+        interval_s=_greeks_interval,
+        env_var="PSD_GREEKS_INTERVAL_S",
+    )
+    if _greeks_interval > 0
+    else None
+)
 _AUTO_REFRESH = os.getenv("POSITIONS_ENGINE_AUTO_REFRESH", "0") == "1"
 WEB_DIST = (REPO_ROOT / "apps" / "web" / "dist").resolve()
 INDEX_HTML = WEB_DIST / "index.html"
@@ -66,6 +79,65 @@ def _isoformat_utc(value: datetime | None) -> str | None:
     if iso.endswith("+00:00"):
         iso = iso[:-6] + "Z"
     return iso
+
+
+def _ensure_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return _ensure_utc(parsed)
+
+
+def _max_datetime(values: list[datetime | None]) -> datetime | None:
+    latest: datetime | None = None
+    for value in values:
+        candidate = _ensure_utc(value)
+        if candidate is None:
+            continue
+        if latest is None or candidate > latest:
+            latest = candidate
+    return latest
+
+
+def _latest_quote_timestamp_for_symbols(
+    quotes: dict[str, Quote], symbols: set[str]
+) -> datetime | None:
+    if not quotes or not symbols:
+        return None
+    latest: datetime | None = None
+    for symbol in symbols:
+        quote = quotes.get(symbol)
+        if quote is None:
+            continue
+        candidates = (
+            quote.updated_at,
+            quote.bid_ts,
+            quote.ask_ts,
+            quote.last_ts,
+            quote.previous_close_ts,
+        )
+        candidate = _max_datetime(list(candidates))
+        if candidate is None:
+            continue
+        if latest is None or candidate > latest:
+            latest = candidate
+    return latest
 
 
 class BreachCountsModel(BaseModel):
@@ -177,11 +249,28 @@ class StatsResponse(BaseModel):
 @app.on_event("startup")
 async def _on_startup() -> None:  # pragma: no cover - exercised by integration tests
     _refresh_from_providers()
+    refresh_loop.start()
+    if _greeks_refresh_loop is not None:
+        _greeks_refresh_loop.start()
+
+
+@app.on_event("shutdown")
+async def _on_shutdown() -> None:  # pragma: no cover - exercised by integration tests
+    refresh_loop.stop()
+    if _greeks_refresh_loop is not None:
+        _greeks_refresh_loop.stop()
 
 
 @app.get("/healthz", tags=["meta"])
 def healthz() -> dict[str, Any]:
     return {"ok": True, "ts": datetime.now(tz=UTC).isoformat()}
+
+
+@app.post("/refresh", tags=["debug"])
+def refresh_now() -> dict[str, Any]:
+    _state.refresh_live_snapshot()
+    _state.refresh_live_greeks()
+    return {"ok": True, "ts": datetime.now(timezone.utc).isoformat()}
 
 
 @app.get("/positions/stocks", tags=["positions"])
@@ -230,7 +319,33 @@ def stats() -> StatsResponse:
     payload["data_source"] = _state.data_source
 
     session_info = detect_session()
-    payload["session"] = asdict(session_info)
+    session_payload = dataclasses.asdict(session_info)
+    payload["session"] = session_payload
+    if "session_info" not in payload or not isinstance(payload["session_info"], dict):
+        payload["session_info"] = session_payload
+
+    quotes_snapshot = _state.quotes_snapshot()
+    positions_map = getattr(_state, "_positions", {})
+    equity_symbols: set[str] = set()
+    option_symbols: set[str] = set()
+    if isinstance(positions_map, dict):
+        for symbol, position in positions_map.items():
+            instrument_type = getattr(position.instrument, "instrument_type", None)
+            if instrument_type == InstrumentType.EQUITY:
+                equity_symbols.add(symbol)
+            elif instrument_type == InstrumentType.OPTION:
+                option_symbols.add(symbol)
+
+    equity_latest = _latest_quote_timestamp_for_symbols(quotes_snapshot, equity_symbols)
+    option_latest = _latest_quote_timestamp_for_symbols(quotes_snapshot, option_symbols)
+    session_latest = _parse_iso_datetime(session_info.as_of)
+    latest_ts = _max_datetime([equity_latest, option_latest, session_latest])
+    if latest_ts is not None:
+        meta_payload = payload.get("meta")
+        if not isinstance(meta_payload, dict):
+            meta_payload = {}
+            payload["meta"] = meta_payload
+        meta_payload.setdefault("latest_ts", _isoformat_utc(latest_ts))
 
     snapshot_at = _state.snapshot_updated_at()
     if snapshot_at is not None and not payload.get("updated_at"):

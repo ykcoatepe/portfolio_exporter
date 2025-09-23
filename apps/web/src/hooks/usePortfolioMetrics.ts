@@ -101,12 +101,13 @@ export function usePortfolioMetrics(): PortfolioMetrics {
     let hasTheta = false;
 
     for (const stock of stocks) {
-      const dayValue = toFiniteNumber(stock.pnl_intraday);
+      const dayValue = toFiniteNumber(stock.day_pnl ?? stock.pnl_intraday);
       if (dayValue !== null) {
         dayPnl += dayValue;
         hasDayPnl = true;
       }
-      const totalValue = computeLegUnrealized(stock);
+      const totalValue =
+        toFiniteNumber(stock.pnl_unrealized ?? stock.total_pnl) ?? computeLegUnrealized(stock);
       if (totalValue !== null) {
         totalPnl += totalValue;
         hasTotalPnl = true;

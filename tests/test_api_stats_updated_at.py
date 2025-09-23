@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from importlib import import_module
 from types import SimpleNamespace
@@ -39,8 +40,9 @@ def api_main(monkeypatch):
 
 
 @pytest.fixture()
-def client(api_main) -> TestClient:
-    return TestClient(api_main.app)
+def client(api_main) -> Iterator[TestClient]:
+    with TestClient(api_main.app) as test_client:
+        yield test_client
 
 
 def test_updated_at_prefers_stats_payload(

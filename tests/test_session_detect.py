@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime
 from importlib import import_module
 from types import SimpleNamespace
@@ -11,6 +12,11 @@ from zoneinfo import ZoneInfo
 from positions_engine.core.session import SessionInfo, detect_session
 
 NY_TZ = ZoneInfo("America/New_York")
+
+
+def _parse_iso(value: str) -> datetime:
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return datetime.fromisoformat(text)
 
 
 @pytest.fixture()
@@ -62,8 +68,9 @@ def api_main(monkeypatch):
 
 
 @pytest.fixture()
-def client(api_main) -> TestClient:
-    return TestClient(api_main.app)
+def client(api_main) -> Iterator[TestClient]:
+    with TestClient(api_main.app) as test_client:
+        yield test_client
 
 
 @pytest.mark.parametrize(
@@ -134,6 +141,27 @@ def test_stats_includes_session(client: TestClient, monkeypatch) -> None:
     payload = response.json()
     assert "session" in payload
     assert payload["session"]["state"] in {"RTH", "ETH", "CLOSED"}
+
+
+def test_stats_includes_latest_ts_meta(client: TestClient, monkeypatch) -> None:
+    monkeypatch.delenv("FORCE_SESSION_STATE", raising=False)
+    response = client.get("/stats")
+    assert response.status_code == 200
+
+    payload = response.json()
+    meta = payload.get("meta")
+    assert isinstance(meta, dict)
+    latest_ts = meta.get("latest_ts")
+    assert isinstance(latest_ts, str) and latest_ts
+
+    session_payload = payload.get("session")
+    assert isinstance(session_payload, dict)
+    session_as_of = session_payload.get("as_of")
+    assert isinstance(session_as_of, str)
+
+    latest_dt = _parse_iso(latest_ts)
+    session_dt = _parse_iso(session_as_of)
+    assert latest_dt >= session_dt
 
 
 def test_state_includes_session(client: TestClient, monkeypatch) -> None:

@@ -22,8 +22,12 @@ idna==3.10
     # via requests
 iniconfig==2.1.0
     # via pytest
+mypy==1.18.2
+    # via -r requirements-dev.in
 mypy-extensions==1.1.0
-    # via black
+    # via
+    #   black
+    #   mypy
 numpy==2.3.2
     # via
     #   -r requirements-dev.in
@@ -36,7 +40,9 @@ packaging==25.0
 pandas==2.3.1
     # via -r requirements-dev.in
 pathspec==0.12.1
-    # via black
+    # via
+    #   black
+    #   mypy
 pip-tools==7.4.1
     # via -r requirements-dev.in
 platformdirs==4.3.8
@@ -65,6 +71,8 @@ ruff==0.12.7
     # via -r requirements-dev.in
 six==1.17.0
     # via python-dateutil
+typing-extensions==4.15.0
+    # via mypy
 tzdata==2025.2
     # via pandas
 urllib3==2.5.0

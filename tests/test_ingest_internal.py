@@ -86,6 +86,9 @@ def test_internal_provider_precedence(monkeypatch):
         assert stock_row.get("mark_source") in {"MID", "LAST", "PREV", "MISSING"}
         assert "stale_seconds" in stock_row
         assert "day_pnl" in stock_row
+        assert "day_pnl_pct" in stock_row
+        assert "pnl_unrealized" in stock_row
+        assert "pnl_unrealized_percent" in stock_row
         assert "total_pnl" in stock_row
         options_payload = client.get("/positions/options").json()
         assert options_payload["legs"]
@@ -103,7 +106,9 @@ def test_internal_provider_precedence(monkeypatch):
         assert first_single.get("mark_source") in {"MID", "LAST", "PREV", "MISSING"}
         assert "stale_seconds" in first_single
         assert "day_pnl" in first_single
+        assert "day_pnl_pct" in first_single
         assert "pnl_unrealized" in first_single
+        assert "pnl_unrealized_percent" in first_single
         combo_legs = [
             leg
             for combo in view.get("option_combos", []) or []
