@@ -165,7 +165,7 @@ def _normalize_positions(
             quantity = 0
         avg_cost = row.get("avg_cost", row.get("average_cost", row.get("avgcost")))
         if avg_cost in (None, ""):
-            avg_cost = 0
+            avg_cost = None
         entry: dict[str, Any] = {
             "symbol": symbol,
             "instrument_type": _normalize_type(row.get("type")),
