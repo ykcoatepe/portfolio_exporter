@@ -30,24 +30,34 @@ def positions_from_records(records: Iterable[dict[str, Any]]) -> list[Position]:
             multiplier=Decimal(str(row.get("multiplier", 1))),
         )
         metadata = _extract_metadata(row, inst_type)
+        avg_cost_value = _resolve_avg_cost(row, inst_type)
         out.append(
             Position(
                 instrument=instrument,
                 quantity=Decimal(
                     str(row.get("quantity", row.get("qty", row.get("position", 0))))
                 ),
-                avg_cost=Decimal(
-                    str(
-                        row.get(
-                            "avg_cost", row.get("average_cost", row.get("avgCost", 0))
-                        )
-                    )
-                ),
+                avg_cost=avg_cost_value,
                 cost_basis=_to_decimal(row.get("cost_basis")),
                 metadata=metadata,
             )
         )
     return out
+
+
+def _resolve_avg_cost(row: dict[str, Any], inst_type: InstrumentType) -> Decimal | None:
+    for key in ("avg_cost", "average_cost", "avgCost"):
+        value = row.get(key)
+        candidate = _to_decimal(value)
+        if candidate is not None and candidate != 0:
+            return candidate
+    if inst_type == InstrumentType.OPTION:
+        for key in ("entry_price", "entryPrice"):
+            value = row.get(key)
+            candidate = _to_decimal(value)
+            if candidate is not None and candidate != 0:
+                return candidate
+    return None
 
 
 def quotes_from_records(records: Iterable[dict[str, Any]]) -> list[Quote]:
@@ -345,14 +355,14 @@ def compute_equity_pnl_fields(
 
     total_pnl_float: float | None = None
     total_percent_float: float | None = None
+    avg_cost = position.avg_cost
     if (
         mark is not None
-        and position.avg_cost is not None
-        and position.avg_cost != 0
         and quantity is not None
+        and avg_cost not in (None, 0)
     ):
-        total_basis = position.avg_cost * quantity * multiplier
-        total_pnl = (mark - position.avg_cost) * quantity * multiplier
+        total_basis = avg_cost * quantity * multiplier
+        total_pnl = (mark - avg_cost) * quantity * multiplier
         total_pnl_float = float(total_pnl)
         total_percent = _percent_decimal(total_pnl, total_basis)
         total_percent_float = _decimal_to_float(total_percent)
