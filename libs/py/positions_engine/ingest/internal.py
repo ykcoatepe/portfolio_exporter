@@ -176,6 +176,108 @@ def _parse_timestamp_like(value: Any) -> datetime | None:
     return None
 
 
+def _normalize_mark_source(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    text = str(value).strip().upper()
+    return text or None
+
+
+def _first_parsed_ts(entry: dict[str, Any], keys: tuple[str, ...]) -> datetime | None:
+    for key in keys:
+        if not isinstance(entry, dict):
+            break
+        parsed = _parse_timestamp_like(entry.get(key))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _decimal_from_any(value: Any) -> Decimal | None:
+    if value in (None, ""):
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def _synthesize_leg_mark_and_ts(
+    leg: dict[str, Any]
+) -> tuple[Decimal | None, str | None, datetime | None]:
+    explicit_source = _normalize_mark_source(
+        leg.get("mark_source") or leg.get("kind")
+    )
+    mark_value = _decimal_from_any(leg.get("mark"))
+    if mark_value is not None:
+        ts = _first_parsed_ts(
+            leg,
+            (
+                "mark_ts",
+                "mark_time",
+                "ts",
+                "last_ts",
+                "previous_close_ts",
+                "quote_timestamp",
+                "updated_at",
+            ),
+        )
+        return mark_value, explicit_source, ts
+
+    bid_value = _decimal_from_any(leg.get("bid"))
+    ask_value = _decimal_from_any(leg.get("ask"))
+    if (
+        bid_value is not None
+        and ask_value is not None
+        and bid_value > Decimal("0")
+        and ask_value > Decimal("0")
+    ):
+        mark_value = (bid_value + ask_value) / Decimal("2")
+        ts = _first_parsed_ts(
+            leg,
+            (
+                "bid_ts",
+                "ask_ts",
+                "updated_ts",
+                "quote_timestamp",
+                "mark_ts",
+                "mark_time",
+                "ts",
+            ),
+        )
+        return mark_value, "MID", ts
+
+    last_value = _decimal_from_any(leg.get("last"))
+    if last_value is not None:
+        ts = _first_parsed_ts(
+            leg,
+            (
+                "quote_timestamp",
+                "last_ts",
+                "updated_ts",
+                "mark_ts",
+                "mark_time",
+                "ts",
+            ),
+        )
+        return last_value, "LAST", ts
+
+    previous_close_value = _decimal_from_any(leg.get("previous_close"))
+    if previous_close_value is not None:
+        ts = _first_parsed_ts(
+            leg,
+            (
+                "previous_close_ts",
+                "quote_timestamp",
+                "updated_ts",
+                "ts",
+            ),
+        )
+        return previous_close_value, "PREV", ts
+
+    return None, explicit_source, None
+
+
 def _resolve_quote_stale_seconds(entry: dict[str, Any]) -> int | None:
     numeric = _normalize_stale_seconds(entry.get("stale_seconds"))
     if numeric is None:
@@ -878,65 +980,27 @@ class InternalScriptsProvider:
             "theta": greeks.get("theta"),
         }
         quote: dict[str, Any] | None = None
-        mark_value = _to_float_or_none(leg.get("mark"))
         bid_value = _to_float_or_none(leg.get("bid"))
         ask_value = _to_float_or_none(leg.get("ask"))
         last_value = _to_float_or_none(leg.get("last"))
         previous_close_value = _to_float_or_none(leg.get("previous_close"))
-        mark_source_value = leg.get("mark_source")
+
+        synthesized_mark, synthesized_source, mark_timestamp_obj = _synthesize_leg_mark_and_ts(
+            leg
+        )
+        mark_value = float(synthesized_mark) if synthesized_mark is not None else None
         mark_source = (
-            str(mark_source_value).strip().upper()
-            if isinstance(mark_source_value, str) and mark_source_value.strip()
+            _normalize_mark_source(synthesized_source)
+            or _normalize_mark_source(leg.get("mark_source"))
+            or _normalize_mark_source(leg.get("kind"))
+        )
+        mark_timestamp = (
+            mark_timestamp_obj.isoformat()
+            if mark_timestamp_obj is not None
             else None
         )
-        mark_timestamp = _first_present(
-            leg.get("mark_ts"),
-            leg.get("mark_time"),
-            leg.get("ts"),
-            leg.get("last_ts"),
-            leg.get("previous_close_ts"),
-            leg.get("updated_at"),
-        )
-        if mark_value is None:
-            if (
-                bid_value is not None
-                and ask_value is not None
-                and bid_value > 0
-                and ask_value > 0
-            ):
-                mark_value = (bid_value + ask_value) / 2
-                if mark_source is None:
-                    mark_source = "MID"
-                mark_timestamp = mark_timestamp or _first_present(
-                    leg.get("bid_ts"),
-                    leg.get("ask_ts"),
-                    leg.get("ts"),
-                    leg.get("updated_at"),
-                )
-            elif last_value is not None:
-                mark_value = last_value
-                if mark_source is None:
-                    mark_source = "LAST"
-                mark_timestamp = mark_timestamp or _first_present(
-                    leg.get("last_ts"),
-                    leg.get("ts"),
-                    leg.get("updated_at"),
-                )
-            elif previous_close_value is not None:
-                mark_value = previous_close_value
-                if mark_source is None:
-                    mark_source = "PREV"
-                mark_timestamp = mark_timestamp or _first_present(
-                    leg.get("previous_close_ts"),
-                    leg.get("ts"),
-                    leg.get("updated_at"),
-                )
-        if (
-            mark_value is not None
-            or bid_value is not None
-            or ask_value is not None
-            or previous_close_value is not None
-        ):
+
+        if mark_value is not None:
             quote = {
                 "symbol": symbol,
                 "bid": bid_value,
@@ -951,6 +1015,9 @@ class InternalScriptsProvider:
                 "last_ts": leg.get("last_ts"),
                 "ts": mark_timestamp
                 or _first_present(
+                    leg.get("mark_ts"),
+                    leg.get("mark_time"),
+                    leg.get("quote_timestamp"),
                     leg.get("ts"),
                     leg.get("last_ts"),
                     leg.get("previous_close_ts"),
@@ -959,6 +1026,7 @@ class InternalScriptsProvider:
                 "updated_at": _first_present(
                     mark_timestamp,
                     leg.get("updated_at"),
+                    leg.get("quote_timestamp"),
                     leg.get("ts"),
                     leg.get("last_ts"),
                     leg.get("previous_close_ts"),
