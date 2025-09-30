@@ -1,35 +1,52 @@
+# SPDX-License-Identifier: MIT
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List
+import asyncio
+import threading
+
+from psd.web import server as public_server
+from src.psd.web import server as impl_server
 
 
-def test_run_loop_web_broadcast(monkeypatch: Any) -> None:
-    # Capture payloads via a simple list
-    captured: List[Dict[str, Any]] = []
+class _FakeWebSocket:
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+        self._called = threading.Event()
 
-    def capture(payload: Dict[str, Any]) -> None:
-        # Ensure it's a dict and JSON-serializable
-        assert isinstance(payload, dict)
-        json.dumps(payload)
-        captured.append(payload)
+    async def send_text(self, payload: str) -> None:  # pragma: no cover - exercised in loop
+        self.messages.append(payload)
+        self._called.set()
 
-    # Optional: monkeypatch the server.broadcast to our capture (not required, but validates import path)
-    try:
-        import src.psd.web.server as web_server
-
-        monkeypatch.setattr(web_server, "broadcast", capture, raising=False)
-    except Exception:
-        # Server may be unavailable in minimal envs; ignore
+    async def close(self) -> None:  # pragma: no cover - not triggered in test
         pass
 
-    from src.psd.sentinel import sched
+    def wait(self, timeout: float = 1.0) -> bool:
+        return self._called.wait(timeout)
 
-    # Run two quick iterations with no file writes
-    sched.run_loop(interval=0.01, cfg={"memo_path": ""}, loops=2, web_broadcast=capture)
 
-    assert len(captured) == 2
-    # Ensure each payload can be serialized by the caller as well
-    for dto in captured:
-        assert isinstance(dto, dict)
-        json.dumps(dto)
+def test_broadcast_uses_registered_loop_from_thread() -> None:
+    fake = _FakeWebSocket()
+    original_clients = set(impl_server._clients)  # type: ignore[attr-defined]
+    impl_server._clients.clear()  # type: ignore[attr-defined]
+    impl_server._clients.add(fake)  # type: ignore[attr-defined]
+
+    loop = asyncio.new_event_loop()
+    impl_server._register_broadcast_loop(loop, force=True)  # type: ignore[attr-defined]
+
+    def _runner() -> None:
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
+
+    thread = threading.Thread(target=_runner, daemon=True)
+    thread.start()
+    try:
+        public_server.broadcast({"ping": "pong"})
+        assert fake.wait(1.0)
+        assert fake.messages == ['{"ping":"pong"}']
+    finally:
+        loop.call_soon_threadsafe(loop.stop)
+        thread.join(timeout=1.0)
+        loop.close()
+        impl_server._register_broadcast_loop(None, force=True)  # type: ignore[attr-defined]
+        impl_server._clients.clear()  # type: ignore[attr-defined]
+        impl_server._clients.update(original_clients)  # type: ignore[attr-defined]

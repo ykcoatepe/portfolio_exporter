@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+from concurrent.futures import Future
 from typing import Any
 
 _HTML_PAGE = """<!doctype html>
@@ -613,6 +615,17 @@ td.empty {
 
 _clients: set[Any] = set()
 _sse_clients: set[Any] = set()
+_broadcast_loop: asyncio.AbstractEventLoop | None = None
+_logger = logging.getLogger("psd.web.server")
+
+
+def _register_broadcast_loop(loop: asyncio.AbstractEventLoop | None, *, force: bool = False) -> None:
+    global _broadcast_loop
+    if loop is None:
+        _broadcast_loop = None
+        return
+    if force or _broadcast_loop is None or _broadcast_loop.is_closed():
+        _broadcast_loop = loop
 
 
 def _html_page() -> str:
@@ -638,6 +651,7 @@ def make_app():
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:  # type: ignore[override]
         await ws.accept()
+        _register_broadcast_loop(asyncio.get_running_loop())
         _clients.add(ws)
         try:
             while True:
@@ -769,9 +783,25 @@ def broadcast(dto: dict) -> None:
         _clients.clear()
         _clients.update(living)
 
+    def _handle_future_done(fut: Future[Any]) -> None:
+        try:
+            fut.result()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            _logger.warning("[psd-web] broadcast failed: %s", exc, exc_info=exc)
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
-        asyncio.run(_send_all())
-    else:
+        loop = None
+
+    if loop is not None:
         loop.create_task(_send_all())
+        return
+
+    target_loop = _broadcast_loop
+    if target_loop is None or target_loop.is_closed():
+        _logger.debug("[psd-web] dropping broadcast; no active event loop")
+        return
+
+    fut = asyncio.run_coroutine_threadsafe(_send_all(), target_loop)
+    fut.add_done_callback(_handle_future_done)
