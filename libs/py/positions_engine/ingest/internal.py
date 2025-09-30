@@ -11,6 +11,7 @@ import math
 import subprocess
 import sys
 import threading
+from collections import Counter
 from collections.abc import Iterable
 from copy import deepcopy
 from datetime import UTC, date, datetime
@@ -597,6 +598,7 @@ class InternalScriptsProvider:
 
         raw_positions_payload = snapshot.get("positions")
         prior_avg_costs = _build_prior_avg_cost_lookup(raw_positions_payload)
+        synthesized_mark_counts: Counter[str] = Counter()
 
         positions_view_payload = snapshot.get("positions_view")
         sanitized_view: dict[str, Any] | None = None
@@ -605,6 +607,7 @@ class InternalScriptsProvider:
             stock_rows, stock_quotes = self._from_positions_view(
                 sanitized_view,
                 prior_avg_costs=prior_avg_costs,
+                mark_counter=synthesized_mark_counts,
             )
             positions.extend(stock_rows)
             derived_quotes.extend(stock_quotes)
@@ -727,6 +730,7 @@ class InternalScriptsProvider:
             fallback_positions, fallback_quote_rows = self._from_positions_view(
                 fallback_view_payload,
                 prior_avg_costs=prior_avg_costs,
+                mark_counter=synthesized_mark_counts,
             )
             if fallback_positions:
                 existing_equity_symbols = {
@@ -781,6 +785,18 @@ class InternalScriptsProvider:
                     detail,
                 )
 
+        if synthesized_mark_counts:
+            parts = [
+                f"{mark_source or 'MISSING'}={count}"
+                for mark_source, count in sorted(synthesized_mark_counts.items())
+                if count
+            ]
+            if parts:
+                logger.info(
+                    "[internal] synthesized_option_marks %s",
+                    ", ".join(parts),
+                )
+
         if not positions and not quotes:
             return [], []
 
@@ -790,6 +806,7 @@ class InternalScriptsProvider:
         self,
         view: dict[str, Any],
         prior_avg_costs: dict[str, Decimal] | None = None,
+        mark_counter: Counter[str] | None = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         positions: list[dict[str, Any]] = []
         quotes: list[dict[str, Any]] = []
@@ -843,6 +860,7 @@ class InternalScriptsProvider:
                     leg,
                     combo_underlying,
                     prior_avg_costs=prior_avg_costs,
+                    mark_counter=mark_counter,
                 )
                 if record:
                     positions.append(record)
@@ -854,6 +872,7 @@ class InternalScriptsProvider:
                 single_leg,
                 single_leg.get("underlying"),
                 prior_avg_costs=prior_avg_costs,
+                mark_counter=mark_counter,
             )
             if record:
                 positions.append(record)
@@ -867,6 +886,7 @@ class InternalScriptsProvider:
         leg: dict[str, Any],
         fallback_underlying: Any,
         prior_avg_costs: dict[str, Decimal] | None = None,
+        mark_counter: Counter[str] | None = None,
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         symbol = _clean_symbol(leg.get("symbol")) or _clean_symbol(leg.get("contract"))
         if not symbol:
@@ -985,6 +1005,7 @@ class InternalScriptsProvider:
         last_value = _to_float_or_none(leg.get("last"))
         previous_close_value = _to_float_or_none(leg.get("previous_close"))
 
+        explicit_mark = _decimal_from_any(leg.get("mark"))
         synthesized_mark, synthesized_source, mark_timestamp_obj = _synthesize_leg_mark_and_ts(
             leg
         )
@@ -999,6 +1020,10 @@ class InternalScriptsProvider:
             if mark_timestamp_obj is not None
             else None
         )
+
+        if mark_value is not None and explicit_mark is None and mark_counter is not None:
+            counter_key = mark_source or _normalize_mark_source(synthesized_source) or "MISSING"
+            mark_counter[counter_key] += 1
 
         if mark_value is not None:
             quote = {
