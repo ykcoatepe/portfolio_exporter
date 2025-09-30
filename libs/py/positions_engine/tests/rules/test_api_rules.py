@@ -14,7 +14,11 @@ ROOT = Path(__file__).resolve().parents[5]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from positions_engine.combos.detector import ComboDetection, OptionCombo, OptionLegSnapshot
+from positions_engine.combos.detector import (
+    ComboDetection,
+    OptionCombo,
+    OptionLegSnapshot,
+)
 from positions_engine.combos.taxonomy import ComboStrategy
 from positions_engine.rules import Rule
 from positions_engine.service.rules_state import RulesState

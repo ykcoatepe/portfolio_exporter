@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 from dataclasses import asdict
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -270,7 +270,7 @@ def healthz() -> dict[str, Any]:
 def refresh_now() -> dict[str, Any]:
     _state.refresh_live_snapshot()
     _state.refresh_live_greeks()
-    return {"ok": True, "ts": datetime.now(timezone.utc).isoformat()}
+    return {"ok": True, "ts": datetime.now(tz=UTC).isoformat()}
 
 
 @app.get("/positions/stocks", tags=["positions"])

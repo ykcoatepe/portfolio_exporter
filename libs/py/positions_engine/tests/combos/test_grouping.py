@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-
 from positions_engine.combos import (
     ComboStrategy,
     OptionCombo,

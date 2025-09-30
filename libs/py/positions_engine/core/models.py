@@ -47,7 +47,7 @@ class Position(BaseModel):
 
     instrument: Instrument
     quantity: Decimal
-    avg_cost: Decimal
+    avg_cost: Decimal | None = None
     cost_basis: Decimal | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 

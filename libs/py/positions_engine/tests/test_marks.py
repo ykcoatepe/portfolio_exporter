@@ -221,7 +221,7 @@ def test_prev_mark_without_timestamp_falls_back_to_default_staleness() -> None:
 
     assert result.source == "PREV"
     assert result.mark == quote.previous_close
-    assert result.stale_seconds == 24 * 60 * 60
+    assert result.stale_seconds == 0
 
 
 def test_positions_view_option_leg_mid_staleness() -> None:

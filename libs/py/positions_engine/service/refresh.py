@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Callable, Optional
+from collections.abc import Callable
 
 
 class RefreshLoop:
@@ -15,14 +15,14 @@ class RefreshLoop:
     def __init__(
         self,
         tick: Callable[[], None],
-        interval_s: Optional[float] = None,
+        interval_s: float | None = None,
         *,
         env_var: str = "PSD_REFRESH_INTERVAL_S",
     ) -> None:
         self._tick = tick
         self._interval = _resolve_interval(env_var, interval_s)
         self._stop = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
 
     def start(self) -> None:
         """Begin invoking the tick callback every configured interval."""
@@ -49,7 +49,7 @@ class RefreshLoop:
                 continue
 
 
-def _resolve_interval(env_var: str, fallback: Optional[float]) -> float:
+def _resolve_interval(env_var: str, fallback: float | None) -> float:
     env_value = os.getenv(env_var)
     if env_value is not None:
         try:

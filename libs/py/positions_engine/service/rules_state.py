@@ -379,7 +379,10 @@ def _annualized_premium_pct(
     if not combo.legs:
         return None
     multiplier = abs(_decimal_to_float(combo.legs[0].multiplier)) or 1.0
-    premium_value = _decimal_to_float(combo.net_price) * multiplier
+    net_price = combo.net_price
+    if net_price is None:
+        return None
+    premium_value = _decimal_to_float(net_price) * multiplier
     notional = underlying_mark * multiplier
     if notional == 0:
         return None

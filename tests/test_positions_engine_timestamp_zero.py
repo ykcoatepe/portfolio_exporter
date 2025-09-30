@@ -1,9 +1,6 @@
 from datetime import UTC, datetime
 
-from positions_engine.service.state import (
-    _PREV_STALE_FALLBACK_SECONDS,
-    _normalize_single_stock,
-)
+from positions_engine.service.state import _normalize_single_stock
 
 
 def test_previous_close_zero_timestamp_treated_as_missing() -> None:
@@ -15,8 +12,8 @@ def test_previous_close_zero_timestamp_treated_as_missing() -> None:
 
     _normalize_single_stock(entry, now)
 
-    assert entry["stale_seconds"] == _PREV_STALE_FALLBACK_SECONDS
-    assert entry["stale_s"] == _PREV_STALE_FALLBACK_SECONDS
+    assert "stale_seconds" not in entry
+    assert "stale_s" not in entry
     assert entry.get("previous_close_ts") not in {"0", "0.0"}
 
 
@@ -44,5 +41,5 @@ def test_previous_close_zero_string_variants_treated_as_missing() -> None:
 
             _normalize_single_stock(entry, now)
 
-            assert entry["stale_seconds"] == _PREV_STALE_FALLBACK_SECONDS
-            assert entry["stale_s"] == _PREV_STALE_FALLBACK_SECONDS
+            assert "stale_seconds" not in entry
+            assert "stale_s" not in entry

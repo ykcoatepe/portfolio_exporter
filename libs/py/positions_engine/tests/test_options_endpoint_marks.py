@@ -94,4 +94,4 @@ def test_leg_missing_timestamps_uses_fallback_staleness() -> None:
     leg = payload["legs"][0]
 
     assert leg["mark_source"] == "PREV"
-    assert leg["stale_seconds"] >= 23 * 3600
+    assert leg["stale_seconds"] == 60

@@ -360,6 +360,31 @@
     {
       "event": "session_start",
       "timestamp": "2025-09-23T16:58:58Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-24T07:55:43Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-24T08:07:20Z"
+    },
+    {
+      "details": "Gathered ingest/state/UI evidence for zero P&L rows, 24h staleness, and missing option marks; artifacts in debug/psd_*.",
+      "event": "PSD PnL diagnostic",
+      "timestamp": "2025-09-24T08:48:11Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-24T15:05:25Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-30T06:25:56Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-09-30T08:36:02Z"
     }
   ],
   "decisions": [
@@ -764,6 +789,19 @@
       "owner": "codex",
       "status": "merged",
       "task": "micro-momo analyzer"
+    },
+    {
+      "branch": "codex/combo-group-playbook",
+      "date": "2025-09-24T09:07:53+03:00",
+      "files": [
+        "libs/py/positions_engine/ingest/internal.py",
+        "libs/py/positions_engine/service/normalize.py",
+        "apps/web/src/hooks/usePortfolioMetrics.ts"
+      ],
+      "notes": "Investigating zero P&L and stale marks in PSD dashboard",
+      "owner": "codex",
+      "status": "open",
+      "task": "PSD PnL diagnostic"
     }
   ]
 }

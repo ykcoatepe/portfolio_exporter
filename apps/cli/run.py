@@ -4,9 +4,10 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Iterable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 MODULE_PATH = Path(__file__).resolve()
 CLI_ROOT = MODULE_PATH.parent

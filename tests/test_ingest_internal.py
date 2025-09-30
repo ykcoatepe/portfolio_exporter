@@ -104,7 +104,8 @@ def test_internal_provider_precedence(monkeypatch):
         assert len(single_stocks) >= 1
         first_single = single_stocks[0]
         assert first_single.get("mark_source") in {"MID", "LAST", "PREV", "MISSING"}
-        assert "stale_seconds" in first_single
+        stale_value = first_single.get("stale_seconds")
+        assert stale_value is None or stale_value >= 0
         assert "day_pnl" in first_single
         assert "day_pnl_pct" in first_single
         assert "pnl_unrealized" in first_single

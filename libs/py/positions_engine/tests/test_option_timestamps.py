@@ -62,8 +62,8 @@ def test_missing_timestamps_fall_back_to_conservative_age() -> None:
 
     _normalize_option_leg_entry(leg, now)
 
-    assert leg["stale_seconds"] >= 23 * 60 * 60
-    assert leg["stale_s"] >= 23 * 60 * 60
+    assert "stale_seconds" not in leg
+    assert "stale_s" not in leg
 
 
 def test_mid_option_falls_back_to_updated_at_when_no_alias() -> None:

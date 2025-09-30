@@ -36,7 +36,7 @@ class OptionLegSnapshot:
     quantity: Decimal
     ratio: Decimal
     multiplier: Decimal
-    avg_cost: Decimal
+    avg_cost: Decimal | None
     mark: Decimal | None
     mark_source: str
     stale_seconds: int | None
@@ -102,7 +102,7 @@ class OptionCombo:
     account: str
     underlying: str
     dte: int
-    net_price: Decimal
+    net_price: Decimal | None
     sum_delta: Decimal
     sum_gamma: Decimal
     sum_theta: Decimal
@@ -688,7 +688,14 @@ def _build_combo(
 ) -> OptionCombo:
     ordered = tuple(sorted(legs, key=_leg_sort_key))
     combo_id = _combo_hash(account, underlying, ordered)
-    net_price = sum((leg.avg_cost * leg.quantity) for leg in ordered)
+    net_price = _sum_optionals(
+        (
+            leg.avg_cost * leg.quantity
+            if leg.avg_cost is not None
+            else None
+        )
+        for leg in ordered
+    )
     sum_delta = _sum_greek(ordered, "delta")
     sum_gamma = _sum_greek(ordered, "gamma")
     sum_theta = _sum_greek(ordered, "theta")
@@ -773,8 +780,10 @@ def _day_basis(
 
 
 def _total_basis(
-    avg_cost: Decimal, quantity: Decimal, multiplier: Decimal
+    avg_cost: Decimal | None, quantity: Decimal, multiplier: Decimal
 ) -> Decimal | None:
+    if avg_cost is None:
+        return None
     return avg_cost * quantity * multiplier
 
 

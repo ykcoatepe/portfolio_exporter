@@ -276,12 +276,22 @@ const deriveComboQuantity = (legs: OptionComboLegRow[]): number => {
 const toComboLegRow = (leg: OptionComboLegApi, asOf?: string | null): OptionComboLegRow => {
   const strike = toNumber(leg.strike, 0) ?? 0;
   const quantity = toInteger(leg.quantity, 0);
-  const markPrice = toNumber(leg.mark_price);
+  const markPrice = toNumber(
+    leg.mark_price ?? leg.mark ?? leg.last ?? leg.previous_close,
+  );
   const delta = toNumber(leg.delta);
   const gamma = toNumber(leg.gamma);
   const theta = toNumber(leg.theta);
   const vega = toNumber(leg.vega);
-  const markTime = normalizeMarkTime(leg.mark_time);
+  const markTime =
+    normalizeMarkTime(leg.mark_time) ??
+    normalizeMarkTime(leg.mark_ts) ??
+    normalizeMarkTime(leg.ts) ??
+    normalizeMarkTime(leg.last_ts) ??
+    normalizeMarkTime(leg.previous_close_ts) ??
+    normalizeMarkTime(leg.bid_ts) ??
+    normalizeMarkTime(leg.ask_ts) ??
+    normalizeMarkTime(leg.updated_at);
   const markSourceRaw = typeof leg.mark_source === "string" ? leg.mark_source.toUpperCase() : leg.mark_source;
   const markSource: MarkSource =
     markSourceRaw === "MID" || markSourceRaw === "LAST" || markSourceRaw === "PREV"

@@ -4,13 +4,13 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
-import math
 
 from .detector import OptionCombo, OptionLegSnapshot
 from .taxonomy import ComboStrategy
@@ -149,8 +149,10 @@ class ComboGroup:
     display: ComboDisplay | None = None
 
     def to_payload(self) -> dict[str, Any]:
-        net_price = (
-            self.net_price_weighted / self.weight_total if self.weight_total else ZERO
+        net_price: Decimal | None = (
+            self.net_price_weighted / self.weight_total
+            if self.weight_total
+            else None
         )
         label_legs = [
             _LabelLeg(right=acc.right, strike=acc.strike, expiry=acc.expiry)
@@ -300,8 +302,9 @@ def group_option_combos(combos: Sequence[OptionCombo]) -> GroupingResult:
             grouped[group_id] = group
 
         group.group_qty += combo_qty
-        group.net_price_weighted += combo.net_price * weight
-        group.weight_total += weight
+        if combo.net_price is not None:
+            group.net_price_weighted += combo.net_price * weight
+            group.weight_total += weight
         group.dte_min = min(group.dte_min, combo.dte)
         group.delta += combo.sum_delta
         group.gamma += combo.sum_gamma
@@ -406,14 +409,18 @@ def format_combo_label(
     strategy: ComboStrategy,
     legs: Sequence[OptionLegSnapshot],
     dte: int,
-    net_price: Decimal,
+    net_price: Decimal | None,
     underlying: str,
 ) -> str:
     dte_text = f"{dte}d" if dte >= 0 else "0d"
-    credit_or_debit = (
-        "Credit" if net_price > ZERO else "Debit" if net_price < ZERO else "Even"
-    )
-    price_text = f"{abs(float(net_price)):.2f}"
+    if net_price is None:
+        credit_or_debit = "Unknown"
+        price_text = "—"
+    else:
+        credit_or_debit = (
+            "Credit" if net_price > ZERO else "Debit" if net_price < ZERO else "Even"
+        )
+        price_text = f"{abs(float(net_price)):.2f}"
     if strategy == ComboStrategy.VERTICAL:
         return _format_vertical_label(
             legs, underlying, dte_text, credit_or_debit, price_text

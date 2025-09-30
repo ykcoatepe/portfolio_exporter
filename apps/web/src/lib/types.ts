@@ -76,6 +76,18 @@ export interface OptionComboLegApi {
   mark_price: number | null;
   mark_source: MarkSource;
   mark_time: string | null;
+  mark?: number | null;
+  bid?: number | null;
+  ask?: number | null;
+  last?: number | null;
+  previous_close?: number | null;
+  bid_ts?: string | null;
+  ask_ts?: string | null;
+  last_ts?: string | null;
+  previous_close_ts?: string | null;
+  mark_ts?: string | null;
+  ts?: string | null;
+  updated_at?: string | null;
   delta: number | null;
   gamma: number | null;
   theta: number | null;

@@ -141,7 +141,10 @@ class PositionsState:
                 update_fields: dict[str, Any] = {}
                 if replacement.quantity != existing.quantity:
                     update_fields["quantity"] = replacement.quantity
-                if replacement.avg_cost != existing.avg_cost:
+                if (
+                    replacement.avg_cost is not None
+                    and replacement.avg_cost != existing.avg_cost
+                ):
                     update_fields["avg_cost"] = replacement.avg_cost
                 if replacement.cost_basis != existing.cost_basis:
                     update_fields["cost_basis"] = replacement.cost_basis
@@ -509,7 +512,9 @@ class PositionsState:
             row = {
                 "symbol": symbol,
                 "qty": float(position.quantity),
-                "avg_cost": float(position.avg_cost),
+                "avg_cost": float(position.avg_cost)
+                if position.avg_cost is not None
+                else None,
                 "mark": float(mark_value),
                 "mark_source": mark.source,
                 "previous_close": float(prev_close) if prev_close is not None else None,
@@ -1187,7 +1192,7 @@ def _option_leg_view_from_detection(leg: OptionLegSnapshot) -> dict[str, Any]:
     }
 
 
-_PREV_STALE_FALLBACK_SECONDS = 24 * 60 * 60
+_PREV_STALE_FALLBACK_SECONDS = 24 * 60 * 60  # legacy export for compatibility
 _MARK_SOURCE_ALIASES = {"LAST_CLOSE": "PREV"}
 _MARK_SOURCE_PRIORITY = {"MID": 0, "LAST": 1, "PREV": 2}
 
@@ -1207,12 +1212,37 @@ def _normalize_option_mark_payload(
     raw_source = entry.get("mark_source")
     if not raw_source:
         raw_source = entry.get("source")
+    alias_from_last_close = (
+        isinstance(raw_source, str) and raw_source.strip().upper() == "LAST_CLOSE"
+    )
     mark_source = _canonical_mark_source(raw_source)
     if mark_source is not None:
         entry["mark_source"] = mark_source
         entry["price_source"] = _safe_lower(mark_source) or mark_source
     elif "mark_source" in entry:
         entry["mark_source"] = None
+    if mark_source == "PREV" and entry.get("previous_close_ts") in (None, "", 0):
+        fallback_ts = _extract_timestamp_from_entry(
+            entry, _OPTION_PREVIOUS_CLOSE_TS_ALIASES
+        )
+        if fallback_ts is None and alias_from_last_close:
+            fallback_ts = _extract_timestamp_from_entry(
+                entry, _OPTION_LAST_TIMESTAMP_KEYS
+            )
+        if fallback_ts is None:
+            fallback_ts = _extract_timestamp_from_entry(
+                entry, _OPTION_UPDATED_TIMESTAMP_KEYS
+            )
+        if fallback_ts is not None:
+            iso = _isoformat(fallback_ts)
+            entry["previous_close_ts"] = iso
+            entry.setdefault("prev_ts", iso)
+    if mark_source == "PREV" and entry.get("prev_ts") in (None, ""):
+        prev_timestamp = _extract_timestamp_from_entry(
+            entry, _OPTION_PREVIOUS_CLOSE_TS_ALIASES
+        )
+        if prev_timestamp is not None:
+            entry["prev_ts"] = _isoformat(prev_timestamp)
     stale_seconds = _resolve_option_stale_seconds_entry(entry, mark_source, now)
     if stale_seconds is not None:
         entry["stale_seconds"] = stale_seconds
@@ -1412,6 +1442,12 @@ _OPTION_PREVIOUS_CLOSE_TS_ALIASES = (
     "priorCloseAt",
     "prev_close_at",
     "prevCloseAt",
+    "prev_ts",
+    "prevTs",
+    "last_close_ts",
+    "lastCloseTs",
+    "last_close_timestamp",
+    "lastCloseTimestamp",
 )
 
 
@@ -1566,8 +1602,11 @@ def _resolve_option_stale_seconds_entry(
     existing = _to_int(entry.get("stale_seconds"))
     if existing is None:
         existing = _to_int(entry.get("stale_s"))
+    if existing == _PREV_STALE_FALLBACK_SECONDS:
+        existing = None
     if mark_source == "PREV":
-        return _resolve_stale_seconds_entry(entry, mark_source, now)
+        resolved = _resolve_stale_seconds_entry(entry, mark_source, now)
+        return resolved if resolved is not None else existing
     if mark_source == "MID":
         timestamp = _latest_timestamp_from_entry(entry, _OPTION_MID_TIMESTAMP_KEYS)
         if timestamp is not None:
@@ -1575,9 +1614,7 @@ def _resolve_option_stale_seconds_entry(
         fallback = _extract_timestamp_from_entry(entry, _OPTION_UPDATED_TIMESTAMP_KEYS)
         if fallback is not None:
             return _seconds_between_datetimes(now, fallback)
-        if existing is not None and existing > 0:
-            return existing
-        return _PREV_STALE_FALLBACK_SECONDS
+        return existing
     if mark_source == "LAST":
         timestamp = _extract_timestamp_from_entry(entry, _OPTION_LAST_TIMESTAMP_KEYS)
         if timestamp is not None:
@@ -1585,9 +1622,7 @@ def _resolve_option_stale_seconds_entry(
         fallback = _extract_timestamp_from_entry(entry, _OPTION_UPDATED_TIMESTAMP_KEYS)
         if fallback is not None:
             return _seconds_between_datetimes(now, fallback)
-        if existing is not None and existing > 0:
-            return existing
-        return _PREV_STALE_FALLBACK_SECONDS
+        return existing
     return existing
 
 
@@ -1638,15 +1673,17 @@ def _resolve_stale_seconds_entry(
     existing = _to_int(entry.get("stale_seconds"))
     if existing is None:
         existing = _to_int(entry.get("stale_s"))
+    if existing == _PREV_STALE_FALLBACK_SECONDS:
+        existing = None
     if mark_source != "PREV":
         return existing
     timestamp = _extract_previous_close_timestamp_from_entry(entry)
     if timestamp is not None:
         delta = now - timestamp
         return int(max(delta.total_seconds(), 0))
-    if existing is not None and existing > 0:
+    if existing is not None:
         return existing
-    return _PREV_STALE_FALLBACK_SECONDS
+    return None
 
 
 def _canonical_mark_source(value: Any) -> str | None:
@@ -1749,7 +1786,11 @@ def _to_int(value: Any) -> int | None:
 
 
 def _mark_or_fallback(mark: MarkResult, position: Position) -> Decimal:
-    return Decimal(mark.mark) if mark.mark is not None else position.avg_cost
+    if mark.mark is not None:
+        return Decimal(mark.mark)
+    if position.avg_cost is not None:
+        return position.avg_cost
+    return Decimal("0")
 
 
 def _ensure_aware(ts: datetime | None) -> datetime:

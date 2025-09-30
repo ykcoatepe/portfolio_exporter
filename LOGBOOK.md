@@ -29,3 +29,33 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Next:** 
 
 **Notes:** 
+
+### 2025-09-24T05:50:52Z • Task: PSD PnL diagnostics • Branch: codex/combo-group-playbook
+**Owner:** codex
+
+**Scope:** Investigate PSD dashboard zero P&L and staleness
+
+**Key files:** libs/py/positions_engine/ingest/internal.py, libs/py/positions_engine/service/state.py, apps/web/src/hooks/usePortfolioMetrics.ts
+
+**Interfaces:** /state snapshot, /stats API
+
+**Status:** open
+
+**Next:** Confirm upstream snapshot coverage for avg_cost + timestamps
+
+**Notes:** Capture repro scripts in debug/psd_logs.txt and document findings under debug/.
+
+### 2025-09-24T08:48:11Z • Task: PSD PnL diagnostic • Branch: feature/psd-diagnostic
+**Owner:** codex
+
+**Scope:** Confirm PSD zero P&L and stale badge regressions; capture repro artifacts.
+
+**Key files:** libs/py/positions_engine/ingest/internal.py, libs/py/positions_engine/service/state.py, libs/py/positions_engine/combos/detector.py, apps/web/src/hooks/usePortfolioMetrics.ts
+
+**Interfaces:** PSD snapshot ingest, /api/psd/state, OptionLegsTable UI
+
+**Status:** in_progress
+
+**Next:** Draft remediation plan for avg_cost defaults, timestamp propagation, and quote backfill heuristics.
+
+**Notes:** Evidence pack under debug/: psd_diagnose.md, psd_trace_map.md, psd_fail_repros.sh, psd_logs.txt, psd_checklist.json.

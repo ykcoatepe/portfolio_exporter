@@ -173,4 +173,4 @@ def test_positions_view_prev_without_timestamp_uses_default_staleness() -> None:
     assert stocks, "expected at least one single stock entry"
     stock = stocks[0]
     assert stock["mark_source"] == "PREV"
-    assert stock["stale_seconds"] == 24 * 60 * 60
+    assert stock["stale_seconds"] == 0

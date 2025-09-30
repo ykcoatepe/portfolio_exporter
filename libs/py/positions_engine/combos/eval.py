@@ -81,16 +81,17 @@ def _evaluate_combo(
     contracts = _combo_contracts(combo)
     multiplier = _combo_multiplier(combo)
     pnl = combo.total_pnl
+    net_price = combo.net_price
 
-    if contracts <= ZERO or multiplier <= ZERO or pnl is None:
+    if contracts <= ZERO or multiplier <= ZERO or pnl is None or net_price is None:
         return payload
 
-    if combo.net_price < ZERO and combo.strategy in CREDIT_STRATEGIES:
+    if net_price < ZERO and combo.strategy in CREDIT_STRATEGIES:
         return _eval_credit_combo(
             combo, contracts, multiplier, pnl, band_low, band_high
         )
 
-    if combo.net_price > ZERO and combo.strategy == ComboStrategy.VERTICAL:
+    if net_price > ZERO and combo.strategy == ComboStrategy.VERTICAL:
         return _eval_debit_combo(combo, multiplier, pnl)
 
     return payload
@@ -111,8 +112,12 @@ def _eval_credit_combo(
         payload["tp_band_low_pct"], payload["tp_band_high_pct"] = band
     payload["sl_r"] = 1.0
 
-    max_profit_total = abs(combo.net_price) * multiplier
-    credit_per_share = _safe_div(abs(combo.net_price), contracts)
+    net_price = combo.net_price
+    if net_price is None:
+        return payload
+
+    max_profit_total = abs(net_price) * multiplier
+    credit_per_share = _safe_div(abs(net_price), contracts)
     widths = _combo_widths(combo)
     max_width = max(widths) if widths else None
     max_loss_total: Decimal | None = None
@@ -160,7 +165,12 @@ def _eval_debit_combo(
     band = [_to_float(ONE), _to_float(TWO)]
     payload["tp_band_pct"] = band
     payload["tp_band_low_pct"], payload["tp_band_high_pct"] = band
-    r_total = combo.net_price * multiplier
+
+    net_price = combo.net_price
+    if net_price is None:
+        return payload
+
+    r_total = net_price * multiplier
     if r_total <= ZERO:
         return payload
 

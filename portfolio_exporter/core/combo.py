@@ -1340,16 +1340,25 @@ def _sync_with_db(combo_df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
             "underlying": underlying,
             "expiry": expiry,
             "structure": structure,
-            "legs": sorted(legs),
+            "legs": sorted(
+                legs,
+                key=lambda leg: (leg[0] is None, leg[0], leg[1]),
+            ),
         }
 
     parent_map: dict[str, str] = {}
     for cid, row in combo_df.iterrows():
         key = sorted(
             [
-                (pos_df.loc[leg_id].strike, pos_df.loc[leg_id].right)
+                (
+                    float(pos_df.loc[leg_id].strike)
+                    if pos_df.loc[leg_id].strike is not None
+                    else None,
+                    pos_df.loc[leg_id].right,
+                )
                 for leg_id in row.legs
-            ]
+            ],
+            key=lambda leg: (leg[0] is None, leg[0], leg[1]),
         )
         for ocid, data in open_combos.items():
             if (
