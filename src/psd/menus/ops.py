@@ -234,7 +234,9 @@ def show_status(console: Console) -> None:
         console.print(table)
     env_info = data.get("env")
     if isinstance(env_info, dict) and env_info:
-        env_table = Table(title="PSD Environment", show_header=False, header_style="dim")
+        env_table = Table(
+            title="PSD Environment", show_header=False, header_style="dim"
+        )
         env_table.add_column("Key", style="dim")
         env_table.add_column("Value")
         for key in ENV_SUMMARY_KEYS:
@@ -314,7 +316,9 @@ def start_psd(console: Console) -> None:
     for service in SERVICES:
         pid = state.get(service)
         if isinstance(pid, int) and _alive(pid):
-            console.print(f"[yellow]{service.title()} already running (PID {pid}).[/yellow]")
+            console.print(
+                f"[yellow]{service.title()} already running (PID {pid}).[/yellow]"
+            )
             running[service] = pid
     commands = {
         name: ([arg.format(port=port) for arg in cmd] if name == "web" else cmd)
@@ -328,7 +332,11 @@ def start_psd(console: Console) -> None:
         process = _spawn(cmd, log_path, env=child_env)
         running[service] = process.pid
         console.print(f"[green]{service.title()} PID {process.pid}[/green]")
-    env_summary = {key: child_env.get(key) for key in ENV_SUMMARY_KEYS if child_env.get(key) is not None}
+    env_summary = {
+        key: child_env.get(key)
+        for key in ENV_SUMMARY_KEYS
+        if child_env.get(key) is not None
+    }
     data: dict[str, object] = {**running, "port": port, "env": env_summary}
     _save_pid_file(data)
     open_dashboard(console)
@@ -349,7 +357,9 @@ def _kill_with_sequence(pid: int, console: Console) -> bool:
         except ProcessLookupError:
             return True
         except PermissionError:
-            console.print(f"[red]Permission denied when sending {sig.name} to PID {pid}.[/red]")
+            console.print(
+                f"[red]Permission denied when sending {sig.name} to PID {pid}.[/red]"
+            )
             return False
         if wait_time and _wait_for_exit(pid, wait_time):
             return True
@@ -395,7 +405,9 @@ def stop_psd(console: Console) -> None:
         if isinstance(env_info, dict) and env_info:
             updated["env"] = env_info
         _save_pid_file(updated)
-        console.print("[yellow]Some services are still running; pid file updated.[/yellow]")
+        console.print(
+            "[yellow]Some services are still running; pid file updated.[/yellow]"
+        )
     elif PID_FILE.exists():
         PID_FILE.unlink()
         console.print("[green]Cleared pid file.[/green]")

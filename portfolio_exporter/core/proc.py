@@ -48,7 +48,7 @@ def is_running(pid: int) -> bool:
         import psutil  # type: ignore
 
         return psutil.pid_exists(pid) and (
-            getattr(psutil.Process(pid), "status")() != getattr(psutil, "STATUS_ZOMBIE", "zombie")
+            psutil.Process(pid).status() != getattr(psutil, "STATUS_ZOMBIE", "zombie")
         )
     except Exception:
         pass
@@ -214,7 +214,9 @@ def status_module(pid_base: str) -> dict[str, Any]:
     return {"running": running, "pid": pid, **meta}
 
 
-def start_module_logged(pid_base: str, module: str, argv: list[str], log_path: str) -> dict[str, Any]:
+def start_module_logged(
+    pid_base: str, module: str, argv: list[str], log_path: str
+) -> dict[str, Any]:
     """Start python -m <module> with argv; pipe stdout/stderr to log_path; write PID/meta.
 
     Writes pid/meta to out/.pid and ensures the log directory exists. Returns

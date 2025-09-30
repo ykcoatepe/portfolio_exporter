@@ -114,7 +114,9 @@ def live_analysis(ib_manager):
 
         df_yf = fetch_yf_quotes(remaining) if remaining else pd.DataFrame()
         df_fred = (
-            fetch_fred_yields([t for t in remaining if t.startswith("US")]) if remaining else pd.DataFrame()
+            fetch_fred_yields([t for t in remaining if t.startswith("US")])
+            if remaining
+            else pd.DataFrame()
         )
 
         df = pd.concat([df_ib, df_yf, df_fred], ignore_index=True)
@@ -126,7 +128,10 @@ def live_analysis(ib_manager):
         if not df_pos.empty:
             pnl_map = df_pos.groupby("ticker")["unrealized_pnl"].sum().to_dict()
             cost_map = df_pos.groupby("ticker")["cost_basis"].sum().to_dict()
-            pct_map = {s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan for s in pnl_map}
+            pct_map = {
+                s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan
+                for s in pnl_map
+            }
 
         df["unrealized_pnl"] = df["ticker"].map(pnl_map)
         df["unrealized_pnl_pct"] = df["ticker"].map(pct_map)
@@ -168,8 +173,12 @@ def option_chain_analysis(ib_manager, symbol):
 def main():
     parser = argparse.ArgumentParser(description="Unified market analysis tool.")
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--mode", choices=["pre-market", "live", "tech-signals"], help="Analysis mode.")
-    group.add_argument("--greeks", action="store_true", help="Portfolio greeks analysis.")
+    group.add_argument(
+        "--mode", choices=["pre-market", "live", "tech-signals"], help="Analysis mode."
+    )
+    group.add_argument(
+        "--greeks", action="store_true", help="Portfolio greeks analysis."
+    )
     group.add_argument(
         "--option-chain",
         type=str,

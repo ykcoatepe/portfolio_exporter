@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update tickers_live.txt from current IBKR portfolio."""
+"""Update portfolio tickers (equities + option underlyings) from IBKR positions."""
 
 from __future__ import annotations
 
@@ -20,29 +20,59 @@ PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}
 TICKERS_FILE = "tickers_live.txt"
 
 
-def fetch_ib_tickers() -> list[str]:
-    """Return stock tickers from current IBKR positions."""
+def fetch_ib_symbols() -> tuple[list[str], list[str], int]:
+    """Return equities, option underlyings, and option contract count."""
     if IB is None:
-        return []
+        return [], [], 0
     ib = IB()
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)
     except Exception:
-        return []
-    positions = ib.positions()
-    ib.disconnect()
-    tickers = {p.contract.symbol.upper() for p in positions if getattr(p.contract, "secType", "") == "STK"}
-    return sorted(tickers)
+        return [], [], 0
+
+    try:
+        positions = ib.positions()
+    except Exception:
+        positions = []
+    finally:
+        try:
+            ib.disconnect()
+        except Exception:
+            pass
+
+    equities: set[str] = set()
+    option_underlyings: set[str] = set()
+    option_contracts = 0
+
+    for pos in positions:
+        contract = getattr(pos, "contract", None)
+        if contract is None:
+            continue
+        sec_type = getattr(contract, "secType", "")
+        symbol = getattr(contract, "symbol", "")
+        if sec_type in {"STK", "ETF"} and symbol:
+            equities.add(str(symbol).upper())
+            continue
+        if sec_type == "OPT":
+            option_contracts += 1
+            if symbol:
+                option_underlyings.add(str(symbol).upper())
+            continue
+        if symbol and sec_type in {"FUT", "IND"}:
+            equities.add(str(symbol).upper())
+
+    return sorted(equities), sorted(option_underlyings), option_contracts
+
+
+def fetch_ib_tickers() -> list[str]:
+    """Backwards-compatible helper returning only equity tickers."""
+    equities, _, _ = fetch_ib_symbols()
+    return equities
 
 
 def save_tickers(tickers: list[str], path: str = TICKERS_FILE) -> None:
-    """Write tickers to a text file in the configured output directory.
-
-    If a relative path is provided, it is resolved under ``settings.output_dir``.
-    Absolute paths are respected but their parent directories will be created.
-    """
+    """Write tickers to a text file in the configured output directory."""
     outdir = Path(settings.output_dir).expanduser()
-    # Resolve relative paths under the configured output directory
     target = Path(path)
     if not target.is_absolute():
         target = outdir / target
@@ -55,9 +85,27 @@ def save_tickers(tickers: list[str], path: str = TICKERS_FILE) -> None:
 
 def run(fmt: str = "csv") -> None:
     """Update ticker list from IBKR positions."""
-    tickers = fetch_ib_tickers()
-    if not tickers:
+    equities, option_underlyings, option_contracts = fetch_ib_symbols()
+    if not equities and not option_underlyings:
         print("No tickers retrieved from IBKR.")
         return
-    save_tickers(tickers)
-    print(f"\u2705  Updated {TICKERS_FILE} with {len(tickers)} tickers in output dir.")
+
+    combined: list[str] = []
+    seen: set[str] = set()
+    for symbol in equities + option_underlyings:
+        if symbol not in seen:
+            combined.append(symbol)
+            seen.add(symbol)
+
+    save_tickers(combined)
+
+    outdir = Path(settings.output_dir).expanduser()
+    parts: list[str] = []
+    if equities:
+        parts.append(f"{len(equities)} equities")
+    if option_contracts:
+        parts.append(f"{option_contracts} option contracts")
+    summary = " and ".join(parts) if parts else "portfolio"
+
+    print(f"\u2705  Synced {summary} from IBKR positions.")
+    print(f"    Output → {outdir / TICKERS_FILE}")

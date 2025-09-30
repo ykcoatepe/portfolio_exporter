@@ -673,7 +673,9 @@ def pick_free_port(host: str) -> int:
             pass
 
 
-def start(host: str = "127.0.0.1", port: int = 8787, *, background: bool = True) -> tuple[str, int]:
+def start(
+    host: str = "127.0.0.1", port: int = 8787, *, background: bool = True
+) -> tuple[str, int]:
     """Start the PSD dashboard server via uvicorn."""
     try:
         import uvicorn  # type: ignore
@@ -689,7 +691,9 @@ def start(host: str = "127.0.0.1", port: int = 8787, *, background: bool = True)
 
     def _run_with_ws(ws_value: str | None) -> None:
         try:
-            print(f"[psd-web] starting at http://{host}:{actual_port} (ws={ws_value or 'auto'})")
+            print(
+                f"[psd-web] starting at http://{host}:{actual_port} (ws={ws_value or 'auto'})"
+            )
         except Exception:
             pass
         if ws_value is None:
@@ -702,7 +706,11 @@ def start(host: str = "127.0.0.1", port: int = 8787, *, background: bool = True)
         if ws_env == "auto":
             order = [None, "websockets", "wsproto"]
         elif ws_env in {"websockets", "wsproto"}:
-            order = [ws_env, None, ("wsproto" if ws_env == "websockets" else "websockets")]
+            order = [
+                ws_env,
+                None,
+                ("wsproto" if ws_env == "websockets" else "websockets"),
+            ]
         else:
             order = [None, "websockets", "wsproto"]
         last_err: Exception | None = None

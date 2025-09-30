@@ -15,4 +15,3 @@ def test_credit_spread_tp_sl():
     assert out["max_loss"] == 4.0
     assert out["tp_debit"] == 0.5
     assert out["sl_debit"] == 5.0
-

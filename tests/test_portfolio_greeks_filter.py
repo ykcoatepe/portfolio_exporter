@@ -43,7 +43,7 @@ def test_list_positions_fill_exchange_and_currency():
     assert pos.contract.currency == "USD"
 
 
-#def test_calc_portfolio_greeks_skip_indices_and_total():
+# def test_calc_portfolio_greeks_skip_indices_and_total():
 #    # sample exposures including an index ticker to be filtered
 #    df = pd.DataFrame({
 #        "underlying": ["AAPL", "VIX"],

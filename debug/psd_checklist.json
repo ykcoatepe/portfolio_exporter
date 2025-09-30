@@ -1,0 +1,26 @@
+{
+  "basis_overwrite": {
+    "status": "PASS",
+    "evidence": [
+      "libs/py/positions_engine/ingest/internal.py:575-589 forces avg_cost to 0.0 when snapshot omits the field.",
+      "libs/py/positions_engine/service/normalize.py:315-332 skips total_pnl when avg_cost == 0.",
+      "debug/psd_logs.txt: avg_cost=0 reproduction shows compute_equity_pnl_fields total_pnl => None."
+    ]
+  },
+  "stale_mapping": {
+    "status": "PASS",
+    "evidence": [
+      "libs/py/positions_engine/service/state.py:1185-1203 alias LAST_CLOSE to PREV without copying previous_close_ts.",
+      "libs/py/positions_engine/service/state.py:1553-1582 falls back to 86400s when PREV lacks a timestamp.",
+      "debug/psd_logs.txt: pytest failure test_leg_missing_timestamps_uses_fallback_staleness asserts stale_seconds == 60 instead of expected 23h, confirming timestamp loss."
+    ]
+  },
+  "leg_quote_rebuild": {
+    "status": "PASS",
+    "evidence": [
+      "libs/py/positions_engine/ingest/internal.py:604-650 emits no quote when bid/ask/mark are all None.",
+      "libs/py/positions_engine/combos/detector.py:214-240 keeps mark=None when quote is missing, propagating total_pnl=None.",
+      "debug/psd_logs.txt: vitest failure OptionLegsTable > applies delta range filter shows OptionLegs rows collapsing with empty marks."
+    ]
+  }
+}

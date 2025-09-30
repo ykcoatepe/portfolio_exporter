@@ -25,11 +25,17 @@ def equity_pnl(
 ) -> PnLBreakdown:
     """Compute equity P&L using the provided mark."""
 
-    mark_value = _coerce_decimal(mark, fallback=position.avg_cost)
+    basis = position.avg_cost
+    if basis in (None, Decimal("0")):
+        basis = None
+    fallback_mark = basis if basis is not None else mark
+    mark_value = _coerce_decimal(mark, fallback=fallback_mark)
     day = Decimal("0")
     if previous_close is not None:
         day = (mark_value - previous_close) * position.quantity * position.multiplier
-    total = (mark_value - position.avg_cost) * position.quantity * position.multiplier
+    total = Decimal("0")
+    if basis is not None:
+        total = (mark_value - basis) * position.quantity * position.multiplier
     return PnLBreakdown(day=day, total=total)
 
 
@@ -43,7 +49,11 @@ def option_leg_pnl(
     return equity_pnl(position=position, mark=mark, previous_close=previous_close)
 
 
-def _coerce_decimal(value: Decimal | None, fallback: Decimal) -> Decimal:
+def _coerce_decimal(value: Decimal | None, fallback: Decimal | None) -> Decimal:
     if value is None:
-        return fallback
-    return Decimal(value)
+        if fallback is not None:
+            return fallback
+        return Decimal("0")
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))

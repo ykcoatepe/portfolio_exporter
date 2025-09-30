@@ -64,10 +64,14 @@ def evaluate_playbook_targets(
     for leg in legs:
         leg_targets[leg.leg_id] = _evaluate_single_leg(leg, band_low, band_high)
 
-    return PlaybookEvaluation(combo_targets=combo_targets, leg_targets=leg_targets, meta=meta)
+    return PlaybookEvaluation(
+        combo_targets=combo_targets, leg_targets=leg_targets, meta=meta
+    )
 
 
-def _evaluate_combo(combo: OptionCombo, band_low: Decimal, band_high: Decimal) -> dict[str, Any]:
+def _evaluate_combo(
+    combo: OptionCombo, band_low: Decimal, band_high: Decimal
+) -> dict[str, Any]:
     payload = _default_payload()
     band = _band_payload(band_low, band_high)
     payload["tp_band_pct"] = band
@@ -77,14 +81,17 @@ def _evaluate_combo(combo: OptionCombo, band_low: Decimal, band_high: Decimal) -
     contracts = _combo_contracts(combo)
     multiplier = _combo_multiplier(combo)
     pnl = combo.total_pnl
+    net_price = combo.net_price
 
-    if contracts <= ZERO or multiplier <= ZERO or pnl is None:
+    if contracts <= ZERO or multiplier <= ZERO or pnl is None or net_price is None:
         return payload
 
-    if combo.net_price < ZERO and combo.strategy in CREDIT_STRATEGIES:
-        return _eval_credit_combo(combo, contracts, multiplier, pnl, band_low, band_high)
+    if net_price < ZERO and combo.strategy in CREDIT_STRATEGIES:
+        return _eval_credit_combo(
+            combo, contracts, multiplier, pnl, band_low, band_high
+        )
 
-    if combo.net_price > ZERO and combo.strategy == ComboStrategy.VERTICAL:
+    if net_price > ZERO and combo.strategy == ComboStrategy.VERTICAL:
         return _eval_debit_combo(combo, multiplier, pnl)
 
     return payload
@@ -105,8 +112,12 @@ def _eval_credit_combo(
         payload["tp_band_low_pct"], payload["tp_band_high_pct"] = band
     payload["sl_r"] = 1.0
 
-    max_profit_total = abs(combo.net_price) * multiplier
-    credit_per_share = _safe_div(abs(combo.net_price), contracts)
+    net_price = combo.net_price
+    if net_price is None:
+        return payload
+
+    max_profit_total = abs(net_price) * multiplier
+    credit_per_share = _safe_div(abs(net_price), contracts)
     widths = _combo_widths(combo)
     max_width = max(widths) if widths else None
     max_loss_total: Decimal | None = None
@@ -147,12 +158,19 @@ def _eval_credit_combo(
     return payload
 
 
-def _eval_debit_combo(combo: OptionCombo, multiplier: Decimal, pnl: Decimal) -> dict[str, Any]:
+def _eval_debit_combo(
+    combo: OptionCombo, multiplier: Decimal, pnl: Decimal
+) -> dict[str, Any]:
     payload = _default_payload()
     band = [_to_float(ONE), _to_float(TWO)]
     payload["tp_band_pct"] = band
     payload["tp_band_low_pct"], payload["tp_band_high_pct"] = band
-    r_total = combo.net_price * multiplier
+
+    net_price = combo.net_price
+    if net_price is None:
+        return payload
+
+    r_total = net_price * multiplier
     if r_total <= ZERO:
         return payload
 
@@ -182,7 +200,9 @@ def _eval_debit_combo(combo: OptionCombo, multiplier: Decimal, pnl: Decimal) -> 
     return payload
 
 
-def _evaluate_single_leg(leg: OptionLegSnapshot, band_low: Decimal, band_high: Decimal) -> dict[str, Any]:
+def _evaluate_single_leg(
+    leg: OptionLegSnapshot, band_low: Decimal, band_high: Decimal
+) -> dict[str, Any]:
     payload = _default_payload()
     quantity = leg.quantity
     pnl = leg.total_pnl
@@ -219,7 +239,9 @@ def _evaluate_single_leg(leg: OptionLegSnapshot, band_low: Decimal, band_high: D
                     "pct_of_goal": _to_float(pct_goal),
                     "pct_of_max_profit_or_r": _to_float(pct_max),
                 },
-                "next_action": _next_action(tp_done=tp_done, tp_hit=tp_hit, sl_hit=sl_hit),
+                "next_action": _next_action(
+                    tp_done=tp_done, tp_hit=tp_hit, sl_hit=sl_hit
+                ),
             }
         )
         return payload
@@ -287,7 +309,11 @@ def _default_payload() -> dict[str, Any]:
 
 
 def _combo_contracts(combo: OptionCombo) -> Decimal:
-    quantities = [abs(leg.quantity) for leg in combo.legs if leg.quantity is not None and leg.quantity != ZERO]
+    quantities = [
+        abs(leg.quantity)
+        for leg in combo.legs
+        if leg.quantity is not None and leg.quantity != ZERO
+    ]
     return min(quantities, default=ZERO)
 
 
@@ -299,8 +325,12 @@ def _combo_multiplier(combo: OptionCombo) -> Decimal:
 
 
 def _combo_widths(combo: OptionCombo) -> list[Decimal]:
-    call_legs = [leg for leg in combo.legs if (leg.right or "").upper().startswith("CALL")]
-    put_legs = [leg for leg in combo.legs if (leg.right or "").upper().startswith("PUT")]
+    call_legs = [
+        leg for leg in combo.legs if (leg.right or "").upper().startswith("CALL")
+    ]
+    put_legs = [
+        leg for leg in combo.legs if (leg.right or "").upper().startswith("PUT")
+    ]
     widths: list[Decimal] = []
     for legs in (call_legs, put_legs):
         width = _vertical_width(legs)
@@ -314,8 +344,12 @@ def _combo_widths(combo: OptionCombo) -> list[Decimal]:
 
 
 def _vertical_width(legs: Sequence[OptionLegSnapshot]) -> Decimal | None:
-    short_leg = next((leg for leg in legs if leg.quantity is not None and leg.quantity < ZERO), None)
-    long_leg = next((leg for leg in legs if leg.quantity is not None and leg.quantity > ZERO), None)
+    short_leg = next(
+        (leg for leg in legs if leg.quantity is not None and leg.quantity < ZERO), None
+    )
+    long_leg = next(
+        (leg for leg in legs if leg.quantity is not None and leg.quantity > ZERO), None
+    )
     if short_leg is None or long_leg is None:
         return None
     if short_leg.strike is None or long_leg.strike is None:

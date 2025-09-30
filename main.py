@@ -53,18 +53,30 @@ def parse_args() -> argparse.Namespace:
         "  python main.py --workflow demo --dry-run\n"
     )
     parser = argparse.ArgumentParser(
-        add_help=False, epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter
+        add_help=False,
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("-q", "--quiet", action="store_true", help="suppress banner & status output")
+    parser.add_argument(
+        "-q", "--quiet", action="store_true", help="suppress banner & status output"
+    )
     parser.add_argument(
         "--format",
         choices=["csv", "excel", "pdf"],
         default="csv",
         help="default output format",
     )
-    parser.add_argument("--json", action="store_true", help="emit JSON output for planning commands")
-    parser.add_argument("--list-tasks", action="store_true", help="list available tasks and aliases")
-    parser.add_argument("--dry-run", action="store_true", help="show execution plan without running tasks")
+    parser.add_argument(
+        "--json", action="store_true", help="emit JSON output for planning commands"
+    )
+    parser.add_argument(
+        "--list-tasks", action="store_true", help="list available tasks and aliases"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show execution plan without running tasks",
+    )
     parser.add_argument("--workflow", help="expand a named workflow from memory")
     # Queue support: allow multiple --task flags or a single comma-separated --tasks
     parser.add_argument(
@@ -191,7 +203,9 @@ def task_registry(fmt: str) -> dict[str, callable]:
 
         # Lazy import to avoid startup cost unless needed
         try:
-            from portfolio_exporter.core.memory import get_pref as _get_pref  # type: ignore
+            from portfolio_exporter.core.memory import (
+                get_pref as _get_pref,  # type: ignore
+            )
         except Exception:
 
             def _get_pref(key: str, default: str | None = None) -> str | None:  # type: ignore
@@ -209,7 +223,11 @@ def task_registry(fmt: str) -> dict[str, callable]:
                     "tests/data/micro_momo_config.json" if pe_test else None,
                 ]
             )
-            or ("tests/data/micro_momo_config.json" if pe_test else "micro_momo_config.json")
+            or (
+                "tests/data/micro_momo_config.json"
+                if pe_test
+                else "micro_momo_config.json"
+            )
         )
 
         if os.getenv("MOMO_INPUT"):
@@ -223,7 +241,9 @@ def task_registry(fmt: str) -> dict[str, callable]:
                 "./inputs",
                 "tests/data" if pe_test else None,
             ]
-            patterns = tuple((os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(","))
+            patterns = tuple(
+                (os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(",")
+            )
             auto = find_latest_file([d for d in search_dirs if d], patterns)
             if pe_test and not auto:
                 auto = "tests/data/meme_scan_sample.csv"
@@ -264,7 +284,9 @@ def task_registry(fmt: str) -> dict[str, callable]:
 
         scored = os.getenv("MOMO_SCORED") or "out/micro_momo_scored.csv"
         cfg = os.getenv("MOMO_CFG") or (
-            "tests/data/micro_momo_config.json" if os.getenv("PE_TEST_MODE") else "micro_momo_config.json"
+            "tests/data/micro_momo_config.json"
+            if os.getenv("PE_TEST_MODE")
+            else "micro_momo_config.json"
         )
         out_dir = os.getenv("MOMO_OUT") or "out"
         interval = os.getenv("MOMO_INTERVAL") or "10"
@@ -446,7 +468,9 @@ def _main_impl(args) -> None:
     if getattr(args, "tasks", None):
         all_tasks.extend([t for t in args.tasks if t])
     if getattr(args, "tasks_csv", None):
-        all_tasks.extend([t.strip() for t in str(args.tasks_csv).split(",") if t.strip()])
+        all_tasks.extend(
+            [t.strip() for t in str(args.tasks_csv).split(",") if t.strip()]
+        )
     if args.workflow:
         wf = load_workflow_queue(args.workflow)
         if wf:
@@ -490,7 +514,9 @@ def _main_impl(args) -> None:
                     status.update("Ready", "green")
 
         if failures:
-            console.print(f"[yellow]Completed with {len(failures)} failure(s): {failures}")
+            console.print(
+                f"[yellow]Completed with {len(failures)} failure(s): {failures}"
+            )
 
         return
 
@@ -512,7 +538,9 @@ def _main_impl(args) -> None:
                 Path(outdir).expanduser()
                 if outdir
                 else Path(
-                    os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or "./tmp_test_run"
+                    os.getenv("OUTPUT_DIR")
+                    or os.getenv("PE_OUTPUT_DIR")
+                    or "./tmp_test_run"
                 ).expanduser()
             )
             try:
@@ -551,7 +579,17 @@ def _main_impl(args) -> None:
                 )
             df = _pd.DataFrame(rows)
             totals = (
-                df[["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]].sum().to_frame().T
+                df[
+                    [
+                        "delta_exposure",
+                        "gamma_exposure",
+                        "vega_exposure",
+                        "theta_exposure",
+                    ]
+                ]
+                .sum()
+                .to_frame()
+                .T
             )
             totals.insert(0, "timestamp", ts_iso)
             totals.index = ["PORTFOLIO_TOTAL"]

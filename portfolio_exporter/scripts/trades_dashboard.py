@@ -81,15 +81,23 @@ def _summarize(df: pd.DataFrame) -> dict[str, Any]:
             "by_structure": {},
             "top_clusters": [],
         }
-    clusters = int(df["cluster_id"].nunique()) if "cluster_id" in df.columns else len(df)
+    clusters = (
+        int(df["cluster_id"].nunique()) if "cluster_id" in df.columns else len(df)
+    )
     val_col = "pnl" if "pnl" in df.columns else "credit_debit"
     net = float(df[val_col].sum()) if val_col in df.columns else 0.0
     by_structure: dict[str, int] = {}
     if "structure" in df.columns:
-        by_structure = {str(k): int(v) for k, v in df.groupby("structure").size().items()}
+        by_structure = {
+            str(k): int(v) for k, v in df.groupby("structure").size().items()
+        }
     top_clusters: list[dict[str, Any]] = []
     if "cluster_id" in df.columns and val_col in df.columns:
-        top = df.groupby(["cluster_id", "structure"], dropna=False)[val_col].sum().reset_index()
+        top = (
+            df.groupby(["cluster_id", "structure"], dropna=False)[val_col]
+            .sum()
+            .reset_index()
+        )
         top = top.sort_values(val_col, key=lambda s: s.abs(), ascending=False).head(5)
         for _, row in top.iterrows():
             top_clusters.append(
@@ -112,7 +120,9 @@ def _summarize(df: pd.DataFrame) -> dict[str, Any]:
 
 
 def _build_html(summary: dict[str, Any]) -> str:
-    by_struct_rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in summary["by_structure"].items())
+    by_struct_rows = "".join(
+        f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in summary["by_structure"].items()
+    )
     top_rows = "".join(
         f"<tr><td>{c['cluster_id']}</td><td>{c['pnl']}</td><td>{c.get('structure', '')}</td></tr>"
         for c in summary["top_clusters"]
@@ -147,13 +157,23 @@ def _build_pdf(summary: dict[str, Any], path: Path) -> None:
 
 def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Trades Dashboard")
-    parser.add_argument("--trades-report", help="Path to trades_report CSV/JSON", default=None)
+    parser.add_argument(
+        "--trades-report", help="Path to trades_report CSV/JSON", default=None
+    )
     # Explicit flags required by tests
-    parser.add_argument("--json", action="store_true", help="Print JSON summary to stdout")
-    parser.add_argument("--no-files", action="store_true", help="Do not write any files")
+    parser.add_argument(
+        "--json", action="store_true", help="Print JSON summary to stdout"
+    )
+    parser.add_argument(
+        "--no-files", action="store_true", help="Do not write any files"
+    )
     parser.add_argument("--output-dir", help="Directory to write outputs")
-    parser.add_argument("--no-pretty", action="store_true", help="Disable pretty printing")
-    parser.add_argument("--debug-timings", action="store_true", help="Emit timing breakdown")
+    parser.add_argument(
+        "--no-pretty", action="store_true", help="Disable pretty printing"
+    )
+    parser.add_argument(
+        "--debug-timings", action="store_true", help="Emit timing breakdown"
+    )
     return parser
 
 
@@ -181,7 +201,9 @@ def main(argv: list[str] | None = None):
             path_html = core_io.save(html, "trades_dashboard", "html", outdir)
             outputs["html"] = str(path_html)
             written.append(path_html)
-            theme_css = Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
+            theme_css = (
+                Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
+            )
             if not theme_css.exists():
                 theme_css = Path(__file__).resolve().parents[1] / "assets" / "theme.css"
             if theme_css.exists() and outdir:

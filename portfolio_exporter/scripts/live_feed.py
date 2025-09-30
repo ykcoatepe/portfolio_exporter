@@ -60,7 +60,9 @@ try:
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=frozenset(["GET", "HEAD"]),
     )
-    _yf_adapter = HTTPAdapter(max_retries=_yf_retries, pool_connections=10, pool_maxsize=10)
+    _yf_adapter = HTTPAdapter(
+        max_retries=_yf_retries, pool_connections=10, pool_maxsize=10
+    )
     _yf_session.mount("https://", _yf_adapter)
     _yf_session.mount("http://", _yf_adapter)
     try:
@@ -295,6 +297,8 @@ from portfolio_exporter.core.ib_config import HOST as IB_HOST
 from portfolio_exporter.core.ib_config import PORT as IB_PORT
 from portfolio_exporter.core.ib_config import client_id as _cid
 
+_EVENT_LOOP: asyncio.AbstractEventLoop | None = None
+
 IB_CID = _cid("live_feed", default=2)  # separate clientId
 IB_TIMEOUT = 4.0  # seconds to wait per batch
 
@@ -329,14 +333,19 @@ YIELD_MAP = {"US2Y": "DGS2", "US10Y": "DGS10", "US20Y": "DGS20", "US30Y": "DGS30
 
 def _ensure_event_loop() -> asyncio.AbstractEventLoop:
     """Ensure ib_insync can access a live asyncio loop before connecting."""
+    global _EVENT_LOOP
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        if _EVENT_LOOP is None or _EVENT_LOOP.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+        asyncio.set_event_loop(_EVENT_LOOP)
+        loop = _EVENT_LOOP
+    else:
+        if loop.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+            asyncio.set_event_loop(_EVENT_LOOP)
+            loop = _EVENT_LOOP
     return loop
 
 
@@ -376,7 +385,8 @@ def load_tickers() -> list[str]:
     Preference: files under ``settings.output_dir``; then current directory.
     """
     candidates = [
-        os.path.join(os.path.expanduser(settings.output_dir), name) for name in PORTFOLIO_FILES
+        os.path.join(os.path.expanduser(settings.output_dir), name)
+        for name in PORTFOLIO_FILES
     ] + PORTFOLIO_FILES
     p = next((f for f in candidates if os.path.exists(f)), None)
     if not p:
@@ -481,16 +491,39 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
                 "ticker": key,
                 "last": (
                     clean_last / 10
-                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and clean_last is not None
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"}
+                    and clean_last is not None
                     else clean_last
                 ),
-                "bid": (md.bid / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid else md.bid),
-                "ask": (md.ask / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask else md.ask),
-                "open": (md.open / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open else md.open),
-                "high": (md.high / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high else md.high),
-                "low": (md.low / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low else md.low),
+                "bid": (
+                    md.bid / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid
+                    else md.bid
+                ),
+                "ask": (
+                    md.ask / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask
+                    else md.ask
+                ),
+                "open": (
+                    md.open / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open
+                    else md.open
+                ),
+                "high": (
+                    md.high / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high
+                    else md.high
+                ),
+                "low": (
+                    md.low / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low
+                    else md.low
+                ),
                 "prev_close": (
-                    md.close / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close else md.close
+                    md.close / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close
+                    else md.close
                 ),
                 "volume": md.volume,
                 "source": "IB",
@@ -529,7 +562,9 @@ def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
                 fast.get("previousClose"),
                 info.get("previousClose"),
             )
-            vol = _first_valid(fast.get("last_volume"), fast.get("volume"), info.get("volume"))
+            vol = _first_valid(
+                fast.get("last_volume"), fast.get("volume"), info.get("volume")
+            )
         except Exception as e:
             logging.warning("yfinance info fail %s: %s", t, e)
             bid = ask = day_high = day_low = vol = np.nan
@@ -643,7 +678,9 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
     ib.sleep(IB_TIMEOUT)  # allow quotes to update
 
     for conId, (con, md, avg_cost, qty) in md_reqs.items():
-        raw_last = _clean_price(md.last) if md.last is not None else _clean_price(md.close)
+        raw_last = (
+            _clean_price(md.last) if md.last is not None else _clean_price(md.close)
+        )
         last = raw_last
         mult = int(con.multiplier) if con.multiplier else 1
         cost_basis = avg_cost * qty * mult
@@ -656,12 +693,16 @@ def fetch_live_positions(ib: "IB") -> pd.DataFrame:
             from ib_insync import Contract
 
             for leg in con.comboLegs:
-                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
+                leg_contract = ib.qualifyContracts(
+                    Contract(conId=leg.conId, exchange=leg.exchange)
+                )[0]
                 combo_legs_data.append(
                     {
                         "symbol": leg_contract.symbol,
                         "sec_type": leg_contract.secType,
-                        "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
+                        "expiry": getattr(
+                            leg_contract, "lastTradeDateOrContractMonth", None
+                        ),
                         "strike": getattr(leg_contract, "strike", None),
                         "right": getattr(leg_contract, "right", None),
                         "ratio": leg.ratio,
@@ -732,7 +773,9 @@ def save_to_pdf(df: pd.DataFrame, path: str) -> None:
     display_df = df.copy()
     num_cols = display_df.select_dtypes(include=["number"]).columns
     for col in num_cols:
-        display_df[col] = display_df[col].apply(lambda x: "—" if pd.isna(x) else f"{x:,.2f}")
+        display_df[col] = display_df[col].apply(
+            lambda x: "—" if pd.isna(x) else f"{x:,.2f}"
+        )
     rows_data = [display_df.columns.tolist()] + display_df.values.tolist()
     doc = SimpleDocTemplate(
         path,
@@ -810,7 +853,9 @@ def run(
         return ["SPY", "QQQ", "IWM", "DIA", "VIX"]
 
     extras = _baseline_indices() if include_indices else []
-    tickers = sorted(set(tickers + (list(opt_under) if include_positions else []) + extras))
+    tickers = sorted(
+        set(tickers + (list(opt_under) if include_positions else []) + extras)
+    )
     if not tickers:
         logging.warning("No tickers to snapshot.")
         return pd.DataFrame() if return_df else None
@@ -825,12 +870,16 @@ def run(
 
     # ----- quotes from IB, YF, FRED -----
     df_ib = fetch_ib_quotes(tickers, opt_list)
-    served = set(df_ib.loc[~df_ib["last"].isna(), "ticker"]) if not df_ib.empty else set()
+    served = (
+        set(df_ib.loc[~df_ib["last"].isna(), "ticker"]) if not df_ib.empty else set()
+    )
     remaining = [t for t in tickers if t not in served]
     remaining_yields = [t for t in remaining if t in YIELD_MAP]
     remaining = [t for t in remaining if t not in YIELD_MAP]
     df_yf = fetch_yf_quotes(remaining) if remaining else pd.DataFrame()
-    df_fred = fetch_fred_yields(remaining_yields) if remaining_yields else pd.DataFrame()
+    df_fred = (
+        fetch_fred_yields(remaining_yields) if remaining_yields else pd.DataFrame()
+    )
     df = pd.concat([df_ib, df_yf, df_fred], ignore_index=True)
     df.insert(0, "timestamp", ts_now)
 
@@ -848,7 +897,10 @@ def run(
             if not df_pos.empty:
                 pnl_map = df_pos.groupby("ticker")["unrealized_pnl"].sum().to_dict()
                 cost_map = df_pos.groupby("ticker")["cost_basis"].sum().to_dict()
-                pct_map = {s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan for s in pnl_map}
+                pct_map = {
+                    s: (100 * pnl_map[s] / cost_map[s]) if cost_map[s] else np.nan
+                    for s in pnl_map
+                }
         except Exception as e:
             logging.warning("Live position snapshot failed: %s", e)
 
@@ -896,7 +948,9 @@ def run(
         df.to_csv(out_q, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
         if not df_pos.empty:
             out_p = base_pos + ".csv"
-            df_pos.to_csv(out_p, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f")
+            df_pos.to_csv(
+                out_p, index=False, quoting=csv.QUOTE_MINIMAL, float_format="%.3f"
+            )
         logging.info("Saved live snapshot → %s", out_q)
 
 
@@ -943,5 +997,7 @@ def _snapshot_quotes(tickers: list[str], fmt: str = "csv") -> pd.DataFrame:
             price = _yf_resolve_last_price(t)
         except Exception:
             price = float("nan")
-        rows.append({"symbol": t, "price": float(price) if price is not None else float("nan")})
+        rows.append(
+            {"symbol": t, "price": float(price) if price is not None else float("nan")}
+        )
     return pd.DataFrame(rows)

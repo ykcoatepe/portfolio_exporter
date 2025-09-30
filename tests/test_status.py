@@ -18,6 +18,7 @@ def test_status_bar_called(monkeypatch):
     monkeypatch.setattr(ui, "StatusBar", lambda *a, **k: dummy)
     import importlib, main as m
 
+    monkeypatch.setenv("PE_QUIET", "0")
     importlib.reload(m)  # re-run main with patch
     m.parse_args = lambda: types.SimpleNamespace(quiet=False, format="csv")
     monkeypatch.setattr(builtins, "input", lambda _: "0")

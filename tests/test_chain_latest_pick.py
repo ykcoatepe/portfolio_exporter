@@ -26,4 +26,3 @@ def test_find_latest_chain_for_symbol(tmp_path: Path) -> None:
     assert best and best.endswith(f"{sym}_20240520.csv")
     rows = load_chain_csv(best)
     assert len(rows) == 1 and rows[0].strike == 13.0
-

@@ -29,7 +29,11 @@ def _read_events(
     events: list[tuple[int | None, str, dict[str, Any]]] = []
     current = {"id": None, "event": None, "data": []}
     for raw_line in resp.iter_lines():
-        line = raw_line.decode("utf-8") if isinstance(raw_line, (bytes, bytearray)) else raw_line
+        line = (
+            raw_line.decode("utf-8")
+            if isinstance(raw_line, (bytes, bytearray))
+            else raw_line
+        )
         if line == "":
             if current["event"]:
                 payload_str = "\n".join(current["data"]).strip()
@@ -50,6 +54,8 @@ def _read_events(
         elif line.startswith("data:"):
             current["data"].append(line[5:])
     return events
+
+
 def test_sse_bootstrap_and_monotonic_ids(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

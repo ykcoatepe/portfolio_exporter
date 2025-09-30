@@ -68,7 +68,9 @@ def _get_quote_option_func():
         return _stub
 
 
-def fetch_chain(symbol: str, expiry: str, strikes: list[float] | None = None) -> pd.DataFrame:
+def fetch_chain(
+    symbol: str, expiry: str, strikes: list[float] | None = None
+) -> pd.DataFrame:
     """Return an option chain snapshot.
 
     The resulting DataFrame includes columns: ``strike``, ``right``, ``mid``,
@@ -93,7 +95,9 @@ def fetch_chain(symbol: str, expiry: str, strikes: list[float] | None = None) ->
 
 
 def _table_exists(cur: sqlite3.Cursor, name: str) -> bool:
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?;", (name,))
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?;", (name,)
+    )
     return cur.fetchone() is not None
 
 
@@ -243,7 +247,11 @@ def _infer_credit_debit(legs: list[dict]) -> str | None:
             qty = float(leg.get("qty", 0))
             if qty == 0 and "side" in leg:
                 side = str(leg["side"]).upper()
-                qty = 1.0 if side in {"SELL", "SHORT"} else -1.0 if side in {"BUY", "LONG"} else 0.0
+                qty = (
+                    1.0
+                    if side in {"SELL", "SHORT"}
+                    else -1.0 if side in {"BUY", "LONG"} else 0.0
+                )
             total += val * qty
         except Exception:
             return None
@@ -302,7 +310,10 @@ def _infer_type_and_width(
         n == 2
         and same_right
         and same_expiry
-        and len({leg_row["strike"] for leg_row in clean if leg_row["strike"] is not None}) == 2
+        and len(
+            {leg_row["strike"] for leg_row in clean if leg_row["strike"] is not None}
+        )
+        == 2
     ):
         s = sorted(
             [leg_row["strike"] for leg_row in clean if leg_row["strike"] is not None]
@@ -312,11 +323,19 @@ def _infer_type_and_width(
     # Iron condor: 4 legs, 2 calls + 2 puts, same expiry (when present)
     if n == 4 and uniq_rights == {"C", "P"} and same_expiry:
         calls = sorted(
-            [leg_row for leg_row in clean if leg_row["right"] == "C" and leg_row["strike"] is not None],
+            [
+                leg_row
+                for leg_row in clean
+                if leg_row["right"] == "C" and leg_row["strike"] is not None
+            ],
             key=lambda row: row["strike"],
         )
         puts = sorted(
-            [leg_row for leg_row in clean if leg_row["right"] == "P" and leg_row["strike"] is not None],
+            [
+                leg_row
+                for leg_row in clean
+                if leg_row["right"] == "P" and leg_row["strike"] is not None
+            ],
             key=lambda row: row["strike"],
         )
         cw = abs(calls[-1]["strike"] - calls[0]["strike"]) if len(calls) >= 2 else None
@@ -361,7 +380,9 @@ def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
         # Detect id column once per connection/transaction
         id_col = _detect_id_column(cur)
         if id_col == "rowid":
-            logging.warning("Using rowid as combo key; consider migrating schema to include an 'id' column.")
+            logging.warning(
+                "Using rowid as combo key; consider migrating schema to include an 'id' column."
+            )
         combos = _fetch_combos(cur, date_from)
         if not combos:
             print(f"[backfill] No combos found from {date_from}.")
@@ -457,7 +478,9 @@ def backfill_combos(db: str, date_from: str = "2023-01-01") -> None:
             cd_filled,
             total,
         )
-        print(f"✅ backfill_combos: updated {updated} / {len(combos)} combos (meta fields).")
+        print(
+            f"✅ backfill_combos: updated {updated} / {len(combos)} combos (meta fields)."
+        )
     finally:
         conn.close()
 

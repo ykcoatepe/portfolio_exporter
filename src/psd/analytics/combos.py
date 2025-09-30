@@ -94,7 +94,9 @@ def _pair_vertical(
     return None, 0.0, 0.0
 
 
-def recognize(positions: Iterable[Position]) -> tuple[list[Combo], list[dict[str, str]]]:
+def recognize(
+    positions: Iterable[Position],
+) -> tuple[list[Combo], list[dict[str, str]]]:
     """Return combos and orphan-risk warnings from option legs in positions.
 
     Only uses Position.kind == 'option' legs; other kinds are forwarded unchanged elsewhere.
@@ -105,7 +107,9 @@ def recognize(positions: Iterable[Position]) -> tuple[list[Combo], list[dict[str
     for p in positions:
         for leg in p.legs or []:
             key = (leg.symbol, leg.expiry)
-            bucket = by_key.setdefault(key, {"C_short": [], "C_long": [], "P_short": [], "P_long": []})
+            bucket = by_key.setdefault(
+                key, {"C_short": [], "C_long": [], "P_short": [], "P_long": []}
+            )
             if leg.right == "C":
                 (bucket["C_short"] if leg.qty < 0 else bucket["C_long"]).append(leg)
             else:
@@ -184,11 +188,15 @@ def recognize(positions: Iterable[Position]) -> tuple[list[Combo], list[dict[str
         if short_call_qty > max(long_call_qty, 0):
             matched = min(short_call_qty, long_call_qty)
             if short_call_qty - matched > 0:
-                orphans.append({"symbol": sym, "expiry": exp, "side": "C", "reason": "orphan-risk"})
+                orphans.append(
+                    {"symbol": sym, "expiry": exp, "side": "C", "reason": "orphan-risk"}
+                )
         short_put_qty = sum(abs(leg.qty) for leg in b["P_short"])
         long_put_qty = sum(abs(leg.qty) for leg in b["P_long"])
         if short_put_qty > max(long_put_qty, 0):
             matched = min(short_put_qty, long_put_qty)
             if short_put_qty - matched > 0:
-                orphans.append({"symbol": sym, "expiry": exp, "side": "P", "reason": "orphan-risk"})
+                orphans.append(
+                    {"symbol": sym, "expiry": exp, "side": "P", "reason": "orphan-risk"}
+                )
     return combos, orphans

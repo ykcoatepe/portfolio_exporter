@@ -5,7 +5,9 @@ from src.psd.rules.circuit_breakers import evaluate as eval_cb
 
 
 def test_risk_bands_and_breakers():
-    band, breaches = eval_band(vix=18.0, delta_beta=0.65, var95_1d=0.010, margin_used=0.75)
+    band, breaches = eval_band(
+        vix=18.0, delta_beta=0.65, var95_1d=0.010, margin_used=0.75
+    )
     assert band == "vix_le_20"
     assert breaches["beta_high"] is True
     assert breaches["var_high"] is True
@@ -15,4 +17,3 @@ def test_risk_bands_and_breakers():
     assert cb["soft_pre"] is True
     assert cb["freeze_1d"] is True
     assert cb["cut_var"] is True
-

@@ -155,4 +155,3 @@ def test_limit_per_underlying(monkeypatch):
     for cand in summary["candidates"]:
         counts[cand["underlying"]] = counts.get(cand["underlying"], 0) + 1
     assert all(v <= 1 for v in counts.values())
-

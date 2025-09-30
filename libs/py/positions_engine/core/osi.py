@@ -53,7 +53,7 @@ def parse_osi(symbol: str | None) -> OsiParseResult | None:
             continue
 
         root = sanitized[:root_len]
-        expiry_digits = sanitized[root_len: root_len + expiry_len]
+        expiry_digits = sanitized[root_len : root_len + expiry_len]
         option_type = sanitized[root_len + expiry_len]
         strike_digits = sanitized[root_len + expiry_len + _TYPE_LEN : strike_end]
 
@@ -83,7 +83,9 @@ def parse_osi(symbol: str | None) -> OsiParseResult | None:
             continue
 
         right = "CALL" if option_type == "C" else "PUT"
-        return OsiParseResult(underlying=root, expiry=expiry_date, right=right, strike=strike_value)
+        return OsiParseResult(
+            underlying=root, expiry=expiry_date, right=right, strike=strike_value
+        )
 
     # Legacy hyphen-delimited fallback (e.g. "AAPL-20240315-320-C")
     legacy = symbol.strip().upper()
@@ -105,7 +107,9 @@ def parse_osi(symbol: str | None) -> OsiParseResult | None:
                 return None
             expiry_date = parsed_expiry
             right = "CALL" if right_code == "C" else "PUT"
-            return OsiParseResult(underlying=root, expiry=expiry_date, right=right, strike=strike_value)
+            return OsiParseResult(
+                underlying=root, expiry=expiry_date, right=right, strike=strike_value
+            )
     return None
 
 

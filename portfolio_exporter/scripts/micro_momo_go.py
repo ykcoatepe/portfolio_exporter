@@ -50,7 +50,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--thread", help="Slack thread_ts (optional)")
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--auto-producers", action="store_true")
-    ap.add_argument("--session", choices=["auto", "rth", "premarket"], default=os.getenv("MOMO_SESSION"))
+    ap.add_argument(
+        "--session",
+        choices=["auto", "rth", "premarket"],
+        default=os.getenv("MOMO_SESSION"),
+    )
     args = ap.parse_args(argv)
 
     from portfolio_exporter.scripts import micro_momo_analyzer as ana
@@ -116,13 +120,19 @@ def main(argv: list[str] | None = None) -> int:
                         api_payload = {"channel": channel, **payload}
                         res = post_message(token, channel, api_payload)
                         if res.get("ok") and res.get("ts"):
-                            set_pref("slack.digest_ts", res["ts"])  # persist for sentinel threading
+                            set_pref(
+                                "slack.digest_ts", res["ts"]
+                            )  # persist for sentinel threading
                     except Exception:
                         pass
                 elif args.webhook:
                     # Webhook path: one message using Block Kit (no ts returned)
                     emit_alerts(
-                        [payload], args.webhook, dry_run=False, offline=bool(args.offline), per_item=True
+                        [payload],
+                        args.webhook,
+                        dry_run=False,
+                        offline=bool(args.offline),
+                        per_item=True,
                     )
 
     # 4) Optional sentinel (non-blocking hint: user typically runs in separate terminal)

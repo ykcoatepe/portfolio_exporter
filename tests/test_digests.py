@@ -13,7 +13,9 @@ def test_rollup_and_eod_digest(tmp_path: Path):
         "memo_path": str(memo_path),
         "rollup_digest": True,
         "eod_digest": True,
-        "kpi_memos": [{"sleeve": "theta", "R": 0.5, "win": True, "theta_roc": 0.01, "nav": 1000}],
+        "kpi_memos": [
+            {"sleeve": "theta", "R": 0.5, "win": True, "theta_roc": 0.01, "nav": 1000}
+        ],
         "day_pl": -0.01,
         "theta_fees_wtd": 120.0,
         "hedge_cost_mtd": 360.0,
@@ -25,4 +27,3 @@ def test_rollup_and_eod_digest(tmp_path: Path):
     assert "digest_rollup" in content and "digest_eod" in content
     # CLI footer presence is driven by dto -> budgets included
     assert "budgets" in dto
-

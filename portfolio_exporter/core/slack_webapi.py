@@ -23,7 +23,9 @@ def post_message(token: str, channel: str, payload: dict[str, Any]) -> dict[str,
             "Authorization": f"Bearer {token}",
         },
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:  # nosec - caller controls URL/token
+    with urllib.request.urlopen(
+        req, timeout=10
+    ) as resp:  # nosec - caller controls URL/token
         raw = resp.read()
     try:
         return json.loads(raw.decode("utf-8"))

@@ -42,7 +42,9 @@ def launch(status, default_fmt):
         if pos_path and combos_path:
             pos_df = pd.read_csv(pos_path)
             combos_df = pd.read_csv(combos_path)
-            console.print(f"[green]Positions: {len(pos_df)} legs / {len(combos_df)} combos")
+            console.print(
+                f"[green]Positions: {len(pos_df)} legs / {len(combos_df)} combos"
+            )
 
     actions = {
         "q": ("Snapshot quotes", _snapshot),

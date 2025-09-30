@@ -1,6 +1,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import type { PortfolioStats, PortfolioStatsApiResponse } from "../lib/types";
+import { normalizeSession } from "../lib/session";
 
 const toNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) {
@@ -26,6 +27,14 @@ const normalizeTimestamp = (value: unknown): string | null =>
 const normalizeBoolean = (value: unknown, fallback = false): boolean =>
   typeof value === "boolean" ? value : fallback;
 
+const normalizeDataSource = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 export async function fetchStats(baseUrl = ""): Promise<PortfolioStats> {
   const origin =
     baseUrl ||
@@ -43,11 +52,16 @@ export async function fetchStats(baseUrl = ""): Promise<PortfolioStats> {
 
   const payload = (await response.json()) as PortfolioStatsApiResponse | null;
 
+  const session = normalizeSession(payload?.session ?? null);
+  const sessionInfo = normalizeSession(payload?.session_info ?? null);
+
   return {
     netLiq: toNumber(payload?.net_liq ?? payload?.netLiq),
     var95: toNumber(payload?.var95_1d_pct ?? payload?.var95 ?? payload?.var_95),
     marginPct: toNumber(payload?.margin_used_pct ?? payload?.margin_pct ?? payload?.marginPct),
     updatedAt: normalizeTimestamp(payload?.updated_at ?? payload?.updatedAt),
+    latestTs: normalizeTimestamp(payload?.meta?.latest_ts ?? null),
+    dataSource: normalizeDataSource(payload?.data_source ?? payload?.dataSource ?? null),
     counts: {
       equities: toCount(payload?.equity_count),
       quotes: toCount(payload?.quote_count),
@@ -60,6 +74,8 @@ export async function fetchStats(baseUrl = ""): Promise<PortfolioStats> {
     rulesEvalMs:
       toNumber(payload?.rules_eval_ms ?? payload?.combos_detection_ms) ?? null,
     tradesPriorPositions: normalizeBoolean(payload?.trades_prior_positions),
+    session,
+    sessionInfo,
   };
 }
 

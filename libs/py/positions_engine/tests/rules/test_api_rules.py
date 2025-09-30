@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,12 @@ ROOT = Path(__file__).resolve().parents[5]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
+from positions_engine.combos.detector import (
+    ComboDetection,
+    OptionCombo,
+    OptionLegSnapshot,
+)
+from positions_engine.combos.taxonomy import ComboStrategy
 from positions_engine.rules import Rule
 from positions_engine.service.rules_state import RulesState
 
@@ -29,7 +36,9 @@ def _fixed_now() -> datetime:
     return datetime(2025, 9, 19, 9, 0, tzinfo=UTC)
 
 
-def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
+def test_rules_summary_returns_counters_and_top(
+    monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
     now = _fixed_now()
     rules = [
         Rule(
@@ -109,7 +118,9 @@ def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch,
     original_rules = api_main._rules_state.rules
     api_main._rules_state.set_rules(rules)
 
-    def fake_build_rows(self: RulesState, _timestamp: datetime) -> dict[str, list[dict[str, object]]]:
+    def fake_build_rows(
+        self: RulesState, _timestamp: datetime
+    ) -> dict[str, list[dict[str, object]]]:
         return {
             "COMBO": [
                 {
@@ -212,3 +223,84 @@ def test_rules_summary_returns_counters_and_top(monkeypatch: pytest.MonkeyPatch,
         assert "trades_prior_positions" in stats
     finally:
         api_main._rules_state.set_rules(original_rules)
+
+
+def test_combo_unit_exit_rule_breach() -> None:
+    now = datetime(2024, 1, 3, 15, 0, tzinfo=UTC)
+
+    def _make_leg(leg_id: str, quantity: str, strike: str) -> OptionLegSnapshot:
+        qty = Decimal(quantity)
+        return OptionLegSnapshot(
+            leg_id=leg_id,
+            instrument_symbol=f"SPY202401{strike}{leg_id}",
+            account="ACC",
+            underlying="SPY",
+            expiry="2024-01-19",
+            dte=5,
+            right="CALL",
+            strike=Decimal(strike),
+            quantity=qty,
+            ratio=Decimal("1"),
+            multiplier=Decimal("100"),
+            avg_cost=Decimal("1.00"),
+            mark=Decimal("1.05"),
+            mark_source="MID",
+            stale_seconds=10,
+            previous_close=Decimal("1.00"),
+            delta=None,
+            gamma=None,
+            theta=None,
+            vega=None,
+            iv=None,
+            day_pnl=Decimal("0"),
+            total_pnl=Decimal("0"),
+            day_basis=None,
+            total_basis=None,
+        )
+
+    short_leg = _make_leg("short", "-1", "430")
+    long_leg = _make_leg("long", "1", "435")
+    combo = OptionCombo(
+        combo_id="combo-exit-unit",
+        strategy=ComboStrategy.VERTICAL,
+        account="ACC",
+        underlying="SPY",
+        dte=5,
+        net_price=Decimal("-1.00"),
+        sum_delta=Decimal("0"),
+        sum_gamma=Decimal("0"),
+        sum_theta=Decimal("0"),
+        sum_vega=Decimal("0"),
+        day_pnl=Decimal("0"),
+        total_pnl=Decimal("70"),
+        day_pnl_percent=None,
+        total_pnl_percent=None,
+        legs=(short_leg, long_leg),
+    )
+    detection = ComboDetection(combos=(combo,), orphans=tuple(), detection_ms=0.1)
+
+    class DummyPositionsState:
+        def equities_payload(self, _now: datetime) -> list[dict[str, float]]:
+            return [{"symbol": "SPY", "mark": 430.0}]
+
+        def options_detection(self, _now: datetime) -> ComboDetection:
+            return detection
+
+        def quotes_snapshot(self) -> dict[str, object]:
+            return {}
+
+    positions_state = DummyPositionsState()
+    rule = Rule(
+        rule_id="combo__unit_exit",
+        name="Exit as unit",
+        severity="INFO",
+        scope="COMBO",
+        filter="",
+        expr="exit_as_unit and tp_done",
+    )
+    rules_state = RulesState(positions_state, rules=[rule])
+
+    summary, evaluation = rules_state.summary(now)
+
+    assert summary["breaches"] == {"critical": 0, "warning": 0, "info": 1}
+    assert any(breach.rule_id == "combo__unit_exit" for breach in evaluation.breaches)

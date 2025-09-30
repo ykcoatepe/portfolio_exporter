@@ -13,4 +13,3 @@ def test_tr_times_dst_awareness():
     assert _fmt(win.open_tr) in ("16:30", "17:30")
     # Close is either 23:00 (DST) or 00:00 (standard time, next day in TR)
     assert _fmt(win.close_tr) in ("23:00", "00:00")
-

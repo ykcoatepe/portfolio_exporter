@@ -59,6 +59,12 @@ describe("contracts: /positions/options", () => {
             day_pnl_percent: decimal(11.2),
             total_pnl_amount: decimal(1850),
             total_pnl_percent: decimal(24.8),
+            progress_pct: decimal(0.62),
+            progress_pct_of_goal: decimal(0.62),
+            progress_pct_of_max: decimal(0.62),
+            progress: like({
+              pct_of_goal: decimal(0.62),
+            }),
             combo_group_id: like("group-iron-condor"),
             combo_qty: decimal(-10),
             label: like("SPX 4250/4300P + 4600/4650C • 32d • Credit 2.21"),
@@ -112,6 +118,11 @@ describe("contracts: /positions/options", () => {
             }),
             mark_source: regex("MID|LAST|PREV", "MID"),
             stale_seconds: decimal(180),
+            progress_pct: decimal(0.62),
+            progress_pct_of_goal: decimal(0.62),
+            progress: like({
+              pct_of_goal: decimal(0.62),
+            }),
             label: like("SPX 4250/4300P + 4600/4650C • 32d • Credit 2.21"),
             display: like({
               combo_label: like("SPX 4250/4300P + 4600/4650C • 32d • Credit 2.21"),

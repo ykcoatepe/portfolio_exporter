@@ -32,12 +32,16 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # pip install ib_insync (requires TWS or IB Gateway running with API enabled)
 from ib_insync import IB
 
+_EVENT_LOOP: asyncio.AbstractEventLoop | None = None
+
 # --------------------------------------------------------------------------- #
 # CONFIG – edit these two blocks only                                         #
 # --------------------------------------------------------------------------- #
 
 # 1.  Where your *latest* IB CSV lives (auto‑export or manual upload).
-IB_CSV = Path("/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/IB/Latest/")
+IB_CSV = Path(
+    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/IB/Latest/"
+)
 
 # 2.  Macro/technical watch‑list & indicators
 MARKET_OVERVIEW = {
@@ -74,14 +78,19 @@ INDICATORS = [
 
 def _ensure_event_loop() -> asyncio.AbstractEventLoop:
     """Ensure ib_insync has an event loop even on Python 3.11+."""
+    global _EVENT_LOOP
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        if _EVENT_LOOP is None or _EVENT_LOOP.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+        asyncio.set_event_loop(_EVENT_LOOP)
+        loop = _EVENT_LOOP
+    else:
+        if loop.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+            asyncio.set_event_loop(_EVENT_LOOP)
+            loop = _EVENT_LOOP
     return loop
 
 
@@ -104,7 +113,9 @@ def load_ib_positions_ib(
         # suppress per‑contract error spam from IB
         ib.errorEvent += lambda *a, **k: None
     except Exception as e:
-        raise ConnectionError(f"❌ Cannot connect to IB API at {host}:{port}  →  {e}") from e
+        raise ConnectionError(
+            f"❌ Cannot connect to IB API at {host}:{port}  →  {e}"
+        ) from e
 
     positions = ib.positions()
     if not positions:
@@ -208,7 +219,9 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
         .join((df["low"] - grp["close"].shift()).abs().to_frame("lc"))
         .max(axis=1)
     )
-    df["atr14"] = grp.apply(lambda g: tr.loc[g.index].rolling(14).mean(), include_groups=False)
+    df["atr14"] = grp.apply(
+        lambda g: tr.loc[g.index].rolling(14).mean(), include_groups=False
+    )
 
     # Bollinger
     m20 = df["sma20"]
@@ -216,12 +229,14 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["bb_upper"] = m20 + 2 * std20
     df["bb_lower"] = m20 - 2 * std20
 
-    df["vwap"] = (df["close"] * df["volume"]).groupby(df["ticker"]).cumsum() / df["volume"].groupby(
-        df["ticker"]
-    ).cumsum()
+    df["vwap"] = (df["close"] * df["volume"]).groupby(df["ticker"]).cumsum() / df[
+        "volume"
+    ].groupby(df["ticker"]).cumsum()
 
     # Realised vol 30d
-    df["real_vol_30"] = grp["pct_change"].transform(lambda s: s.rolling(30).std() * (252**0.5))
+    df["real_vol_30"] = grp["pct_change"].transform(
+        lambda s: s.rolling(30).std() * (252**0.5)
+    )
     return df
 
 
@@ -231,7 +246,12 @@ def last_row(df: pd.DataFrame) -> pd.DataFrame:
 
 def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> None:
     """Write the latest metrics for each ticker to ``output_path``."""
-    latest = df.sort_values("date").groupby("ticker", as_index=False).tail(1).set_index("ticker", drop=True)
+    latest = (
+        df.sort_values("date")
+        .groupby("ticker", as_index=False)
+        .tail(1)
+        .set_index("ticker", drop=True)
+    )
 
     cols = [
         "close",
@@ -252,12 +272,18 @@ def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> Non
     latest = latest[cols].round(3)
 
     if fmt == "excel":
-        with pd.ExcelWriter(output_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd") as writer:
-            latest.reset_index().to_excel(writer, sheet_name="Pulse", index=False, float_format="%.3f")
+        with pd.ExcelWriter(
+            output_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd"
+        ) as writer:
+            latest.reset_index().to_excel(
+                writer, sheet_name="Pulse", index=False, float_format="%.3f"
+            )
     elif fmt == "pdf":
         if SimpleDocTemplate is None:
             raise RuntimeError("reportlab is required for PDF output")
-        rows = [latest.reset_index().columns.tolist()] + latest.reset_index().values.tolist()
+        rows = [
+            latest.reset_index().columns.tolist()
+        ] + latest.reset_index().values.tolist()
         doc = SimpleDocTemplate(
             output_path,
             pagesize=landscape(letter),

@@ -10,7 +10,9 @@ from collections.abc import Callable, Iterable
 from psd.core.store import append_event, init, latest_snapshot, tail_events
 
 log = logging.getLogger("psd.scan")
-RULES_FN_SPEC = os.getenv("PSD_RULES_FN", "").strip()  # e.g. "portfolio_exporter.psd_rules:evaluate"
+RULES_FN_SPEC = os.getenv(
+    "PSD_RULES_FN", ""
+).strip()  # e.g. "portfolio_exporter.psd_rules:evaluate"
 
 
 def _load_rules(spec: str) -> Callable[[dict], Iterable[str]]:
@@ -49,7 +51,9 @@ async def run() -> None:
                 log.warning("rules evaluation failed: %s", e, exc_info=False)
                 breaches = []
             if breaches:
-                append_event("breach", {"ts": time.time(), "breaches": breaches, "risk": risk})
+                append_event(
+                    "breach", {"ts": time.time(), "breaches": breaches, "risk": risk}
+                )
 
 
 if __name__ == "__main__":

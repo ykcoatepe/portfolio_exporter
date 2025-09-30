@@ -16,7 +16,6 @@ from typing import Any
 from ..core.marks import MarkSettings, select_equity_mark
 from ..core.models import InstrumentType, Position, Quote
 from ..core.osi import parse_osi
-from ..core.pnl import option_leg_pnl
 from .taxonomy import ComboStrategy
 
 ZERO = Decimal("0")
@@ -37,7 +36,7 @@ class OptionLegSnapshot:
     quantity: Decimal
     ratio: Decimal
     multiplier: Decimal
-    avg_cost: Decimal
+    avg_cost: Decimal | None
     mark: Decimal | None
     mark_source: str
     stale_seconds: int | None
@@ -47,8 +46,8 @@ class OptionLegSnapshot:
     theta: Decimal | None
     vega: Decimal | None
     iv: Decimal | None
-    day_pnl: Decimal
-    total_pnl: Decimal
+    day_pnl: Decimal | None
+    total_pnl: Decimal | None
     day_basis: Decimal | None
     total_basis: Decimal | None
     feed_strategy_id: str | None = None
@@ -103,13 +102,13 @@ class OptionCombo:
     account: str
     underlying: str
     dte: int
-    net_price: Decimal
+    net_price: Decimal | None
     sum_delta: Decimal
     sum_gamma: Decimal
     sum_theta: Decimal
     sum_vega: Decimal
-    day_pnl: Decimal
-    total_pnl: Decimal
+    day_pnl: Decimal | None
+    total_pnl: Decimal | None
     day_pnl_percent: Decimal | None
     total_pnl_percent: Decimal | None
     legs: tuple[OptionLegSnapshot, ...]
@@ -188,9 +187,21 @@ def build_option_leg_snapshot(
         return None
 
     mark_result = select_equity_mark(quote, now, mark_settings)
-    pnl = option_leg_pnl(position, mark_result.mark, normalized.previous_close)
-    day_basis = _day_basis(position.quantity, position.instrument.multiplier, normalized.previous_close)
-    total_basis = _total_basis(position.avg_cost, position.quantity, position.instrument.multiplier)
+
+    multiplier = position.instrument.multiplier
+    quantity = position.quantity
+    mark_value = mark_result.mark
+
+    day_basis = _day_basis(quantity, multiplier, normalized.previous_close)
+    total_basis = _total_basis(position.avg_cost, quantity, multiplier)
+
+    day_pnl: Decimal | None = None
+    if mark_value is not None and normalized.previous_close is not None:
+        day_pnl = (mark_value - normalized.previous_close) * quantity * multiplier
+
+    total_pnl: Decimal | None = None
+    if mark_value is not None and position.avg_cost is not None:
+        total_pnl = (mark_value - position.avg_cost) * quantity * multiplier
 
     leg_id = _leg_hash(
         normalized.account,
@@ -223,8 +234,8 @@ def build_option_leg_snapshot(
         theta=normalized.theta,
         vega=normalized.vega,
         iv=normalized.iv,
-        day_pnl=pnl.day,
-        total_pnl=pnl.total,
+        day_pnl=day_pnl,
+        total_pnl=total_pnl,
         day_basis=day_basis,
         total_basis=total_basis,
         feed_strategy_id=normalized.feed_strategy_id,
@@ -256,16 +267,24 @@ def detect_option_combos(legs: Sequence[OptionLegSnapshot]) -> ComboDetection:
         remaining_ids.difference_update(consumed)
 
     detection_ms = (perf_counter() - start) * 1000.0
-    orphans = tuple(sorted((leg for leg in legs if leg.leg_id in remaining_ids), key=_leg_sort_key))
-    combos_sorted = tuple(sorted(combos, key=lambda combo: (combo.underlying, combo.dte, combo.combo_id)))
-    return ComboDetection(combos=combos_sorted, orphans=orphans, detection_ms=detection_ms)
+    orphans = tuple(
+        sorted((leg for leg in legs if leg.leg_id in remaining_ids), key=_leg_sort_key)
+    )
+    combos_sorted = tuple(
+        sorted(combos, key=lambda combo: (combo.underlying, combo.dte, combo.combo_id))
+    )
+    return ComboDetection(
+        combos=combos_sorted, orphans=orphans, detection_ms=detection_ms
+    )
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 
 
-def _normalize_option_metadata(position: Position, now: datetime) -> _NormalizedMetadata | None:
+def _normalize_option_metadata(
+    position: Position, now: datetime
+) -> _NormalizedMetadata | None:
     metadata = position.metadata or {}
     account = str(metadata.get("account") or "UNKNOWN").strip() or "UNKNOWN"
 
@@ -370,7 +389,9 @@ def _group_feed_combos(
         if len({leg.underlying for leg in bucket}) != 1:
             continue
         strategy = _classify_strategy(bucket)
-        combo = _build_combo(account, bucket[0].underlying, bucket, strategy, notes=("feed_group",))
+        combo = _build_combo(
+            account, bucket[0].underlying, bucket, strategy, notes=("feed_group",)
+        )
         combos.append(combo)
         used.update(leg.leg_id for leg in bucket)
     return combos, used
@@ -382,7 +403,9 @@ def _match_condors_and_butterflies(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry))
+    buckets = _group_by(
+        legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry)
+    )
     for (account, underlying, _expiry), bucket in buckets.items():
         if len(bucket) != 4:
             continue
@@ -401,7 +424,11 @@ def _match_verticals(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry, leg.right))
+    buckets = _group_by(
+        legs,
+        remaining_ids,
+        lambda leg: (leg.account, leg.underlying, leg.expiry, leg.right),
+    )
     for (account, underlying, _expiry, _right), bucket in buckets.items():
         if len(bucket) < 2:
             continue
@@ -420,7 +447,11 @@ def _match_calendars(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.right, leg.strike))
+    buckets = _group_by(
+        legs,
+        remaining_ids,
+        lambda leg: (leg.account, leg.underlying, leg.right, leg.strike),
+    )
     for (account, underlying, _right, _strike), bucket in buckets.items():
         if len(bucket) < 2:
             continue
@@ -439,14 +470,20 @@ def _match_straddles_and_strangles(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry))
+    buckets = _group_by(
+        legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry)
+    )
     for (account, underlying, _expiry), bucket in buckets.items():
         if len(bucket) < 2:
             continue
         pair = _find_straddle_or_strangle(bucket)
         if pair is None:
             continue
-        strategy = ComboStrategy.STRADDLE if pair[0].strike == pair[1].strike else ComboStrategy.STRANGLE
+        strategy = (
+            ComboStrategy.STRADDLE
+            if pair[0].strike == pair[1].strike
+            else ComboStrategy.STRANGLE
+        )
         combo = _build_combo(account, underlying, pair, strategy)
         combos.append(combo)
         consumed.update(leg.leg_id for leg in pair)
@@ -459,7 +496,11 @@ def _match_ratios(
 ) -> tuple[list[OptionCombo], set[str]]:
     combos: list[OptionCombo] = []
     consumed: set[str] = set()
-    buckets = _group_by(legs, remaining_ids, lambda leg: (leg.account, leg.underlying, leg.expiry, leg.right))
+    buckets = _group_by(
+        legs,
+        remaining_ids,
+        lambda leg: (leg.account, leg.underlying, leg.expiry, leg.right),
+    )
     for (account, underlying, _expiry, _right), bucket in buckets.items():
         if len(bucket) < 2:
             continue
@@ -512,7 +553,9 @@ def _looks_like_condor(legs: Sequence[OptionLegSnapshot]) -> ComboStrategy | Non
     if len(quantities) != 1:
         return None
     return (
-        ComboStrategy.IRON_BUTTERFLY if call_short.strike == put_short.strike else ComboStrategy.IRON_CONDOR
+        ComboStrategy.IRON_BUTTERFLY
+        if call_short.strike == put_short.strike
+        else ComboStrategy.IRON_CONDOR
     )
 
 
@@ -570,7 +613,9 @@ def _pick_short_long(
     legs: Sequence[OptionLegSnapshot],
     right: str,
 ) -> tuple[OptionLegSnapshot | None, OptionLegSnapshot | None]:
-    short = next((leg for leg in legs if leg.right == right and leg.direction < 0), None)
+    short = next(
+        (leg for leg in legs if leg.right == right and leg.direction < 0), None
+    )
     long = next((leg for leg in legs if leg.right == right and leg.direction > 0), None)
     return short, long
 
@@ -582,7 +627,10 @@ def _find_vertical_pair(
     shorts = [leg for leg in legs if leg.direction < 0]
     for long_leg in sorted(longs, key=_leg_sort_key):
         for short_leg in sorted(shorts, key=_leg_sort_key):
-            if abs(long_leg.quantity) == abs(short_leg.quantity) and long_leg.strike != short_leg.strike:
+            if (
+                abs(long_leg.quantity) == abs(short_leg.quantity)
+                and long_leg.strike != short_leg.strike
+            ):
                 return (short_leg, long_leg)
     return None
 
@@ -640,17 +688,24 @@ def _build_combo(
 ) -> OptionCombo:
     ordered = tuple(sorted(legs, key=_leg_sort_key))
     combo_id = _combo_hash(account, underlying, ordered)
-    net_price = sum((leg.avg_cost * leg.quantity) for leg in ordered)
+    net_price = _sum_optionals(
+        (
+            leg.avg_cost * leg.quantity
+            if leg.avg_cost is not None
+            else None
+        )
+        for leg in ordered
+    )
     sum_delta = _sum_greek(ordered, "delta")
     sum_gamma = _sum_greek(ordered, "gamma")
     sum_theta = _sum_greek(ordered, "theta")
     sum_vega = _sum_greek(ordered, "vega")
-    day_pnl = sum((leg.day_pnl for leg in ordered), ZERO)
-    total_pnl = sum((leg.total_pnl for leg in ordered), ZERO)
+    day_pnl = _sum_optionals(leg.day_pnl for leg in ordered)
+    total_pnl = _sum_optionals(leg.total_pnl for leg in ordered)
     day_basis = _sum_optionals(leg.day_basis for leg in ordered)
     total_basis = _sum_optionals(leg.total_basis for leg in ordered)
-    day_pct = _percent(day_pnl, day_basis)
-    total_pct = _percent(total_pnl, total_basis)
+    day_pct = _percent(day_pnl, day_basis) if day_pnl is not None else None
+    total_pct = _percent(total_pnl, total_basis) if total_pnl is not None else None
     combo_notes = tuple(notes) if notes else tuple()
     dte = min((leg.dte for leg in ordered), default=0)
     return OptionCombo(
@@ -673,7 +728,9 @@ def _build_combo(
     )
 
 
-def _combo_hash(account: str, underlying: str, legs: Sequence[OptionLegSnapshot]) -> str:
+def _combo_hash(
+    account: str, underlying: str, legs: Sequence[OptionLegSnapshot]
+) -> str:
     leg_signatures = sorted(leg.signature() for leg in legs)
     payload = "PSD|" + account + "|" + underlying + "|" + "|".join(leg_signatures)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()
@@ -714,13 +771,19 @@ def _sum_optionals(values: Iterable[Decimal | None]) -> Decimal | None:
     return total if has_value else None
 
 
-def _day_basis(quantity: Decimal, multiplier: Decimal, previous_close: Decimal | None) -> Decimal | None:
+def _day_basis(
+    quantity: Decimal, multiplier: Decimal, previous_close: Decimal | None
+) -> Decimal | None:
     if previous_close is None:
         return None
     return previous_close * quantity * multiplier
 
 
-def _total_basis(avg_cost: Decimal, quantity: Decimal, multiplier: Decimal) -> Decimal | None:
+def _total_basis(
+    avg_cost: Decimal | None, quantity: Decimal, multiplier: Decimal
+) -> Decimal | None:
+    if avg_cost is None:
+        return None
     return avg_cost * quantity * multiplier
 
 

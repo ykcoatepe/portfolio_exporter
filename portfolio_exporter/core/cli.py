@@ -36,9 +36,15 @@ def add_common_output_args(
     """
 
     defaults = defaults or {}
-    parser.add_argument("--json", action="store_true", default=defaults.get("json", False))
-    parser.add_argument("--no-pretty", action="store_true", default=defaults.get("no_pretty", False))
-    parser.add_argument("--no-files", action="store_true", default=defaults.get("no_files", False))
+    parser.add_argument(
+        "--json", action="store_true", default=defaults.get("json", False)
+    )
+    parser.add_argument(
+        "--no-pretty", action="store_true", default=defaults.get("no_pretty", False)
+    )
+    parser.add_argument(
+        "--no-files", action="store_true", default=defaults.get("no_files", False)
+    )
     parser.add_argument("--output-dir", default=defaults.get("output_dir"))
     if include_excel:
         parser.add_argument(
@@ -109,7 +115,11 @@ def decide_file_writes(
     if any(formats.values()):
         return formats
 
-    if json_only_default and getattr(args, "json", False) and getattr(args, "output_dir", None) is None:
+    if (
+        json_only_default
+        and getattr(args, "json", False)
+        and getattr(args, "output_dir", None) is None
+    ):
         return {k: False for k in defaults}
 
     return defaults

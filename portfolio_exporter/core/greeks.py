@@ -63,10 +63,14 @@ def bs_greeks(
     d1, d2 = _d1_d2(s, k, t, r, vol)
     if call:
         delta = _cdf(d1)
-        theta = -s * _pdf(d1) * vol / (2 * math.sqrt(t)) - r * k * math.exp(-r * t) * _cdf(d2)
+        theta = -s * _pdf(d1) * vol / (2 * math.sqrt(t)) - r * k * math.exp(
+            -r * t
+        ) * _cdf(d2)
     else:
         delta = -_cdf(-d1)
-        theta = -s * _pdf(d1) * vol / (2 * math.sqrt(t)) + r * k * math.exp(-r * t) * _cdf(-d2)
+        theta = -s * _pdf(d1) * vol / (2 * math.sqrt(t)) + r * k * math.exp(
+            -r * t
+        ) * _cdf(-d2)
 
     gamma = _pdf(d1) / (s * vol * math.sqrt(t))
     vega = s * _pdf(d1) * math.sqrt(t)

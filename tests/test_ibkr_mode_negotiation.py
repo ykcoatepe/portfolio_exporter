@@ -26,7 +26,9 @@ class _StubClient:
 
 def test_auto_mode_falls_back_to_delayed_on_entitlement() -> None:
     client = _StubClient()
-    mode = ibkr.set_market_data_mode("auto", client=client, timeout=0.05, has_ticks=lambda: True)
+    mode = ibkr.set_market_data_mode(
+        "auto", client=client, timeout=0.05, has_ticks=lambda: True
+    )
     assert mode == "delayed"
     assert client.calls == [1, 4]
     assert ibkr.is_entitlement_error(10167) is True

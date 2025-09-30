@@ -27,7 +27,12 @@ def test_rules_env_override(monkeypatch):
     monkeypatch.setenv("PSD_RULE_BETA_MIN", "0.01")
     monkeypatch.setenv("PSD_RULE_VAR95_1D_MAX", "0.50")
     monkeypatch.setenv("PSD_RULE_MARGIN_MAX", "0.90")
-    risk = {"beta": 0.02, "VaR95_1d": 2_000.0, "notional": 100_000.0, "margin_used": 0.5}
+    risk = {
+        "beta": 0.02,
+        "VaR95_1d": 2_000.0,
+        "notional": 100_000.0,
+        "margin_used": 0.5,
+    }
 
     breaches = psd_rules.evaluate(risk)
     assert breaches == []

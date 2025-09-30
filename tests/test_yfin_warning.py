@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # ruff: noqa: I001
 
 import warnings
@@ -12,7 +13,9 @@ def test_get_closes_no_future_warning(monkeypatch: Any) -> None:
 
     class DummyYF:
         @staticmethod
-        def download(tickers: str, period: str, interval: str, progress: bool, **kwargs):
+        def download(
+            tickers: str, period: str, interval: str, progress: bool, **kwargs
+        ):
             # Capture whether auto_adjust is explicitly provided
             seen["auto"] = kwargs.get("auto_adjust")
             # Return a small DataFrame with Close column

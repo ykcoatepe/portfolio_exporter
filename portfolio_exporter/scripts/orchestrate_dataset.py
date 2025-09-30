@@ -316,9 +316,13 @@ def _print_preflight_summary(report: dict, no_pretty: bool) -> None:
             console.print(t_csv)
 
         # One-liner statuses
-        console.print(f"Output dir writable: {'yes' if report['output_dir_writable'] else 'no'}")
+        console.print(
+            f"Output dir writable: {'yes' if report['output_dir_writable'] else 'no'}"
+        )
         if report["ibkr_socket_ok"] is not None:
-            console.print(f"IBKR socket reachable: {'yes' if report['ibkr_socket_ok'] else 'no'}")
+            console.print(
+                f"IBKR socket reachable: {'yes' if report['ibkr_socket_ok'] else 'no'}"
+            )
 
         # Warnings/errors plainly listed
         for w in report["warnings"]:
@@ -409,13 +413,18 @@ def preflight_check(no_pretty: bool = False) -> dict:
             report["ibkr_socket_ok"] = True
         except Exception:
             report["ibkr_socket_ok"] = False
-            report["warnings"].append("IBKR TWS/Gateway not reachable on 127.0.0.1:7496 (use 7497 for paper)")
+            report["warnings"].append(
+                "IBKR TWS/Gateway not reachable on 127.0.0.1:7496 (use 7497 for paper)"
+            )
 
     # CSV header sanity checks (best-effort)
     from portfolio_exporter.core import io as io_core
 
     checks = [
-        ("portfolio_greeks_positions", {"underlying", "right", "strike", "expiry", "qty"}),
+        (
+            "portfolio_greeks_positions",
+            {"underlying", "right", "strike", "expiry", "qty"},
+        ),
         ("live_quotes", {"symbol", "bid", "ask"}),
     ]
     for name, expected in checks:
@@ -437,7 +446,9 @@ def preflight_check(no_pretty: bool = False) -> dict:
                 entry["missing_cols"] = missing
                 entry["ok"] = len(missing) == 0
                 if missing:
-                    report["warnings"].append(f"CSV {name} missing columns: {', '.join(missing)}")
+                    report["warnings"].append(
+                        f"CSV {name} missing columns: {', '.join(missing)}"
+                    )
             except Exception as exc:  # pragma: no cover - unexpected format
                 entry["ok"] = None
                 report["warnings"].append(f"Could not read CSV {name}: {exc}")
@@ -497,7 +508,11 @@ def main() -> None:
 
             with open(args.expect, encoding="utf-8") as fh:
                 data = json.load(fh)
-            if isinstance(data, dict) and "files" in data and isinstance(data["files"], list):
+            if (
+                isinstance(data, dict)
+                and "files" in data
+                and isinstance(data["files"], list)
+            ):
                 expect = [str(x) for x in data["files"]]
             elif isinstance(data, list):
                 expect = [str(x) for x in data]

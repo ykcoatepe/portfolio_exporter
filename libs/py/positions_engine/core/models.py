@@ -47,7 +47,7 @@ class Position(BaseModel):
 
     instrument: Instrument
     quantity: Decimal
-    avg_cost: Decimal
+    avg_cost: Decimal | None = None
     cost_basis: Decimal | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -63,9 +63,13 @@ class Quote(BaseModel):
 
     symbol: str
     bid: Decimal | None = None
+    bid_ts: datetime | None = None
     ask: Decimal | None = None
+    ask_ts: datetime | None = None
     last: Decimal | None = None
+    last_ts: datetime | None = None
     previous_close: Decimal | None = None
+    previous_close_ts: datetime | None = None
     session: TradingSession = TradingSession.CLOSED
     updated_at: datetime | None = None
     extended_last: Decimal | None = None

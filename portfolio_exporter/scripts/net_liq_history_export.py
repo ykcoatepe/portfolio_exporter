@@ -73,7 +73,9 @@ def _pa_rest_download() -> pd.DataFrame:
     df_all = pd.read_csv(io.StringIO(r.text))
     if {"Date", "NetLiquidation"}.issubset(df_all.columns):
         df = (
-            df_all[["Date", "NetLiquidation"]].rename(columns={"NetLiquidation": "net_liq"}).set_index("Date")
+            df_all[["Date", "NetLiquidation"]]
+            .rename(columns={"NetLiquidation": "net_liq"})
+            .set_index("Date")
         )
         return _parse_dates(df)
     sys.exit("❌  Unexpected column layout from PortfolioAnalyst CSV.")
@@ -173,7 +175,11 @@ def _run_core(
 def cli(ns: argparse.Namespace) -> dict:
     outdir = cli_helpers.resolve_output_dir(getattr(ns, "output_dir", None))
     defaults = {
-        "csv": bool(getattr(ns, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR"))
+        "csv": bool(
+            getattr(ns, "output_dir", None)
+            or os.getenv("OUTPUT_DIR")
+            or os.getenv("PE_OUTPUT_DIR")
+        )
     }
     defaults.update({"excel": False, "pdf": False})
     formats = cli_helpers.decide_file_writes(
@@ -182,7 +188,9 @@ def cli(ns: argparse.Namespace) -> dict:
         defaults=defaults,
     )
 
-    with RunLog(script="net_liq_history_export", args=vars(ns), output_dir=outdir) as rl:
+    with RunLog(
+        script="net_liq_history_export", args=vars(ns), output_dir=outdir
+    ) as rl:
         with rl.time("run_core"):
             df, summary, written = _run_core(ns, formats, outdir)
         if ns.debug_timings:

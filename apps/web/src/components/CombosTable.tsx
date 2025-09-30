@@ -14,7 +14,13 @@ import type {
 } from "react";
 import clsx from "clsx";
 
-import { useOptionCombos } from "../hooks/useOptions";
+import {
+  useOptionCombos,
+  COMBO_FILTER_ITEMS,
+  buildComboPredicate,
+  buildGroupPredicate,
+  type ComboFilterKey,
+} from "../hooks/useOptions";
 import { formatDuration, formatMoney } from "../lib/format";
 import type { OptionComboGroupRow, OptionComboLegRow, OptionComboRow } from "../lib/types";
 import { fmtPrice, fmtSide } from "../lib/labels";
@@ -31,6 +37,7 @@ export const COMBO_COLUMN_ORDER = [
   "Status",
   "Progress",
   "Mark",
+  "Unrealized P&L",
   "Staleness",
 ] as const;
 
@@ -39,6 +46,12 @@ export const COLUMN_COUNT = COMBO_COLUMN_ORDER.length;
 const SKELETON_ROWS = Array.from({ length: 6 }, (_, idx) => idx);
 const SHOULD_POLL = import.meta.env.MODE !== "test";
 const QTY_TOOLTIP = "+ = long (debit), − = short (credit); magnitude = contracts";
+
+const createFilterState = (value = false): Record<ComboFilterKey, boolean> =>
+  COMBO_FILTER_ITEMS.reduce((acc, item) => {
+    acc[item.key] = value;
+    return acc;
+  }, {} as Record<ComboFilterKey, boolean>);
 
 type StatusLabel = "STOP" | "TP DONE" | "TP HIT" | "HOLD";
 
@@ -349,14 +362,15 @@ const ComboRow = (
     tpHit: isGroup ? entry.row.tpHit : entry.row.tpHit,
   });
 
-  const progressValue = isGroup
-    ? entry.row.progress?.pctOfGoal ?? entry.row.progressPctOfGoal
-    : entry.row.progress?.pctOfGoal ?? entry.row.progressPctOfGoal;
+  const progressValue = entry.row.progressPct;
   const progressPercent = getProgressPercent(progressValue);
 
   const markPrice = isGroup ? entry.row.mark : entry.row.markPrice;
   const markSource = entry.row.markSource;
   const markText = formatMoney(markPrice);
+  const pnlValue = isGroup ? entry.row.pnlUnrealized : entry.row.totalPnlAmount;
+  const pnlClass = valueTone(pnlValue);
+  const pnlText = formatMoney(pnlValue);
 
   const greeks = entry.row;
   const labelText = entry.row.label;
@@ -532,6 +546,9 @@ const ComboRow = (
             </div>
           )}
         </td>
+        <td role="gridcell" className={clsx("px-4 py-4 text-sm", pnlClass)}>
+          {pnlText}
+        </td>
         <td role="gridcell" className={clsx("px-4 py-4 text-sm", stalenessClass)}>
           {stalenessLabel}
         </td>
@@ -573,14 +590,42 @@ export function CombosTable(): JSX.Element {
   const [now, setNow] = useState(() => Date.now());
   const [activeIndex, setActiveIndex] = useState(0);
   const [showRaw, setShowRaw] = useState(false);
-  const [statusFilters, setStatusFilters] = useState({ tpHit: false, stopHit: false, near: false });
-  const toggleFilter = useCallback(
-    (key: keyof typeof statusFilters) => {
-      setStatusFilters((current) => ({ ...current, [key]: !current[key] }));
+  const [filters, setFilters] = useState<Record<ComboFilterKey, boolean>>(() => createFilterState());
+  const handleToggleFilter = useCallback(
+    (key: ComboFilterKey) => {
+      setFilters((current) => ({ ...current, [key]: !current[key] }));
     },
     [],
   );
-  const clearFilters = useCallback(() => setStatusFilters({ tpHit: false, stopHit: false, near: false }), []);
+  const handleResetFilters = useCallback(() => setFilters(createFilterState()), []);
+  const activeFilterKeys = useMemo(
+    () => COMBO_FILTER_ITEMS.filter((item) => filters[item.key]).map((item) => item.key),
+    [filters],
+  );
+  const filtersActive = activeFilterKeys.length > 0;
+  const comboPredicate = useMemo(() => buildComboPredicate(activeFilterKeys), [activeFilterKeys]);
+  const groupPredicate = useMemo(() => buildGroupPredicate(activeFilterKeys), [activeFilterKeys]);
+  const combosForDisplay = useMemo<OptionComboRow[]>(
+    () => (filtersActive ? rawCombos.filter(comboPredicate) : rawCombos),
+    [filtersActive, rawCombos, comboPredicate],
+  );
+  const groupsForDisplay = useMemo<OptionComboGroupRow[]>(
+    () => (filtersActive ? groups.filter(groupPredicate) : groups),
+    [filtersActive, groups, groupPredicate],
+  );
+  const combosByGroup = useMemo(() => {
+    if (!filtersActive) {
+      return groupCombos;
+    }
+    const map = new Map<string, OptionComboRow[]>();
+    combosForDisplay.forEach((combo) => {
+      const key = combo.comboGroupId ?? combo.id;
+      const list = map.get(key) ?? [];
+      list.push(combo);
+      map.set(key, list);
+    });
+    return map;
+  }, [filtersActive, groupCombos, combosForDisplay]);
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
 
   useEffect(() => {
@@ -591,28 +636,6 @@ export function CombosTable(): JSX.Element {
     return () => window.clearInterval(timer);
   }, []);
 
-  const filtersActive = statusFilters.tpHit || statusFilters.stopHit || statusFilters.near;
-
-  const matchesFilters = useCallback(
-    (combo: OptionComboRow) => {
-      if (statusFilters.tpHit && !combo.tpHit) {
-        return false;
-      }
-      if (statusFilters.stopHit && !combo.slHit) {
-        return false;
-      }
-      if (statusFilters.near && !combo.isNearTarget) {
-        return false;
-      }
-      return true;
-    },
-    [statusFilters],
-  );
-
-  const combosForDisplay = useMemo<OptionComboRow[]>(
-    () => (filtersActive ? rawCombos.filter(matchesFilters) : rawCombos),
-    [filtersActive, rawCombos, matchesFilters],
-  );
 
   const playbookBandLabel = useMemo(() => {
     if (playbook?.tpBandLowPct != null && playbook?.tpBandHighPct != null) {
@@ -633,8 +656,8 @@ export function CombosTable(): JSX.Element {
       return combosForDisplay.map((combo): TableRowData => ({ kind: "combo", id: combo.id, row: combo }));
     }
     const groupRows: TableRowData[] = [];
-    for (const group of groups) {
-      const combosForGroup = (groupCombos.get(group.id) ?? []).filter(matchesFilters);
+    for (const group of groupsForDisplay) {
+      const combosForGroup = combosByGroup.get(group.id) ?? [];
       if (filtersActive && combosForGroup.length === 0) {
         continue;
       }
@@ -646,7 +669,7 @@ export function CombosTable(): JSX.Element {
       });
     }
     return groupRows;
-  }, [showRaw, combosForDisplay, groups, groupCombos, filtersActive, matchesFilters]);
+  }, [showRaw, combosForDisplay, groupsForDisplay, combosByGroup, filtersActive]);
 
   useEffect(() => {
     if (expandedId && !rows.some((entry) => entry.id === expandedId)) {
@@ -715,17 +738,13 @@ export function CombosTable(): JSX.Element {
         </div>
         <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-2">
-            {[
-              { key: "tpHit", label: "TP Hit" },
-              { key: "stopHit", label: "Stop Hit" },
-              { key: "near", label: "Near TP" },
-            ].map(({ key, label }) => {
-              const active = statusFilters[key as keyof typeof statusFilters];
+            {COMBO_FILTER_ITEMS.map(({ key, label }) => {
+              const active = filters[key];
               return (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => toggleFilter(key as keyof typeof statusFilters)}
+                  onClick={() => handleToggleFilter(key)}
                   aria-pressed={active}
                   className={clsx(
                     "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition",
@@ -741,8 +760,8 @@ export function CombosTable(): JSX.Element {
             {filtersActive ? (
               <button
                 type="button"
-                onClick={clearFilters}
-                className="text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-200"
+                onClick={handleResetFilters}
+                className="rounded-full border border-slate-800 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-300 transition hover:bg-slate-800"
               >
                 Reset
               </button>

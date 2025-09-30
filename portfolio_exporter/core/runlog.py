@@ -14,7 +14,11 @@ class RunLog:
     """Context manager to capture run metadata and optionally write a manifest."""
 
     def __init__(
-        self, *, script: str, args: dict | None = None, output_dir: str | Path | None = None
+        self,
+        *,
+        script: str,
+        args: dict | None = None,
+        output_dir: str | Path | None = None,
     ) -> None:
         self.script = script
         self.argv = args or {}
@@ -37,7 +41,9 @@ class RunLog:
         self.start_ts = datetime.utcnow().isoformat()
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - no special handling
+    def __exit__(
+        self, exc_type, exc, tb
+    ) -> None:  # pragma: no cover - no special handling
         return None
 
     def add_outputs(self, paths: Iterable[str | Path]) -> None:
@@ -74,7 +80,10 @@ class RunLog:
             if isinstance(obj, dict):
                 return {k: _json_sanitize(v) for k, v in obj.items()}
             if isinstance(obj, (list, tuple)):
-                return [_json_sanitize(v) for v in (list(obj) if isinstance(obj, tuple) else obj)]
+                return [
+                    _json_sanitize(v)
+                    for v in (list(obj) if isinstance(obj, tuple) else obj)
+                ]
             try:
                 json.dumps(obj)
                 return obj

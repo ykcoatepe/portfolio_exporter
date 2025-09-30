@@ -162,7 +162,9 @@ def launch(status: StatusBar, default_fmt: str):
         out_dir: str | None = None,
     ) -> None:
         target_out_dir = out_dir or os.getenv("MOMO_OUT") or "out"
-        session_arg = _normalize_session(session_mode) if session_mode else _load_session_pref()
+        session_arg = (
+            _normalize_session(session_mode) if session_mode else _load_session_pref()
+        )
         force_flag = force_live if force_live is not None else _load_force_live_pref()
         try:
             from portfolio_exporter.scripts import micro_momo_diag as _diag
@@ -305,7 +307,9 @@ def _run_micro_momo(console: Console) -> None:
     force_live_default = _load_force_live_pref()
 
     def _session_label() -> str:
-        return {"auto": "Auto", "rth": "RTH", "premarket": "Pre-market"}.get(session_mode, "Auto")
+        return {"auto": "Auto", "rth": "RTH", "premarket": "Pre-market"}.get(
+            session_mode, "Auto"
+        )
 
     def _set_session(new_session: str) -> None:
         nonlocal session_mode
@@ -321,7 +325,9 @@ def _run_micro_momo(console: Console) -> None:
         nonlocal force_live_default
         force_live_default = not force_live_default
         _persist_force_live_pref(force_live_default)
-        console.print(f"[green]Force-live default set to {'ON' if force_live_default else 'OFF'}[/]")
+        console.print(
+            f"[green]Force-live default set to {'ON' if force_live_default else 'OFF'}[/]"
+        )
 
     def _session_args() -> list[str]:
         return ["--session", session_mode]
@@ -349,7 +355,9 @@ def _run_micro_momo(console: Console) -> None:
                     "./inputs",
                     "tests/data" if pe_test else None,
                 ]
-                patterns = tuple((os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(","))
+                patterns = tuple(
+                    (os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(",")
+                )
                 auto = find_latest_file([d for d in search_dirs if d], patterns)
                 if pe_test and not auto:
                     auto = "tests/data/meme_scan_sample.csv"
@@ -362,14 +370,21 @@ def _run_micro_momo(console: Console) -> None:
             if cfg:
                 argv_base += ["--cfg", cfg]
             chains_dir = os.getenv("MOMO_CHAINS_DIR") or auto_chains_dir(
-                ["./option_chains", "./chains", "./data/chains", "tests/data" if pe_test else None]
+                [
+                    "./option_chains",
+                    "./chains",
+                    "./data/chains",
+                    "tests/data" if pe_test else None,
+                ]
             )
             if chains_dir:
                 argv_base += ["--chains_dir", chains_dir]
 
             if inp and not os.path.exists(inp):
                 console.print(f"[yellow]Scan CSV not found:[/] {inp}")
-                console.print("[yellow]Enter symbols or provide a valid scan CSV before running.[/]")
+                console.print(
+                    "[yellow]Enter symbols or provide a valid scan CSV before running.[/]"
+                )
                 inp = None
                 argv_base = ["--out_dir", out_dir]
                 if cfg:
@@ -392,7 +407,10 @@ def _run_micro_momo(console: Console) -> None:
                 _clear_saved_symbols(console)
                 continue
             if choice == "j":
-                console.print("Session guard: [1] Auto  ·  [2] RTH only  ·  [3] Pre-market", highlight=False)
+                console.print(
+                    "Session guard: [1] Auto  ·  [2] RTH only  ·  [3] Pre-market",
+                    highlight=False,
+                )
                 sel = core_ui.prompt_input("Session › ").strip().lower()
                 mapping = {
                     "1": "auto",
@@ -455,7 +473,11 @@ def _run_micro_momo(console: Console) -> None:
                     from rich.panel import Panel
 
                     console.print(
-                        Panel.fit("".join(lines) or "(log empty)", title="log tail", border_style="cyan")
+                        Panel.fit(
+                            "".join(lines) or "(log empty)",
+                            title="log tail",
+                            border_style="cyan",
+                        )
                     )
                 else:
                     console.print("[dim]No log yet[/]")
@@ -463,7 +485,9 @@ def _run_micro_momo(console: Console) -> None:
             if choice == "t":
                 res = stop_module("momo_analyzer")
                 console.print(
-                    f"[green]{res.get('msg', 'stopped')}[/]" if res.get("ok") else f"[yellow]{res.get('msg')}"
+                    f"[green]{res.get('msg', 'stopped')}[/]"
+                    if res.get("ok")
+                    else f"[yellow]{res.get('msg')}"
                 )
                 continue
             if choice == "o":
@@ -476,7 +500,12 @@ def _run_micro_momo(console: Console) -> None:
                         "[yellow]No symbols found.[/] Enter symbols first (press Enter), or provide a scan CSV."
                     )
                     continue
-                bg_args = ["--out_dir", out_dir, "--symbols", resolved] + _session_args()
+                bg_args = [
+                    "--out_dir",
+                    out_dir,
+                    "--symbols",
+                    resolved,
+                ] + _session_args()
                 if cfg and os.path.exists(cfg):
                     bg_args += ["--cfg", cfg]
                 if chains_dir:
@@ -499,14 +528,22 @@ def _run_micro_momo(console: Console) -> None:
                 return
 
             try:
-                d_syms = os.getenv("MOMO_SYMBOLS") or (get_pref("micro_momo.symbols") or "")
-                sym_in = _input(f"Symbols (comma, optional) [{d_syms}]: ").strip() or d_syms
+                d_syms = os.getenv("MOMO_SYMBOLS") or (
+                    get_pref("micro_momo.symbols") or ""
+                )
+                sym_in = (
+                    _input(f"Symbols (comma, optional) [{d_syms}]: ").strip() or d_syms
+                )
             except Exception:
-                sym_in = os.getenv("MOMO_SYMBOLS") or (get_pref("micro_momo.symbols") or "")
+                sym_in = os.getenv("MOMO_SYMBOLS") or (
+                    get_pref("micro_momo.symbols") or ""
+                )
             run_args = list(argv_base)
             if sym_in:
                 alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])
-                syms = normalize_symbols([s for s in sym_in.split(",") if s.strip()], alias_map)
+                syms = normalize_symbols(
+                    [s for s in sym_in.split(",") if s.strip()], alias_map
+                )
                 if syms:
                     symbols = ",".join(syms)
                     run_args += ["--symbols", symbols]
@@ -609,7 +646,9 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
 
         # Read menu toggles from memory (defaults: ON/10)
         try:
-            allow_aft = (get_pref("sentinel.allow_afternoon_rearm") or "true").lower() not in (
+            allow_aft = (
+                get_pref("sentinel.allow_afternoon_rearm") or "true"
+            ).lower() not in (
                 "0",
                 "false",
                 "no",
@@ -617,11 +656,17 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
         except Exception:
             allow_aft = True
         try:
-            allow_halt = (get_pref("sentinel.halt_rearm") or "true").lower() not in ("0", "false", "no")
+            allow_halt = (get_pref("sentinel.halt_rearm") or "true").lower() not in (
+                "0",
+                "false",
+                "no",
+            )
         except Exception:
             allow_halt = True
         try:
-            require_recross = (get_pref("sentinel.require_vwap_recross") or "true").lower() not in (
+            require_recross = (
+                get_pref("sentinel.require_vwap_recross") or "true"
+            ).lower() not in (
                 "0",
                 "false",
                 "no",
@@ -640,7 +685,11 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
         )
         # Show halt re-arm parameters
         try:
-            halt_on = (get_pref("sentinel.halt_rearm") or "true").lower() not in ("0", "false", "no")
+            halt_on = (get_pref("sentinel.halt_rearm") or "true").lower() not in (
+                "0",
+                "false",
+                "no",
+            )
         except Exception:
             halt_on = True
         try:
@@ -703,25 +752,33 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
                 args += ["--offline"]
             res = sentinel_start(args)
             console.print(
-                f"[green]Started[/] PID {res.get('pid')}" if res.get("ok") else f"[yellow]{res.get('msg')}"
+                f"[green]Started[/] PID {res.get('pid')}"
+                if res.get("ok")
+                else f"[yellow]{res.get('msg')}"
             )
         elif choice == "2":
             res = sentinel_stop()
             console.print(
-                f"[green]{res.get('msg', 'stopped')}[/]" if res.get("ok") else f"[yellow]{res.get('msg')}"
+                f"[green]{res.get('msg', 'stopped')}[/]"
+                if res.get("ok")
+                else f"[yellow]{res.get('msg')}"
             )
         elif choice == "3":
             _show_active_positions(console)
         elif choice == "4":
             try:
                 set_pref("sentinel.allow_afternoon_rearm", not allow_aft)
-                console.print(f"[green]Afternoon re-arm set to[/] {'ON' if not allow_aft else 'OFF'}")
+                console.print(
+                    f"[green]Afternoon re-arm set to[/] {'ON' if not allow_aft else 'OFF'}"
+                )
             except Exception as exc:
                 console.print(f"[yellow]Failed to update preference:[/] {exc}")
         elif choice == "5":
             try:
                 set_pref("sentinel.halt_rearm", not allow_halt)
-                console.print(f"[green]Post-halt re-arm set to[/] {'ON' if not allow_halt else 'OFF'}")
+                console.print(
+                    f"[green]Post-halt re-arm set to[/] {'ON' if not allow_halt else 'OFF'}"
+                )
             except Exception as exc:
                 console.print(f"[yellow]Failed to update preference:[/] {exc}")
         elif choice == "6":
@@ -734,7 +791,9 @@ def launch_sentinel_menu(status, fmt):  # noqa: ARG001 - fmt reserved for future
                 console.print(f"[yellow]Failed to update preference:[/] {exc}")
         elif choice == "7":
             try:
-                val = core_ui.prompt_input("Cooldown bars (integer, e.g., 10): ").strip()
+                val = core_ui.prompt_input(
+                    "Cooldown bars (integer, e.g., 10): "
+                ).strip()
                 new_cd = max(0, int(val))
                 set_pref("sentinel.cooldown_bars", new_cd)
                 console.print(f"[green]Cooldown bars set to[/] {new_cd}")
@@ -753,7 +812,11 @@ def _show_active_positions(console):
         return
     with open(p, encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-    active = [r for r in rows if (str(r.get("status", "")).lower() in ("pending", "triggered"))]
+    active = [
+        r
+        for r in rows
+        if (str(r.get("status", "")).lower() in ("pending", "triggered"))
+    ]
     if not active:
         console.print("[green]No active positions[/]")
         return

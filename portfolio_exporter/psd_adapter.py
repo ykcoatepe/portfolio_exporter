@@ -81,7 +81,9 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
     try:
         stocks_iter = state.stocks()  # type: ignore[attr-defined]
     except AttributeError:
-        stocks_iter = state.equities_payload() if hasattr(state, "equities_payload") else []
+        stocks_iter = (
+            state.equities_payload() if hasattr(state, "equities_payload") else []
+        )
     except Exception as exc:  # pragma: no cover - defensive fallback
         logger.debug("positions engine stocks() failed: %s", exc)
         stocks_iter = []
@@ -90,7 +92,9 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
     for record in stocks_iter or []:
         if not isinstance(record, dict):
             continue
-        symbol = str(record.get("symbol") or record.get("underlying") or "").strip() or "?"
+        symbol = (
+            str(record.get("symbol") or record.get("underlying") or "").strip() or "?"
+        )
         qty = _coerce_float(record.get("qty") or record.get("quantity")) or 0.0
         mark = _coerce_float(record.get("mark") or record.get("mid"))
         avg_cost = _coerce_float(record.get("avg_cost") or record.get("avg"))
@@ -116,7 +120,9 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
     try:
         options_payload = state.options()  # type: ignore[attr-defined]
     except AttributeError:
-        options_payload = state.options_payload() if hasattr(state, "options_payload") else {}
+        options_payload = (
+            state.options_payload() if hasattr(state, "options_payload") else {}
+        )
     except Exception as exc:  # pragma: no cover - defensive fallback
         logger.debug("positions engine options() failed: %s", exc)
         options_payload = {}
@@ -131,7 +137,9 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
         if not isinstance(combo, dict):
             continue
         raw_legs = combo.get("legs") if isinstance(combo.get("legs"), list) else []
-        legs_payload: list[dict[str, Any]] = [leg for leg in raw_legs if isinstance(leg, dict)]
+        legs_payload: list[dict[str, Any]] = [
+            leg for leg in raw_legs if isinstance(leg, dict)
+        ]
         legs = []
         for leg in legs_payload:
             leg_mark = _coerce_float(leg.get("mark"))
@@ -141,7 +149,8 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
                     "right": leg.get("right"),
                     "strike": _coerce_float(leg.get("strike")),
                     "expiry": leg.get("expiry"),
-                    "quantity": _coerce_float(leg.get("quantity") or leg.get("qty")) or 0.0,
+                    "quantity": _coerce_float(leg.get("quantity") or leg.get("qty"))
+                    or 0.0,
                     "mark": leg_mark,
                     "greeks": {
                         "delta": _coerce_float(leg.get("delta")) or 0.0,
@@ -154,7 +163,10 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
 
         greeks_payload = combo.get("sum_greeks") or combo.get("greeks") or {}
         greeks = greeks_payload if isinstance(greeks_payload, dict) else {}
-        pnl_combo = _coerce_float(combo.get("total_pnl_amount") or combo.get("day_pnl_amount")) or 0.0
+        pnl_combo = (
+            _coerce_float(combo.get("total_pnl_amount") or combo.get("day_pnl_amount"))
+            or 0.0
+        )
         combos_view.append(
             {
                 "combo_id": combo.get("combo_id") or combo.get("id"),
@@ -172,7 +184,10 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
     for leg in options_payload.get("legs", []) or []:
         if not isinstance(leg, dict):
             continue
-        pnl_leg = _coerce_float(leg.get("total_pnl_amount") or leg.get("day_pnl_amount")) or 0.0
+        pnl_leg = (
+            _coerce_float(leg.get("total_pnl_amount") or leg.get("day_pnl_amount"))
+            or 0.0
+        )
         legs_view.append(
             {
                 "symbol": leg.get("symbol") or leg.get("underlying"),
@@ -256,7 +271,9 @@ def _normalize_positions(df: Any, pd_module: Any) -> list[dict[str, Any]]:
 
 async def get_marks(positions: Iterable[dict[str, Any]]) -> dict[str, float]:
     """Return mark prices for all symbols using the resilient quotes helper."""
-    symbols = sorted({str(row.get("symbol", "")).strip() for row in positions if row.get("symbol")})
+    symbols = sorted(
+        {str(row.get("symbol", "")).strip() for row in positions if row.get("symbol")}
+    )
     if not symbols:
         return {}
     try:

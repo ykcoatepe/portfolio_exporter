@@ -19,7 +19,9 @@ class ParsedOrder(NamedTuple):
     qty: int  # default 1
 
 
-_STRIKE_RGX = re.compile(r"(?P<k1>\d+(?:\.\d+)?)(?:/|‑)?(?P<k2>\d+(?:\.\d+)?)?" r"(?P<right>[CPcp])?$")
+_STRIKE_RGX = re.compile(
+    r"(?P<k1>\d+(?:\.\d+)?)(?:/|‑)?(?P<k2>\d+(?:\.\d+)?)?" r"(?P<right>[CPcp])?$"
+)
 
 LAST_PARSED: ParsedOrder | None = None
 

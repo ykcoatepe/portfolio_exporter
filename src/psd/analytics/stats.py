@@ -12,7 +12,9 @@ from psd.models import Kind, OptionLeg, Position, Sleeve
 # Default staleness threshold: 15 minutes (900 seconds).
 _DEFAULT_STALE_THRESHOLD = 900.0
 try:
-    _ENV_THRESHOLD = float(os.getenv("PSD_STALE_QUOTE_THRESHOLD", "") or _DEFAULT_STALE_THRESHOLD)
+    _ENV_THRESHOLD = float(
+        os.getenv("PSD_STALE_QUOTE_THRESHOLD", "") or _DEFAULT_STALE_THRESHOLD
+    )
     if math.isnan(_ENV_THRESHOLD) or _ENV_THRESHOLD <= 0:
         raise ValueError
     DEFAULT_STALE_THRESHOLD = _ENV_THRESHOLD
@@ -56,7 +58,9 @@ def compute_stats(
     ts = snapshot.get("ts")
 
     threshold = (
-        _coerce_positive_float(DEFAULT_STALE_THRESHOLD if stale_threshold is None else stale_threshold)
+        _coerce_positive_float(
+            DEFAULT_STALE_THRESHOLD if stale_threshold is None else stale_threshold
+        )
         or DEFAULT_STALE_THRESHOLD
     )
 
@@ -107,7 +111,9 @@ def _coerce_position(raw: Any, idx: int) -> tuple[Position | None, int]:
 
     leg_count = len(legs)
 
-    symbol = str(raw.get("symbol") or raw.get("underlying") or raw.get("ticker") or "").strip()
+    symbol = str(
+        raw.get("symbol") or raw.get("underlying") or raw.get("ticker") or ""
+    ).strip()
     if not symbol:
         return None, leg_count
 
@@ -129,7 +135,9 @@ def _coerce_position(raw: Any, idx: int) -> tuple[Position | None, int]:
     kind_value = cast(Kind, kind_raw)
 
     qty = _coerce_int(raw, ["qty", "quantity", "position", "contracts"], default=0)
-    mark = _coerce_float(raw, ["mark", "price", "marketPrice", "lastPrice", "mid", "avg_price"])
+    mark = _coerce_float(
+        raw, ["mark", "price", "marketPrice", "lastPrice", "mid", "avg_price"]
+    )
 
     try:
         position = Position(
@@ -160,7 +168,9 @@ def _coerce_leg(raw: Any) -> OptionLeg | None:
         or ""
     ).strip()
 
-    right_raw = str(raw.get("right") or raw.get("option_type") or raw.get("type") or "").upper()
+    right_raw = str(
+        raw.get("right") or raw.get("option_type") or raw.get("type") or ""
+    ).upper()
     if right_raw.startswith("C"):
         right = "C"
     elif right_raw.startswith("P"):
@@ -168,7 +178,9 @@ def _coerce_leg(raw: Any) -> OptionLeg | None:
     else:
         return None
 
-    qty = _coerce_int(raw, ["qty", "quantity", "position", "contracts", "size"], default=0)
+    qty = _coerce_int(
+        raw, ["qty", "quantity", "position", "contracts", "size"], default=0
+    )
     strike = _coerce_float(raw, ["strike", "strikePrice", "strike_price"])
     price = _coerce_float(raw, ["price", "mark", "mid", "entry_price", "avg_price"])
 
@@ -259,7 +271,10 @@ def _count_stale_quotes(quotes: dict[str, Any], now_ts: float, threshold: float)
 
 def _is_stale_quote(value: Any, now_ts: float, threshold: float) -> bool:
     if isinstance(value, dict):
-        if any(bool(value.get(key)) for key in ("stale", "is_stale", "stale_flag", "delayed", "isDelayed")):
+        if any(
+            bool(value.get(key))
+            for key in ("stale", "is_stale", "stale_flag", "delayed", "isDelayed")
+        ):
             return True
 
         age = _coerce_float(

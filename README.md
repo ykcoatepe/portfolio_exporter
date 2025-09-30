@@ -12,10 +12,18 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | Script | Description |
 | ------ | ----------- |
 | `market_analyzer.py` | A unified tool for market analysis, including pre-market reports, live data feeds, technical signals, portfolio greeks, and option chain snapshots. Use `--mode pre-market`, `--mode live`, `--mode tech-signals`, `--greeks`, or `--option-chain <SYMBOL>`. |
-| `update_tickers.py` | Writes the current IBKR stock positions to `tickers_live.txt` so other scripts always use a fresh portfolio. |
+| `update_tickers.py` | Syncs IBKR equities and option underlyings (deduped) to `tickers_live.txt` so other scripts always use fresh data. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. Supports `--excel` and `--pdf` outputs. |
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
 | `daily_report.py` | Render a one-page HTML/PDF snapshot from the latest portfolio greeks CSVs. |
+
+## Session Detection & Overrides
+
+- `GET /session` returns a canonical market session (`RTH`, `ETH`, or `CLOSED`) with `as_of`, `rth_open`, `rth_close`, and timezone metadata in `America/New_York`.
+- `/stats` now surfaces `session` in the root payload, while `/state` keeps the legacy string field and adds a structured `session_info` (and mirrors it under `meta.session`).
+- Detection prefers `exchange_calendars` (or `pandas_market_calendars`) for the XNYS schedule, falling back to fixed weekday windows (04:00–09:30, 09:30–16:00, 16:00–20:00 ET) when calendars are unavailable.
+- Development override: set `FORCE_SESSION_STATE=RTH|ETH|CLOSED` or hit `/debug/session/override/{state}` and `/debug/session/clear` to pin the backend state during local testing.
+- The PSD Stats ribbon consumes the same object through `useSession`, so the UI reflects overrides instantly and shows an `updated …` timer derived from `as_of`.
 
 ### Utilities → Sentinel (Micro‑MOMO)
 
@@ -387,6 +395,35 @@ Outputs when files are enabled:
 - `out/micro_momo_orders.csv`
 
 If a chain file is missing for a symbol, a `Template` structure is emitted with `needs_chain=1` so you can add data or switch to live providers in a later version.
+
+### PSD × Micro-MOMO
+
+Use the PSD CLI wrapper when you want analyzer output formatted like other PSD analyzers.
+
+- JSON-only (offline) mode keeps artifacts disabled and emits results to stdout:
+
+  ```bash
+  python -m apps.cli.run \
+    --analyzer micro_momo_analyzer \
+    --json-only \
+    --out out/micro_momo
+  # or the Make wrapper
+  make psd-run-momo
+  ```
+
+- Full-artifacts mode enables the analyzer's CSV/HTML outputs and returns their paths under `notes.artifacts`:
+
+  ```bash
+  python -m apps.cli.run \
+    --analyzer micro_momo_analyzer \
+    --no-json-only \
+    --full-artifacts \
+    --out out/micro_momo
+  # or the Make wrapper
+  make psd-run-momo-full
+  ```
+
+The CLI understands `--scan-csv`, `--chains-dir`, `--symbols`, and `--cfg-json=@path.json` to mirror the analyzer's native parameters. Outputs respect `--out` and map key files to `scored_csv`, `orders_csv`, `journal_json`, `basket_csv`, and `dashboard_html` when present.
 
 Run via task or menu
 - Task runner: `python main.py --task micro-momo`
@@ -1147,7 +1184,7 @@ Schedule `update_tickers.py` with cron or another task scheduler to run daily:
 0 8 * * * /usr/bin/python3 /path/to/repo/update_tickers.py
 ```
 
-This keeps `tickers_live.txt` synced with your IBKR portfolio.
+This keeps `tickers_live.txt` synced with your IBKR portfolio (equities + option underlyings, no duplicates).
 
 ## Utilities
 

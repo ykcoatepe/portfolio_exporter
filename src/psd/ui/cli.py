@@ -36,9 +36,7 @@ def render_dashboard(dto: dict[str, Any]) -> str:
     margin_pct = float(snap.get("margin_used", 0.0) or 0.0) * 100.0
     delta_beta_val = float(snap.get("delta_beta", 0.0) or 0.0)
     var_val = float(snap.get("var95_1d", 0.0) or 0.0)
-    top = (
-        f"Regime: {regime} | Δβ: {delta_beta_val:.4f} | VaR95(1d): {var_val:.2f} | Margin%: {margin_pct:.1f}"
-    )
+    top = f"Regime: {regime} | Δβ: {delta_beta_val:.4f} | VaR95(1d): {var_val:.2f} | Margin%: {margin_pct:.1f}"
     lines = [top]
     breaches = snap.get("breaches", {}) or {}
     breakers = snap.get("breakers", {}) or {}

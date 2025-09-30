@@ -11,7 +11,7 @@ THRESH ?= 3
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate serve-api
+.PHONY: setup dev fmt test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate serve-api
 .PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
@@ -42,10 +42,14 @@ dev:
 ci-home: lint test build
 	@echo "✅  ci-home complete"
 
+fmt:
+	ruff check . --select I --fix
+	ruff format .
+
 lint:
 	# Ruff + Black share configuration in pyproject.toml
-	$(VENV)/bin/ruff check .
-	$(VENV)/bin/black --check .
+	ruff check .
+	python3 -m black --check .
 
 test:
 	$(PYTEST) -q
@@ -185,7 +189,21 @@ sanity-menus-quick: setup
 	@./scripts/sanity_menus_quick.sh
 
 # --- Micro-MOMO helpers ---
-.PHONY: momo-journal
+.PHONY: psd-run-momo psd-run-momo-full momo-journal
+
+psd-run-momo:
+	python -m apps.cli.run \
+	  --analyzer micro_momo_analyzer \
+	  --json-only \
+	  --out out/micro_momo
+
+psd-run-momo-full:
+	python -m apps.cli.run \
+	  --analyzer micro_momo_analyzer \
+	  --no-json-only \
+	  --full-artifacts \
+	  --out out/micro_momo
+
 momo-journal:
 	python -m portfolio_exporter.scripts.micro_momo_analyzer \
 	  --input tests/data/meme_scan_sample.csv \

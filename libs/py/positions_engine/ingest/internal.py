@@ -13,7 +13,8 @@ import sys
 import threading
 from collections.abc import Iterable
 from copy import deepcopy
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal, InvalidOperation
 from importlib import import_module
 from inspect import isawaitable
 from pathlib import Path
@@ -51,7 +52,9 @@ def _copy_positions_view(view: dict[str, Any]) -> dict[str, Any]:
     for key in ("single_stocks", "option_combos", "single_options"):
         raw = view.get(key)
         if isinstance(raw, list):
-            sanitized[key] = [deepcopy(entry) for entry in raw if isinstance(entry, dict)]
+            sanitized[key] = [
+                deepcopy(entry) for entry in raw if isinstance(entry, dict)
+            ]
         else:
             sanitized[key] = []
     for key, value in view.items():
@@ -59,7 +62,9 @@ def _copy_positions_view(view: dict[str, Any]) -> dict[str, Any]:
             continue
         try:
             sanitized[key] = deepcopy(value)
-        except Exception:  # pragma: no cover - defensive fallback for unserializable values
+        except (
+            Exception
+        ):  # pragma: no cover - defensive fallback for unserializable values
             sanitized[key] = value
     return sanitized
 
@@ -90,6 +95,111 @@ def _to_float_or_none(value: Any) -> float | None:
     return result
 
 
+def _to_decimal_or_none(value: Any) -> Decimal | None:
+    if value in (None, "", 0, 0.0):
+        return None
+    try:
+        candidate = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if candidate == 0:
+        return None
+    return candidate
+
+
+def _build_prior_avg_cost_lookup(positions_payload: Any) -> dict[str, Decimal]:
+    lookup: dict[str, Decimal] = {}
+    if not isinstance(positions_payload, list):
+        return lookup
+    for entry in positions_payload:
+        if not isinstance(entry, dict):
+            continue
+        symbol = _clean_symbol(entry.get("symbol"))
+        if not symbol:
+            continue
+        avg_cost_value: Decimal | None = None
+        for key in ("avg_cost", "average_cost", "avgCost", "entry_price", "entryPrice"):
+            avg_cost_value = _to_decimal_or_none(entry.get(key))
+            if avg_cost_value is not None:
+                break
+        if avg_cost_value is not None:
+            lookup[symbol] = avg_cost_value
+    return lookup
+
+
+def _normalize_stale_seconds(value: Any) -> int | None:
+    numeric = _to_float_or_none(value)
+    if numeric is None:
+        return None
+    return int(max(numeric, 0))
+
+
+def _parse_timestamp_like(value: Any) -> datetime | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+    if isinstance(value, (int, float)):
+        seconds = float(value)
+        if math.isnan(seconds):
+            return None
+        if seconds > 1e12:
+            seconds /= 1000.0
+        try:
+            return datetime.fromtimestamp(seconds, tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            return None
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        normalized = text
+        if normalized.endswith("Z") or normalized.endswith("z"):
+            normalized = normalized[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            try:
+                seconds = float(text)
+            except (TypeError, ValueError):
+                return None
+            if math.isnan(seconds):
+                return None
+            if seconds > 1e12:
+                seconds /= 1000.0
+            try:
+                return datetime.fromtimestamp(seconds, tz=UTC)
+            except (OverflowError, OSError, ValueError):
+                return None
+        else:
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    return None
+
+
+def _resolve_quote_stale_seconds(entry: dict[str, Any]) -> int | None:
+    numeric = _normalize_stale_seconds(entry.get("stale_seconds"))
+    if numeric is None:
+        numeric = _normalize_stale_seconds(entry.get("stale_s"))
+    if numeric is not None:
+        return numeric
+    timestamp = _first_present(
+        entry.get("mark_ts"),
+        entry.get("mark_time"),
+        entry.get("updated_at"),
+        entry.get("ts"),
+        entry.get("timestamp"),
+        entry.get("last_ts"),
+        entry.get("previous_close_ts"),
+        entry.get("bid_ts"),
+        entry.get("ask_ts"),
+    )
+    parsed = _parse_timestamp_like(timestamp)
+    if parsed is None:
+        return None
+    delta = datetime.now(tz=UTC) - parsed
+    return int(max(delta.total_seconds(), 0))
+
+
 def _derive_single_stock_rows(
     positions: Iterable[dict[str, Any]],
     quotes: Iterable[dict[str, Any]],
@@ -107,11 +217,19 @@ def _derive_single_stock_rows(
         symbol = _clean_symbol(position.get("symbol") or position.get("ticker"))
         if not symbol:
             continue
-        inst_type = str(position.get("instrument_type") or position.get("secType") or "").strip().lower()
+        inst_type = (
+            str(position.get("instrument_type") or position.get("secType") or "")
+            .strip()
+            .lower()
+        )
         if inst_type and inst_type not in {"equity", "stock", "stk"}:
             continue
-        quantity = position.get("quantity", position.get("qty", position.get("position")))
-        avg_cost = position.get("avg_cost", position.get("average_cost", position.get("avgCost")))
+        quantity = position.get(
+            "quantity", position.get("qty", position.get("position"))
+        )
+        avg_cost = position.get(
+            "avg_cost", position.get("average_cost", position.get("avgCost"))
+        )
         base_entry = rows.setdefault(
             symbol,
             {
@@ -146,12 +264,19 @@ def _derive_single_stock_rows(
             )
             if previous_close is not None:
                 base_entry["previous_close"] = previous_close
-            updated_at = _first_present(quote.get("updated_at"), quote.get("ts"), quote.get("timestamp"))
+            updated_at = _first_present(
+                quote.get("updated_at"), quote.get("ts"), quote.get("timestamp")
+            )
             if updated_at is not None:
                 base_entry["updated_at"] = updated_at
             bid_float = _to_float_or_none(bid_value)
             ask_float = _to_float_or_none(ask_value)
-            if bid_float is not None and ask_float is not None and bid_float > 0 and ask_float > 0:
+            if (
+                bid_float is not None
+                and ask_float is not None
+                and bid_float > 0
+                and ask_float > 0
+            ):
                 mark_source = "MID"
             elif mark_candidate is not None:
                 mark_source = "LAST"
@@ -169,6 +294,25 @@ def _derive_single_stock_rows(
             base_entry["mark"] = mark_candidate
         base_entry["mark_source"] = mark_source
         base_entry.setdefault("price_source", mark_source.lower())
+
+        stale_value = _normalize_stale_seconds(base_entry.get("stale_seconds"))
+        if stale_value is None:
+            stale_value = _normalize_stale_seconds(base_entry.get("stale_s"))
+        if stale_value is None:
+            stale_value = _normalize_stale_seconds(
+                _first_present(position.get("stale_seconds"), position.get("stale_s"))
+            )
+        if stale_value is None and quote:
+            stale_value = _resolve_quote_stale_seconds(quote)
+        if stale_value is None:
+            stale_value = (
+                _resolve_quote_stale_seconds(position)
+                if isinstance(position, dict)
+                else None
+            )
+        if stale_value is not None:
+            base_entry["stale_seconds"] = stale_value
+            base_entry["stale_s"] = stale_value
 
     for entry in rows.values():
         qty_value = _to_float_or_none(entry.get("qty")) or 0.0
@@ -199,12 +343,11 @@ def _derive_single_stock_rows(
                 entry["total_pnl"] = total_pnl
             if total_basis and entry.get("total_pnl_percent") in (None, ""):
                 entry["total_pnl_percent"] = total_pnl / total_basis
-        stale_value = entry.get("stale_s")
+        stale_value = _normalize_stale_seconds(entry.get("stale_s"))
         if stale_value is None:
-            stale_value = 0
+            stale_value = _normalize_stale_seconds(entry.get("stale_seconds"))
         entry["stale_s"] = stale_value
-        if entry.get("stale_seconds") in (None, ""):
-            entry["stale_seconds"] = stale_value
+        entry["stale_seconds"] = stale_value
     return list(rows.values())
 
 
@@ -234,6 +377,32 @@ class InternalScriptsProvider:
             logger.info("Internal ingest skipped: %s", exc)
             return [], []
 
+    def load_greeks_snapshot(self) -> dict[str, Any] | None:
+        """Return a lightweight greeks payload when available from project helpers."""
+
+        _ensure_repo_root()
+        for module_name, attr_candidates in (
+            ("portfolio_exporter.psd_adapter", ("greeks_snapshot_once", "greeks_snapshot")),
+            ("src.psd.ingestor.normalize", ("greeks_snapshot_once",)),
+        ):
+            module = self._import_optional(module_name)
+            if module is None:
+                continue
+            for attr_name in attr_candidates:
+                fn = getattr(module, attr_name, None)
+                if not callable(fn):
+                    continue
+                try:
+                    result = self._invoke_callable(fn)
+                except Exception:  # pragma: no cover - defensive logging
+                    logger.debug("[internal] greeks snapshot via %s.%s failed", module_name, attr_name, exc_info=True)
+                    continue
+                if isinstance(result, dict) and result:
+                    return result
+                if isinstance(result, list) and result:
+                    return {"rows": [entry for entry in result if isinstance(entry, dict)]}
+        return None
+
     def _load_snapshot(self) -> dict[str, Any] | None:
         _ensure_repo_root()
 
@@ -253,7 +422,10 @@ class InternalScriptsProvider:
                     self.source_detail = f"{module_name}.{attr_name}"
                     return result
 
-        for module_name in ("portfolio_exporter.psd_adapter", "src.psd.ingestor.normalize"):
+        for module_name in (
+            "portfolio_exporter.psd_adapter",
+            "src.psd.ingestor.normalize",
+        ):
             snapshot = self._load_via_cli(module_name)
             if isinstance(snapshot, dict) and snapshot:
                 self.source_detail = f"{module_name} (cli)"
@@ -301,7 +473,10 @@ class InternalScriptsProvider:
                 cwd=str(self._repo_root),
                 timeout=30,
             )
-        except (FileNotFoundError, subprocess.SubprocessError):  # pragma: no cover - defensive logging
+        except (
+            FileNotFoundError,
+            subprocess.SubprocessError,
+        ):  # pragma: no cover - defensive logging
             return None
         stdout = proc.stdout.strip()
         if not stdout:
@@ -311,22 +486,31 @@ class InternalScriptsProvider:
         except json.JSONDecodeError:  # pragma: no cover - defensive logging
             return None
 
-    def _normalize_snapshot(self, snapshot: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def _normalize_snapshot(
+        self, snapshot: dict[str, Any]
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         positions: list[dict[str, Any]] = []
         derived_quotes: list[dict[str, Any]] = []
         normalized_positions: list[dict[str, Any]] = []
+
+        raw_positions_payload = snapshot.get("positions")
+        prior_avg_costs = _build_prior_avg_cost_lookup(raw_positions_payload)
 
         positions_view_payload = snapshot.get("positions_view")
         sanitized_view: dict[str, Any] | None = None
         if isinstance(positions_view_payload, dict):
             sanitized_view = _copy_positions_view(positions_view_payload)
-            stock_rows, stock_quotes = self._from_positions_view(sanitized_view)
+            stock_rows, stock_quotes = self._from_positions_view(
+                sanitized_view,
+                prior_avg_costs=prior_avg_costs,
+            )
             positions.extend(stock_rows)
             derived_quotes.extend(stock_quotes)
 
-        raw_positions = snapshot.get("positions")
-        if isinstance(raw_positions, list):
-            normalized_positions = [row for row in raw_positions if isinstance(row, dict)]
+        if isinstance(raw_positions_payload, list):
+            normalized_positions = [
+                row for row in raw_positions_payload if isinstance(row, dict)
+            ]
             if normalized_positions and not positions:
                 positions = normalized_positions.copy()
 
@@ -367,7 +551,9 @@ class InternalScriptsProvider:
         elif not any(True for _ in _iter_dicts(sanitized_view.get("single_stocks"))):
             if enriched_stocks:
                 fallback_stocks = enriched_stocks
-                sanitized_view["single_stocks"] = [deepcopy(row) for row in enriched_stocks]
+                sanitized_view["single_stocks"] = [
+                    deepcopy(row) for row in enriched_stocks
+                ]
         else:
             if enriched_stocks:
                 lookup = {
@@ -417,9 +603,13 @@ class InternalScriptsProvider:
                     stock["mark_source"] = "MISSING"
                 if "price_source" not in stock and stock.get("mark_source"):
                     stock["price_source"] = str(stock["mark_source"]).lower()
-                if stock.get("day_pnl") in (None, "") and stock.get("pnl_intraday") not in (None, ""):
+                if stock.get("day_pnl") in (None, "") and stock.get(
+                    "pnl_intraday"
+                ) not in (None, ""):
                     stock["day_pnl"] = stock["pnl_intraday"]
-                if stock.get("total_pnl") in (None, "") and stock.get("pnl_unrealized") not in (None, ""):
+                if stock.get("total_pnl") in (None, "") and stock.get(
+                    "pnl_unrealized"
+                ) not in (None, ""):
                     stock["total_pnl"] = stock["pnl_unrealized"]
                 if stock.get("stale_seconds") in (None, ""):
                     stale_candidate = stock.get("stale_s")
@@ -432,7 +622,10 @@ class InternalScriptsProvider:
                 "option_combos": [],
                 "single_options": [],
             }
-            fallback_positions, fallback_quote_rows = self._from_positions_view(fallback_view_payload)
+            fallback_positions, fallback_quote_rows = self._from_positions_view(
+                fallback_view_payload,
+                prior_avg_costs=prior_avg_costs,
+            )
             if fallback_positions:
                 existing_equity_symbols = {
                     row.get("symbol")
@@ -465,7 +658,9 @@ class InternalScriptsProvider:
         self.positions_view = view_for_logging
 
         if self.positions_view is not None:
-            stocks_count, combos_count, singles_count = _positions_view_counts(self.positions_view)
+            stocks_count, combos_count, singles_count = _positions_view_counts(
+                self.positions_view
+            )
             detail = self.source_detail or "snapshot"
             if fallback_stocks:
                 logger.info(
@@ -489,7 +684,11 @@ class InternalScriptsProvider:
 
         return positions, quotes
 
-    def _from_positions_view(self, view: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def _from_positions_view(
+        self,
+        view: dict[str, Any],
+        prior_avg_costs: dict[str, Decimal] | None = None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         positions: list[dict[str, Any]] = []
         quotes: list[dict[str, Any]] = []
 
@@ -498,15 +697,28 @@ class InternalScriptsProvider:
             if not symbol:
                 continue
             quantity = stock.get("qty", stock.get("quantity"))
-            avg_cost = stock.get("avg_cost")
-            if avg_cost is None:
-                avg_cost = stock.get("mark")
+            prior_value = (
+                prior_avg_costs.get(symbol) if prior_avg_costs is not None else None
+            )
+            avg_cost_value: Decimal | None = None
+            for candidate in (
+                stock.get("avg_cost"),
+                stock.get("average_cost"),
+                stock.get("avgCost"),
+            ):
+                avg_cost_value = _to_decimal_or_none(candidate)
+                if avg_cost_value is not None:
+                    break
+            if avg_cost_value is None:
+                avg_cost_value = prior_value
+            if avg_cost_value is not None and prior_avg_costs is not None:
+                prior_avg_costs[symbol] = avg_cost_value
             positions.append(
                 {
                     "symbol": symbol,
                     "instrument_type": "equity",
                     "quantity": quantity if quantity is not None else 0,
-                    "avg_cost": avg_cost if avg_cost is not None else 0.0,
+                    "avg_cost": avg_cost_value,
                     "multiplier": stock.get("multiplier", 1),
                     "previous_close": stock.get("previous_close"),
                 }
@@ -525,14 +737,22 @@ class InternalScriptsProvider:
         for combo in _iter_dicts(view.get("option_combos")):
             combo_underlying = combo.get("underlying")
             for leg in _iter_dicts(combo.get("legs")):
-                record, leg_quote = self._option_leg_record(leg, combo_underlying)
+                record, leg_quote = self._option_leg_record(
+                    leg,
+                    combo_underlying,
+                    prior_avg_costs=prior_avg_costs,
+                )
                 if record:
                     positions.append(record)
                 if leg_quote:
                     quotes.append(leg_quote)
 
         for single_leg in _iter_dicts(view.get("single_options")):
-            record, leg_quote = self._option_leg_record(single_leg, single_leg.get("underlying"))
+            record, leg_quote = self._option_leg_record(
+                single_leg,
+                single_leg.get("underlying"),
+                prior_avg_costs=prior_avg_costs,
+            )
             if record:
                 positions.append(record)
             if leg_quote:
@@ -541,7 +761,10 @@ class InternalScriptsProvider:
         return positions, quotes
 
     def _option_leg_record(
-        self, leg: dict[str, Any], fallback_underlying: Any
+        self,
+        leg: dict[str, Any],
+        fallback_underlying: Any,
+        prior_avg_costs: dict[str, Decimal] | None = None,
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         symbol = _clean_symbol(leg.get("symbol")) or _clean_symbol(leg.get("contract"))
         if not symbol:
@@ -550,9 +773,22 @@ class InternalScriptsProvider:
             return None, None
         greeks = leg.get("greeks") if isinstance(leg.get("greeks"), dict) else {}
         quantity = leg.get("quantity", leg.get("qty"))
-        avg_cost = leg.get("avg_cost")
-        if avg_cost is None:
-            avg_cost = leg.get("entry_price") or leg.get("mark")
+        prior_value = (
+            prior_avg_costs.get(symbol) if prior_avg_costs is not None else None
+        )
+        avg_cost_value: Decimal | None = None
+        for candidate in (
+            leg.get("avg_cost"),
+            leg.get("entry_price"),
+            leg.get("entryPrice"),
+        ):
+            avg_cost_value = _to_decimal_or_none(candidate)
+            if avg_cost_value is not None:
+                break
+        if avg_cost_value is None:
+            avg_cost_value = prior_value
+        if avg_cost_value is not None and prior_avg_costs is not None:
+            prior_avg_costs[symbol] = avg_cost_value
 
         multiplier = leg.get("multiplier", leg.get("contract_multiplier", 100))
         parsed_symbol = parse_osi(symbol)
@@ -589,10 +825,18 @@ class InternalScriptsProvider:
         elif isinstance(expiry_value, str):
             expiry_text = expiry_value.strip()
             if not expiry_text:
-                expiry_value = parsed_symbol.expiry.isoformat() if parsed_symbol is not None else None
+                expiry_value = (
+                    parsed_symbol.expiry.isoformat()
+                    if parsed_symbol is not None
+                    else None
+                )
             else:
                 digits = "".join(ch for ch in expiry_text if ch.isdigit())
-                if parsed_symbol is not None and digits == expiry_text and len(digits) in (6, 8):
+                if (
+                    parsed_symbol is not None
+                    and digits == expiry_text
+                    and len(digits) in (6, 8)
+                ):
                     expiry_value = parsed_symbol.expiry.isoformat()
                 else:
                     expiry_value = expiry_text
@@ -624,7 +868,7 @@ class InternalScriptsProvider:
             "symbol": symbol,
             "instrument_type": "option",
             "quantity": quantity if quantity is not None else 0,
-            "avg_cost": avg_cost if avg_cost is not None else 0.0,
+            "avg_cost": avg_cost_value,
             "multiplier": multiplier if multiplier not in (None, "") else 100,
             "underlying": underlying_clean,
             "right": normalized_right,
@@ -634,17 +878,91 @@ class InternalScriptsProvider:
             "theta": greeks.get("theta"),
         }
         quote: dict[str, Any] | None = None
-        mark = leg.get("mark")
-        bid = leg.get("bid")
-        ask = leg.get("ask")
-        if mark is not None or bid is not None or ask is not None:
+        mark_value = _to_float_or_none(leg.get("mark"))
+        bid_value = _to_float_or_none(leg.get("bid"))
+        ask_value = _to_float_or_none(leg.get("ask"))
+        last_value = _to_float_or_none(leg.get("last"))
+        previous_close_value = _to_float_or_none(leg.get("previous_close"))
+        mark_source_value = leg.get("mark_source")
+        mark_source = (
+            str(mark_source_value).strip().upper()
+            if isinstance(mark_source_value, str) and mark_source_value.strip()
+            else None
+        )
+        mark_timestamp = _first_present(
+            leg.get("mark_ts"),
+            leg.get("mark_time"),
+            leg.get("ts"),
+            leg.get("last_ts"),
+            leg.get("previous_close_ts"),
+            leg.get("updated_at"),
+        )
+        if mark_value is None:
+            if (
+                bid_value is not None
+                and ask_value is not None
+                and bid_value > 0
+                and ask_value > 0
+            ):
+                mark_value = (bid_value + ask_value) / 2
+                if mark_source is None:
+                    mark_source = "MID"
+                mark_timestamp = mark_timestamp or _first_present(
+                    leg.get("bid_ts"),
+                    leg.get("ask_ts"),
+                    leg.get("ts"),
+                    leg.get("updated_at"),
+                )
+            elif last_value is not None:
+                mark_value = last_value
+                if mark_source is None:
+                    mark_source = "LAST"
+                mark_timestamp = mark_timestamp or _first_present(
+                    leg.get("last_ts"),
+                    leg.get("ts"),
+                    leg.get("updated_at"),
+                )
+            elif previous_close_value is not None:
+                mark_value = previous_close_value
+                if mark_source is None:
+                    mark_source = "PREV"
+                mark_timestamp = mark_timestamp or _first_present(
+                    leg.get("previous_close_ts"),
+                    leg.get("ts"),
+                    leg.get("updated_at"),
+                )
+        if (
+            mark_value is not None
+            or bid_value is not None
+            or ask_value is not None
+            or previous_close_value is not None
+        ):
             quote = {
                 "symbol": symbol,
-                "bid": bid,
-                "ask": ask,
-                "last": mark,
-                "previous_close": leg.get("previous_close"),
-                "updated_at": leg.get("updated_at") or leg.get("ts"),
+                "bid": bid_value,
+                "ask": ask_value,
+                "last": last_value if last_value is not None else mark_value,
+                "mark": mark_value,
+                "mark_source": mark_source,
+                "previous_close": previous_close_value,
+                "previous_close_ts": leg.get("previous_close_ts"),
+                "bid_ts": leg.get("bid_ts"),
+                "ask_ts": leg.get("ask_ts"),
+                "last_ts": leg.get("last_ts"),
+                "ts": mark_timestamp
+                or _first_present(
+                    leg.get("ts"),
+                    leg.get("last_ts"),
+                    leg.get("previous_close_ts"),
+                    leg.get("updated_at"),
+                ),
+                "updated_at": _first_present(
+                    mark_timestamp,
+                    leg.get("updated_at"),
+                    leg.get("ts"),
+                    leg.get("last_ts"),
+                    leg.get("previous_close_ts"),
+                ),
             }
         return record, quote
 

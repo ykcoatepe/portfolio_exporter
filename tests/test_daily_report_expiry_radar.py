@@ -24,7 +24,9 @@ def test_expiry_radar_combos(monkeypatch):
         "portfolio_greeks_totals": data_dir / "totals_sample.csv",
         "portfolio_greeks_combos": data_dir / "combos_expiry_sample.csv",
     }
-    monkeypatch.setattr("portfolio_exporter.core.io.latest_file", _fake_latest_factory(mapping))
+    monkeypatch.setattr(
+        "portfolio_exporter.core.io.latest_file", _fake_latest_factory(mapping)
+    )
     monkeypatch.setattr(daily_report, "datetime", FixedDate)
     res = daily_report.main(["--json", "--expiry-window", "7"])
     radar = res["expiry_radar"]
@@ -39,7 +41,9 @@ def test_expiry_radar_positions_fallback(monkeypatch):
     mapping = {
         "portfolio_greeks_positions": data_dir / "positions_sample.csv",
     }
-    monkeypatch.setattr("portfolio_exporter.core.io.latest_file", _fake_latest_factory(mapping))
+    monkeypatch.setattr(
+        "portfolio_exporter.core.io.latest_file", _fake_latest_factory(mapping)
+    )
     monkeypatch.setattr(daily_report, "datetime", FixedDate)
     res = daily_report.main(["--json", "--expiry-window", "10"])
     radar = res["expiry_radar"]
@@ -54,7 +58,9 @@ def test_expiry_radar_symbol_filter(monkeypatch):
         "portfolio_greeks_totals": data_dir / "totals_sample.csv",
         "portfolio_greeks_combos": data_dir / "combos_expiry_sample.csv",
     }
-    monkeypatch.setattr("portfolio_exporter.core.io.latest_file", _fake_latest_factory(mapping))
+    monkeypatch.setattr(
+        "portfolio_exporter.core.io.latest_file", _fake_latest_factory(mapping)
+    )
     monkeypatch.setattr(daily_report, "datetime", FixedDate)
     res = daily_report.main(["--json", "--expiry-window", "7", "--symbol", "AAPL"])
     assert res["positions_rows"] == 1
@@ -71,7 +77,9 @@ def test_expiry_radar_disabled(monkeypatch):
         "portfolio_greeks_positions": data_dir / "positions_sample.csv",
         "portfolio_greeks_combos": data_dir / "combos_expiry_sample.csv",
     }
-    monkeypatch.setattr("portfolio_exporter.core.io.latest_file", _fake_latest_factory(mapping))
+    monkeypatch.setattr(
+        "portfolio_exporter.core.io.latest_file", _fake_latest_factory(mapping)
+    )
     monkeypatch.setattr(daily_report, "datetime", FixedDate)
     res = daily_report.main(["--json", "--expiry-window", "0"])
     assert "expiry_radar" not in res

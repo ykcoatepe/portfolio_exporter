@@ -42,24 +42,28 @@ def test_daily_report_preflight_fail(tmp_path, monkeypatch):
 
 
 def test_portfolio_greeks_preflight(monkeypatch):
-    res = portfolio_greeks.main([
-        "--positions-csv",
-        "tests/data/positions_sample.csv",
-        "--json",
-        "--no-files",
-        "--preflight",
-    ])
+    res = portfolio_greeks.main(
+        [
+            "--positions-csv",
+            "tests/data/positions_sample.csv",
+            "--json",
+            "--no-files",
+            "--preflight",
+        ]
+    )
     assert res["ok"] is True
 
 
 def test_portfolio_greeks_preflight_fail(tmp_path):
     bad = tmp_path / "pos.csv"
     bad.write_text("underlying,qty\nAAPL,1\n")
-    res = portfolio_greeks.main([
-        "--positions-csv",
-        str(bad),
-        "--json",
-        "--no-files",
-        "--preflight",
-    ])
+    res = portfolio_greeks.main(
+        [
+            "--positions-csv",
+            str(bad),
+            "--json",
+            "--no-files",
+            "--preflight",
+        ]
+    )
     assert res["ok"] is False

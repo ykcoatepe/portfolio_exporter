@@ -22,7 +22,9 @@ OSI_PATTERN = re.compile(r"\d{6,8}[CP]\d{8}")
 
 
 def _make_instrument(symbol: str) -> Instrument:
-    return Instrument(symbol=symbol, instrument_type=InstrumentType.OPTION, multiplier=Decimal("100"))
+    return Instrument(
+        symbol=symbol, instrument_type=InstrumentType.OPTION, multiplier=Decimal("100")
+    )
 
 
 def _make_position(symbol: str, qty: float) -> Position:

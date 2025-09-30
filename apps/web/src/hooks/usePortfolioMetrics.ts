@@ -16,7 +16,6 @@ export type PortfolioMetrics = {
   sumTheta: number | null;
   updatedAt: number | null;
   stalenessSeconds: number | null;
-  session: PSDSnapshot["session"] | null;
 };
 
 function toFiniteNumber(value: unknown): number | null {
@@ -102,12 +101,13 @@ export function usePortfolioMetrics(): PortfolioMetrics {
     let hasTheta = false;
 
     for (const stock of stocks) {
-      const dayValue = toFiniteNumber(stock.pnl_intraday);
+      const dayValue = toFiniteNumber(stock.day_pnl ?? stock.pnl_intraday);
       if (dayValue !== null) {
         dayPnl += dayValue;
         hasDayPnl = true;
       }
-      const totalValue = computeLegUnrealized(stock);
+      const totalValue =
+        toFiniteNumber(stock.pnl_unrealized ?? stock.total_pnl) ?? computeLegUnrealized(stock);
       if (totalValue !== null) {
         totalPnl += totalValue;
         hasTotalPnl = true;
@@ -181,7 +181,6 @@ export function usePortfolioMetrics(): PortfolioMetrics {
     const updatedAt = typeof snapshot?.ts === "number" && Number.isFinite(snapshot.ts)
       ? snapshot.ts
       : null;
-    const session = snapshot?.session ?? null;
 
     return {
       dayPnl: hasDayPnl ? dayPnl : null,
@@ -190,7 +189,6 @@ export function usePortfolioMetrics(): PortfolioMetrics {
       sumTheta: hasTheta ? sumTheta : null,
       updatedAt,
       stalenessSeconds,
-      session,
     };
   }, [snapshot]);
 }

@@ -50,7 +50,9 @@ def _load_csv(name: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _prep_positions(df: pd.DataFrame, since: str | None, until: str | None) -> pd.DataFrame:
+def _prep_positions(
+    df: pd.DataFrame, since: str | None, until: str | None
+) -> pd.DataFrame:
     if df.empty:
         return df
     if "expiry" in df.columns:
@@ -63,7 +65,9 @@ def _prep_positions(df: pd.DataFrame, since: str | None, until: str | None) -> p
     cols = ["underlying", "right", "strike", "expiry", "qty"]
     greek_cols = [c for c in ["delta", "gamma", "vega", "theta"] if c in df.columns]
     exposure_cols = [
-        c for c in ["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"] if c in df.columns
+        c
+        for c in ["delta_exposure", "gamma_exposure", "vega_exposure", "theta_exposure"]
+        if c in df.columns
     ]
     keep = [c for c in cols + greek_cols + exposure_cols if c in df.columns]
     return df[keep]
@@ -129,10 +133,14 @@ def _expiry_radar(
     if df.empty:
         return result
     delta_col = (
-        "delta_exposure" if "delta_exposure" in df.columns else "delta" if "delta" in df.columns else None
+        "delta_exposure"
+        if "delta_exposure" in df.columns
+        else "delta" if "delta" in df.columns else None
     )
     theta_col = (
-        "theta_exposure" if "theta_exposure" in df.columns else "theta" if "theta" in df.columns else None
+        "theta_exposure"
+        if "theta_exposure" in df.columns
+        else "theta" if "theta" in df.columns else None
     )
     rows: list[dict[str, Any]] = []
     for date, grp in df.groupby(df["expiry_dt"].dt.date):
@@ -175,7 +183,9 @@ def _theta_decay_5d(df: pd.DataFrame) -> float:
     if df.empty:
         return 0.0
     theta_col = (
-        "theta_exposure" if "theta_exposure" in df.columns else "theta" if "theta" in df.columns else None
+        "theta_exposure"
+        if "theta_exposure" in df.columns
+        else "theta" if "theta" in df.columns else None
     )
     if theta_col is None:
         return 0.0
@@ -218,7 +228,9 @@ def _build_html(
             for r in rows:
                 r = r.copy()
                 if "by_structure" in r:
-                    r["by_structure"] = "; ".join(f"{k}: {v}" for k, v in r["by_structure"].items())
+                    r["by_structure"] = "; ".join(
+                        f"{k}: {v}" for k, v in r["by_structure"].items()
+                    )
                 tab_rows.append(r)
             sec_parts.append(pd.DataFrame(tab_rows).to_html(index=False))
         else:
@@ -232,19 +244,33 @@ def _build_html(
             }
         )
         parts.append(
-            '<section class="card"><h2>Delta Buckets</h2>' + db_df.to_html(index=False) + "</section>"
+            '<section class="card"><h2>Delta Buckets</h2>'
+            + db_df.to_html(index=False)
+            + "</section>"
         )
     if theta_decay_5d is not None:
         parts.append(
-            '<section class="card"><h2>Theta Decay 5d</h2>' + f"<p>{theta_decay_5d}</p>" + "</section>"
+            '<section class="card"><h2>Theta Decay 5d</h2>'
+            + f"<p>{theta_decay_5d}</p>"
+            + "</section>"
         )
     if not totals.empty:
-        parts.append('<section class="card"><h2>Totals</h2>' + totals.to_html(index=False) + "</section>")
+        parts.append(
+            '<section class="card"><h2>Totals</h2>'
+            + totals.to_html(index=False)
+            + "</section>"
+        )
     if not combos.empty:
-        parts.append('<section class="card"><h2>Combos</h2>' + combos.to_html(index=False) + "</section>")
+        parts.append(
+            '<section class="card"><h2>Combos</h2>'
+            + combos.to_html(index=False)
+            + "</section>"
+        )
     if not positions.empty:
         parts.append(
-            '<section class="card"><h2>Positions</h2>' + positions.to_html(index=False) + "</section>"
+            '<section class="card"><h2>Positions</h2>'
+            + positions.to_html(index=False)
+            + "</section>"
         )
     parts.append("</body></html>")
     return "\n".join(parts)
@@ -264,7 +290,9 @@ def _build_pdf_flowables(
         return []
     styles = getSampleStyleSheet()
     flow = [Paragraph("Daily Portfolio Report", styles["Heading1"])]
-    flow.append(Paragraph(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), styles["Normal"]))
+    flow.append(
+        Paragraph(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), styles["Normal"])
+    )
     if account:
         flow.append(Paragraph(f"Account: {account}", styles["Normal"]))
     flow.append(Paragraph(f"Output dir: {outdir}", styles["Normal"]))
@@ -281,7 +309,9 @@ def _build_pdf_flowables(
             for r in rows:
                 r = r.copy()
                 if "by_structure" in r:
-                    r["by_structure"] = ", ".join(f"{k}: {v}" for k, v in r["by_structure"].items())
+                    r["by_structure"] = ", ".join(
+                        f"{k}: {v}" for k, v in r["by_structure"].items()
+                    )
                 tab_rows.append(r)
             df_r = pd.DataFrame(tab_rows)
             flow.append(RLTable([df_r.columns.tolist()] + df_r.values.tolist()))
@@ -318,7 +348,9 @@ def _build_pdf_flowables(
 
 
 def get_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Render portfolio report from latest CSVs")
+    parser = argparse.ArgumentParser(
+        description="Render portfolio report from latest CSVs"
+    )
     parser.add_argument("--html", action="store_true")
     parser.add_argument("--pdf", action="store_true")
     cli_helpers.add_common_output_args(parser, include_excel=True)
@@ -386,7 +418,9 @@ def main(argv: list[str] | None = None) -> dict:
 
     with RunLog(script="daily_report", args=vars(args), output_dir=outdir) as rl:
         with rl.time("load_data"):
-            positions = _prep_positions(_load_csv("portfolio_greeks_positions"), args.since, args.until)
+            positions = _prep_positions(
+                _load_csv("portfolio_greeks_positions"), args.since, args.until
+            )
             totals = _load_csv("portfolio_greeks_totals")
             combos_raw = _load_csv("portfolio_greeks_combos")
 
@@ -403,12 +437,18 @@ def main(argv: list[str] | None = None) -> dict:
         with rl.time("analytics"):
             combos = _prep_combos(combos_raw)
 
-            account = totals["account"].iloc[0] if "account" in totals.columns and not totals.empty else None
+            account = (
+                totals["account"].iloc[0]
+                if "account" in totals.columns and not totals.empty
+                else None
+            )
 
             # Expiry radar (exposed at top-level via meta back-compat)
             expiry_radar = None
             if args.expiry_window and args.expiry_window > 0:
-                expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
+                expiry_radar = _expiry_radar(
+                    combos, positions, args.expiry_window, console
+                )
                 meta["expiry_radar"] = expiry_radar
 
             # Analytics (live under sections)
@@ -418,7 +458,9 @@ def main(argv: list[str] | None = None) -> dict:
             # Pre-build HTML for HTML/PDF requests
             html_str = None
             # Locate stylesheet: prefer repo docs; fallback to packaged asset
-            theme_css = Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
+            theme_css = (
+                Path(__file__).resolve().parents[2] / "docs" / "assets" / "theme.css"
+            )
             if not theme_css.exists():
                 theme_css = Path(__file__).resolve().parents[1] / "assets" / "theme.css"
             link_theme = theme_css.exists()
@@ -476,7 +518,9 @@ def main(argv: list[str] | None = None) -> dict:
                 except Exception:
                     # Gracefully skip when openpyxl is not installed
                     if console:
-                        console.print("Skipping XLSX: openpyxl not installed", style="yellow")
+                        console.print(
+                            "Skipping XLSX: openpyxl not installed", style="yellow"
+                        )
                 else:
                     xlsx_path = outdir / "daily_report.xlsx"
                     try:
@@ -487,7 +531,9 @@ def main(argv: list[str] | None = None) -> dict:
                             if not combos.empty:
                                 combos.to_excel(xw, index=False, sheet_name="Combos")
                             if not positions.empty:
-                                positions.to_excel(xw, index=False, sheet_name="Positions")
+                                positions.to_excel(
+                                    xw, index=False, sheet_name="Positions"
+                                )
                             # Add small analytics sheets for quick reference
                             if expiry_radar and expiry_radar.get("rows"):
                                 pd.DataFrame(expiry_radar["rows"]).to_excel(
@@ -512,7 +558,9 @@ def main(argv: list[str] | None = None) -> dict:
             if args.debug_timings:
                 meta["timings"] = rl.timings
                 if written:
-                    path_t = core_io.save(pd.DataFrame(rl.timings), "timings", "csv", outdir)
+                    path_t = core_io.save(
+                        pd.DataFrame(rl.timings), "timings", "csv", outdir
+                    )
                     outputs["timings"] = str(path_t)
                     written.append(path_t)
 

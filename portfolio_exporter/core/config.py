@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     # Default to iCloud Drive Downloads path used on the target machine.
     # Callers can still override via OUTPUT_DIR/PE_OUTPUT_DIR or .env; writers
     # will smartly fall back to a local path if this location is not writable.
-    output_dir: str = "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+    output_dir: str = (
+        "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
+    )
     timezone: str = "Europe/Istanbul"
     broker: str = "IBKR"
     default_account: str = "UXXXXXXX"

@@ -1,8 +1,10 @@
 pytest
+pytest-timeout
 pandas
 numpy
 requests
 pip-tools
 black
 ruff
+mypy
 build             # provides `python -m build` invoked by the Makefile

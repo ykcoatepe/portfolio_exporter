@@ -183,4 +183,5 @@ class OpenOrderTests(unittest.TestCase):
         self.assertIsNone(self.open_order_single.combo_legs)
 
 
-if __name__ == "__main__":    unittest.main()
+if __name__ == "__main__":
+    unittest.main()

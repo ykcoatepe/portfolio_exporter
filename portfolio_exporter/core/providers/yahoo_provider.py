@@ -56,7 +56,11 @@ def _to_int(value: Any, default: int = 0) -> int:
 
 
 def _cache_cfg(cfg: dict[str, Any]) -> tuple[bool, str, int]:
-    d = cfg.get("data", {}).get("cache", {}) if isinstance(cfg.get("data", {}), dict) else {}
+    d = (
+        cfg.get("data", {}).get("cache", {})
+        if isinstance(cfg.get("data", {}), dict)
+        else {}
+    )
     enabled = bool(d.get("enabled", False))
     cdir = str(d.get("dir", "out/.cache"))
     ttl = int(d.get("ttl_sec", 60))
@@ -130,7 +134,8 @@ def get_summary(symbol: str, cfg: dict[str, Any]) -> dict[str, Any]:
         pre_price = getattr(t, "prepost", None)
         # Best effort
         out = {
-            "float_shares": getattr(info, "shares_float", None) or info.get("shares_float"),
+            "float_shares": getattr(info, "shares_float", None)
+            or info.get("shares_float"),
             "short_percent_float": info.get("short_percent_of_float"),
             "avg_vol_10d": info.get("ten_day_average_volume"),
             "avg_vol_3m": info.get("three_month_average_volume"),
@@ -178,7 +183,9 @@ def get_intraday_bars(
             try:
                 rows.append(
                     {
-                        "ts": int(idx.timestamp()) if hasattr(idx, "timestamp") else None,
+                        "ts": (
+                            int(idx.timestamp()) if hasattr(idx, "timestamp") else None
+                        ),
                         "open": _to_float(r.get("Open", r.get("open", math.nan))),
                         "high": _to_float(r.get("High", r.get("high", math.nan))),
                         "low": _to_float(r.get("Low", r.get("low", math.nan))),
@@ -225,7 +232,10 @@ def get_option_chain(symbol: str, cfg: dict[str, Any]) -> list[dict[str, Any]]:
             exp_yymmdd = expiry_iso.replace("-", "")
         oc = t.option_chain(expiry_iso)
         rows: list[dict[str, Any]] = []
-        for side, df in (("C", getattr(oc, "calls", None)), ("P", getattr(oc, "puts", None))):
+        for side, df in (
+            ("C", getattr(oc, "calls", None)),
+            ("P", getattr(oc, "puts", None)),
+        ):
             if df is None or len(df) == 0:
                 continue
             for _, r in df.iterrows():
@@ -238,9 +248,13 @@ def get_option_chain(symbol: str, cfg: dict[str, Any]) -> list[dict[str, Any]]:
                             "strike": _to_float(r.get("strike", 0.0), 0.0),
                             "bid": _to_float(r.get("bid", 0.0), 0.0),
                             "ask": _to_float(r.get("ask", 0.0), 0.0),
-                            "last": _to_float(r.get("lastPrice", r.get("last_price", 0.0)), 0.0),
+                            "last": _to_float(
+                                r.get("lastPrice", r.get("last_price", 0.0)), 0.0
+                            ),
                             "volume": _to_int(r.get("volume", 0) or 0, 0),
-                            "oi": _to_int(r.get("openInterest", r.get("open_interest", 0)) or 0, 0),
+                            "oi": _to_int(
+                                r.get("openInterest", r.get("open_interest", 0)) or 0, 0
+                            ),
                         }
                     )
                 except Exception:

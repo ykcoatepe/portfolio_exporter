@@ -56,12 +56,23 @@ def test_internal_provider_precedence(monkeypatch):
         }
 
     def _empty_csv(_base_dir: object) -> CsvLoadResult:
-        return CsvLoadResult(positions=[], quotes=[], metadata={"data_root": "test", "positions_rows": 0, "quotes_rows": 0, "greeks_rows": 0})
+        return CsvLoadResult(
+            positions=[],
+            quotes=[],
+            metadata={
+                "data_root": "test",
+                "positions_rows": 0,
+                "quotes_rows": 0,
+                "greeks_rows": 0,
+            },
+        )
 
     monkeypatch.setenv("POSITIONS_ENGINE_ALLOW_EMPTY", "1")
     monkeypatch.setenv("POSITIONS_ENGINE_DEMO", "0")
     monkeypatch.setattr("positions_engine.ingest.csv.load_csv_records", _empty_csv)
-    monkeypatch.setattr("portfolio_exporter.psd_adapter.snapshot_once", _fake_snapshot_once)
+    monkeypatch.setattr(
+        "portfolio_exporter.psd_adapter.snapshot_once", _fake_snapshot_once
+    )
 
     api._DEMO_OVERRIDE = None
     api._state.refresh(positions=[], quotes=[], data_source="unknown")
@@ -75,10 +86,15 @@ def test_internal_provider_precedence(monkeypatch):
         assert stock_row.get("mark_source") in {"MID", "LAST", "PREV", "MISSING"}
         assert "stale_seconds" in stock_row
         assert "day_pnl" in stock_row
+        assert "day_pnl_pct" in stock_row
+        assert "pnl_unrealized" in stock_row
+        assert "pnl_unrealized_percent" in stock_row
         assert "total_pnl" in stock_row
         options_payload = client.get("/positions/options").json()
         assert options_payload["legs"]
-        assert any(leg["symbol"] == "TSLA 20251018C00750000" for leg in options_payload["legs"])
+        assert any(
+            leg["symbol"] == "TSLA 20251018C00750000" for leg in options_payload["legs"]
+        )
 
         state_snapshot = client.get("/state").json()
         assert state_snapshot["data_source"] == "internal"
@@ -88,9 +104,12 @@ def test_internal_provider_precedence(monkeypatch):
         assert len(single_stocks) >= 1
         first_single = single_stocks[0]
         assert first_single.get("mark_source") in {"MID", "LAST", "PREV", "MISSING"}
-        assert "stale_seconds" in first_single
+        stale_value = first_single.get("stale_seconds")
+        assert stale_value is None or stale_value >= 0
         assert "day_pnl" in first_single
+        assert "day_pnl_pct" in first_single
         assert "pnl_unrealized" in first_single
+        assert "pnl_unrealized_percent" in first_single
         combo_legs = [
             leg
             for combo in view.get("option_combos", []) or []

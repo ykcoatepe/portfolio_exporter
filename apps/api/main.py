@@ -4,12 +4,14 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 import sys
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -24,14 +26,19 @@ if str(LIBS_PATH) not in sys.path:
     sys.path.append(str(LIBS_PATH))
 
 from positions_engine.core.models import InstrumentType, Quote  # noqa: E402
+from positions_engine.core.session import SessionInfo, detect_session  # noqa: E402
 from positions_engine.ingest import (  # noqa: E402
     choose_provider,
     last_provider_info,
     load_demo_dataset,
 )
-from positions_engine.rules.catalog import CatalogError, CatalogValidationError  # noqa: E402
+from positions_engine.rules.catalog import (  # noqa: E402
+    CatalogError,
+    CatalogValidationError,
+)
 from positions_engine.service import (  # noqa: E402
     PositionsState,
+    RefreshLoop,
     RulesCatalogState,
     RulesState,
     positions_from_records,
@@ -44,6 +51,17 @@ app = FastAPI(title="Positions Engine API", version="0.1.0")
 _state = PositionsState()
 _rules_state = RulesState(_state)
 _catalog_state = RulesCatalogState(_state, _rules_state)
+refresh_loop = RefreshLoop(tick=_state.refresh_live_snapshot)
+_greeks_interval = int(os.getenv("PSD_GREEKS_INTERVAL_S", "60"))
+_greeks_refresh_loop = (
+    RefreshLoop(
+        tick=_state.refresh_live_greeks,
+        interval_s=_greeks_interval,
+        env_var="PSD_GREEKS_INTERVAL_S",
+    )
+    if _greeks_interval > 0
+    else None
+)
 _AUTO_REFRESH = os.getenv("POSITIONS_ENGINE_AUTO_REFRESH", "0") == "1"
 WEB_DIST = (REPO_ROOT / "apps" / "web" / "dist").resolve()
 INDEX_HTML = WEB_DIST / "index.html"
@@ -52,6 +70,74 @@ _DEMO_OVERRIDE: bool | None = None
 
 def _resolve_data_root() -> Path:
     return Path(os.getenv("POSITIONS_ENGINE_DATA_DIR", "var")).expanduser()
+
+
+def _isoformat_utc(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    iso = value.astimezone(UTC).isoformat()
+    if iso.endswith("+00:00"):
+        iso = iso[:-6] + "Z"
+    return iso
+
+
+def _ensure_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return _ensure_utc(parsed)
+
+
+def _max_datetime(values: list[datetime | None]) -> datetime | None:
+    latest: datetime | None = None
+    for value in values:
+        candidate = _ensure_utc(value)
+        if candidate is None:
+            continue
+        if latest is None or candidate > latest:
+            latest = candidate
+    return latest
+
+
+def _latest_quote_timestamp_for_symbols(
+    quotes: dict[str, Quote], symbols: set[str]
+) -> datetime | None:
+    if not quotes or not symbols:
+        return None
+    latest: datetime | None = None
+    for symbol in symbols:
+        quote = quotes.get(symbol)
+        if quote is None:
+            continue
+        candidates = (
+            quote.updated_at,
+            quote.bid_ts,
+            quote.ask_ts,
+            quote.last_ts,
+            quote.previous_close_ts,
+        )
+        candidate = _max_datetime(list(candidates))
+        if candidate is None:
+            continue
+        if latest is None or candidate > latest:
+            latest = candidate
+    return latest
 
 
 class BreachCountsModel(BaseModel):
@@ -123,6 +209,21 @@ class RulesCatalogPublishResponseModel(BaseModel):
     updated_by: str | None = None
 
 
+class SessionResponseModel(BaseModel):
+    exchange: str
+    tz: str
+    state: Literal["RTH", "ETH", "CLOSED"]
+    as_of: str
+    rth_open: str | None = None
+    rth_close: str | None = None
+    source: str = "fallback"
+    note: str | None = None
+
+    @classmethod
+    def from_info(cls, info: SessionInfo) -> SessionResponseModel:
+        return cls(**asdict(info))
+
+
 class StatsResponse(BaseModel):
     equity_count: int
     quote_count: int | None = None
@@ -139,6 +240,7 @@ class StatsResponse(BaseModel):
     updated_at: datetime | None = None
     trades_prior_positions: bool | None = None
     data_source: str | None = None
+    session: SessionResponseModel | None = None
 
     class Config:
         extra = "allow"
@@ -147,10 +249,27 @@ class StatsResponse(BaseModel):
 @app.on_event("startup")
 async def _on_startup() -> None:  # pragma: no cover - exercised by integration tests
     _refresh_from_providers()
+    refresh_loop.start()
+    if _greeks_refresh_loop is not None:
+        _greeks_refresh_loop.start()
+
+
+@app.on_event("shutdown")
+async def _on_shutdown() -> None:  # pragma: no cover - exercised by integration tests
+    refresh_loop.stop()
+    if _greeks_refresh_loop is not None:
+        _greeks_refresh_loop.stop()
 
 
 @app.get("/healthz", tags=["meta"])
 def healthz() -> dict[str, Any]:
+    return {"ok": True, "ts": datetime.now(tz=UTC).isoformat()}
+
+
+@app.post("/refresh", tags=["debug"])
+def refresh_now() -> dict[str, Any]:
+    _state.refresh_live_snapshot()
+    _state.refresh_live_greeks()
     return {"ok": True, "ts": datetime.now(tz=UTC).isoformat()}
 
 
@@ -165,7 +284,18 @@ def equities() -> list[dict[str, Any]]:
 def state_snapshot() -> dict[str, Any]:
     if _AUTO_REFRESH:
         _refresh_from_providers()
-    return _state.snapshot_payload()
+    payload = _state.snapshot_payload()
+    session_info = asdict(detect_session())
+
+    if not isinstance(payload.get("session"), str):
+        payload["session"] = session_info["state"]
+
+    meta = payload.get("meta")
+    if isinstance(meta, dict):
+        meta["session"] = session_info
+    payload["session_info"] = session_info
+
+    return payload
 
 
 @app.get(
@@ -187,6 +317,35 @@ def stats() -> StatsResponse:
     payload.setdefault("var95_1d_pct", None)
     payload.setdefault("margin_used_pct", None)
     payload["data_source"] = _state.data_source
+
+    session_info = detect_session()
+    session_payload = dataclasses.asdict(session_info)
+    payload["session"] = session_payload
+    if "session_info" not in payload or not isinstance(payload["session_info"], dict):
+        payload["session_info"] = session_payload
+
+    quotes_snapshot = _state.quotes_snapshot()
+    positions_map = getattr(_state, "_positions", {})
+    equity_symbols: set[str] = set()
+    option_symbols: set[str] = set()
+    if isinstance(positions_map, dict):
+        for symbol, position in positions_map.items():
+            instrument_type = getattr(position.instrument, "instrument_type", None)
+            if instrument_type == InstrumentType.EQUITY:
+                equity_symbols.add(symbol)
+            elif instrument_type == InstrumentType.OPTION:
+                option_symbols.add(symbol)
+
+    equity_latest = _latest_quote_timestamp_for_symbols(quotes_snapshot, equity_symbols)
+    option_latest = _latest_quote_timestamp_for_symbols(quotes_snapshot, option_symbols)
+    session_latest = _parse_iso_datetime(session_info.as_of)
+    latest_ts = _max_datetime([equity_latest, option_latest, session_latest])
+    if latest_ts is not None:
+        meta_payload = payload.get("meta")
+        if not isinstance(meta_payload, dict):
+            meta_payload = {}
+            payload["meta"] = meta_payload
+        meta_payload.setdefault("latest_ts", _isoformat_utc(latest_ts))
 
     snapshot_at = _state.snapshot_updated_at()
     if snapshot_at is not None and not payload.get("updated_at"):
@@ -213,7 +372,11 @@ def _refresh_from_providers() -> None:
         source_name = None
         provider_info = {}
 
-    if (not positions_records and not quotes_records) and include_demo and _DEMO_OVERRIDE is not False:
+    if (
+        (not positions_records and not quotes_records)
+        and include_demo
+        and _DEMO_OVERRIDE is not False
+    ):
         positions_records, quotes_records = load_demo_dataset()
         source_name = "demo"
         if "detail" not in provider_info:
@@ -224,13 +387,21 @@ def _refresh_from_providers() -> None:
     positions = positions_from_records(positions_records)
     quotes = _guard_quotes(quotes_from_records(quotes_records))
 
-    if data_source == "live" and not positions and not quotes and include_demo and _DEMO_OVERRIDE is False:
+    if (
+        data_source == "live"
+        and not positions
+        and not quotes
+        and include_demo
+        and _DEMO_OVERRIDE is False
+    ):
         logger.info(
             "[ingest] Live dataset empty; demo override disabled. Provide CSVs or enable POSITIONS_ENGINE_DEMO=1 for fallback"
         )
 
     snapshot_at = _latest_quote_timestamp(quotes)
-    positions_view_payload = provider_info.get("positions_view") if isinstance(provider_info, dict) else None
+    positions_view_payload = (
+        provider_info.get("positions_view") if isinstance(provider_info, dict) else None
+    )
     _state.refresh(
         positions=positions,
         quotes=quotes,
@@ -240,10 +411,14 @@ def _refresh_from_providers() -> None:
     )
 
     equity_positions = [
-        position for position in positions if position.instrument.instrument_type == InstrumentType.EQUITY
+        position
+        for position in positions
+        if position.instrument.instrument_type == InstrumentType.EQUITY
     ]
     option_positions = [
-        position for position in positions if position.instrument.instrument_type == InstrumentType.OPTION
+        position
+        for position in positions
+        if position.instrument.instrument_type == InstrumentType.OPTION
     ]
 
     detail_hint: str | None = None
@@ -253,7 +428,9 @@ def _refresh_from_providers() -> None:
     elif data_source == "csv":
         metadata = provider_info.get("metadata") or {}
         detail_hint = metadata.get("positions_path") or metadata.get("data_root")
-        rows_summary = f"{metadata.get('positions_rows', 0)}/{metadata.get('quotes_rows', 0)}"
+        rows_summary = (
+            f"{metadata.get('positions_rows', 0)}/{metadata.get('quotes_rows', 0)}"
+        )
     elif data_source == "demo":
         detail_hint = provider_info.get("detail", "demo")
 
@@ -302,11 +479,29 @@ def _load_prior_positions_hint() -> str | None:
     return os.getenv("TRADES_PRIOR_POSITIONS")
 
 
+@app.get("/session", tags=["meta"], response_model=SessionResponseModel)
+def session_endpoint() -> SessionResponseModel:
+    return SessionResponseModel.from_info(detect_session())
+
+
 @app.get("/positions/options", tags=["positions"])
 def options() -> dict[str, Any]:
     if _AUTO_REFRESH:
         _refresh_from_providers()
     return _state.options_payload()
+
+
+@app.get("/debug/session/override/{state}", include_in_schema=False)
+def override_session(state: str) -> SessionResponseModel:
+    override_state = state.strip().upper()
+    os.environ["FORCE_SESSION_STATE"] = override_state
+    return SessionResponseModel.from_info(detect_session())
+
+
+@app.get("/debug/session/clear", include_in_schema=False)
+def clear_session_override() -> SessionResponseModel:
+    os.environ.pop("FORCE_SESSION_STATE", None)
+    return SessionResponseModel.from_info(detect_session())
 
 
 @app.get("/debug/demo/enable", include_in_schema=False)
@@ -359,7 +554,11 @@ def rules_summary() -> RulesSummaryResponseModel:
                 severity=severity,
                 subject=str(subject),
                 symbol=symbol if isinstance(symbol, str) else None,
-                occurred_at=str(occurred_at) if occurred_at is not None else datetime.now(tz=UTC).isoformat(),
+                occurred_at=(
+                    str(occurred_at)
+                    if occurred_at is not None
+                    else datetime.now(tz=UTC).isoformat()
+                ),
                 description=breach.get("notes"),
                 status=breach.get("status"),
             )
@@ -370,15 +569,27 @@ def rules_summary() -> RulesSummaryResponseModel:
         fallback_symbols = summary.get("focus_symbols", [])
         if isinstance(fallback_symbols, list):
             focus_symbols_list = sorted(
-                {str(symbol) for symbol in fallback_symbols if isinstance(symbol, str) and symbol}
+                {
+                    str(symbol)
+                    for symbol in fallback_symbols
+                    if isinstance(symbol, str) and symbol
+                }
             )
-    fundamentals_raw = summary.get("fundamentals", {}) if isinstance(summary, dict) else {}
+    fundamentals_raw = (
+        summary.get("fundamentals", {}) if isinstance(summary, dict) else {}
+    )
     fundamentals_map = fundamentals_raw if isinstance(fundamentals_raw, dict) else {}
     return RulesSummaryResponseModel(
-        as_of=str(summary.get("as_of")) if isinstance(summary, dict) else datetime.now(tz=UTC).isoformat(),
-        rules_total=int(summary.get("rules_total", len(_rules_state.rules)))
-        if isinstance(summary, dict)
-        else len(_rules_state.rules),
+        as_of=(
+            str(summary.get("as_of"))
+            if isinstance(summary, dict)
+            else datetime.now(tz=UTC).isoformat()
+        ),
+        rules_total=(
+            int(summary.get("rules_total", len(_rules_state.rules)))
+            if isinstance(summary, dict)
+            else len(_rules_state.rules)
+        ),
         breaches=breaches_model,
         top=top_payload,
         focus_symbols=focus_symbols_list,
@@ -392,7 +603,11 @@ def rules_catalog() -> RulesCatalogResponseModel:
     return RulesCatalogResponseModel(**_catalog_state.as_dict())
 
 
-@app.post("/rules/validate", tags=["rules"], response_model=RulesCatalogValidationResponseModel)
+@app.post(
+    "/rules/validate",
+    tags=["rules"],
+    response_model=RulesCatalogValidationResponseModel,
+)
 def rules_validate(payload: CatalogTextRequest) -> RulesCatalogValidationResponseModel:
     result = _catalog_state.validate_catalog_text(payload.catalog_text)
     return RulesCatalogValidationResponseModel(
@@ -403,7 +618,9 @@ def rules_validate(payload: CatalogTextRequest) -> RulesCatalogValidationRespons
     )
 
 
-@app.post("/rules/preview", tags=["rules"], response_model=RulesCatalogPreviewResponseModel)
+@app.post(
+    "/rules/preview", tags=["rules"], response_model=RulesCatalogPreviewResponseModel
+)
 def rules_preview(payload: CatalogTextRequest) -> RulesCatalogPreviewResponseModel:
     validation, diff = _catalog_state.preview_catalog(payload.catalog_text)
     diff_model = CatalogDiffModel(**diff)
@@ -416,17 +633,21 @@ def rules_preview(payload: CatalogTextRequest) -> RulesCatalogPreviewResponseMod
     )
 
 
-@app.post("/rules/publish", tags=["rules"], response_model=RulesCatalogPublishResponseModel)
+@app.post(
+    "/rules/publish", tags=["rules"], response_model=RulesCatalogPublishResponseModel
+)
 def rules_publish(payload: CatalogPublishRequest) -> RulesCatalogPublishResponseModel:
     try:
-        catalog = _catalog_state.publish_catalog(payload.catalog_text, author=payload.author)
+        catalog = _catalog_state.publish_catalog(
+            payload.catalog_text, author=payload.author
+        )
     except CatalogValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except CatalogError as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=500, detail=str(exc))
     return RulesCatalogPublishResponseModel(
         version=catalog.version,
-        updated_at=catalog.updated_at.isoformat(),
+        updated_at=_isoformat_utc(catalog.updated_at),
         updated_by=catalog.updated_by,
     )
 
@@ -451,18 +672,20 @@ async def _spa_fallback(request: Request, call_next):  # pragma: no cover - thin
         return response
 
     path = request.url.path
-    if path.startswith((
-        "/docs",
-        "/openapi",
-        "/redoc",
-        "/healthz",
-        "/stats",
-        "/positions",
-        "/rules",
-        "/state",
-        "/static",
-        "/favicon.ico",
-    )):
+    if path.startswith(
+        (
+            "/docs",
+            "/openapi",
+            "/redoc",
+            "/healthz",
+            "/stats",
+            "/positions",
+            "/rules",
+            "/state",
+            "/static",
+            "/favicon.ico",
+        )
+    ):
         return response
 
     if not INDEX_HTML.exists():

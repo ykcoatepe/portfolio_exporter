@@ -60,7 +60,9 @@ STREAM_EVENTS = Counter("psd_stream_events_total", "SSE events sent", ["kind"])
 def state():
     snap = latest_snapshot()
     if not snap:
-        return JSONResponse({"ts": None, "positions": [], "quotes": {}, "risk": {}, "empty": True})
+        return JSONResponse(
+            {"ts": None, "positions": [], "quotes": {}, "risk": {}, "empty": True}
+        )
     return JSONResponse(snap)
 
 
@@ -173,7 +175,9 @@ async def stream(request: Request):
             snap = latest_snapshot()
             if snap:
                 STREAM_EVENTS.labels("snapshot").inc()
-                yield "event: snapshot\n" + "data: " + json.dumps(snap, separators=(",", ":")) + "\n\n"
+                yield "event: snapshot\n" + "data: " + json.dumps(
+                    snap, separators=(",", ":")
+                ) + "\n\n"
                 frames_sent += 1
                 t_last = time.monotonic()
                 if _maybe_quit():

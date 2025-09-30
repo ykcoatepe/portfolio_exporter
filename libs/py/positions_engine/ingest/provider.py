@@ -60,7 +60,9 @@ def last_provider_info() -> dict[str, Any] | None:
     return _LAST_PROVIDER_INFO
 
 
-def choose_provider(data_root: Path | str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
+def choose_provider(
+    data_root: Path | str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
     """Return the first provider that yields data, respecting built-in precedence."""
 
     global _LAST_PROVIDER_INFO
@@ -70,6 +72,8 @@ def choose_provider(data_root: Path | str) -> tuple[list[dict[str, Any]], list[d
     include_demo = demo_env_enabled or not allow_empty
 
     providers: list[Provider] = [InternalScriptsProvider(), CsvProvider(data_root)]
+    if os.getenv("PE_TEST_MODE") == "1":
+        providers = [CsvProvider(data_root)]
     if include_demo:
         providers.append(DemoProvider())
 

@@ -36,10 +36,24 @@ type StockSnapshotInput = {
   markPrice: number;
   markSource: MarkSource;
   markTime: string;
-  dayPnlAmount: number;
-  totalPnlAmount: number;
-  previousClose: number;
+  dayPnlAmount: number | null;
+  totalPnlAmount: number | null;
+  previousClose: number | null;
   staleSeconds: number;
+};
+
+const computePercent = (amount: number | null, basis: number | null): number | null => {
+  if (amount === null || basis === null) {
+    return null;
+  }
+  if (!Number.isFinite(amount) || !Number.isFinite(basis)) {
+    return null;
+  }
+  const denominator = Math.abs(basis);
+  if (denominator === 0) {
+    return null;
+  }
+  return (amount / denominator) * 100;
 };
 
 const buildStockEntry = ({
@@ -53,21 +67,36 @@ const buildStockEntry = ({
   totalPnlAmount,
   previousClose,
   staleSeconds,
-}: StockSnapshotInput) => ({
-  secType: "STK" as const,
-  symbol,
-  qty: quantity,
-  avg_cost: averageCost,
-  multiplier: 1,
-  mark: markPrice,
-  mark_source: markSource,
-  price_source: markSource.toLowerCase(),
-  stale_s: staleSeconds,
-  pnl_intraday: dayPnlAmount,
-  pnl_unrealized: totalPnlAmount,
-  previous_close: previousClose,
-  updated_at: markTime,
-});
+}: StockSnapshotInput) => {
+  const dayBasis =
+    previousClose !== null ? Math.abs(quantity) * previousClose : null;
+  const totalBasis = Math.abs(quantity) * averageCost;
+  const dayPercent = computePercent(dayPnlAmount, dayBasis);
+  const unrealPercent = computePercent(totalPnlAmount, totalBasis);
+
+  return {
+    secType: "STK" as const,
+    symbol,
+    qty: quantity,
+    avg_cost: averageCost,
+    multiplier: 1,
+    mark: markPrice,
+    mark_source: markSource,
+    price_source: markSource.toLowerCase(),
+    stale_s: staleSeconds,
+    day_pnl: dayPnlAmount ?? undefined,
+    day_pnl_percent: dayPercent ?? undefined,
+    day_pnl_pct: dayPercent ?? undefined,
+    pnl_intraday: dayPnlAmount ?? null,
+    pnl_unrealized: totalPnlAmount ?? null,
+    pnl_unrealized_percent: unrealPercent ?? undefined,
+    pnl_unrealized_pct: unrealPercent ?? undefined,
+    total_pnl: totalPnlAmount ?? undefined,
+    total_pnl_percent: unrealPercent ?? undefined,
+    previous_close: previousClose ?? undefined,
+    updated_at: markTime,
+  };
+};
 
 const mockStocks = (entries: StockSnapshotInput[]) => {
   const snapshot = {
@@ -123,7 +152,7 @@ describe("StocksTable", () => {
       },
     ]);
 
-    const { client } = renderWithClient(<StocksTable />);
+    renderWithClient(<StocksTable />);
 
     await screen.findByText("AAPL");
     const grid = screen.getByRole("grid", { name: /single stocks positions/i });
@@ -153,7 +182,7 @@ describe("StocksTable", () => {
       },
     ]);
 
-    const { client } = renderWithClient(<StocksTable />);
+    renderWithClient(<StocksTable />);
 
     const grid = await screen.findByRole("grid", { name: /single stocks positions/i });
     expect(grid).toBeInTheDocument();
@@ -176,7 +205,36 @@ describe("StocksTable", () => {
       throw new Error("Day P&L header not found");
     }
     expect(dayPnlHeader).toHaveAttribute("aria-sort", "descending");
+  });
 
+  test("renders placeholder for missing P&L values", async () => {
+    mockStocks([
+      {
+        symbol: "NODATA",
+        quantity: 10,
+        averageCost: 100,
+        markPrice: 102,
+        markSource: "MID",
+        markTime: "2024-01-01T11:00:00Z",
+        dayPnlAmount: null,
+        totalPnlAmount: null,
+        previousClose: null,
+        staleSeconds: 45,
+      },
+    ]);
+
+    renderWithClient(<StocksTable />);
+
+    const rowheader = await screen.findByRole("rowheader", { name: "NODATA" });
+    const row = rowheader.closest("tr");
+    if (!row) {
+      throw new Error("Row not found");
+    }
+    const cells = within(row).getAllByRole("gridcell");
+    const dayCell = cells[3];
+    const totalCell = cells[4];
+    expect(within(dayCell).getAllByText("—")).toHaveLength(2);
+    expect(within(totalCell).getAllByText("—")).toHaveLength(2);
   });
 
   test("formats staleness as mm:ss and applies threshold styling", async () => {
@@ -195,7 +253,7 @@ describe("StocksTable", () => {
       },
     ]);
 
-    const { client } = renderWithClient(<StocksTable />);
+    renderWithClient(<StocksTable />);
 
     const stalenessCell = await screen.findByText("05:15");
     expect(stalenessCell).toBeInTheDocument();
@@ -231,7 +289,7 @@ describe("StocksTable", () => {
       },
     ]);
 
-    const { client } = renderWithClient(<StocksTable />);
+    renderWithClient(<StocksTable />);
     const user = userEvent.setup();
 
     await screen.findByText("NVDA");
@@ -323,7 +381,7 @@ describe("StocksTable", () => {
       },
     ]);
 
-    const { client } = renderWithClient(<StocksTable />);
+    renderWithClient(<StocksTable />);
     const user = userEvent.setup();
 
     const header = await screen.findByRole("columnheader", { name: /day p&l/i });
@@ -365,7 +423,7 @@ describe("StocksTable", () => {
       },
     ]);
 
-    const { client } = renderWithClient(<StocksTable />);
+    renderWithClient(<StocksTable />);
     const user = userEvent.setup();
 
     await screen.findByText("AMD");

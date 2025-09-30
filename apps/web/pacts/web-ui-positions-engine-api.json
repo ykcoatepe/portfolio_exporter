@@ -15,10 +15,72 @@
       "response": {
         "body": {
           "as_of": "2024-10-18T14:05:00.000Z",
+          "combo_groups": [
+            {
+              "combo_group_id": "group-iron-condor",
+              "display": {
+                "combo_label": "SPX 4250/4300P + 4600/4650C • 32d • Credit 2.21",
+                "expiry_short": "Oct 18 '24",
+                "short_ul": "SPX"
+              },
+              "dte": 32,
+              "group_net_price": 2.21,
+              "group_qty": -10,
+              "label": "SPX 4250/4300P + 4600/4650C • 32d • Credit 2.21",
+              "legs": [
+                {
+                  "combo_group_id": "group-iron-condor",
+                  "display": {
+                    "expiry_short": "Oct 18 '24",
+                    "leg_label": "SPX 4600C • Oct 18 '24",
+                    "short_ul": "SPX"
+                  },
+                  "expiry": "2024-10-18",
+                  "label": "SPX 4600C • Oct 18 '24",
+                  "mark": 1.05,
+                  "mark_source": "MID",
+                  "quantity": -10,
+                  "right": "C",
+                  "stale_seconds": 180,
+                  "strike": 4600,
+                  "sum_greeks": {
+                    "delta": 0.12,
+                    "gamma": 0.01,
+                    "theta": -4.2,
+                    "vega": -18.5
+                  },
+                  "symbol": "SPX  20241018C00460000",
+                  "underlying": "SPX"
+                }
+              ],
+              "mark_source": "MID",
+              "progress": {
+                "pct_of_goal": 0.62
+              },
+              "progress_pct": 0.62,
+              "progress_pct_of_goal": 0.62,
+              "stale_seconds": 180,
+              "strategy": "IRON_CONDOR",
+              "sum_greeks": {
+                "delta": -0.04,
+                "gamma": 0.01,
+                "theta": -5.4,
+                "vega": -20.3
+              },
+              "underlying": "SPX"
+            }
+          ],
           "combos": [
             {
+              "combo_group_id": "group-iron-condor",
+              "combo_qty": -10,
               "day_pnl_amount": 700,
               "day_pnl_percent": 11.2,
+              "display": {
+                "combo_label": "SPX 4250/4300P + 4600/4650C • 32d • Credit 2.21",
+                "expiry_short": "Oct 18 '24",
+                "short_ul": "SPX"
+              },
               "dte": 32,
               "expiry": "2024-10-18",
               "greeks": {
@@ -28,22 +90,31 @@
                 "vega": -20.3
               },
               "id": "combo-iron-condor",
+              "label": "SPX 4250/4300P + 4600/4650C • 32d • Credit 2.21",
               "legs": [
                 {
+                  "combo_group_id": "group-iron-condor",
                   "combo_id": "combo-iron-condor",
                   "day_pnl_amount": 480,
                   "day_pnl_percent": 12.4,
                   "delta": 0.12,
+                  "display": {
+                    "expiry_short": "Oct 18 '24",
+                    "leg_label": "SPX 4600C • Oct 18 '24",
+                    "short_ul": "SPX"
+                  },
                   "expiry": "2024-10-18",
                   "gamma": 0.01,
                   "id": "leg-condor-short-call",
                   "iv": 0.19,
+                  "label": "SPX 4600C • Oct 18 '24",
                   "mark_price": 1.05,
                   "mark_source": "MID",
                   "mark_time": "2024-10-18T14:02:00.000Z",
                   "quantity": -10,
                   "right": "C",
                   "strike": 4600,
+                  "symbol": "SPX  20241018C00460000",
                   "theta": -4.2,
                   "total_pnl_amount": 1240,
                   "total_pnl_percent": 18.1,
@@ -55,6 +126,13 @@
               "mark_source": "MID",
               "mark_time": "2024-10-18T14:02:00.000Z",
               "net_premium": 2.21,
+              "net_price": 2.21,
+              "progress": {
+                "pct_of_goal": 0.62
+              },
+              "progress_pct": 0.62,
+              "progress_pct_of_goal": 0.62,
+              "progress_pct_of_max": 0.62,
               "side": "credit",
               "strategy": "Iron Condor",
               "total_pnl_amount": 1850,
@@ -64,20 +142,28 @@
           ],
           "legs": [
             {
+              "combo_group_id": null,
               "combo_id": null,
               "day_pnl_amount": 75,
               "day_pnl_percent": 1.6,
               "delta": -0.18,
+              "display": {
+                "expiry_short": "Dec 20 '24",
+                "leg_label": "MSFT 360C • Dec 20 '24",
+                "short_ul": "MSFT"
+              },
               "expiry": "2024-12-20",
               "gamma": 0.01,
               "id": "leg-orphan",
               "iv": 0.27,
+              "label": "MSFT 360C • Dec 20 '24",
               "mark_price": 6.1,
               "mark_source": "MID",
               "mark_time": "2024-12-20T14:12:00.000Z",
               "quantity": -2,
               "right": "C",
               "strike": 360,
+              "symbol": "MSFT20241220C00360000",
               "theta": 1.2,
               "total_pnl_amount": 210,
               "total_pnl_percent": 5.1,
@@ -108,12 +194,386 @@
                 }
               ]
             },
+            "$.combo_groups": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.combo_groups[*].combo_group_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].display": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].display.combo_label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].display.expiry_short": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].display.short_ul": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].dte": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].group_net_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].group_qty": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].combo_group_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].display": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].display.expiry_short": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].display.leg_label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].display.short_ul": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].expiry": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "\\d{4}-\\d{2}-\\d{2}"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].mark": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].mark_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "MID|LAST|PREV"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].quantity": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].right": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "C|P"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].stale_seconds": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].strike": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].sum_greeks": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].sum_greeks.delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].sum_greeks.gamma": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].sum_greeks.theta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].sum_greeks.vega": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].symbol": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].legs[*].underlying": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].mark_source": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "MID|LAST|PREV"
+                }
+              ]
+            },
+            "$.combo_groups[*].progress": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].progress.pct_of_goal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].progress_pct": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].progress_pct_of_goal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].stale_seconds": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].strategy": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].sum_greeks": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combo_groups[*].sum_greeks.delta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].sum_greeks.gamma": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].sum_greeks.theta": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].sum_greeks.vega": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combo_groups[*].underlying": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
             "$.combos": {
               "combine": "AND",
               "matchers": [
                 {
                   "match": "type",
                   "min": 1
+                }
+              ]
+            },
+            "$.combos[*].combo_group_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].combo_qty": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
                 }
               ]
             },
@@ -130,6 +590,38 @@
               "matchers": [
                 {
                   "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].display": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].display.combo_label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].display.expiry_short": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].display.short_ul": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },
@@ -198,12 +690,28 @@
                 }
               ]
             },
+            "$.combos[*].label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
             "$.combos[*].legs": {
               "combine": "AND",
               "matchers": [
                 {
                   "match": "type",
                   "min": 1
+                }
+              ]
+            },
+            "$.combos[*].legs[*].combo_group_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },
@@ -239,6 +747,38 @@
                 }
               ]
             },
+            "$.combos[*].legs[*].display": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].display.expiry_short": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].display.leg_label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].display.short_ul": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
             "$.combos[*].legs[*].expiry": {
               "combine": "AND",
               "matchers": [
@@ -269,6 +809,14 @@
               "matchers": [
                 {
                   "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },
@@ -320,6 +868,14 @@
               "matchers": [
                 {
                   "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].legs[*].symbol": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },
@@ -397,6 +953,54 @@
                 }
               ]
             },
+            "$.combos[*].net_price": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].progress": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.combos[*].progress.pct_of_goal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].progress_pct": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].progress_pct_of_goal": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
+            "$.combos[*].progress_pct_of_max": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "decimal"
+                }
+              ]
+            },
             "$.combos[*].side": {
               "combine": "AND",
               "matchers": [
@@ -447,6 +1051,14 @@
                 }
               ]
             },
+            "$.legs[*].combo_group_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "null"
+                }
+              ]
+            },
             "$.legs[*].combo_id": {
               "combine": "AND",
               "matchers": [
@@ -476,6 +1088,38 @@
               "matchers": [
                 {
                   "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].display": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.legs[*].display.expiry_short": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.legs[*].display.leg_label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.legs[*].display.short_ul": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },
@@ -509,6 +1153,14 @@
               "matchers": [
                 {
                   "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].label": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },
@@ -560,6 +1212,14 @@
               "matchers": [
                 {
                   "match": "decimal"
+                }
+              ]
+            },
+            "$.legs[*].symbol": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
                 }
               ]
             },

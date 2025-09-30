@@ -65,9 +65,14 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Simulate PSD scheduler pacing")
     ap.add_argument("--loops", type=int, default=5, help="Number of iterations")
     ap.add_argument("--interval", type=float, default=1.0, help="Seconds per iteration")
-    ap.add_argument("--positions", type=int, default=100, help="Synthetic positions count")
     ap.add_argument(
-        "--change-ratio", type=float, default=0.2, help="Fraction of symbols that change each loop"
+        "--positions", type=int, default=100, help="Synthetic positions count"
+    )
+    ap.add_argument(
+        "--change-ratio",
+        type=float,
+        default=0.2,
+        help="Fraction of symbols that change each loop",
     )
     args = ap.parse_args()
 
@@ -113,7 +118,9 @@ def main() -> None:
         _ = dto.get("alerts", [])
 
         # Collect current marks from synthetic positions
-        current_marks: dict[str, float] = {p["symbol"]: float(p["mark"]) for p in positions}
+        current_marks: dict[str, float] = {
+            p["symbol"]: float(p["mark"]) for p in positions
+        }
         changed_syms = [s for s, m in current_marks.items() if last_marks.get(s) != m]
 
         if changed_syms:
@@ -133,8 +140,20 @@ def main() -> None:
             )
 
         # Explicit historical duplicate to demonstrate 15s dedupe
-        _ = io_request("historical", key="dup-test", func=lambda: None, hist_limiter=hist, web_bucket=web)
-        r2 = io_request("historical", key="dup-test", func=lambda: None, hist_limiter=hist, web_bucket=web)
+        _ = io_request(
+            "historical",
+            key="dup-test",
+            func=lambda: None,
+            hist_limiter=hist,
+            web_bucket=web,
+        )
+        r2 = io_request(
+            "historical",
+            key="dup-test",
+            func=lambda: None,
+            hist_limiter=hist,
+            web_bucket=web,
+        )
         if r2 is None:
             counters["dup_hist_skips"] += 1
 

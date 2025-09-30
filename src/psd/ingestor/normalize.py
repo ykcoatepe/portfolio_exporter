@@ -83,7 +83,9 @@ def _aggregate_greeks(legs: Iterable[dict[str, Any]]) -> dict[str, float]:
     return totals
 
 
-def split_positions(raw_positions: list[dict[str, Any]], session: str | Session) -> dict[str, Any]:
+def split_positions(
+    raw_positions: list[dict[str, Any]], session: str | Session
+) -> dict[str, Any]:
     normalized_session = _normalize_session(session)
     norm_rows: list[dict[str, Any]] = []
     conid_index: dict[Any, list[dict[str, Any]]] = defaultdict(list)
@@ -140,7 +142,9 @@ def split_positions(raw_positions: list[dict[str, Any]], session: str | Session)
             legs_of_combo.add(id(match))
         if not legs:
             continue
-        combo_id = str(hash(tuple(sorted((leg.get("conId"), leg.get("qty")) for leg in legs))))
+        combo_id = str(
+            hash(tuple(sorted((leg.get("conId"), leg.get("qty")) for leg in legs)))
+        )
         combos.append(
             {
                 "combo_id": combo_id,
@@ -188,7 +192,9 @@ def split_positions(raw_positions: list[dict[str, Any]], session: str | Session)
                     "name": combo_name,
                     "underlier": key[0],
                     "legs": combo_legs,
-                    "pnl_intraday": sum(leg.get("pnl_intraday", 0.0) for leg in combo_legs),
+                    "pnl_intraday": sum(
+                        leg.get("pnl_intraday", 0.0) for leg in combo_legs
+                    ),
                     "greeks_agg": _aggregate_greeks(combo_legs),
                 }
             )
@@ -199,9 +205,7 @@ def split_positions(raw_positions: list[dict[str, Any]], session: str | Session)
         if entry.get("secType") in {"OPT", "FOP"} and id(entry) not in legs_of_combo
     ]
 
-    single_stocks = [
-        entry for entry in norm_rows if entry.get("secType") == "STK"
-    ]
+    single_stocks = [entry for entry in norm_rows if entry.get("secType") == "STK"]
 
     combos.sort(key=lambda combo: combo.get("pnl_intraday", 0.0), reverse=True)
     single_options.sort(key=lambda leg: leg.get("pnl_intraday", 0.0), reverse=True)

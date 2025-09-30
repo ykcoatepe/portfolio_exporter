@@ -38,4 +38,3 @@ def test_logbook_add_and_list(tmp_path: Path, monkeypatch, capsys) -> None:
     rc2 = log_main(["list"])  # noqa: F841
     out = capsys.readouterr().out
     assert "sample" in out
-

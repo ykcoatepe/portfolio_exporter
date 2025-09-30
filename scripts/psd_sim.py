@@ -11,7 +11,11 @@ from typing import Any
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, root) if root not in sys.path else None
 from src.psd.datasources import ibkr as ib_src  # noqa: E402
-from src.psd.sentinel.sched import HistoricalLimiter, TokenBucket, run_loop  # noqa: E402
+from src.psd.sentinel.sched import (  # noqa: E402
+    HistoricalLimiter,
+    TokenBucket,
+    run_loop,
+)
 
 
 class Sim429(Exception):
@@ -20,7 +24,9 @@ class Sim429(Exception):
         self.status_code = 429
 
 
-def run_sim(loops: int = 80, interval: float = 0.25, positions_n: int = 100) -> dict[str, Any]:
+def run_sim(
+    loops: int = 80, interval: float = 0.25, positions_n: int = 100
+) -> dict[str, Any]:
     positions = [
         {
             "uid": f"SYM{i:03d}-eq",
@@ -43,7 +49,13 @@ def run_sim(loops: int = 80, interval: float = 0.25, positions_n: int = 100) -> 
     hist = HistoricalLimiter()  # 60/10min limiter
     web = TokenBucket(capacity=10.0, refill_rate_per_sec=10.0)
 
-    counters = {"hist_calls": 0, "web_calls": 0, "deduped": 0, "burst_suppressed": 0, "backoffs": 0}
+    counters = {
+        "hist_calls": 0,
+        "web_calls": 0,
+        "deduped": 0,
+        "burst_suppressed": 0,
+        "backoffs": 0,
+    }
     call_index = {"historical": 0, "web": 0}
 
     def _io(

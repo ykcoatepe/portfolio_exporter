@@ -1,0 +1,6 @@
+- Ingest: `internal.InternalScriptsProvider._normalize_snapshot` hydrates stocks and options. `_derive_single_stock_rows` seeds equities with `avg_cost`/`mark_source` and forces `stale_s = 0`.
+- Ingest (options): `_option_leg_record` normalizes OSI legs. Missing `avg_cost` becomes `0.0`; quote payloads are only emitted when bid/ask/mark exist, and no timestamp accompanies `previous_close`.
+- Positions state: `PositionsState.refresh` hands normalized rows to `service.normalize` and `service.state`. `_canonical_mark_source` aliases `LAST_CLOSE → PREV`; `_resolve_option_stale_seconds_entry` expects `previous_close_ts` or falls back to 86400 seconds.
+- Mark selection: `core.marks.select_equity_mark` drops `mark` and P&L when `quote=None` or `avg_cost` is falsy; option combos inherit these `None` fields.
+- API fan-out: `/api/psd/state` serializes `PositionsState.options_payload` and `combos_payload`, exposing `total_pnl=None` and `stale_seconds=86400` for affected legs.
+- UI hooks: `apps/web/src/hooks/usePortfolioMetrics.ts` and `useOptions.ts` read the API payload. Empty marks collapse the OptionLegs table and filter slices, while `stale_seconds` drives the 24h badge.

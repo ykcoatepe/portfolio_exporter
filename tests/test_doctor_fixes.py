@@ -34,7 +34,9 @@ def test_missing_pandera(monkeypatch, tmp_path):
         return csv if name == "portfolio_greeks_positions" else None
 
     monkeypatch.setattr(core_io, "latest_file", fake_latest)
-    monkeypatch.setattr(pa_schemas, "check_headers", lambda n, df: ["pandera not installed"])
+    monkeypatch.setattr(
+        pa_schemas, "check_headers", lambda n, df: ["pandera not installed"]
+    )
 
     summary = doctor.cli(argparse.Namespace())
     fixes = summary["sections"]["fixes"]

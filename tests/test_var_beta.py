@@ -7,7 +7,15 @@ from src.psd.models import OptionLeg, Position
 
 def test_delta_beta_exposure_mixed():
     positions = [
-        Position(uid="EQ1", symbol="SPY", sleeve="core", kind="equity", qty=100, mark=400.0, beta=1.0),
+        Position(
+            uid="EQ1",
+            symbol="SPY",
+            sleeve="core",
+            kind="equity",
+            qty=100,
+            mark=400.0,
+            beta=1.0,
+        ),
         Position(
             uid="OPT1",
             symbol="SPY",
@@ -15,7 +23,17 @@ def test_delta_beta_exposure_mixed():
             kind="option",
             qty=1,
             mark=2.0,
-            legs=[OptionLeg(symbol="SPY", expiry="20250117", right="C", strike=420.0, qty=1, price=2.0, delta=0.25)],
+            legs=[
+                OptionLeg(
+                    symbol="SPY",
+                    expiry="20250117",
+                    right="C",
+                    strike=420.0,
+                    qty=1,
+                    price=2.0,
+                    delta=0.25,
+                )
+            ],
         ),
     ]
     nav = 100_000.0
@@ -31,4 +49,3 @@ def test_var95_historical_and_parametric():
     assert v > 0
     v2 = var95_1d_from_closes([100, 101], nav_exposed)
     assert v2 > 0
-

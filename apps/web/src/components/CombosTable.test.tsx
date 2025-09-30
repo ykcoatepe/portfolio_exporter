@@ -115,8 +115,12 @@ describe("CombosTable", () => {
     group.tp_hit = true;
     group.tp_done = false;
     group.sl_hit = false;
-    group.progress_pct_of_goal = 0.45;
+    group.progress_pct = 0.45;
+    delete group.progress_pct_of_goal;
+    delete group.progress;
+    group.group_mark = 1.91;
     group.group_mark_price = 1.91;
+    group.group_pnl_unrealized = 275.5;
     group.mark_source = "MID";
     group.stale_seconds = 90;
 
@@ -126,7 +130,10 @@ describe("CombosTable", () => {
       combo.tp_hit = true;
       combo.tp_done = false;
       combo.sl_hit = false;
-      combo.progress_pct_of_goal = 0.45;
+      combo.progress_pct = 0.45;
+      delete combo.progress_pct_of_goal;
+      delete combo.progress_pct_of_max;
+      delete combo.progress;
       combo.mark_price = 1.91;
       combo.mark_source = "MID";
     }
@@ -154,7 +161,50 @@ describe("CombosTable", () => {
     expect(within(cells[7]).getByText("45%")).toBeInTheDocument();
     expect(within(cells[8]).getByText("$1.91")).toBeInTheDocument();
     expect(within(cells[8]).getByText("MID")).toBeInTheDocument();
-    expect(cells[9]).toHaveTextContent("01:30");
+    expect(within(cells[9]).getByText("$275.50")).toBeInTheDocument();
+    expect(cells[10]).toHaveTextContent("01:30");
+  });
+
+  test("shows em dash when progressPct is null", async () => {
+    const payload = mockOptions();
+    const group = payload.combo_groups?.[0];
+    if (!group) {
+      throw new Error("expected combo group in payload");
+    }
+    group.progress_pct = null;
+    delete group.progress_pct_of_goal;
+    delete group.progress;
+
+    const combo = payload.combos?.find((item) => item.combo_group_id === group.combo_group_id);
+    if (combo) {
+      combo.progress_pct = null;
+      delete combo.progress_pct_of_goal;
+      delete combo.progress_pct_of_max;
+      delete combo.progress;
+    }
+
+    server.use(
+      http.get("*/positions/options", () => HttpResponse.json(payload)),
+    );
+
+    renderWithClient(<CombosTable />);
+
+    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
+
+    const rowHeader = await screen.findByRole("rowheader", {
+      name: /SPX 4250\/4300P \+ 4600\/4650C/i,
+    });
+    const row = rowHeader.closest("tr");
+    if (!row) {
+      throw new Error("expected row element");
+    }
+    const cells = within(row).getAllByRole("gridcell");
+    const progressCell = cells.find((cell) => within(cell).queryByText("—"));
+    if (!progressCell) {
+      throw new Error("expected progress cell to contain em dash");
+    }
+    expect(within(progressCell).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(within(progressCell).getByText("—")).toBeInTheDocument();
   });
 
   test("expanded detail row spans all columns", async () => {
@@ -256,6 +306,119 @@ describe("CombosTable", () => {
       await user.keyboard("{Home}");
     });
     await waitFor(() => expect(document.activeElement).toHaveAttribute("data-row-index", "0"));
+  });
+
+  test("filter chips narrow combos by playbook predicates", async () => {
+    const user = userEvent.setup();
+    renderWithClient(<CombosTable />);
+
+    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
+
+    const getRowHeaders = () =>
+      screen
+        .getAllByRole("row", { name: /combo row/i })
+        .map((row) => within(row).getByRole("rowheader").textContent ?? "");
+
+    const getGridCells = () =>
+      screen.getAllByRole("row", { name: /combo row/i }).map((row) => ({
+        row,
+        cells: within(row).getAllByRole("gridcell"),
+      }));
+
+    const clickChip = async (label: string) => {
+      const chip = screen.getByRole("button", { name: label });
+      await user.click(chip);
+    };
+
+    const clickReset = async () => {
+      const reset = screen.getByRole("button", { name: /reset/i });
+      await user.click(reset);
+    };
+
+    const initialHeaders = getRowHeaders();
+    expect(initialHeaders.length).toBeGreaterThanOrEqual(6);
+
+    await clickChip("TP Hit");
+    await waitFor(() => expect(getRowHeaders()).toHaveLength(1));
+    expect(getRowHeaders()[0]).toMatch(/SPX .*Credit 2\.21/);
+    await clickReset();
+
+    await clickChip("TP Done");
+    await waitFor(() => expect(getRowHeaders()).toHaveLength(1));
+    expect(getRowHeaders()[0]).toMatch(/MSFT .*Debit 1\.85/);
+    await clickReset();
+
+    await clickChip("Stop");
+    await waitFor(() => expect(getRowHeaders()).toHaveLength(1));
+    expect(getRowHeaders()[0]).toMatch(/ES .*Credit 1\.15/);
+    await clickReset();
+
+    await clickChip("Near TP");
+    await waitFor(() => expect(getRowHeaders()).toHaveLength(2));
+    const nearHeaders = getRowHeaders();
+    expect(nearHeaders.some((text) => /IWM .*Credit 0\.76/.test(text))).toBe(true);
+    expect(nearHeaders.some((text) => /RUT .*Debit 2\.40/.test(text))).toBe(true);
+    await clickReset();
+
+    await clickChip("Credit");
+    await waitFor(() => expect(getRowHeaders()).toHaveLength(3));
+    const creditCells = getGridCells();
+    creditCells.forEach(({ cells }) => {
+      expect(cells[3].textContent ?? "").toMatch(/Credit/i);
+    });
+    await clickReset();
+
+    await clickChip("Debit");
+    await waitFor(() => expect(getRowHeaders()).toHaveLength(3));
+    const debitCells = getGridCells();
+    debitCells.forEach(({ cells }) => {
+      expect(cells[3].textContent ?? "").toMatch(/Debit/i);
+    });
+    await clickReset();
+
+    await clickChip("DTE < 14d");
+    await waitFor(() => expect(getRowHeaders()).toHaveLength(2));
+    const shortDteCells = getGridCells();
+    shortDteCells.forEach(({ cells }) => {
+      const value = Number.parseInt((cells[1].textContent ?? "0").replace(/d$/, ""), 10);
+      expect(Number.isNaN(value)).toBe(false);
+      expect(value).toBeLessThan(14);
+    });
+    await clickReset();
+
+    await waitFor(() => expect(getRowHeaders()).toHaveLength(initialHeaders.length));
+  });
+
+  test("shows dashes instead of $0.00 when mark or P&L are missing", async () => {
+    const payload = mockOptions();
+    const group = payload.combo_groups?.[0];
+    if (!group) {
+      throw new Error("expected combo group in payload");
+    }
+    group.group_mark = null;
+    group.group_mark_price = null;
+    group.mark_price = null;
+    group.mark = null;
+    group.group_pnl_unrealized = null;
+    group.mark_source = "MISSING";
+
+    server.use(
+      http.get("*/positions/options", () => HttpResponse.json(payload)),
+    );
+
+    renderWithClient(<CombosTable />);
+
+    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
+
+    const rowElement = screen.getAllByRole("row", { name: /combo row/i })[0];
+    const headerCell = within(rowElement).getByRole("rowheader");
+    const gridCells = within(rowElement).getAllByRole("gridcell");
+    const cells = [headerCell, ...gridCells];
+
+    expect(cells[8]).toHaveTextContent("—");
+    expect((cells[8].textContent ?? "")).not.toContain("$0.00");
+    expect(cells[9]).toHaveTextContent("—");
+    expect((cells[9].textContent ?? "")).not.toContain("$0.00");
   });
 
   test("fallback grouping preserves highest priority mark source", async () => {

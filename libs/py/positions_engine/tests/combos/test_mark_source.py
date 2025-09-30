@@ -131,8 +131,7 @@ def test_mark_source_reduction_is_idempotent() -> None:
     baseline = tuple(entries)
 
     round_trip = {
-        perm: _aggregate_mark_source(list(perm))[0]
-        for perm in permutations(entries)
+        perm: _aggregate_mark_source(list(perm))[0] for perm in permutations(entries)
     }
 
     assert len(set(round_trip.values())) == 1

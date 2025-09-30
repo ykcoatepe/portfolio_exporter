@@ -66,8 +66,9 @@ class HistoricPricesTests(unittest.TestCase):
             hp.fetch_and_prepare_data([])
 
     def test_load_tickers_file_fallback(self):
-        with patch.object(hp, "_tickers_from_ib", return_value=[]), patch.object(
-            hp, "EXTRA_TICKERS", []
+        with (
+            patch.object(hp, "_tickers_from_ib", return_value=[]),
+            patch.object(hp, "EXTRA_TICKERS", []),
         ):
             with patch.object(hp, "PORTFOLIO_FILES", ["dummy.txt"]):
                 # create temporary file
@@ -82,10 +83,10 @@ class HistoricPricesTests(unittest.TestCase):
         self.assertEqual(sorted(tickers), ["AAA", "^VIX"])
 
     def test_load_tickers_ib(self):
-        with patch.object(
-            hp, "_tickers_from_ib", return_value=["BBB", "VIX"]
-        ), patch.object(hp, "EXTRA_TICKERS", ["SPY"]), patch.object(
-            hp, "PORTFOLIO_FILES", []
+        with (
+            patch.object(hp, "_tickers_from_ib", return_value=["BBB", "VIX"]),
+            patch.object(hp, "EXTRA_TICKERS", ["SPY"]),
+            patch.object(hp, "PORTFOLIO_FILES", []),
         ):
             tickers = hp.load_tickers()
         self.assertEqual(sorted(tickers), ["BBB", "SPY", "^VIX"])

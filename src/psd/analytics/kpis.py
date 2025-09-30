@@ -27,7 +27,9 @@ def per_sleeve_kpis(memos: Iterable[dict]) -> dict[str, dict[str, float]]:
     cnt: dict[str, dict[str, int]] = {}
     for m in memos:
         s = str(m.get("sleeve", "")).strip() or "unknown"
-        a = agg.setdefault(s, {"R_sum": 0.0, "theta_roc_sum": 0.0, "cost_sum": 0.0, "nav_sum": 0.0})
+        a = agg.setdefault(
+            s, {"R_sum": 0.0, "theta_roc_sum": 0.0, "cost_sum": 0.0, "nav_sum": 0.0}
+        )
         c = cnt.setdefault(s, {"N": 0, "wins": 0})
         R = _safe_float(m.get("R"))
         a["R_sum"] += R
@@ -42,6 +44,13 @@ def per_sleeve_kpis(memos: Iterable[dict]) -> dict[str, dict[str, float]]:
         win_rate = cnt[s]["wins"] / N
         avg_R = agg[s]["R_sum"] / N
         theta_ROC = agg[s]["theta_roc_sum"] / N
-        costs_pct = (agg[s]["cost_sum"] / agg[s]["nav_sum"]) if agg[s]["nav_sum"] > 0 else 0.0
-        out[s] = {"win_rate": win_rate, "avg_R": avg_R, "theta_ROC": theta_ROC, "costs_pct": costs_pct}
+        costs_pct = (
+            (agg[s]["cost_sum"] / agg[s]["nav_sum"]) if agg[s]["nav_sum"] > 0 else 0.0
+        )
+        out[s] = {
+            "win_rate": win_rate,
+            "avg_R": avg_R,
+            "theta_ROC": theta_ROC,
+            "costs_pct": costs_pct,
+        }
     return out

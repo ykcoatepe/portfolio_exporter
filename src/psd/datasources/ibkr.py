@@ -161,7 +161,10 @@ def set_market_data_mode(
     except Exception as exc:
         code = _extract_error_code(exc)
         if code is not None and is_entitlement_error(code):
-            logger.warning("IBKR live market data entitlement missing (code %s); switching to delayed.", code)
+            logger.warning(
+                "IBKR live market data entitlement missing (code %s); switching to delayed.",
+                code,
+            )
         else:
             logger.debug("reqMarketDataType(live) raised %s; using delayed data.", exc)
         effective = "delayed"
@@ -179,7 +182,10 @@ def set_market_data_mode(
                 break
             sleeper(0.05)
         else:
-            logger.warning("No live ticks within %.2fs – falling back to delayed market data.", timeout_val)
+            logger.warning(
+                "No live ticks within %.2fs – falling back to delayed market data.",
+                timeout_val,
+            )
             effective = "delayed"
 
     if effective == "delayed":
@@ -229,7 +235,11 @@ def get_positions(
     """Return PSD position dicts sourced from ``portfolio_greeks`` snapshots."""
     ibkr_cfg, fill_cfg = _resolve_cfg(cfg or {})
     market_mode = (
-        str(mode or (cfg or {}).get("market_data_mode") or ibkr_cfg.get("market_data_mode", "auto"))
+        str(
+            mode
+            or (cfg or {}).get("market_data_mode")
+            or ibkr_cfg.get("market_data_mode", "auto")
+        )
         .strip()
         .lower()
     )
@@ -245,9 +255,13 @@ def get_positions(
     tick_probe = has_ticks if callable(has_ticks) else None
 
     try:
-        set_market_data_mode(market_mode, client=client, timeout=timeout_sec, has_ticks=tick_probe)
+        set_market_data_mode(
+            market_mode, client=client, timeout=timeout_sec, has_ticks=tick_probe
+        )
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("Failed to negotiate IBKR market data mode (%s): %s", market_mode, exc)
+        logger.warning(
+            "Failed to negotiate IBKR market data mode (%s): %s", market_mode, exc
+        )
 
     try:
         from portfolio_exporter.scripts import portfolio_greeks as pg  # type: ignore
@@ -269,7 +283,16 @@ def get_positions(
     except Exception:
         return []
 
-    required = ["symbol", "underlying", "secType", "qty", "price", "right", "strike", "expiry"]
+    required = [
+        "symbol",
+        "underlying",
+        "secType",
+        "qty",
+        "price",
+        "right",
+        "strike",
+        "expiry",
+    ]
     for col in required:
         if col not in df.columns:
             df[col] = None
@@ -388,7 +411,9 @@ def get_positions(
         if sym in _GREEKS_WARNED:
             continue
         logger.warning(
-            "Greeks unavailable for %s within %.1fs; leaving legs with null values.", sym, greeks_timeout
+            "Greeks unavailable for %s within %.1fs; leaving legs with null values.",
+            sym,
+            greeks_timeout,
         )
         _GREEKS_WARNED.add(sym)
 

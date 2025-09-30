@@ -162,7 +162,9 @@ def run(
 
         portfolio_greeks = _pg
 
-    pos_df = core_ui.run_with_spinner("Fetching positions…", portfolio_greeks.load_positions_sync)
+    pos_df = core_ui.run_with_spinner(
+        "Fetching positions…", portfolio_greeks.load_positions_sync
+    )
     if pos_df.empty:
         if return_df:
             return pd.DataFrame()
@@ -208,7 +210,9 @@ def run(
         rights = list(pos_df.loc[legs, "right"])
         qtys = list(pos_df.loc[legs, "qty"])
         mult = pos_df.loc[legs, "multiplier"].iloc[0] if "multiplier" in pos_df else 100
-        chain = run_with_spinner(f"Pricing {cmb.underlying}", fetch_chain, cmb.underlying, new_exp, strikes)
+        chain = run_with_spinner(
+            f"Pricing {cmb.underlying}", fetch_chain, cmb.underlying, new_exp, strikes
+        )
         new_legs = []
         new_delta = 0.0
         new_theta = 0.0
@@ -220,18 +224,26 @@ def run(
             if "strike" not in chain.columns:
                 chain = chain.reset_index(drop=False, names=["strike"])  # pandas ≥2
             if "right" not in chain.columns:
-                chain["right"] = chain.index.get_level_values("right") if chain.index.nlevels > 1 else pd.NA
+                chain["right"] = (
+                    chain.index.get_level_values("right")
+                    if chain.index.nlevels > 1
+                    else pd.NA
+                )
 
             # IB/YF chains often list strikes in 5‑pt increments; roll to the
             # *nearest* available strike within $0.25 of the original.
-            sel = chain[(chain["right"] == right) & (abs(chain["strike"] - strike) < 0.25)]
+            sel = chain[
+                (chain["right"] == right) & (abs(chain["strike"] - strike) < 0.25)
+            ]
             if sel.empty:
                 if console:
                     console.print(
                         f"[yellow]⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
                     )
                 else:
-                    print(f"⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping.")
+                    print(
+                        f"⚠  No quote for {cmb.underlying} {strike}{right} {new_exp}. Skipping."
+                    )
                 continue
             ch = sel.iloc[0]
             new_legs.append(
@@ -367,25 +379,36 @@ def cli(args: argparse.Namespace | None = None) -> dict:
     parser.add_argument("--include-cal", action="store_true", help="Include calendars")
     parser.add_argument("--days", type=int, default=default_days, help="Expiry window")
     parser.add_argument(
-        "--tenor", choices=["weekly", "monthly", "all"], default="all", help="Filter candidates"
+        "--tenor",
+        choices=["weekly", "monthly", "all"],
+        default="all",
+        help="Filter candidates",
     )
-    parser.add_argument("--limit-per-underlying", type=int, help="Cap candidates per symbol")
+    parser.add_argument(
+        "--limit-per-underlying", type=int, help="Cap candidates per symbol"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Preview only; no files")
     parser.add_argument("--debug-timings", action="store_true")
     parser.add_argument("--no-pretty", action="store_true", help="Disable rich tables")
     parser.add_argument("--json", action="store_true", help="Print JSON summary")
     parser.add_argument("--output-dir", help="Override output directory")
-    parser.add_argument("--no-files", action="store_true", help="Disable all file writes")
+    parser.add_argument(
+        "--no-files", action="store_true", help="Disable all file writes"
+    )
     if args is None:
         args = parser.parse_args()
 
     outdir = cli_helpers.resolve_output_dir(getattr(args, "output_dir", None))
     defaults = {
         "preview": bool(
-            getattr(args, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR")
+            getattr(args, "output_dir", None)
+            or os.getenv("OUTPUT_DIR")
+            or os.getenv("PE_OUTPUT_DIR")
         ),
         "ticket": bool(
-            getattr(args, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR")
+            getattr(args, "output_dir", None)
+            or os.getenv("OUTPUT_DIR")
+            or os.getenv("PE_OUTPUT_DIR")
         ),
     }
     formats = cli_helpers.decide_file_writes(
@@ -440,7 +463,9 @@ def cli(args: argparse.Namespace | None = None) -> dict:
         written: list[pathlib.Path] = []
         if not args.dry_run and any(formats.values()):
             with rl.time("write_outputs"):
-                pos_df = run_with_spinner("Fetching positions…", portfolio_greeks.load_positions_sync)
+                pos_df = run_with_spinner(
+                    "Fetching positions…", portfolio_greeks.load_positions_sync
+                )
                 paths = _write_files(df, pos_df, outdir)
                 for k, p in paths.items():
                     outputs[k] = str(p)

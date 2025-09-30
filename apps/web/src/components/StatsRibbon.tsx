@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import clsx from "clsx";
 
 import { usePortfolioMetrics } from "../hooks/usePortfolioMetrics";
+import { useSession } from "../hooks/useSession";
 import { useStats } from "../hooks/useStats";
 import { formatDuration, formatMoney, formatPercent } from "../lib/format";
 import { formatSigned, stalenessTone, valueTone } from "./tableUtils";
@@ -36,6 +37,14 @@ function normalizeEpochMs(value: number | null | undefined): number | null {
   return numeric < 1e12 ? Math.trunc(numeric * 1000) : Math.trunc(numeric);
 }
 
+function parseIsoToMs(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function formatRelativeFromNow(timestamp: number, now: number): string {
   const diffMs = timestamp - now;
   const diffSeconds = Math.round(diffMs / 1000);
@@ -56,23 +65,39 @@ function formatRelativeFromNow(timestamp: number, now: number): string {
 export default function StatsRibbon(): JSX.Element {
   const { data: stats } = useStats();
   const metrics = usePortfolioMetrics();
+  const sessionSeed = stats?.session ?? stats?.sessionInfo ?? null;
+  const sessionResult = useSession(sessionSeed);
+  const session = sessionSeed ?? sessionResult.data ?? null;
 
   const now = Date.now();
 
   const updatedTimestamp = useMemo(() => {
+    const preferred = parseIsoToMs(stats?.latestTs);
+    if (preferred !== null) {
+      return preferred;
+    }
+
     const candidates: number[] = [];
+    const sessionTimestamp = parseIsoToMs(stats?.session?.asOf ?? stats?.sessionInfo?.asOf);
+    if (sessionTimestamp !== null) {
+      candidates.push(sessionTimestamp);
+    }
     const normalizedMetricsTimestamp = normalizeEpochMs(metrics.updatedAt);
     if (normalizedMetricsTimestamp !== null) {
       candidates.push(normalizedMetricsTimestamp);
     }
-    if (stats?.updatedAt) {
-      const parsed = Date.parse(stats.updatedAt);
-      if (!Number.isNaN(parsed)) {
-        candidates.push(parsed);
-      }
+    const statsUpdatedTimestamp = parseIsoToMs(stats?.updatedAt);
+    if (statsUpdatedTimestamp !== null) {
+      candidates.push(statsUpdatedTimestamp);
     }
     return selectLatestTimestamp(candidates);
-  }, [metrics.updatedAt, stats?.updatedAt]);
+  }, [
+    metrics.updatedAt,
+    stats?.latestTs,
+    stats?.session?.asOf,
+    stats?.sessionInfo?.asOf,
+    stats?.updatedAt,
+  ]);
 
   const updatedLabel = updatedTimestamp
     ? formatRelativeFromNow(updatedTimestamp, now)
@@ -86,7 +111,17 @@ export default function StatsRibbon(): JSX.Element {
   const stalenessLabel = stalenessSeconds !== null ? formatDuration(stalenessSeconds) : null;
   const stalenessClassName = stalenessTone(stalenessSeconds);
 
-  const sessionLabel = metrics.session ? metrics.session.toUpperCase() : "—";
+  const sessionLabel = session?.state ?? "—";
+  const sessionUpdatedTimestamp = session?.asOf ? Date.parse(session.asOf) : NaN;
+  const hasSessionTimestamp = Number.isFinite(sessionUpdatedTimestamp);
+  const sessionUpdatedLabel = hasSessionTimestamp
+    ? formatRelativeFromNow(sessionUpdatedTimestamp, now)
+    : "—";
+  const sessionUpdatedTitle = hasSessionTimestamp
+    ? new Date(sessionUpdatedTimestamp).toLocaleString()
+    : undefined;
+
+  const dataSourceLabel = stats?.dataSource ?? "—";
 
   const cards = [
     {
@@ -151,9 +186,23 @@ export default function StatsRibbon(): JSX.Element {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
           Portfolio Stats
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-slate-700/70 bg-slate-900/70 px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-slate-300">
-            session: {sessionLabel}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col items-end text-right">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+              SESSION: {sessionLabel}
+            </span>
+            <span
+              className="text-[11px] uppercase tracking-wide text-slate-500"
+              title={sessionUpdatedTitle}
+            >
+              updated {sessionUpdatedLabel}
+            </span>
+          </div>
+          <span
+            data-testid="data-source-chip"
+            className="rounded-full border border-slate-800/70 bg-slate-900/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300"
+          >
+            DATA • {dataSourceLabel}
           </span>
           {isStale && stalenessLabel ? (
             <span

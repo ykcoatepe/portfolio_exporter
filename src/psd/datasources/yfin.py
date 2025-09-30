@@ -32,7 +32,9 @@ def get_vix(cfg: dict[str, Any] | None = None) -> float | None:
         return None
 
 
-def get_closes(symbol: str, days: int = 60, cfg: dict[str, Any] | None = None) -> list[float]:
+def get_closes(
+    symbol: str, days: int = 60, cfg: dict[str, Any] | None = None
+) -> list[float]:
     """Return recent close prices for VaR calculation.
 
     Uses yfinance via provider or returns [] when unavailable. Tests can
@@ -42,7 +44,13 @@ def get_closes(symbol: str, days: int = 60, cfg: dict[str, Any] | None = None) -
         import yfinance as yf  # type: ignore
 
         period = f"{max(days, 30)}d"
-        df = yf.download(tickers=symbol, period=period, interval="1d", progress=False, auto_adjust=False)
+        df = yf.download(
+            tickers=symbol,
+            period=period,
+            interval="1d",
+            progress=False,
+            auto_adjust=False,
+        )
         if df is None or len(df) == 0:
             return []
         closes = df.get("Close") or df.get("close")

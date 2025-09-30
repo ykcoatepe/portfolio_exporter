@@ -15,11 +15,19 @@ def test_cli_rollup_snapshot():
             "margin_used": 0.42,
         },
         "rows": [
-            {"uid": "SPY-20260117-iron_condor", "sleeve": "theta", "kind": "iron_condor", "R": 320.0, "stop": "-", "target": "-", "mark": 1.6, "alert": "tp"}
+            {
+                "uid": "SPY-20260117-iron_condor",
+                "sleeve": "theta",
+                "kind": "iron_condor",
+                "R": 320.0,
+                "stop": "-",
+                "target": "-",
+                "mark": 1.6,
+                "alert": "tp",
+            }
         ],
     }
     out = render_dashboard(dto)
     assert "Regime: 15-25" in out
     assert "BREACH:" in out
     assert "SPY-20260117-iron_condor" in out
-

@@ -21,8 +21,28 @@ CODE_PATTERNS: tuple[tuple[str, str], ...] = (
     ('os.environ.get("IB_PORT","7497")', "os.environ default"),
 )
 
-SKIP_DIRS = {".git", "node_modules", ".venv", "dist", "build", "__pycache__", "iv_history", ".ruff_cache"}
-SKIP_SUFFIXES = {".pyc", ".pyo", ".so", ".dll", ".log", ".db", ".sqlite", ".png", ".jpg", ".jpeg"}
+SKIP_DIRS = {
+    ".git",
+    "node_modules",
+    ".venv",
+    "dist",
+    "build",
+    "__pycache__",
+    "iv_history",
+    ".ruff_cache",
+}
+SKIP_SUFFIXES = {
+    ".pyc",
+    ".pyo",
+    ".so",
+    ".dll",
+    ".log",
+    ".db",
+    ".sqlite",
+    ".png",
+    ".jpg",
+    ".jpeg",
+}
 
 
 def _should_skip(path: pathlib.Path) -> bool:
@@ -68,7 +88,9 @@ def main() -> int:
                 bad.append(f"{file_path}:{idx + 1}:socket-default: {line.strip()}")
 
     if bad:
-        print("Found unintended 7497 defaults (should be 7496 for live):", file=sys.stderr)
+        print(
+            "Found unintended 7497 defaults (should be 7496 for live):", file=sys.stderr
+        )
         for item in bad:
             print(f"  {item}", file=sys.stderr)
         return 1

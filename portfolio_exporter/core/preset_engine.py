@@ -114,7 +114,9 @@ def _nearest_yf_expiry(symbol: str, expiry: str) -> tuple[str, list[str]]:
     return exps[-1], exps
 
 
-def _yf_chain(symbol: str, expiry: str) -> tuple[pd.DataFrame, pd.DataFrame, float, str]:
+def _yf_chain(
+    symbol: str, expiry: str
+) -> tuple[pd.DataFrame, pd.DataFrame, float, str]:
     tkr = yf.Ticker(symbol)
     spot = tkr.history(period="1d")["Close"].iloc[-1]
     resolved, _ = _nearest_yf_expiry(symbol, expiry)
@@ -142,7 +144,9 @@ def _add_delta(df: pd.DataFrame, spot: float, dte: int, right: str) -> pd.DataFr
             return np.nan
         t = max(dte, 1) / 365
         try:
-            d1 = (math.log(spot / float(row["strike"])) + (0.01 + 0.5 * iv * iv) * t) / (iv * math.sqrt(t))
+            d1 = (
+                math.log(spot / float(row["strike"])) + (0.01 + 0.5 * iv * iv) * t
+            ) / (iv * math.sqrt(t))
         except Exception:
             return np.nan
         if right == "C":
@@ -224,7 +228,12 @@ def suggest_credit_vertical(
     if df_calls is None or df_puts is None or spot_override is None:
         calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
     else:
-        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+        calls, puts, spot, expiry_resolved = (
+            df_calls.copy(),
+            df_puts.copy(),
+            float(spot_override),
+            expiry,
+        )
     # Use the resolved expiry for downstream pricing/labels
     expiry = expiry_resolved
     if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
@@ -266,7 +275,11 @@ def suggest_credit_vertical(
         if k_long == k_short:
             try:
                 idx = all_strikes.index(k_short)
-                idx_long = max(0, idx - 1) if right == "P" else min(len(all_strikes) - 1, idx + 1)
+                idx_long = (
+                    max(0, idx - 1)
+                    if right == "P"
+                    else min(len(all_strikes) - 1, idx + 1)
+                )
                 k_long = float(all_strikes[idx_long])
             except Exception:
                 continue
@@ -284,7 +297,14 @@ def suggest_credit_vertical(
         if width <= 0:
             continue
         max_loss = max(0.0, width - credit)
-        pop = max(0.0, 1.0 - float(abs(short_row["delta"])) if not math.isnan(short_row["delta"]) else 0.0)
+        pop = max(
+            0.0,
+            (
+                1.0 - float(abs(short_row["delta"]))
+                if not math.isnan(short_row["delta"])
+                else 0.0
+            ),
+        )
         breakeven = (k_short - credit) if right == "P" else (k_short + credit)
 
         cand = {
@@ -292,8 +312,20 @@ def suggest_credit_vertical(
             "underlying": symbol,
             "expiry": expiry,
             "legs": [
-                {"secType": "OPT", "right": right, "strike": k_short, "qty": -1, "expiry": expiry},
-                {"secType": "OPT", "right": right, "strike": k_long, "qty": 1, "expiry": expiry},
+                {
+                    "secType": "OPT",
+                    "right": right,
+                    "strike": k_short,
+                    "qty": -1,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": right,
+                    "strike": k_long,
+                    "qty": 1,
+                    "expiry": expiry,
+                },
             ],
             "credit": credit,
             "width": width,
@@ -307,7 +339,9 @@ def suggest_credit_vertical(
             },
             "em": {
                 "value": em,
-                "distance_to_short": (spot - k_short) if right == "P" else (k_short - spot),
+                "distance_to_short": (
+                    (spot - k_short) if right == "P" else (k_short - spot)
+                ),
             },
             "rationale": f"target Δ≈{p.target_delta:.2f}, width≈{p.width:g}",
         }
@@ -358,7 +392,12 @@ def suggest_debit_vertical(
     if df_calls is None or df_puts is None or spot_override is None:
         calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
     else:
-        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+        calls, puts, spot, expiry_resolved = (
+            df_calls.copy(),
+            df_puts.copy(),
+            float(spot_override),
+            expiry,
+        )
     expiry = expiry_resolved
     if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
         return []
@@ -417,8 +456,20 @@ def suggest_debit_vertical(
                 "underlying": symbol,
                 "expiry": expiry,
                 "legs": [
-                    {"secType": "OPT", "right": right, "strike": k_long, "qty": 1, "expiry": expiry},
-                    {"secType": "OPT", "right": right, "strike": k_short, "qty": -1, "expiry": expiry},
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": k_long,
+                        "qty": 1,
+                        "expiry": expiry,
+                    },
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": k_short,
+                        "qty": -1,
+                        "expiry": expiry,
+                    },
                 ],
                 "debit": debit,
                 "width": width,
@@ -426,7 +477,11 @@ def suggest_debit_vertical(
                 "breakeven": (k_long + debit) if right == "C" else (k_long - debit),
                 "rationale": f"long Δ≈{p.target_delta:.2f}, width≈{w:g}, debit≈{frac:.2f} of width",
             }
-            best = min([best, (score, cand)], key=lambda t: (t is None, t[0])) if best else (score, cand)
+            best = (
+                min([best, (score, cand)], key=lambda t: (t is None, t[0]))
+                if best
+                else (score, cand)
+            )
         if best:
             results.append(best[1])
     return results[:3]
@@ -458,7 +513,12 @@ def suggest_iron_condor(
     if df_calls is None or df_puts is None or spot_override is None:
         calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
     else:
-        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+        calls, puts, spot, expiry_resolved = (
+            df_calls.copy(),
+            df_puts.copy(),
+            float(spot_override),
+            expiry,
+        )
     expiry = expiry_resolved
     if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
         return []
@@ -474,8 +534,12 @@ def suggest_iron_condor(
         dfc["delta_abs"], dfp["delta_abs"] = dfc["delta"].abs(), dfp["delta"].abs()
         if dfc.empty or dfp.empty:
             continue
-        short_call = dfc.iloc[(dfc["delta_abs"] - p.target_delta).abs().argsort()].iloc[0]
-        short_put = dfp.iloc[(dfp["delta_abs"] - p.target_delta).abs().argsort()].iloc[0]
+        short_call = dfc.iloc[(dfc["delta_abs"] - p.target_delta).abs().argsort()].iloc[
+            0
+        ]
+        short_put = dfp.iloc[(dfp["delta_abs"] - p.target_delta).abs().argsort()].iloc[
+            0
+        ]
         kc_s = float(short_call["strike"])
         kp_s = float(short_put["strike"])
         wings = p.width
@@ -493,10 +557,34 @@ def suggest_iron_condor(
             "underlying": symbol,
             "expiry": expiry,
             "legs": [
-                {"secType": "OPT", "right": "P", "strike": kp_s, "qty": -1, "expiry": expiry},
-                {"secType": "OPT", "right": "P", "strike": kp_l, "qty": 1, "expiry": expiry},
-                {"secType": "OPT", "right": "C", "strike": kc_s, "qty": -1, "expiry": expiry},
-                {"secType": "OPT", "right": "C", "strike": kc_l, "qty": 1, "expiry": expiry},
+                {
+                    "secType": "OPT",
+                    "right": "P",
+                    "strike": kp_s,
+                    "qty": -1,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "P",
+                    "strike": kp_l,
+                    "qty": 1,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "C",
+                    "strike": kc_s,
+                    "qty": -1,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "C",
+                    "strike": kc_l,
+                    "qty": 1,
+                    "expiry": expiry,
+                },
             ],
             "credit": credit,
             "width": width,
@@ -551,7 +639,12 @@ def suggest_butterfly(
     if df_calls is None or df_puts is None or spot_override is None:
         calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
     else:
-        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+        calls, puts, spot, expiry_resolved = (
+            df_calls.copy(),
+            df_puts.copy(),
+            float(spot_override),
+            expiry,
+        )
     expiry = expiry_resolved
     if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
         return []
@@ -586,9 +679,27 @@ def suggest_butterfly(
                 "underlying": symbol,
                 "expiry": expiry,
                 "legs": [
-                    {"secType": "OPT", "right": right, "strike": low, "qty": 1, "expiry": expiry},
-                    {"secType": "OPT", "right": right, "strike": center, "qty": -2, "expiry": expiry},
-                    {"secType": "OPT", "right": right, "strike": high, "qty": 1, "expiry": expiry},
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": low,
+                        "qty": 1,
+                        "expiry": expiry,
+                    },
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": center,
+                        "qty": -2,
+                        "expiry": expiry,
+                    },
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": high,
+                        "qty": 1,
+                        "expiry": expiry,
+                    },
                 ],
                 "debit": debit,
                 "width": float(high - low) / 2.0,
@@ -672,7 +783,11 @@ def suggest_calendar(
     df_far = calls_far if right == "C" else puts_far
     if df_near.empty or df_far.empty:
         return []
-    strikes = sorted(set(df_near["strike"].astype(float)).intersection(set(df_far["strike"].astype(float))))
+    strikes = sorted(
+        set(df_near["strike"].astype(float)).intersection(
+            set(df_far["strike"].astype(float))
+        )
+    )
     if not strikes:
         return []
     center = _nearest_strike(strikes, float(spot))
@@ -704,15 +819,31 @@ def suggest_calendar(
             "underlying": symbol,
             "expiry": far_resolved,
             "legs": [
-                {"secType": "OPT", "right": right, "strike": center, "qty": -1, "expiry": near_resolved},
-                {"secType": "OPT", "right": right, "strike": far_strike, "qty": 1, "expiry": far_resolved},
+                {
+                    "secType": "OPT",
+                    "right": right,
+                    "strike": center,
+                    "qty": -1,
+                    "expiry": near_resolved,
+                },
+                {
+                    "secType": "OPT",
+                    "right": right,
+                    "strike": far_strike,
+                    "qty": 1,
+                    "expiry": far_resolved,
+                },
             ],
             "debit": debit,
             "near": near_resolved,
             "far": far_resolved,
             "strike_near": center,
             "strike_far": far_strike,
-            "term_structure": {"near_iv": near_iv, "far_iv": far_iv, "inverted": inverted},
+            "term_structure": {
+                "near_iv": near_iv,
+                "far_iv": far_iv,
+                "inverted": inverted,
+            },
             "rationale": f"ATM calendar near≈{dte_near}D, far≈{dte_far}D",
         }
     ]

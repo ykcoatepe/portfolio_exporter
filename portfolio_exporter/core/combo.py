@@ -76,7 +76,9 @@ def _db() -> sqlite3.Connection:
         conn = sqlite3.connect(DB_PATH)
     except Exception:
         # Last-resort fallback to local tmp if prior path became unwritable
-        fallback = _ensure_writable_dir(pathlib.Path.cwd() / "tmp_test_run") / "combos.db"
+        fallback = (
+            _ensure_writable_dir(pathlib.Path.cwd() / "tmp_test_run") / "combos.db"
+        )
         conn = sqlite3.connect(fallback)
     conn.executescript(_DDL)
     migrate_combo_schema(conn)
@@ -181,7 +183,9 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
     import pandas as pd
 
     if df is None or df.empty:
-        return pd.DataFrame(columns=["underlying", "expiry", "right", "strike", "qty", "secType"])
+        return pd.DataFrame(
+            columns=["underlying", "expiry", "right", "strike", "qty", "secType"]
+        )
 
     out = df.copy()
 
@@ -206,7 +210,9 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
     # --- underlying fallback ---
     # if underlying is blank but symbol present, fill with symbol
     if "symbol" in out.columns:
-        mask_u = out["underlying"].isna() | (out["underlying"].astype(str).str.strip() == "")
+        mask_u = out["underlying"].isna() | (
+            out["underlying"].astype(str).str.strip() == ""
+        )
         out.loc[mask_u, "underlying"] = out.loc[mask_u, "symbol"]
 
     # --- normalize right to C/P ---
@@ -280,7 +286,9 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
         pass
 
     # Keep only columns the detector needs
-    out = out[["underlying", "expiry", "right", "strike", "qty", "secType", "conId"]].copy()
+    out = out[
+        ["underlying", "expiry", "right", "strike", "qty", "secType", "conId"]
+    ].copy()
 
     # Focus detection on option-like instruments only
     out = out[out["secType"].isin(["OPT", "FOP"])].copy()
@@ -293,14 +301,21 @@ def _normalize_positions_df(df: pd.DataFrame) -> pd.DataFrame:
             from portfolio_exporter.core import config as config_core
             from portfolio_exporter.core import io as io_core
 
-            io_core.save(out, "positions_normalized_debug", "csv", config_core.settings.output_dir)
+            io_core.save(
+                out,
+                "positions_normalized_debug",
+                "csv",
+                config_core.settings.output_dir,
+            )
         except Exception:
             pass
 
     return out.reset_index(drop=True)
 
 
-def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> pd.DataFrame:
+def detect_from_positions(
+    df_positions: pd.DataFrame, min_abs_qty: int = 1
+) -> pd.DataFrame:
     """Greedy live detector for true multi‑leg combos.
 
     - Normalizes the positions DataFrame.
@@ -329,7 +344,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
     if not {"abs_qty", "side"}.issubset(norm.columns):
         try:
             norm["abs_qty"] = norm["qty"].abs().astype(int)
-            norm["side"] = norm["qty"].apply(lambda q: "long" if float(q) > 0 else "short")
+            norm["side"] = norm["qty"].apply(
+                lambda q: "long" if float(q) > 0 else "short"
+            )
         except Exception:
             norm["abs_qty"] = 0
             norm["side"] = ""
@@ -348,11 +365,15 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     [
                         {
                             "reason": "no_option_rows_after_normalization",
-                            "total_input_rows": int(len(df_positions) if df_positions is not None else 0),
+                            "total_input_rows": int(
+                                len(df_positions) if df_positions is not None else 0
+                            ),
                         }
                     ]
                 )
-                io_core.save(diag, "combos_diag_debug", "csv", config_core.settings.output_dir)
+                io_core.save(
+                    diag, "combos_diag_debug", "csv", config_core.settings.output_dir
+                )
             except Exception:
                 pass
         return pd.DataFrame(
@@ -387,7 +408,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
         if not eq_src.empty:
             for u, g in eq_src.groupby("underlying"):
                 try:
-                    total_shares = float(pd.to_numeric(g["qty"], errors="coerce").fillna(0).sum())
+                    total_shares = float(
+                        pd.to_numeric(g["qty"], errors="coerce").fillna(0).sum()
+                    )
                 except Exception:
                     total_shares = 0.0
                 # pick a representative conId for the stock row (or synthesize)
@@ -395,7 +418,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                 try:
                     cval = g.get("conId")
                     if cval is not None and not pd.isna(cval).all():
-                        conid = int(pd.to_numeric(cval, errors="coerce").dropna().iloc[0])
+                        conid = int(
+                            pd.to_numeric(cval, errors="coerce").dropna().iloc[0]
+                        )
                 except Exception:
                     conid = None
                 if conid is None:
@@ -430,8 +455,16 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
         for (exp, right), grp in u_df.groupby(["expiry", "right"]):
             idxs = list(grp.sort_values("strike").index)
             # Separate longs/shorts
-            longs = [i for i in idxs if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == "long"]
-            shorts = [i for i in idxs if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == "short"]
+            longs = [
+                i
+                for i in idxs
+                if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == "long"
+            ]
+            shorts = [
+                i
+                for i in idxs
+                if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == "short"
+            ]
             if not longs or not shorts:
                 continue
 
@@ -484,7 +517,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                         si += 1
                     continue
                 k_low, k_high = (kL, kS) if kL < kS else (kS, kL)
-                vertical_records.append((exp, right, k_low, k_high, m, [i_long, i_short]))
+                vertical_records.append(
+                    (exp, right, k_low, k_high, m, [i_long, i_short])
+                )
                 remaining[i_long] -= m
                 remaining[i_short] -= m
                 if remaining[i_long] <= 0:
@@ -493,7 +528,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     si += 1
 
         # ── 2) Butterflies (same expiry, same right, 1:-2:1) ────────────
-        butterfly_records: list[tuple[str, str, float, float, float, int, list[int]]] = []
+        butterfly_records: list[
+            tuple[str, str, float, float, float, int, list[int]]
+        ] = []
         for (exp, right), grp in u_df.groupby(["expiry", "right"]):
             g = grp.sort_values("strike")
             strikes = list(g["strike"].unique())
@@ -504,12 +541,18 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
 
             def _avail(side: str, row_ids: list[int]) -> int:
                 return sum(
-                    remaining[i] for i in row_ids if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == side
+                    remaining[i]
+                    for i in row_ids
+                    if remaining.get(i, 0) > 0 and u_df.loc[i, "side"] == side
                 )
 
             for i in range(1, len(strikes) - 1):
                 k1, k2, k3 = strikes[i - 1], strikes[i], strikes[i + 1]
-                rows1, rows2, rows3 = rows_by_strike[k1], rows_by_strike[k2], rows_by_strike[k3]
+                rows1, rows2, rows3 = (
+                    rows_by_strike[k1],
+                    rows_by_strike[k2],
+                    rows_by_strike[k3],
+                )
                 # Long wings, short body
                 lots1 = _avail("long", rows1)
                 lots2_short = _avail("short", rows2)
@@ -522,7 +565,10 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     for rid in rows1:
                         if need["long@k1"] == 0:
                             break
-                        if u_df.loc[rid, "side"] == "long" and remaining.get(rid, 0) > 0:
+                        if (
+                            u_df.loc[rid, "side"] == "long"
+                            and remaining.get(rid, 0) > 0
+                        ):
                             take = min(remaining[rid], need["long@k1"])
                             remaining[rid] -= take
                             if take > 0:
@@ -531,7 +577,10 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     for rid in rows2:
                         if need["short@k2"] == 0:
                             break
-                        if u_df.loc[rid, "side"] == "short" and remaining.get(rid, 0) > 0:
+                        if (
+                            u_df.loc[rid, "side"] == "short"
+                            and remaining.get(rid, 0) > 0
+                        ):
                             take = min(remaining[rid], need["short@k2"])
                             remaining[rid] -= take
                             if take > 0:
@@ -540,7 +589,10 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     for rid in rows3:
                         if need["long@k3"] == 0:
                             break
-                        if u_df.loc[rid, "side"] == "long" and remaining.get(rid, 0) > 0:
+                        if (
+                            u_df.loc[rid, "side"] == "long"
+                            and remaining.get(rid, 0) > 0
+                        ):
                             take = min(remaining[rid], need["long@k3"])
                             remaining[rid] -= take
                             if take > 0:
@@ -560,7 +612,10 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     for rid in rows1:
                         if need["short@k1"] == 0:
                             break
-                        if u_df.loc[rid, "side"] == "short" and remaining.get(rid, 0) > 0:
+                        if (
+                            u_df.loc[rid, "side"] == "short"
+                            and remaining.get(rid, 0) > 0
+                        ):
                             take = min(remaining[rid], need["short@k1"])
                             remaining[rid] -= take
                             if take > 0:
@@ -569,7 +624,10 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     for rid in rows2:
                         if need["long@k2"] == 0:
                             break
-                        if u_df.loc[rid, "side"] == "long" and remaining.get(rid, 0) > 0:
+                        if (
+                            u_df.loc[rid, "side"] == "long"
+                            and remaining.get(rid, 0) > 0
+                        ):
                             take = min(remaining[rid], need["long@k2"])
                             remaining[rid] -= take
                             if take > 0:
@@ -578,7 +636,10 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     for rid in rows3:
                         if need["short@k3"] == 0:
                             break
-                        if u_df.loc[rid, "side"] == "short" and remaining.get(rid, 0) > 0:
+                        if (
+                            u_df.loc[rid, "side"] == "short"
+                            and remaining.get(rid, 0) > 0
+                        ):
                             take = min(remaining[rid], need["short@k3"])
                             remaining[rid] -= take
                             if take > 0:
@@ -675,7 +736,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             i1, i2 = row_ids[0], row_ids[1]
             strike_first = float(u_df.loc[i1, "strike"])
             strike_second = float(u_df.loc[i2, "strike"])
-            side_first, _side_second = str(u_df.loc[i1, "side"]), str(u_df.loc[i2, "side"])
+            side_first, _side_second = str(u_df.loc[i1, "side"]), str(
+                u_df.loc[i2, "side"]
+            )
             long_k = strike_first if side_first == "long" else strike_second
             short_k = strike_first if side_first == "short" else strike_second
             if right_val == "C":
@@ -690,7 +753,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             grp_all = u_df[(u_df["expiry"] == exp) & (u_df["right"] == right)]
             try:
                 tot_long = int(grp_all.loc[grp_all["side"] == "long", "abs_qty"].sum())
-                tot_short = int(grp_all.loc[grp_all["side"] == "short", "abs_qty"].sum())
+                tot_short = int(
+                    grp_all.loc[grp_all["side"] == "short", "abs_qty"].sum()
+                )
             except Exception:
                 tot_long = tot_short = q
             is_ratio = tot_long != tot_short
@@ -779,7 +844,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     m = min(remaining[a], remaining[b])
                     if m <= 0:
                         continue
-                    exp_use = max(u_df.loc[a, "expiry"], u_df.loc[b, "expiry"])  # later expiry
+                    exp_use = max(
+                        u_df.loc[a, "expiry"], u_df.loc[b, "expiry"]
+                    )  # later expiry
                     remaining[a] -= m
                     remaining[b] -= m
                     used_for_calendar.update([a, b])
@@ -802,7 +869,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
 
         # ── 5) Diagonals (across expiries, same right, different strikes, opposite sides) ──
         for right in ["C", "P"]:
-            grp = u_df[u_df["right"] == right].sort_values(["strike", "expiry"])  # stable order
+            grp = u_df[u_df["right"] == right].sort_values(
+                ["strike", "expiry"]
+            )  # stable order
             if grp.empty:
                 continue
             idxs = [i for i in grp.index if remaining.get(i, 0) > 0]
@@ -825,8 +894,12 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                     m = min(remaining[a], remaining[b])
                     if m <= 0:
                         continue
-                    exp_use = max(u_df.loc[a, "expiry"], u_df.loc[b, "expiry"])  # later expiry
-                    width = abs(float(u_df.loc[a, "strike"]) - float(u_df.loc[b, "strike"]))
+                    exp_use = max(
+                        u_df.loc[a, "expiry"], u_df.loc[b, "expiry"]
+                    )  # later expiry
+                    width = abs(
+                        float(u_df.loc[a, "strike"]) - float(u_df.loc[b, "strike"])
+                    )
                     remaining[a] -= m
                     remaining[b] -= m
                     leg_ids = [row_conid.get(int(a)), row_conid.get(int(b))]
@@ -892,7 +965,11 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                             used_rows.append(rid)
                             m2 -= take
                     if used_rows:
-                        leg_ids = [row_conid.get(int(r)) for r in used_rows if int(r) in row_conid]
+                        leg_ids = [
+                            row_conid.get(int(r))
+                            for r in used_rows
+                            if int(r) in row_conid
+                        ]
                         rows.append(
                             {
                                 "underlying": u_sym,
@@ -914,11 +991,21 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             puts = grp[grp["right"] == "P"].sort_values("strike")
             for side in ["long", "short"]:
                 ci, pi = 0, 0
-                c_idx = [i for i in calls.index if u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0]
-                p_idx = [i for i in puts.index if u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0]
+                c_idx = [
+                    i
+                    for i in calls.index
+                    if u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0
+                ]
+                p_idx = [
+                    i
+                    for i in puts.index
+                    if u_df.loc[i, "side"] == side and remaining.get(i, 0) > 0
+                ]
                 while ci < len(c_idx) and pi < len(p_idx):
                     ic, ip = c_idx[ci], p_idx[pi]
-                    kc, kp = float(u_df.loc[ic, "strike"]), float(u_df.loc[ip, "strike"])
+                    kc, kp = float(u_df.loc[ic, "strike"]), float(
+                        u_df.loc[ip, "strike"]
+                    )
                     if kc == kp:  # straddle handled already
                         # advance the one with less remaining
                         if remaining.get(ic, 0) <= remaining.get(ip, 0):
@@ -963,7 +1050,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
             shorts = [
                 i
                 for i in u_df.index
-                if u_df.loc[i, "right"] == "C" and u_df.loc[i, "side"] == "short" and remaining.get(i, 0) > 0
+                if u_df.loc[i, "right"] == "C"
+                and u_df.loc[i, "side"] == "short"
+                and remaining.get(i, 0) > 0
             ]
             for rid in shorts:
                 lots_cover = int(min(remaining.get(rid, 0), shares_avail // 100))
@@ -1027,7 +1116,10 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                         rows=("qty", "size"),
                         longs=("qty", lambda s: int((s > 0).sum())),
                         shorts=("qty", lambda s: int((s < 0).sum())),
-                        strikes_unique=("strike", lambda s: int(pd.Series(s).nunique())),
+                        strikes_unique=(
+                            "strike",
+                            lambda s: int(pd.Series(s).nunique()),
+                        ),
                     )
                     .reset_index()
                 )
@@ -1045,7 +1137,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
                             }
                         ]
                     )
-                io_core.save(grp, "combos_diag_debug", "csv", config_core.settings.output_dir)
+                io_core.save(
+                    grp, "combos_diag_debug", "csv", config_core.settings.output_dir
+                )
             except Exception:
                 pass
         return pd.DataFrame(
@@ -1084,7 +1178,9 @@ def detect_from_positions(df_positions: pd.DataFrame, min_abs_qty: int = 1) -> p
         out["structure_label"] = out.get("structure", "")
     # Coerce lists for legs and count into legs_n if missing
     if "legs_n" not in out.columns:
-        out["legs_n"] = out.get("legs").apply(lambda v: len(v) if isinstance(v, (list, tuple)) else 0)
+        out["legs_n"] = out.get("legs").apply(
+            lambda v: len(v) if isinstance(v, (list, tuple)) else 0
+        )
     return out
 
 
@@ -1206,7 +1302,9 @@ def _match_butterfly(df: pd.DataFrame, used: set[int]) -> list[dict]:
     for (exp, right), grp in sub.groupby(["expiry", "right"]):
         if len(grp) == 3:
             qtys = list(grp["qty"])
-            if (qtys.count(-2) == 1 and qtys.count(1) == 2) or (qtys.count(2) == 1 and qtys.count(-1) == 2):
+            if (qtys.count(-2) == 1 and qtys.count(1) == 2) or (
+                qtys.count(2) == 1 and qtys.count(-1) == 2
+            ):
                 conids = list(grp.index)
                 used.update(conids)
                 width = _calc_width(df.loc[conids])
@@ -1230,21 +1328,37 @@ def _sync_with_db(combo_df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
     today = _dt.date.today().isoformat()
 
     active = set(combo_df.index)
-    cur = conn.execute("SELECT combo_id, underlying, expiry, structure FROM combos WHERE ts_closed IS NULL")
+    cur = conn.execute(
+        "SELECT combo_id, underlying, expiry, structure FROM combos WHERE ts_closed IS NULL"
+    )
     open_combos = {}
     for cid, underlying, expiry, structure in cur.fetchall():
-        legs = conn.execute("SELECT strike, right FROM legs WHERE combo_id=?", (cid,)).fetchall()
+        legs = conn.execute(
+            "SELECT strike, right FROM legs WHERE combo_id=?", (cid,)
+        ).fetchall()
         open_combos[cid] = {
             "underlying": underlying,
             "expiry": expiry,
             "structure": structure,
-            "legs": sorted(legs),
+            "legs": sorted(
+                legs,
+                key=lambda leg: (leg[0] is None, leg[0], leg[1]),
+            ),
         }
 
     parent_map: dict[str, str] = {}
     for cid, row in combo_df.iterrows():
         key = sorted(
-            [(pos_df.loc[leg_id].strike, pos_df.loc[leg_id].right) for leg_id in row.legs]
+            [
+                (
+                    float(pos_df.loc[leg_id].strike)
+                    if pos_df.loc[leg_id].strike is not None
+                    else None,
+                    pos_df.loc[leg_id].right,
+                )
+                for leg_id in row.legs
+            ],
+            key=lambda leg: (leg[0] is None, leg[0], leg[1]),
         )
         for ocid, data in open_combos.items():
             if (

@@ -21,11 +21,15 @@ from portfolio_exporter.core.io import migrate_combo_schema
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Migrate schema and backfill combo metadata.")
+    parser = argparse.ArgumentParser(
+        description="Migrate schema and backfill combo metadata."
+    )
     parser.add_argument(
         "--db",
         default=None,
-        help=("Path to combos.db. If omitted, uses PE_DB_PATH or settings.output_dir/combos.db"),
+        help=(
+            "Path to combos.db. If omitted, uses PE_DB_PATH or settings.output_dir/combos.db"
+        ),
     )
     parser.add_argument(
         "--from",

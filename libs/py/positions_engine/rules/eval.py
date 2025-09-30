@@ -221,7 +221,9 @@ def evaluate_rules(
             )
 
     duration_ms = (perf_counter() - started) * 1000.0
-    return EvaluationResult(breaches=breaches, rules_evaluated=len(compiled), duration_ms=duration_ms)
+    return EvaluationResult(
+        breaches=breaches, rules_evaluated=len(compiled), duration_ms=duration_ms
+    )
 
 
 def _compile(source: str) -> _CompiledExpression:
@@ -238,13 +240,19 @@ def _compile(source: str) -> _CompiledExpression:
 
 def _validate_expr(node: ast.AST) -> None:
     for child in ast.walk(node):
-        if isinstance(child, (ast.Call, ast.Attribute, ast.Subscript, ast.Await, ast.Lambda)):
-            raise RuleParseError("Function calls, attributes, and subscripts are not allowed")
+        if isinstance(
+            child, (ast.Call, ast.Attribute, ast.Subscript, ast.Await, ast.Lambda)
+        ):
+            raise RuleParseError(
+                "Function calls, attributes, and subscripts are not allowed"
+            )
         if not isinstance(child, _ALLOWED_NODES):
             raise RuleParseError(f"Disallowed expression node: {type(child).__name__}")
         if isinstance(child, ast.BoolOp) and not isinstance(child.op, _ALLOWED_BOOLOPS):
             raise RuleParseError("Only 'and'/'or' boolean operators are supported")
-        if isinstance(child, ast.UnaryOp) and not isinstance(child.op, _ALLOWED_UNARYOPS):
+        if isinstance(child, ast.UnaryOp) and not isinstance(
+            child.op, _ALLOWED_UNARYOPS
+        ):
             raise RuleParseError("Only not/+/- unary operators are supported")
         if isinstance(child, ast.BinOp) and not isinstance(child.op, _ALLOWED_BINOPS):
             raise RuleParseError("Unsupported binary operator")
@@ -338,12 +346,20 @@ def _compare(operator: ast.cmpop, left: Any, right: Any) -> bool:
     if isinstance(operator, ast.NotEq):
         return left != right
     if isinstance(operator, ast.Lt):
+        if left is None or right is None:
+            return False
         return left < right
     if isinstance(operator, ast.LtE):
+        if left is None or right is None:
+            return False
         return left <= right
     if isinstance(operator, ast.Gt):
+        if left is None or right is None:
+            return False
         return left > right
     if isinstance(operator, ast.GtE):
+        if left is None or right is None:
+            return False
         return left >= right
     if isinstance(operator, ast.Is):
         return left is right

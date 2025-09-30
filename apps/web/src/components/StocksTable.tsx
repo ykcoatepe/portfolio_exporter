@@ -206,7 +206,11 @@ export function StocksTable(): JSX.Element {
   const sortedRows = useMemo(() => {
     const rows = [...stocks];
     return rows.sort((a, b) => {
-      const delta = a.dayPnlAmount - b.dayPnlAmount;
+      const fallback =
+        sortDirection === "ascending" ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+      const aValue = a.dayPnlAmount ?? fallback;
+      const bValue = b.dayPnlAmount ?? fallback;
+      const delta = aValue - bValue;
       return sortDirection === "ascending" ? delta : -delta;
     });
   }, [stocks, sortDirection]);

@@ -95,7 +95,9 @@ def test_snapshot_once_uses_engine_fallback(monkeypatch) -> None:
     async def _marks(_positions: list[dict[str, object]]) -> dict[str, object]:
         return {}
 
-    async def _greeks(_positions: list[dict[str, object]], _marks: dict[str, object]) -> dict[str, float]:
+    async def _greeks(
+        _positions: list[dict[str, object]], _marks: dict[str, object]
+    ) -> dict[str, float]:
         return {"delta": 0.0, "gamma": 0.0, "vega": 0.0, "theta": 0.0}
 
     async def _risk(

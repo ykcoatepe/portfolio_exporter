@@ -54,14 +54,18 @@ class TokenBucket:
         if self.last_refill is None:
             self.last_refill = time.monotonic()
 
-    def take(self, amount: float = 1.0, block: bool = True, timeout: float | None = None) -> bool:
+    def take(
+        self, amount: float = 1.0, block: bool = True, timeout: float | None = None
+    ) -> bool:
         start = time.monotonic()
         while True:
             with self.lock:
                 now = time.monotonic()
                 assert self.last_refill is not None and self.tokens is not None
                 elapsed = max(0.0, now - self.last_refill)
-                self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_rate_per_sec)
+                self.tokens = min(
+                    self.capacity, self.tokens + elapsed * self.refill_rate_per_sec
+                )
                 self.last_refill = now
                 if self.tokens >= amount:
                     self.tokens -= amount
@@ -81,7 +85,9 @@ class HistoricalLimiter:
     - Avoid ≥6 small-bar requests for same (contract, exchange, ticktype) in 2s
     """
 
-    def __init__(self, capacity: int = 60, window_sec: int = 600, dedupe_window: int = 15) -> None:
+    def __init__(
+        self, capacity: int = 60, window_sec: int = 600, dedupe_window: int = 15
+    ) -> None:
         rate = capacity / float(window_sec)
         self.bucket = TokenBucket(capacity=float(capacity), refill_rate_per_sec=rate)
         self.dedupe_window = dedupe_window
@@ -101,12 +107,17 @@ class HistoricalLimiter:
             if not self._burst_key_times[k]:
                 del self._burst_key_times[k]
 
-    def allow(self, key: str, small_bar_key: tuple[str, str, str] | None = None) -> bool:
+    def allow(
+        self, key: str, small_bar_key: tuple[str, str, str] | None = None
+    ) -> bool:
         now = time.monotonic()
         with self.lock:
             self._cleanup(now)
             # Dedupe identical
-            if key in self._last_seen and (now - self._last_seen[key]) < self.dedupe_window:
+            if (
+                key in self._last_seen
+                and (now - self._last_seen[key]) < self.dedupe_window
+            ):
                 return False
             # Burst window for small bars
             if small_bar_key is not None:
@@ -219,7 +230,11 @@ def run_loop(
                 return ib_src.get_positions(cfg)
 
             positions = io_request(
-                "web", key="ibkr:get_positions", func=_get_pos, hist_limiter=hist, web_bucket=web
+                "web",
+                key="ibkr:get_positions",
+                func=_get_pos,
+                hist_limiter=hist,
+                web_bucket=web,
             )
             if positions is None:
                 positions = []
@@ -282,7 +297,9 @@ def run_loop(
         # Basic progress output kept minimal to avoid noisy logs
         try:
             n_alerts = len(dto.get("alerts", [])) if isinstance(dto, dict) else 0
-            print(f"[sentinel] {time.strftime('%H:%M:%S')} alerts={n_alerts} changed={len(changed_syms)}")
+            print(
+                f"[sentinel] {time.strftime('%H:%M:%S')} alerts={n_alerts} changed={len(changed_syms)}"
+            )
         except Exception:
             pass
 

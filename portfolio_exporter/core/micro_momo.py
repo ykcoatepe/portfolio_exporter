@@ -89,7 +89,9 @@ def passes_filters(row: ScanRow, cfg: dict[str, object]) -> bool:
     return True
 
 
-def score_components(row: ScanRow, cfg: dict[str, object]) -> tuple[dict[str, float], float]:
+def score_components(
+    row: ScanRow, cfg: dict[str, object]
+) -> tuple[dict[str, float], float]:
     w = cfg.get("weights", {})  # type: ignore[assignment]
 
     # gap: 0→20% mapped to 0→100
@@ -176,7 +178,9 @@ def score_components(row: ScanRow, cfg: dict[str, object]) -> tuple[dict[str, fl
     return comps, raw
 
 
-def tier_and_dir(row: ScanRow, raw_score: float, cfg: dict[str, object]) -> tuple[str, str]:
+def tier_and_dir(
+    row: ScanRow, raw_score: float, cfg: dict[str, object]
+) -> tuple[str, str]:
     # Tiering
     t_cfg = cfg.get("tiers", {})  # type: ignore[assignment]
     a_thr = float(t_cfg.get("A_tier", 75.0))  # type: ignore[union-attr]
@@ -201,7 +205,9 @@ def tier_and_dir(row: ScanRow, raw_score: float, cfg: dict[str, object]) -> tupl
     return tier, direction
 
 
-def size_and_targets(struct: Structure, row: ScanRow, cfg: dict[str, object]) -> tuple[int, float, float]:
+def size_and_targets(
+    struct: Structure, row: ScanRow, cfg: dict[str, object]
+) -> tuple[int, float, float]:
     s_cfg = cfg.get("sizing", {})  # type: ignore[assignment]
     risk_budget = float(s_cfg.get("risk_budget", 250.0))  # type: ignore[union-attr]
     max_contracts = int(s_cfg.get("max_contracts", 5))  # type: ignore[union-attr]
@@ -209,7 +215,9 @@ def size_and_targets(struct: Structure, row: ScanRow, cfg: dict[str, object]) ->
     px = struct.limit_price if (struct.limit_price and struct.limit_price > 0) else 1.0
     # Options are per 100 multiplier
     risk_per_contract = px * 100.0
-    contracts = max(1, min(max_contracts, int(risk_budget // max(1.0, risk_per_contract))))
+    contracts = max(
+        1, min(max_contracts, int(risk_budget // max(1.0, risk_per_contract)))
+    )
     # If risk_per_contract < 1 we could end up with too many; clamp to max
     contracts = min(max_contracts, max(1, contracts))
 
@@ -240,7 +248,5 @@ def entry_trigger(direction: str, row: ScanRow, cfg: dict[str, object]) -> str |
     vwap = _get(row, "vwap", "NA")
     orb_high = _get(row, "orb_high", "NA")
     if direction == "long":
-        return (
-            f"ORB break → pullback to VWAP → reclaim (RVOL ≥ {confirm}); levels: orb={orb_high}, vwap={vwap}"
-        )
+        return f"ORB break → pullback to VWAP → reclaim (RVOL ≥ {confirm}); levels: orb={orb_high}, vwap={vwap}"
     return f"Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ {confirm}); levels: vwap={vwap}"

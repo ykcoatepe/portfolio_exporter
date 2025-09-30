@@ -73,7 +73,9 @@ def run(
     # ── natural‑language expiry parsing ──────────────────────────────
     if not expiry:
         exp_raw = (
-            input(f"Expiry (YYYY-MM-DD, 'Aug 15', '+30d', etc.) [{default_expiry}]: ").strip()
+            input(
+                f"Expiry (YYYY-MM-DD, 'Aug 15', '+30d', etc.) [{default_expiry}]: "
+            ).strip()
             or default_expiry
         )
     else:
@@ -121,7 +123,9 @@ def run(
 
     def _fetch(cur_width: int, cur_expiry: str) -> pd.DataFrame:
         exp = _nearest(cur_expiry) if normalize_exps else cur_expiry
-        use_strikes = strikes if strikes is not None else _calc_strikes(symbol, cur_width)
+        use_strikes = (
+            strikes if strikes is not None else _calc_strikes(symbol, cur_width)
+        )
         df = run_with_spinner(
             f"Fetching {symbol} {exp} …",
             core_chain.fetch_chain,
@@ -134,7 +138,9 @@ def run(
             # Same directory convention as the other scripts
             out_dir = os.getenv("PE_OUTPUT_DIR", settings.output_dir)
             os.makedirs(out_dir, exist_ok=True)
-            csv_path = os.path.join(out_dir, f"chain_{symbol}_{exp.replace('-', '')}.csv")
+            csv_path = os.path.join(
+                out_dir, f"chain_{symbol}_{exp.replace('-', '')}.csv"
+            )
             df.to_csv(csv_path, index=False)
             console.print(f"[green]CSV saved → {csv_path}")
         return df
@@ -145,7 +151,9 @@ def run(
         calls = df[df["right"] == "C"].sort_values("strike").reset_index(drop=True)
         puts = df[df["right"] == "P"].sort_values("strike").reset_index(drop=True)
         grid = Table.grid(expand=True)
-        grid.add_row(render_chain(calls, console, width), render_chain(puts, console, width))
+        grid.add_row(
+            render_chain(calls, console, width), render_chain(puts, console, width)
+        )
         return grid
 
     interactive = sys.stdin.isatty() or bool(os.environ.get("PYTEST_CURRENT_TEST"))
@@ -180,10 +188,14 @@ def run(
                 width += 2
                 df = _fetch(width, expiry)
             elif cmd == ">":
-                expiry = (pd.to_datetime(expiry) + pd.Timedelta(weeks=1)).date().isoformat()
+                expiry = (
+                    (pd.to_datetime(expiry) + pd.Timedelta(weeks=1)).date().isoformat()
+                )
                 df = _fetch(width, expiry)
             elif cmd == "<":
-                expiry = (pd.to_datetime(expiry) - pd.Timedelta(weeks=1)).date().isoformat()
+                expiry = (
+                    (pd.to_datetime(expiry) - pd.Timedelta(weeks=1)).date().isoformat()
+                )
                 df = _fetch(width, expiry)
             elif cmd == " ":
                 if cursor not in marked:
@@ -237,7 +249,9 @@ def _ensure_delta(df: pd.DataFrame) -> pd.DataFrame:
         d["delta"] = pd.NA
     d["delta"] = d["delta"].apply(_norm_delta)
     # Best-effort BS fallback if IV and last/mid are present
-    missing = d["delta"].isna() | (~d["delta"].apply(lambda v: isinstance(v, (int, float))))
+    missing = d["delta"].isna() | (
+        ~d["delta"].apply(lambda v: isinstance(v, (int, float)))
+    )
     if missing.any():
         try:
             from portfolio_exporter.core.greeks import bs_greeks
@@ -338,7 +352,9 @@ def _same_delta_by_expiry(
     return out
 
 
-def _filter_tenor(df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]) -> pd.DataFrame:
+def _filter_tenor(
+    df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]
+) -> pd.DataFrame:
     if df is None or df.empty or tenor == "all":
         return df
     d = df.copy()
@@ -350,9 +366,13 @@ def _filter_tenor(df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]) 
 
 
 def _run_cli_v3() -> int:
-    parser = argparse.ArgumentParser(description="Quick-Chain v3: Same-Delta & Tenor Filters")
+    parser = argparse.ArgumentParser(
+        description="Quick-Chain v3: Same-Delta & Tenor Filters"
+    )
     parser.add_argument("--chain-csv", help="Offline chain CSV (fixture)", default=None)
-    parser.add_argument("--symbols", nargs="*", help="Symbols to fetch (demo)", default=None)
+    parser.add_argument(
+        "--symbols", nargs="*", help="Symbols to fetch (demo)", default=None
+    )
     parser.add_argument("--target-delta", type=float, default=0.30)
     parser.add_argument("--side", choices=["call", "put", "both"], default="both")
     parser.add_argument("--tenor", choices=["weekly", "monthly", "all"], default="all")
@@ -362,7 +382,9 @@ def _run_cli_v3() -> int:
     parser.add_argument("--no-pretty", action="store_true", default=False)
     parser.add_argument("--no-files", action="store_true", default=False)
     parser.add_argument("--output-dir", help="Override output directory", default=None)
-    parser.add_argument("--json", action="store_true", default=False, help="Emit summary JSON and exit")
+    parser.add_argument(
+        "--json", action="store_true", default=False, help="Emit summary JSON and exit"
+    )
     parser.add_argument("--debug-timings", action="store_true")
     args = parser.parse_args()
 
@@ -401,7 +423,11 @@ def _run_cli_v3() -> int:
                         frames.append(df_sym)
                     except Exception:
                         continue
-                df = pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+                df = (
+                    pd.concat(frames, ignore_index=True, sort=False)
+                    if frames
+                    else pd.DataFrame()
+                )
 
             if df is None or df.empty:
                 print("⚠ No chain data available")
@@ -454,7 +480,9 @@ def _run_cli_v3() -> int:
 
             if args.debug_timings:
                 if written:
-                    tpath = io_save(pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir)
+                    tpath = io_save(
+                        pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir
+                    )
                     outputs["timings"] = str(tpath)
                     written.append(tpath)
 
@@ -463,15 +491,23 @@ def _run_cli_v3() -> int:
 
         meta = {
             "underlyings": [
-                str(u) for u in df_out.get("underlying", pd.Series(dtype=str)).dropna().unique().tolist()
+                str(u)
+                for u in df_out.get("underlying", pd.Series(dtype=str))
+                .dropna()
+                .unique()
+                .tolist()
             ],
             "tenor": args.tenor or "",
-            "target_delta": float(args.target_delta) if args.target_delta is not None else None,
+            "target_delta": (
+                float(args.target_delta) if args.target_delta is not None else None
+            ),
             "side": args.side or "",
         }
         if args.debug_timings:
             meta["timings"] = rl.timings
-        summary = json_helpers.report_summary({"chain": int(len(df_out))}, outputs, meta=meta)
+        summary = json_helpers.report_summary(
+            {"chain": int(len(df_out))}, outputs, meta=meta
+        )
         if manifest_path:
             summary["outputs"].append(str(manifest_path))
         if args.json:

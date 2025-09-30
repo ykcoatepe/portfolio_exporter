@@ -166,4 +166,45 @@ describe("OptionLegsTable", () => {
       expect(rowsAfterReset.length).toBeGreaterThan(filteredRows.length);
     });
   });
+
+  test("displays legs with derived marks even when totals are null", async () => {
+    const payload = mockOptions();
+    const targetLeg = payload.legs[0];
+    targetLeg.symbol = "NULLPNL  250118C00150000";
+    targetLeg.label = "Null PnL Mark";
+    targetLeg.display = {
+      ...targetLeg.display,
+      leg_label: "Null PnL Mark",
+      short_ul: "NPNL",
+      expiry_short: "JAN25",
+    };
+    targetLeg.mark_price = null;
+    targetLeg.mark_time = null;
+    targetLeg.mark = 1.23;
+    targetLeg.last = 1.23;
+    targetLeg.last_ts = "2024-01-01T11:59:30Z";
+    targetLeg.previous_close = 1.1;
+    targetLeg.total_pnl_amount = null;
+    targetLeg.total_pnl_percent = null;
+    targetLeg.day_pnl_amount = null;
+    targetLeg.day_pnl_percent = null;
+
+    renderWithClient(<OptionLegsTable />);
+
+    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
+    const body = screen.getByTestId("rows-body");
+    const rows = within(body).getAllByRole("row", { name: /leg row/i });
+    const targetRow = rows.find((row) =>
+      within(row).queryByText(/Null PnL Mark/i),
+    );
+    expect(targetRow).toBeDefined();
+    if (!targetRow) {
+      return;
+    }
+
+    expect(within(targetRow).getByText(/\$1\.23/)).toBeInTheDocument();
+    expect(within(targetRow).getByText("00:30")).toBeInTheDocument();
+    const placeholders = within(targetRow).getAllByText("—");
+    expect(placeholders.length).toBeGreaterThan(0);
+  });
 });

@@ -24,7 +24,9 @@ def _write_bars_csv(path: Path) -> None:
         )
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["ts", "open", "high", "low", "close", "volume"])
+        w = csv.DictWriter(
+            f, fieldnames=["ts", "open", "high", "low", "close", "volume"]
+        )
         w.writeheader()
         for r in rows:
             w.writerow(r)
@@ -32,12 +34,45 @@ def _write_bars_csv(path: Path) -> None:
 
 def _write_chain_csv(path: Path, symbol: str) -> None:
     rows = [
-        {"symbol": symbol, "expiry": "20250115", "right": "C", "strike": 10.0, "bid": 1.0, "ask": 1.2, "last": 1.1, "volume": 100, "oi": 500},
-        {"symbol": symbol, "expiry": "20250115", "right": "C", "strike": 10.5, "bid": 0.7, "ask": 0.9, "last": 0.8, "volume": 50, "oi": 300},
+        {
+            "symbol": symbol,
+            "expiry": "20250115",
+            "right": "C",
+            "strike": 10.0,
+            "bid": 1.0,
+            "ask": 1.2,
+            "last": 1.1,
+            "volume": 100,
+            "oi": 500,
+        },
+        {
+            "symbol": symbol,
+            "expiry": "20250115",
+            "right": "C",
+            "strike": 10.5,
+            "bid": 0.7,
+            "ask": 0.9,
+            "last": 0.8,
+            "volume": 50,
+            "oi": 300,
+        },
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["symbol", "expiry", "right", "strike", "bid", "ask", "last", "volume", "oi"])
+        w = csv.DictWriter(
+            f,
+            fieldnames=[
+                "symbol",
+                "expiry",
+                "right",
+                "strike",
+                "bid",
+                "ask",
+                "last",
+                "volume",
+                "oi",
+            ],
+        )
         w.writeheader()
         for r in rows:
             w.writerow(r)

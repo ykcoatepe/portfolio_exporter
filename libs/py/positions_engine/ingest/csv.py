@@ -56,7 +56,9 @@ def load_csv_records(base_dir: Path | str) -> CsvLoadResult:
     directory = _coerce_path(base_dir)
     positions_path = _latest_file(directory, _POSITIONS_PATTERN)
     quotes_path = _latest_file(directory, _QUOTES_PATTERN)
-    greeks_path = directory / _GREEKS_FILE if (directory / _GREEKS_FILE).exists() else None
+    greeks_path = (
+        directory / _GREEKS_FILE if (directory / _GREEKS_FILE).exists() else None
+    )
 
     positions_df = _read_csv(positions_path)
     quotes_df = _read_csv(quotes_path)
@@ -77,16 +79,26 @@ def load_csv_records(base_dir: Path | str) -> CsvLoadResult:
 
     if metadata["positions_path"]:
         logger.info(
-            "Loaded positions CSV %s rows=%d", metadata["positions_path"], metadata["positions_rows"]
+            "Loaded positions CSV %s rows=%d",
+            metadata["positions_path"],
+            metadata["positions_rows"],
         )
     else:
         logger.debug("No positions CSV found under %s", directory)
     if metadata["quotes_path"]:
-        logger.info("Loaded quotes CSV %s rows=%d", metadata["quotes_path"], metadata["quotes_rows"])
+        logger.info(
+            "Loaded quotes CSV %s rows=%d",
+            metadata["quotes_path"],
+            metadata["quotes_rows"],
+        )
     else:
         logger.debug("No quotes CSV found under %s", directory)
     if metadata["greeks_path"]:
-        logger.info("Loaded greeks CSV %s rows=%d", metadata["greeks_path"], metadata["greeks_rows"])
+        logger.info(
+            "Loaded greeks CSV %s rows=%d",
+            metadata["greeks_path"],
+            metadata["greeks_rows"],
+        )
 
     return CsvLoadResult(positions=positions, quotes=quotes, metadata=metadata)
 
@@ -121,7 +133,9 @@ def _read_csv(path: Path | None) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _normalize_positions(positions_df: pd.DataFrame, greeks_df: pd.DataFrame) -> list[dict[str, Any]]:
+def _normalize_positions(
+    positions_df: pd.DataFrame, greeks_df: pd.DataFrame
+) -> list[dict[str, Any]]:
     if positions_df is None or positions_df.empty:
         return []
 
@@ -151,7 +165,7 @@ def _normalize_positions(positions_df: pd.DataFrame, greeks_df: pd.DataFrame) ->
             quantity = 0
         avg_cost = row.get("avg_cost", row.get("average_cost", row.get("avgcost")))
         if avg_cost in (None, ""):
-            avg_cost = 0
+            avg_cost = None
         entry: dict[str, Any] = {
             "symbol": symbol,
             "instrument_type": _normalize_type(row.get("type")),
@@ -159,7 +173,9 @@ def _normalize_positions(positions_df: pd.DataFrame, greeks_df: pd.DataFrame) ->
             "avg_cost": avg_cost,
             "multiplier": row.get("multiplier", 1),
             "account": row.get("account"),
-            "previous_close": row.get("previous_close", row.get("prior_close", row.get("prev_close"))),
+            "previous_close": row.get(
+                "previous_close", row.get("prior_close", row.get("prev_close"))
+            ),
         }
         if entry["instrument_type"] == "option":
             entry.update(
@@ -197,7 +213,9 @@ def _normalize_quotes(quotes_df: pd.DataFrame) -> list[dict[str, Any]]:
                 "bid": row.get("bid"),
                 "ask": row.get("ask"),
                 "last": row.get("last", row.get("close")),
-                "previous_close": row.get("previous_close", row.get("prior_close", row.get("prev_close"))),
+                "previous_close": row.get(
+                    "previous_close", row.get("prior_close", row.get("prev_close"))
+                ),
                 "session": row.get("session"),
                 "timestamp": row.get("ts"),
             }

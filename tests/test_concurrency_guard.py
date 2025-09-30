@@ -77,4 +77,3 @@ def test_concurrency_guard_marks_overflow(tmp_path: Path, capsys) -> None:
     assert len(data) == 2
     assert data[0].get("concurrency_guard") == 0
     assert data[1].get("concurrency_guard") == 1
-

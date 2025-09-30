@@ -239,7 +239,9 @@ def main(argv: list[str] | None = None) -> int:
                 "./inputs",
                 "tests/data" if pe_test else None,
             ]
-            patterns = tuple((os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(","))
+            patterns = tuple(
+                (os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(",")
+            )
             latest: tuple[float, pathlib.Path] | None = None
             for directory in search_dirs:
                 if not directory:
@@ -371,10 +373,15 @@ def main(argv: list[str] | None = None) -> int:
                 symbols = ""
         if symbols:
             try:
-                from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
+                from portfolio_exporter.core.symbols import (
+                    load_alias_map,
+                    normalize_symbols,
+                )
 
                 alias_map = load_alias_map([_os.getenv("MOMO_ALIASES_PATH") or ""])
-                normalized = normalize_symbols([s for s in symbols.split(",") if s.strip()], alias_map)
+                normalized = normalize_symbols(
+                    [s for s in symbols.split(",") if s.strip()], alias_map
+                )
                 if normalized:
                     argv += ["--symbols", ",".join(normalized)]
             except Exception:

@@ -27,7 +27,9 @@ IB_PORT = 7496  # use 7497 for paper/sim
 CLIENT_ID = 20
 
 # --- Logging ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 log = logging.getLogger(__name__)
 
 # Silence noisy ib_insync logs
@@ -38,7 +40,9 @@ for logger_name in ("ib_insync.client", "ib_insync.wrapper", "ib_insync.ib"):
 class IBManager:
     """A context manager for handling IBKR connections."""
 
-    def __init__(self, host: str = IB_HOST, port: int = IB_PORT, client_id: int = CLIENT_ID):
+    def __init__(
+        self, host: str = IB_HOST, port: int = IB_PORT, client_id: int = CLIENT_ID
+    ):
         self.ib = IB()
         self.host = host
         self.port = port
@@ -85,8 +89,12 @@ def get_positions(ib: IB) -> pd.DataFrame:
                 "position": p.position,
                 "avg_cost": p.avgCost,
                 "mark_price": mark_price,
-                "market_value": p.position * mark_price * float(p.contract.multiplier or 1),
-                "unrealized_pnl": (mark_price - p.avgCost) * p.position * float(p.contract.multiplier or 1),
+                "market_value": p.position
+                * mark_price
+                * float(p.contract.multiplier or 1),
+                "unrealized_pnl": (mark_price - p.avgCost)
+                * p.position
+                * float(p.contract.multiplier or 1),
             }
         )
 
@@ -159,7 +167,9 @@ def _tickers_from_ib(ib: IB) -> list[str]:
     if not positions:
         return []
     # extract underlying symbol for stocks only
-    tickers = {p.contract.symbol.upper() for p in positions if p.contract.secType == "STK"}
+    tickers = {
+        p.contract.symbol.upper() for p in positions if p.contract.secType == "STK"
+    }
     return sorted(tickers)
 
 
@@ -237,14 +247,40 @@ def fetch_ib_quotes(ib: IB, tickers: list[str], opt_cons: list[Option]) -> pd.Da
         combined_rows.append(
             {
                 "ticker": key,
-                "last": (md.last / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.last else md.last),
-                "bid": (md.bid / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid else md.bid),
-                "ask": (md.ask / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask else md.ask),
-                "open": (md.open / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open else md.open),
-                "high": (md.high / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high else md.high),
-                "low": (md.low / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low else md.low),
+                "last": (
+                    md.last / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.last
+                    else md.last
+                ),
+                "bid": (
+                    md.bid / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.bid
+                    else md.bid
+                ),
+                "ask": (
+                    md.ask / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.ask
+                    else md.ask
+                ),
+                "open": (
+                    md.open / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.open
+                    else md.open
+                ),
+                "high": (
+                    md.high / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.high
+                    else md.high
+                ),
+                "low": (
+                    md.low / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.low
+                    else md.low
+                ),
                 "prev_close": (
-                    md.close / 10 if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close else md.close
+                    md.close / 10
+                    if key in {"^IRX", "^FVX", "^TNX", "^TYX"} and md.close
+                    else md.close
                 ),
                 "volume": md.volume,
                 "source": "IB",
@@ -383,12 +419,16 @@ def fetch_live_positions(ib: IB) -> pd.DataFrame:
         combo_legs_data = []
         if con.secType == "BAG" and con.comboLegs:
             for leg in con.comboLegs:
-                leg_contract = ib.qualifyContracts(Contract(conId=leg.conId, exchange=leg.exchange))[0]
+                leg_contract = ib.qualifyContracts(
+                    Contract(conId=leg.conId, exchange=leg.exchange)
+                )[0]
                 combo_legs_data.append(
                     {
                         "symbol": leg_contract.symbol,
                         "sec_type": leg_contract.secType,
-                        "expiry": getattr(leg_contract, "lastTradeDateOrContractMonth", None),
+                        "expiry": getattr(
+                            leg_contract, "lastTradeDateOrContractMonth", None
+                        ),
                         "strike": getattr(leg_contract, "strike", None),
                         "right": getattr(leg_contract, "right", None),
                         "ratio": leg.ratio,
@@ -459,7 +499,9 @@ def _parse_ib_month(dt_str: str) -> datetime:
     return datetime(1900, 1, 1)
 
 
-def _first_valid_expiry(ib: IB, symbol: str, expirations: list[str], spot: float, root_tc: str) -> str:
+def _first_valid_expiry(
+    ib: IB, symbol: str, expirations: list[str], spot: float, root_tc: str
+) -> str:
     """
     Return the first expiry whose chain has a *valid* ATM contract.
     Falls back to earliest expiry if none validate.
@@ -491,7 +533,9 @@ def front_future(ib: IB, root: str, exch: str) -> Future:
     details = ib.reqContractDetails(Future(root, exchange=exch))
     if not details:
         raise ValueError("no contract details")
-    for det in sorted(details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)):
+    for det in sorted(
+        details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)
+    ):
         dt = _parse_ib_month(det.contract.lastTradeDateOrContractMonth)
         if dt > datetime.utcnow():
             return det.contract

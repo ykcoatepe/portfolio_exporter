@@ -56,7 +56,9 @@ def _rebuild_state_from_memos(memo_path: str) -> None:
                 ts = int(obj.get("ts", 0)) if obj.get("ts") is not None else 0
                 typ = obj.get("type")
                 if typ == "snooze":
-                    until = int(obj.get("until", 0)) if obj.get("until") is not None else 0
+                    until = (
+                        int(obj.get("until", 0)) if obj.get("until") is not None else 0
+                    )
                     if until > 0:
                         _snooze_until[key] = until
                 else:
@@ -110,8 +112,12 @@ def _risk_context(
     closes = yf_src.get_closes("SPY", 60, cfg)
     var_abs = var95_1d_from_closes(closes, nav * abs(d_beta)) if closes else 0.0
     margin_used = float(cfg.get("margin_used", 0.0))
-    snapshot = RiskSnapshot(nav=nav, vix=vix, delta_beta=d_beta, var95_1d=var_abs, margin_used=margin_used)
-    band_key, breaches = risk_bands.evaluate(vix, d_beta, var_abs / nav if nav else 0.0, margin_used)
+    snapshot = RiskSnapshot(
+        nav=nav, vix=vix, delta_beta=d_beta, var95_1d=var_abs, margin_used=margin_used
+    )
+    band_key, breaches = risk_bands.evaluate(
+        vix, d_beta, var_abs / nav if nav else 0.0, margin_used
+    )
     daily_ret = float(cfg.get("daily_return", 0.0))
     var_change = float(cfg.get("var_change", 0.0))
     breakers = circuit_breakers.evaluate(daily_ret, var_change)
@@ -151,7 +157,11 @@ def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
             if until <= now:
                 until = (
                     now
-                    + (minutes if minutes > 0 else int(cfg.get("alerts", {}).get("snooze_default_min", 30)))
+                    + (
+                        minutes
+                        if minutes > 0
+                        else int(cfg.get("alerts", {}).get("snooze_default_min", 30))
+                    )
                     * 60
                 )
             _snooze_until[(uid, rule)] = until
@@ -174,7 +184,9 @@ def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
             mark_backfills = ib_src.consume_mark_backfills()  # type: ignore[attr-defined]
         except Exception:
             mark_backfills = []
-    snapshot, band_key, breaches, breakers, breaker_state = _risk_context(positions, cfg, nav)
+    snapshot, band_key, breaches, breakers, breaker_state = _risk_context(
+        positions, cfg, nav
+    )
     vix = float(snapshot.vix)
 
     # Recognize combos (spreads/condors) and orphan risk
@@ -203,14 +215,22 @@ def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         sev, reason = theta_templates.enforce(vix, c.dte, max(c.credit, 0.0), debit_now)
         if any(breaches.values()) or any(breakers.values()):
             sev = "warn" if sev == "info" else sev
-            reason = ",".join(k for k, v in {**breaches, **breakers}.items() if v) or reason
+            reason = (
+                ",".join(k for k, v in {**breaches, **breakers}.items() if v) or reason
+            )
         key = (uid, "combo")
         # Snooze check
         until = _snooze_until.get(key, 0)
         if until and now_ts < until:
             write_jsonl(
                 memo_path,
-                {"ts": now_ts, "type": "snoozed", "uid": uid, "rule": "combo", "next": until},
+                {
+                    "ts": now_ts,
+                    "type": "snoozed",
+                    "uid": uid,
+                    "rule": "combo",
+                    "next": until,
+                },
             )
             # Still render the row with a badge
             rows.append(
@@ -232,7 +252,13 @@ def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
             nxt = last + debounce_sec
             write_jsonl(
                 memo_path,
-                {"ts": now_ts, "type": "suppressed", "uid": uid, "rule": "combo", "next": nxt},
+                {
+                    "ts": now_ts,
+                    "type": "suppressed",
+                    "uid": uid,
+                    "rule": "combo",
+                    "next": nxt,
+                },
             )
             suppressed_now.add(key)
             # Render the row with a muted hint
@@ -284,7 +310,13 @@ def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         if until and now_ts < until:
             write_jsonl(
                 memo_path,
-                {"ts": now_ts, "type": "snoozed", "uid": uid, "rule": "orphan", "next": until},
+                {
+                    "ts": now_ts,
+                    "type": "snoozed",
+                    "uid": uid,
+                    "rule": "orphan",
+                    "next": until,
+                },
             )
             rows.append(
                 {
@@ -303,7 +335,14 @@ def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
             if last and (now_ts - last) < debounce_sec:
                 nxt = last + debounce_sec
                 write_jsonl(
-                    memo_path, {"ts": now_ts, "type": "suppressed", "uid": uid, "rule": "orphan", "next": nxt}
+                    memo_path,
+                    {
+                        "ts": now_ts,
+                        "type": "suppressed",
+                        "uid": uid,
+                        "rule": "orphan",
+                        "next": nxt,
+                    },
                 )
                 rows.append(
                     {
@@ -319,7 +358,12 @@ def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
                 )
             else:
                 alerts.append(
-                    Alert(uid=uid, rule="orphan", severity="warn", message=o.get("reason", "orphan-risk"))
+                    Alert(
+                        uid=uid,
+                        rule="orphan",
+                        severity="warn",
+                        message=o.get("reason", "orphan-risk"),
+                    )
                 )
                 rows.append(
                     {
@@ -408,7 +452,13 @@ def scan_once(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         },
         "budgets": budgets_dto,
         "alerts": [
-            {"uid": a.uid, "rule": a.rule, "severity": a.severity, "message": a.message, "data": a.data}
+            {
+                "uid": a.uid,
+                "rule": a.rule,
+                "severity": a.severity,
+                "message": a.message,
+                "data": a.data,
+            }
             for a in alerts
         ],
         "rows": rows,
@@ -420,7 +470,9 @@ def compute_snapshot(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
     cfg = cfg or {}
     nav = float(cfg.get("nav", 100_000.0))
     positions = _load_positions(cfg)
-    snapshot, band_key, breaches, breakers, breaker_state = _risk_context(positions, cfg, nav)
+    snapshot, band_key, breaches, breakers, breaker_state = _risk_context(
+        positions, cfg, nav
+    )
     return {
         "snapshot": snapshot,
         "band": band_key,

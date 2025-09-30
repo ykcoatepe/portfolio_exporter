@@ -4,7 +4,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from positions_engine.combos.detector import ComboDetection, OptionCombo, OptionLegSnapshot
+from positions_engine.combos.detector import (
+    ComboDetection,
+    OptionCombo,
+    OptionLegSnapshot,
+)
 from positions_engine.combos.eval import PlaybookEvaluation, evaluate_playbook_targets
 from positions_engine.combos.taxonomy import ComboStrategy
 from positions_engine.core.models import Quote, TradingSession
@@ -61,7 +65,14 @@ def _make_leg(
 
 
 def _make_quote(symbol: str, value: str) -> Quote:
-    return Quote(symbol=symbol, last=Decimal(value), session=TradingSession.RTH)
+    now = datetime.now(tz=UTC)
+    return Quote(
+        symbol=symbol,
+        last=Decimal(value),
+        last_ts=now,
+        session=TradingSession.RTH,
+        updated_at=now,
+    )
 
 
 def test_credit_vertical_tp_flags() -> None:
@@ -306,7 +317,9 @@ def test_options_payload_includes_playbook_fields() -> None:
     assert combo_payload["tp_band_low_pct"] == 0.4
     assert combo_payload["tp_band_high_pct"] == 0.6
     assert "progress" in combo_payload
-    assert combo_payload["progress_pct_of_goal"] is None or isinstance(combo_payload["progress_pct_of_goal"], float)
+    assert combo_payload["progress_pct_of_goal"] is None or isinstance(
+        combo_payload["progress_pct_of_goal"], float
+    )
     assert "playbook" in payload
     leg_payload = payload["legs"][0]
     assert leg_payload["tp_band_pct"] == [0.4, 0.6]
@@ -432,7 +445,9 @@ def test_combo_group_merges_playbook_fields(monkeypatch: pytest.MonkeyPatch) -> 
         _fake_evaluation,
     )
 
-    detection = ComboDetection(combos=(combo_one, combo_two), orphans=(), detection_ms=0.0)
+    detection = ComboDetection(
+        combos=(combo_one, combo_two), orphans=(), detection_ms=0.0
+    )
     state = PositionsState()
     now = datetime(2025, 5, 1, tzinfo=UTC)
     state._options_cache = {

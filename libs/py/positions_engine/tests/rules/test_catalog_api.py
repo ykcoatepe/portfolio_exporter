@@ -24,14 +24,18 @@ from apps.api import main as api_main
 
 
 @pytest.fixture
-def catalog_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient, Path]]:
+def catalog_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[tuple[TestClient, Path]]:
     catalog_path = tmp_path / "catalog.yaml"
 
     original_rules_state = api_main._rules_state
     original_catalog_state = api_main._catalog_state
 
     new_rules_state = RulesState(api_main._state)
-    new_catalog_state = RulesCatalogState(api_main._state, new_rules_state, path=catalog_path)
+    new_catalog_state = RulesCatalogState(
+        api_main._state, new_rules_state, path=catalog_path
+    )
 
     monkeypatch.setattr(api_main, "_rules_state", new_rules_state)
     monkeypatch.setattr(api_main, "_catalog_state", new_catalog_state)
@@ -65,11 +69,17 @@ rules:
     preview = client.post("/rules/preview", json={"catalog_text": yaml_text})
     assert preview.status_code == 200
     preview_payload = preview.json()
-    assert preview_payload["diff"]["added"], "expected proposed catalog to add new rules"
-    assert preview_payload["diff"]["removed"], "expected preview diff to include removed defaults"
+    assert preview_payload["diff"][
+        "added"
+    ], "expected proposed catalog to add new rules"
+    assert preview_payload["diff"][
+        "removed"
+    ], "expected preview diff to include removed defaults"
 
 
-def test_validate_catalog_forbidden_ast(catalog_client: tuple[TestClient, Path]) -> None:
+def test_validate_catalog_forbidden_ast(
+    catalog_client: tuple[TestClient, Path],
+) -> None:
     client, _path = catalog_client
     yaml_text = """
 rules:
@@ -87,7 +97,9 @@ rules:
     assert payload["errors"], "expected validation errors for forbidden AST"
 
 
-def test_publish_catalog_updates_summary_and_disk(catalog_client: tuple[TestClient, Path]) -> None:
+def test_publish_catalog_updates_summary_and_disk(
+    catalog_client: tuple[TestClient, Path],
+) -> None:
     client, catalog_path = catalog_client
 
     baseline_summary = client.get("/rules/summary").json()
@@ -130,7 +142,9 @@ rules:
     assert summary["rules_total"] != baseline_total
 
 
-def test_atomic_write_prevents_partial_reads(catalog_client: tuple[TestClient, Path]) -> None:
+def test_atomic_write_prevents_partial_reads(
+    catalog_client: tuple[TestClient, Path],
+) -> None:
     client, catalog_path = catalog_client
 
     first_yaml = """
@@ -142,7 +156,9 @@ rules:
     filter: ""
     expr: "False"
 """
-    client.post("/rules/publish", json={"catalog_text": first_yaml, "author": "initial"})
+    client.post(
+        "/rules/publish", json={"catalog_text": first_yaml, "author": "initial"}
+    )
     initial_text = catalog_path.read_text(encoding="utf-8")
 
     second_yaml = """
@@ -175,7 +191,9 @@ rules:
     thread = threading.Thread(target=reader, daemon=True)
     thread.start()
     try:
-        publish_response = client.post("/rules/publish", json={"catalog_text": second_yaml, "author": "update"})
+        publish_response = client.post(
+            "/rules/publish", json={"catalog_text": second_yaml, "author": "update"}
+        )
         assert publish_response.status_code == 200
     finally:
         stop_event.set()
@@ -187,4 +205,6 @@ rules:
     assert errors == []
     assert initial_text in seen
     assert updated_text in seen
-    assert len(seen - {initial_text, updated_text}) == 0, "Unexpected intermediate catalog content observed"
+    assert (
+        len(seen - {initial_text, updated_text}) == 0
+    ), "Unexpected intermediate catalog content observed"

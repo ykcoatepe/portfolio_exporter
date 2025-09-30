@@ -3,16 +3,29 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from positions_engine.combos import (
     ComboStrategy,
     OptionCombo,
     OptionLegSnapshot,
     group_option_combos,
 )
-from positions_engine.core.models import Instrument, InstrumentType, Position, Quote, TradingSession
+from positions_engine.core.models import (
+    Instrument,
+    InstrumentType,
+    Position,
+    Quote,
+    TradingSession,
+)
 from positions_engine.service.state import PositionsState
 
 NOW = datetime(2025, 2, 15, 15, 30, tzinfo=UTC)
+
+
+def _maybe_decimal(value: str | None) -> Decimal | None:
+    if value is None:
+        return None
+    return Decimal(value)
 
 
 def make_leg(
@@ -26,13 +39,15 @@ def make_leg(
     strike: str,
     quantity: str,
     avg_cost: str,
-    mark: str,
+    mark: str | None,
     mark_source: str,
     stale_seconds: int,
-    delta: str,
-    gamma: str,
-    theta: str,
-    vega: str,
+    delta: str | None,
+    gamma: str | None,
+    theta: str | None,
+    vega: str | None,
+    day_pnl: str | None = "0",
+    total_pnl: str | None = "0",
 ) -> OptionLegSnapshot:
     return OptionLegSnapshot(
         leg_id=leg_id,
@@ -47,17 +62,17 @@ def make_leg(
         ratio=abs(Decimal(quantity)) or Decimal("1"),
         multiplier=Decimal("100"),
         avg_cost=Decimal(avg_cost),
-        mark=Decimal(mark),
+        mark=_maybe_decimal(mark),
         mark_source=mark_source,
         stale_seconds=stale_seconds,
         previous_close=None,
-        delta=Decimal(delta),
-        gamma=Decimal(gamma),
-        theta=Decimal(theta),
-        vega=Decimal(vega),
+        delta=_maybe_decimal(delta),
+        gamma=_maybe_decimal(gamma),
+        theta=_maybe_decimal(theta),
+        vega=_maybe_decimal(vega),
         iv=None,
-        day_pnl=Decimal("0"),
-        total_pnl=Decimal("0"),
+        day_pnl=_maybe_decimal(day_pnl),
+        total_pnl=_maybe_decimal(total_pnl),
         day_basis=None,
         total_basis=None,
         notes=tuple(),
@@ -76,6 +91,8 @@ def make_combo(
     theta: str,
     vega: str,
     legs: tuple[OptionLegSnapshot, ...],
+    day_pnl: str | None = "0",
+    total_pnl: str | None = "0",
 ) -> OptionCombo:
     return OptionCombo(
         combo_id=combo_id,
@@ -88,8 +105,8 @@ def make_combo(
         sum_gamma=Decimal(gamma),
         sum_theta=Decimal(theta),
         sum_vega=Decimal(vega),
-        day_pnl=Decimal("0"),
-        total_pnl=Decimal("0"),
+        day_pnl=_maybe_decimal(day_pnl),
+        total_pnl=_maybe_decimal(total_pnl),
         day_pnl_percent=None,
         total_pnl_percent=None,
         legs=legs,
@@ -342,7 +359,10 @@ def test_group_option_combos_merges_duplicate_condors() -> None:
     assert len(result.groups) == 1
 
     group = result.groups[0]
-    assert group.combo_group_id == "IRON_CONDOR|SPY|C:440/445@2025-10-18|P:395/400@2025-10-18"
+    assert (
+        group.combo_group_id
+        == "IRON_CONDOR|SPY|C:440/445@2025-10-18|P:395/400@2025-10-18"
+    )
     assert group.group_qty == Decimal("-2")
     assert group.mark_source == "MID"
 
@@ -353,7 +373,10 @@ def test_group_option_combos_merges_duplicate_condors() -> None:
     assert payload["mark_source"] == "MID"
     assert payload["stale_seconds"] == 195
 
-    leg_labels = {leg_payload["symbol"]: leg_payload["display"]["leg_label"] for leg_payload in payload["legs"]}
+    leg_labels = {
+        leg_payload["symbol"]: leg_payload["display"]["leg_label"]
+        for leg_payload in payload["legs"]
+    }
     assert leg_labels["SPY 20251018P00395000"] == "SPY 395P • Oct 18 '25"
     assert leg_labels["SPY 20251018C00445000"] == "SPY 445C • Oct 18 '25"
 
@@ -517,15 +540,29 @@ def test_combo_labels_for_various_strategies() -> None:
     )
 
     result = group_option_combos((vertical, calendar, straddle))
-    labels = {group.combo_group_id: group.to_payload()["label"] for group in result.groups}
+    labels = {
+        group.combo_group_id: group.to_payload()["label"] for group in result.groups
+    }
 
-    assert labels["VERTICAL|MSFT|C:315/320@2024-05-17"] == "MSFT 315/320C • 30d • Credit 0.60"
-    assert labels["CALENDAR|AAPL|C:180@2024-05-17|C:180@2024-07-19"] == "AAPL 180C CAL • May→Jul • Debit 2.40"
-    assert labels["STRADDLE|TSLA|C:240@2024-03-08|P:240@2024-03-08"] == "TSLA 240C+P • 7d"
+    assert (
+        labels["VERTICAL|MSFT|C:315/320@2024-05-17"]
+        == "MSFT 315/320C • 30d • Credit 0.60"
+    )
+    assert (
+        labels["CALENDAR|AAPL|C:180@2024-05-17|C:180@2024-07-19"]
+        == "AAPL 180C CAL • May→Jul • Debit 2.40"
+    )
+    assert (
+        labels["STRADDLE|TSLA|C:240@2024-03-08|P:240@2024-03-08"] == "TSLA 240C+P • 7d"
+    )
 
 
 def test_options_payload_exposes_group_data() -> None:
-    instrument = Instrument(symbol="MSFT 20240517C00320000", instrument_type=InstrumentType.OPTION, multiplier=Decimal("100"))
+    instrument = Instrument(
+        symbol="MSFT 20240517C00320000",
+        instrument_type=InstrumentType.OPTION,
+        multiplier=Decimal("100"),
+    )
     position = Position(
         instrument=instrument,
         quantity=Decimal("-1"),
@@ -538,7 +575,11 @@ def test_options_payload_exposes_group_data() -> None:
         },
     )
     hedge = Position(
-        instrument=Instrument(symbol="MSFT 20240517C00315000", instrument_type=InstrumentType.OPTION, multiplier=Decimal("100")),
+        instrument=Instrument(
+            symbol="MSFT 20240517C00315000",
+            instrument_type=InstrumentType.OPTION,
+            multiplier=Decimal("100"),
+        ),
         quantity=Decimal("1"),
         avg_cost=Decimal("1.40"),
         metadata={
@@ -551,8 +592,11 @@ def test_options_payload_exposes_group_data() -> None:
     quote_short = Quote(
         symbol=instrument.symbol,
         bid=Decimal("2.05"),
+        bid_ts=NOW,
         ask=Decimal("2.15"),
+        ask_ts=NOW,
         last=Decimal("2.10"),
+        last_ts=NOW,
         previous_close=Decimal("2.00"),
         session=TradingSession.RTH,
         updated_at=NOW,
@@ -560,8 +604,11 @@ def test_options_payload_exposes_group_data() -> None:
     quote_long = Quote(
         symbol=hedge.instrument.symbol,
         bid=Decimal("1.35"),
+        bid_ts=NOW,
         ask=Decimal("1.45"),
+        ask_ts=NOW,
         last=Decimal("1.40"),
+        last_ts=NOW,
         previous_close=Decimal("1.30"),
         session=TradingSession.RTH,
         updated_at=NOW,
@@ -591,3 +638,269 @@ def test_options_payload_exposes_group_data() -> None:
     assert group["label"].startswith("MSFT 315/320C")
     assert group["legs"][0]["display"]["leg_label"].startswith("MSFT")
     assert len(payload["legs"]) == 0  # no orphan legs
+
+
+def test_group_option_combos_accumulates_greeks_and_pnl_unrealized() -> None:
+    long_call = make_leg(
+        leg_id="leg-long-call",
+        symbol="SPY 20250516C00450000",
+        underlying="SPY",
+        expiry="2025-05-16",
+        dte=90,
+        right="CALL",
+        strike="450",
+        quantity="2",
+        avg_cost="1.10",
+        mark="1.25",
+        mark_source="MID",
+        stale_seconds=45,
+        delta="0.40",
+        gamma="0.02",
+        theta="-0.12",
+        vega="0.50",
+        total_pnl="150",
+    )
+    short_put = make_leg(
+        leg_id="leg-short-put",
+        symbol="SPY 20250516P00430000",
+        underlying="SPY",
+        expiry="2025-05-16",
+        dte=90,
+        right="PUT",
+        strike="430",
+        quantity="-1",
+        avg_cost="0.90",
+        mark="0.70",
+        mark_source="LAST",
+        stale_seconds=30,
+        delta="-0.35",
+        gamma="0.01",
+        theta="0.05",
+        vega="-0.20",
+        total_pnl="-45",
+    )
+    combo = make_combo(
+        combo_id="combo-risk-reversal",
+        strategy=ComboStrategy.STRANGLE,
+        underlying="SPY",
+        dte=90,
+        net_price="-0.55",
+        delta="0",
+        gamma="0",
+        theta="0",
+        vega="0",
+        legs=(long_call, short_put),
+    )
+
+    grouping = group_option_combos((combo,))
+    assert len(grouping.groups) == 1
+    payload = grouping.groups[0].to_payload()
+
+    assert payload["group_mark"] == pytest.approx(1.25)
+    assert payload["group_mark_price"] == payload["group_mark"]
+    assert payload["group_pnl_unrealized"] == pytest.approx(105.0)
+
+    sum_greeks = payload["sum_greeks"]
+    assert sum_greeks["delta"] == pytest.approx(115.0)
+    assert sum_greeks["gamma"] == pytest.approx(3.0)
+    assert sum_greeks["theta"] == pytest.approx(-29.0)
+
+
+def test_group_sum_greeks_and_pnl_skip_missing_values() -> None:
+    leg_missing = make_leg(
+        leg_id="leg-missing",
+        symbol="AAPL 20240517C00170000",
+        underlying="AAPL",
+        expiry="2024-05-17",
+        dte=60,
+        right="CALL",
+        strike="170",
+        quantity="1",
+        avg_cost="1.25",
+        mark="1.30",
+        mark_source="MID",
+        stale_seconds=45,
+        delta=None,
+        gamma=None,
+        theta=None,
+        vega=None,
+        day_pnl=None,
+        total_pnl=None,
+    )
+    combo = make_combo(
+        combo_id="combo-missing",
+        strategy=ComboStrategy.VERTICAL,
+        underlying="AAPL",
+        dte=60,
+        net_price="1.25",
+        delta="0",
+        gamma="0",
+        theta="0",
+        vega="0",
+        legs=(leg_missing,),
+        day_pnl=None,
+        total_pnl=None,
+    )
+
+    grouping = group_option_combos((combo,))
+    payload = grouping.groups[0].to_payload()
+
+    assert payload["group_pnl_unrealized"] is None
+    assert payload["sum_greeks"] == {"delta": None, "gamma": None, "theta": None, "vega": None}
+
+
+def test_group_pnl_unrealized_none_when_legs_missing_pnl() -> None:
+    leg = make_leg(
+        leg_id="leg-missing-pnl",
+        symbol="AAPL 20240517C00180000",
+        underlying="AAPL",
+        expiry="2024-05-17",
+        dte=30,
+        right="CALL",
+        strike="180",
+        quantity="1",
+        avg_cost="1.00",
+        mark="1.05",
+        mark_source="MID",
+        stale_seconds=120,
+        delta="0.45",
+        gamma="0.01",
+        theta="-0.05",
+        vega="1.20",
+        total_pnl=None,
+    )
+    combo = make_combo(
+        combo_id="combo-missing-pnl",
+        strategy=ComboStrategy.VERTICAL,
+        underlying="AAPL",
+        dte=30,
+        net_price="0.00",
+        delta="0",
+        gamma="0",
+        theta="0",
+        vega="0",
+        legs=(leg,),
+    )
+
+    result = group_option_combos([combo])
+    payload = result.groups[0].to_payload()
+
+    assert payload["group_pnl_unrealized"] is None
+
+
+def test_group_pnl_unrealized_sums_present_leg_values() -> None:
+    leg_gain = make_leg(
+        leg_id="leg-gain",
+        symbol="AAPL 20240517C00185000",
+        underlying="AAPL",
+        expiry="2024-05-17",
+        dte=30,
+        right="CALL",
+        strike="185",
+        quantity="1",
+        avg_cost="1.20",
+        mark="1.50",
+        mark_source="MID",
+        stale_seconds=45,
+        delta="0.40",
+        gamma="0.02",
+        theta="-0.04",
+        vega="1.10",
+        total_pnl="45",
+    )
+    leg_loss = make_leg(
+        leg_id="leg-loss",
+        symbol="AAPL 20240517C00190000",
+        underlying="AAPL",
+        expiry="2024-05-17",
+        dte=30,
+        right="CALL",
+        strike="190",
+        quantity="-1",
+        avg_cost="0.80",
+        mark="0.60",
+        mark_source="LAST",
+        stale_seconds=60,
+        delta="-0.30",
+        gamma="-0.01",
+        theta="0.03",
+        vega="-0.80",
+        total_pnl="-20",
+    )
+    combo = make_combo(
+        combo_id="combo-with-pnl",
+        strategy=ComboStrategy.VERTICAL,
+        underlying="AAPL",
+        dte=30,
+        net_price="0.00",
+        delta="0",
+        gamma="0",
+        theta="0",
+        vega="0",
+        legs=(leg_gain, leg_loss),
+    )
+
+    result = group_option_combos([combo])
+    payload = result.groups[0].to_payload()
+
+    assert payload["group_pnl_unrealized"] == pytest.approx(25.0)
+
+
+def test_group_mark_prefers_best_leg_source() -> None:
+    leg_prev = make_leg(
+        leg_id="leg-prev",
+        symbol="AAPL 20240517C00195000",
+        underlying="AAPL",
+        expiry="2024-05-17",
+        dte=30,
+        right="CALL",
+        strike="195",
+        quantity="1",
+        avg_cost="1.10",
+        mark="1.05",
+        mark_source="PREV",
+        stale_seconds=300,
+        delta="0.35",
+        gamma="0.01",
+        theta="-0.03",
+        vega="0.90",
+        total_pnl="5",
+    )
+    leg_mid = make_leg(
+        leg_id="leg-mid",
+        symbol="AAPL 20240517C00195000",
+        underlying="AAPL",
+        expiry="2024-05-17",
+        dte=30,
+        right="CALL",
+        strike="195",
+        quantity="-1",
+        avg_cost="1.05",
+        mark="1.25",
+        mark_source="MID",
+        stale_seconds=30,
+        delta="-0.35",
+        gamma="-0.01",
+        theta="0.03",
+        vega="-0.90",
+        total_pnl="-20",
+    )
+    combo = make_combo(
+        combo_id="combo-mark",
+        strategy=ComboStrategy.VERTICAL,
+        underlying="AAPL",
+        dte=30,
+        net_price="0.00",
+        delta="0",
+        gamma="0",
+        theta="0",
+        vega="0",
+        legs=(leg_prev, leg_mid),
+    )
+
+    result = group_option_combos([combo])
+    payload = result.groups[0].to_payload()
+
+    assert payload["group_mark"] == pytest.approx(1.25)
+    assert payload["mark_source"] == "MID"
+    assert payload["stale_seconds"] == 300

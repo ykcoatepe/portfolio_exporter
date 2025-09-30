@@ -1,13 +1,47 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { PSD_SNAPSHOT_QUERY_KEY, fetchPsdSnapshot } from "./usePsdSnapshot";
-import type { MarkSource, PSDSnapshot, PSDLeg, StockRow } from "../lib/types";
+import type {
+  MarkSource,
+  PSDSnapshot,
+  PSDLeg,
+  StockPositionApi,
+  StocksApiResponse,
+  StockRow,
+} from "../lib/types";
 
 const MARK_SOURCE_FALLBACK: MarkSource = "MISSING";
 
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const toNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toNullablePercent = (value: unknown): number | null => {
+  const parsed = toNullableNumber(value);
+  if (parsed === null) {
+    return null;
+  }
+  return parsed / 100;
+};
+
+const coerceTimestamp = (value: unknown, fallback?: unknown): string | null => {
+  const pick = (candidate: unknown): string | null => {
+    if (typeof candidate !== "string") {
+      return null;
+    }
+    const trimmed = candidate.trim();
+    return trimmed ? trimmed : null;
+  };
+  return pick(value) ?? pick(fallback);
 };
 
 const normalizeMarkSource = (value: unknown): MarkSource => {
@@ -34,25 +68,53 @@ const fallbackMarkTime = (entry: PSDLeg, snapshot: PSDSnapshot | undefined): str
   return null;
 };
 
-const computePercent = (amount: number, basis: number): number => {
-  if (!Number.isFinite(amount) || !Number.isFinite(basis) || basis === 0) {
-    return 0;
+const computePercent = (amount: number | null, basis: number | null): number | null => {
+  if (amount === null || basis === null) {
+    return null;
   }
-  return amount / basis;
+  if (!Number.isFinite(amount) || !Number.isFinite(basis)) {
+    return null;
+  }
+  const denominator = Math.abs(basis);
+  if (denominator === 0) {
+    return null;
+  }
+  const ratio = amount / denominator;
+  return Number.isFinite(ratio) ? ratio : null;
 };
 
 const mapSingleStock = (entry: PSDLeg, snapshot: PSDSnapshot | undefined): StockRow => {
   const quantity = toNumber(entry.qty, 0);
-  const avgCost = toNumber(entry.avg_cost, 0);
-  const markPrice = toNumber(entry.mark, 0);
-  const dayPnlAmount = toNumber(entry.pnl_intraday, 0);
-  const totalPnlAmount = toNumber(entry.pnl_unrealized, 0);
-  const previousClose = toNumber(entry.previous_close, Number.NaN);
+  const avgCostValue = toNullableNumber(entry.avg_cost);
+  const avgCost = avgCostValue ?? 0;
+  const markPriceValue = toNullableNumber(entry.mark);
+  const markPrice = markPriceValue ?? 0;
+  const dayPnlAmount = toNullableNumber(entry.day_pnl ?? entry.pnl_intraday);
+  const totalPnlAmount = toNullableNumber(
+    entry.pnl_unrealized ?? entry.total_pnl ?? entry.pnl_intraday,
+  );
+  const previousClose = toNullableNumber(entry.previous_close);
 
-  const dayBasis = Number.isFinite(previousClose)
-    ? Math.abs(quantity) * previousClose
-    : Number.NaN;
-  const totalBasis = Math.abs(quantity) * avgCost;
+  const dayBasis =
+    previousClose !== null ? Math.abs(quantity) * previousClose : null;
+  const totalBasis =
+    avgCostValue !== null ? Math.abs(quantity) * avgCostValue : null;
+
+  const dayPercentFromApi = toNullableNumber(
+    entry.day_pnl_percent ?? entry.day_pnl_pct,
+  );
+  const totalPercentFromApi = toNullableNumber(
+    entry.pnl_unrealized_percent ?? entry.pnl_unrealized_pct ?? entry.total_pnl_percent,
+  );
+
+  const dayPnlPercent =
+    dayPercentFromApi !== null
+      ? dayPercentFromApi / 100
+      : computePercent(dayPnlAmount, dayBasis);
+  const totalPnlPercent =
+    totalPercentFromApi !== null
+      ? totalPercentFromApi / 100
+      : computePercent(totalPnlAmount, totalBasis);
 
   const markSource = normalizeMarkSource(entry.mark_source ?? entry.price_source);
   const markTime = fallbackMarkTime(entry, snapshot);
@@ -65,11 +127,49 @@ const mapSingleStock = (entry: PSDLeg, snapshot: PSDSnapshot | undefined): Stock
     markSource,
     markTime,
     dayPnlAmount,
-    dayPnlPercent: computePercent(dayPnlAmount, dayBasis),
+    dayPnlPercent,
     totalPnlAmount,
-    totalPnlPercent: computePercent(totalPnlAmount, totalBasis),
+    totalPnlPercent,
     currency: "USD",
   };
+};
+
+const mapStockPosition = (
+  entry: StockPositionApi,
+  asOf: string | null,
+): StockRow => {
+  const quantity = toNumber(entry.quantity, 0);
+  const averagePrice = toNullableNumber(entry.average_price) ?? 0;
+  const markPrice = toNullableNumber(entry.mark_price) ?? 0;
+  const dayPnlAmount = toNullableNumber(entry.day_pnl_amount);
+  const totalPnlAmount = toNullableNumber(entry.total_pnl_amount);
+  const dayPnlPercent = toNullablePercent(entry.day_pnl_percent);
+  const totalPnlPercent = toNullablePercent(entry.total_pnl_percent);
+  const markSource = normalizeMarkSource(entry.mark_source);
+  const markTime = coerceTimestamp(entry.mark_time, asOf);
+  const currency =
+    typeof entry.currency === "string" && entry.currency.trim()
+      ? entry.currency.trim()
+      : "USD";
+  const exposure = toNullableNumber(entry.exposure);
+
+  const row: StockRow = {
+    symbol: entry.symbol,
+    quantity,
+    averagePrice,
+    markPrice,
+    markSource,
+    markTime,
+    dayPnlAmount,
+    dayPnlPercent,
+    totalPnlAmount,
+    totalPnlPercent,
+    currency,
+  };
+  if (exposure !== null) {
+    row.exposure = exposure;
+  }
+  return row;
 };
 
 export function useStocks(): UseQueryResult<StockRow[], Error> {
@@ -87,3 +187,23 @@ export function useStocks(): UseQueryResult<StockRow[], Error> {
     refetchInterval: 30_000,
   });
 }
+
+async function fetchStocks(baseUrl = ""): Promise<StockRow[]> {
+  const origin =
+    baseUrl ||
+    (typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  const sanitizedBase = origin.replace(/\/+$/, "");
+  const response = await fetch(`${sanitizedBase}/positions/stocks`, {
+    headers: { accept: "application/json" },
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+  const payload = (await response.json()) as StocksApiResponse;
+  const asOf = typeof payload.as_of === "string" ? payload.as_of : null;
+  const data = Array.isArray(payload.data) ? payload.data : [];
+  return data.map((entry) => mapStockPosition(entry, asOf));
+}
+
+export { fetchStocks };

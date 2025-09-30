@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from importlib import import_module
 from types import SimpleNamespace
@@ -39,11 +40,14 @@ def api_main(monkeypatch):
 
 
 @pytest.fixture()
-def client(api_main) -> TestClient:
-    return TestClient(api_main.app)
+def client(api_main) -> Iterator[TestClient]:
+    with TestClient(api_main.app) as test_client:
+        yield test_client
 
 
-def test_updated_at_prefers_stats_payload(client: TestClient, api_main, monkeypatch) -> None:
+def test_updated_at_prefers_stats_payload(
+    client: TestClient, api_main, monkeypatch
+) -> None:
     stats_ts = datetime(2024, 1, 1, tzinfo=timezone.utc)
     snapshot_ts = datetime(2023, 12, 31, tzinfo=timezone.utc)
 
@@ -66,7 +70,9 @@ def test_updated_at_prefers_stats_payload(client: TestClient, api_main, monkeypa
     assert payload["updated_at"].startswith("2024-01-01")
 
 
-def test_updated_at_uses_snapshot_when_missing(client: TestClient, api_main, monkeypatch) -> None:
+def test_updated_at_uses_snapshot_when_missing(
+    client: TestClient, api_main, monkeypatch
+) -> None:
     snapshot_ts = datetime(2024, 2, 1, 12, tzinfo=timezone.utc)
 
     def stats_without_timestamp() -> dict[str, object]:
@@ -87,7 +93,9 @@ def test_updated_at_uses_snapshot_when_missing(client: TestClient, api_main, mon
     assert payload["updated_at"].startswith("2024-02-01T12:00:00")
 
 
-def test_updated_at_omitted_when_unknown(client: TestClient, api_main, monkeypatch) -> None:
+def test_updated_at_omitted_when_unknown(
+    client: TestClient, api_main, monkeypatch
+) -> None:
     def stats_without_timestamp() -> dict[str, object]:
         return {
             "equity_count": 1,
