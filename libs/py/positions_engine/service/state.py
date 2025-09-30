@@ -1219,6 +1219,15 @@ def _normalize_option_mark_payload(
     if mark_source is not None:
         entry["mark_source"] = mark_source
         entry["price_source"] = _safe_lower(mark_source) or mark_source
+        if alias_from_last_close and mark_source == "PREV":
+            # Preserve a real timestamp for PREV so staleness is accurate.
+            prev_ts = (
+                entry.get("last_close_ts")
+                or entry.get("ts")
+                or entry.get("last_ts")
+            )
+            if prev_ts is not None:
+                entry["prev_ts"] = prev_ts
     elif "mark_source" in entry:
         entry["mark_source"] = None
     if mark_source == "PREV" and entry.get("previous_close_ts") in (None, "", 0):
@@ -1599,30 +1608,58 @@ def _normalize_option_leg_entry(entry: dict[str, Any], now: datetime) -> None:
 def _resolve_option_stale_seconds_entry(
     entry: dict[str, Any], mark_source: str | None, now: datetime
 ) -> int | None:
+    """Return staleness in seconds based on the best available timestamp."""
+
     existing = _to_int(entry.get("stale_seconds"))
     if existing is None:
         existing = _to_int(entry.get("stale_s"))
     if existing == _PREV_STALE_FALLBACK_SECONDS:
         existing = None
+
+    def _entry_value(key: str) -> Any:
+        if isinstance(entry, dict):
+            value = entry.get(key)
+        else:  # pragma: no cover - defensive fallback for attr-style payloads
+            value = getattr(entry, key, None)
+        return value
+
+    timestamp: datetime | None = None
+    for key in ("ts", "last_ts", "prev_ts"):
+        candidate = _entry_value(key)
+        if candidate is None:
+            continue
+        parsed = _parse_timestamp_like(candidate)
+        if parsed is not None:
+            timestamp = parsed
+            break
+
+    aware_now = _ensure_aware(now)
+
+    if timestamp is not None:
+        return _seconds_between_datetimes(aware_now, timestamp)
+
     if mark_source == "PREV":
-        resolved = _resolve_stale_seconds_entry(entry, mark_source, now)
+        resolved = _resolve_stale_seconds_entry(entry, mark_source, aware_now)
         return resolved if resolved is not None else existing
+
     if mark_source == "MID":
         timestamp = _latest_timestamp_from_entry(entry, _OPTION_MID_TIMESTAMP_KEYS)
         if timestamp is not None:
-            return _seconds_between_datetimes(now, timestamp)
+            return _seconds_between_datetimes(aware_now, timestamp)
         fallback = _extract_timestamp_from_entry(entry, _OPTION_UPDATED_TIMESTAMP_KEYS)
         if fallback is not None:
-            return _seconds_between_datetimes(now, fallback)
+            return _seconds_between_datetimes(aware_now, fallback)
         return existing
+
     if mark_source == "LAST":
         timestamp = _extract_timestamp_from_entry(entry, _OPTION_LAST_TIMESTAMP_KEYS)
         if timestamp is not None:
-            return _seconds_between_datetimes(now, timestamp)
+            return _seconds_between_datetimes(aware_now, timestamp)
         fallback = _extract_timestamp_from_entry(entry, _OPTION_UPDATED_TIMESTAMP_KEYS)
         if fallback is not None:
-            return _seconds_between_datetimes(now, fallback)
+            return _seconds_between_datetimes(aware_now, fallback)
         return existing
+
     return existing
 
 
