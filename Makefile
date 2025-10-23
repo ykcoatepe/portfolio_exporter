@@ -152,13 +152,13 @@ msb-emit:
 .PHONY: msb-run-now
 msb-run-now:
 	python - <<'PY'
-from psd.sentinel.msb_actions import evaluate_msb_triggers_and_update_livebar
-from psd.web.app import create_app
-from psd.web.config import Settings
+	from psd.sentinel.msb_actions import evaluate_msb_triggers_and_update_livebar
+	from psd.web.app import create_app
+	from psd.web.config import Settings
 
-app = create_app(Settings(disable_background=True))
-evaluate_msb_triggers_and_update_livebar(app)
-PY
+	app = create_app(Settings(disable_background=True))
+	evaluate_msb_triggers_and_update_livebar(app)
+	PY
 
 # ------------------------------------------------------------------
 # Sanity helpers
