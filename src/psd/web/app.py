@@ -185,6 +185,7 @@ async def stream(
             if _maybe_quit():
                 return
 
+            snapshot_head = max_event_id()
             snap = latest_snapshot()
             if snap:
                 STREAM_EVENTS.labels("snapshot").inc()
@@ -197,7 +198,7 @@ async def stream(
                     return
             last_id_local = last_event_id if last_event_id is not None else 0
             if snap and last_event_id is None:
-                last_id_local = max_event_id()
+                last_id_local = snapshot_head
 
             while True:
                 if await request.is_disconnected():
