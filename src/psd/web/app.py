@@ -3,18 +3,28 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 from contextlib import asynccontextmanager
+from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from prometheus_client import Counter, Gauge
+from pydantic import BaseModel, ConfigDict
 from starlette.middleware.cors import CORSMiddleware
 
 from psd.analytics.stats import compute_stats
-from psd.core.store import init, latest_snapshot, max_event_id, tail_events
+from psd.core.store import (
+    init,
+    latest_snapshot,
+    max_event_id,
+    read_msb_current,
+    read_msb_history,
+    tail_events,
+)
+from psd.web.config import Settings, get_settings
 from psd.web.ready import router as ready_router
+from psd.web.sse import SseManager, sse_endpoint
 
 # Importing the ingestor module registers the psd_events_total counter so that
 # /metrics exposes it even before ingestion writes events.
@@ -23,41 +33,53 @@ try:  # pragma: no cover - defensive in case optional deps change
 except Exception:  # pragma: no cover - metrics should still render
     _psd_ingestor_main = None
 
-TEST_MODE = os.getenv("PSD_SSE_TEST_MODE", "").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
-
 log = logging.getLogger("psd.web.stats")
 STALE_ALERT_THRESHOLD = 10
 _DEFAULT_STATS_EMPTY = compute_stats(None)
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # FastAPI's lifespan hook is the modern place for startup/shutdown work.
-    init()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.include_router(ready_router)
-
 STREAM_CLIENTS = Gauge("psd_stream_clients", "Connected SSE clients")
 STREAM_EVENTS = Counter("psd_stream_events_total", "SSE events sent", ["kind"])
 
+router = APIRouter()
 
-@app.get("/state")
-def state():
+
+class MsbDTO(BaseModel):
+    """JSON representation of an MSB reading."""
+
+    date: str
+    hy: float
+    vx1: float
+    vx2: float
+    z_hy: float | None = None
+    term_ratio: float | None = None
+    cal_spread_pct: float | None = None
+    cal_spread_abs: float | None = None
+    saturated: bool
+    hy_score: int
+    vix_score: int
+    msb: int
+    color: str
+    triggers: list[str]
+    winsor_clipped_n: int
+    cooldown_until: str | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+def _create_lifespan(settings: Settings | None) -> Any:
+    if settings and settings.disable_background:
+        return None
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        init()
+        yield
+
+    return lifespan
+
+
+@router.get("/state")
+def state() -> JSONResponse:
     snap = latest_snapshot()
     if not snap:
         return JSONResponse(
@@ -66,8 +88,8 @@ def state():
     return JSONResponse(snap)
 
 
-@app.get("/stats")
-def stats():
+@router.get("/stats")
+def stats() -> JSONResponse:
     snap = latest_snapshot()
     if not snap:
         payload = dict(_DEFAULT_STATS_EMPTY)
@@ -81,7 +103,7 @@ def stats():
         return JSONResponse(payload)
 
     payload = compute_stats(snap)
-    payload = dict(payload)  # ensure mutable copy
+    payload = dict(payload)
     quotes_obj = snap.get("quotes")
     payload.update(
         {
@@ -96,11 +118,10 @@ def stats():
     return JSONResponse(payload)
 
 
-# SSE stream: bootstrap snapshot (no id) followed by event/data/id frames with retry hints.
-# Last-Event-ID headers resume only events with a strictly higher ledger id.
-@app.get("/stream")
-async def stream(request: Request):
-    # Pick up from the last event the client acknowledged (if any).
+@router.get("/stream")
+async def stream(
+    request: Request, settings: Settings = Depends(get_settings)  # noqa: B008
+):
     last_event_id_header = request.headers.get("last-event-id", "").strip()
     last_event_id: int | None
     try:
@@ -108,13 +129,7 @@ async def stream(request: Request):
     except ValueError:
         last_event_id = None
 
-    test_mode_env = os.getenv("PSD_SSE_TEST_MODE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    test_mode = TEST_MODE or test_mode_env
+    test_mode = bool(settings.test_mode)
     limit_ids = 0
     limit_frames = 0
     max_ms = 0.0
@@ -164,14 +179,12 @@ async def stream(request: Request):
         nonlocal ids_sent, frames_sent, t_last
         STREAM_CLIENTS.inc()
         try:
-            # Suggest a retry window so browsers reconnect promptly on drops.
             yield "retry: 2000\n\n"
             frames_sent += 1
             t_last = time.monotonic()
             if _maybe_quit():
                 return
 
-            # Bootstrap snapshot without id for quick render.
             snap = latest_snapshot()
             if snap:
                 STREAM_EVENTS.labels("snapshot").inc()
@@ -207,7 +220,6 @@ async def stream(request: Request):
                         if _maybe_quit():
                             return
                 else:
-                    # keep proxies and EventSource alive
                     STREAM_EVENTS.labels("heartbeat").inc()
                     yield "event: heartbeat\n" + "data: {}\n\n"
                     frames_sent += 1
@@ -218,19 +230,80 @@ async def stream(request: Request):
         finally:
             STREAM_CLIENTS.dec()
 
-    # Hint reverse proxies not to buffer SSE frames (Cache-Control + X-Accel-Buffering cooperate).
     headers = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
     return StreamingResponse(gen(), media_type="text/event-stream", headers=headers)
 
 
-@app.get("/metrics")
+@router.get("/metrics")
 def metrics():
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-    # TODO: add authentication/allowlist for production deployments.
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.get("/healthz")
+@router.get("/healthz")
 def healthz():
     return {"ok": bool(latest_snapshot())}
+
+
+@router.get("/msb/current", response_model=MsbDTO)
+def msb_current() -> MsbDTO:
+    record = read_msb_current()
+    if not record:
+        raise HTTPException(status_code=404, detail="MSB reading unavailable")
+    return MsbDTO.model_validate(record)
+
+
+@router.get("/msb/history", response_model=list[MsbDTO])
+def msb_history(days: int = 365) -> list[MsbDTO]:
+    history = read_msb_history(days)
+    return [MsbDTO.model_validate(entry) for entry in history]
+
+
+def broadcast_latest_msb(app: FastAPI) -> bool:
+    manager = getattr(app.state, "sse", None)
+    if not isinstance(manager, SseManager):
+        raise RuntimeError("SSE manager not attached to FastAPI application")
+    record = read_msb_current()
+    if not record:
+        return False
+    dto = MsbDTO.model_validate(record).model_dump(mode="json")
+    manager.broadcast("msb.update", dto)
+    return True
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    resolved = settings or get_settings()
+    lifespan = _create_lifespan(resolved)
+    app = FastAPI(lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(ready_router)
+    app.include_router(router)
+
+    manager = SseManager(heartbeat_interval=resolved.sse_heartbeat_sec)
+    app.state.sse = manager
+    app.state.settings = resolved
+    app.dependency_overrides[get_settings] = lambda: resolved
+
+    @app.get("/sse")
+    async def _sse_route(
+        request: Request, current: Settings = Depends(get_settings)  # noqa: B008
+    ):
+        manager_in_state = getattr(app.state, "sse", None)
+        if not isinstance(manager_in_state, SseManager):
+            raise HTTPException(status_code=503, detail="SSE manager unavailable")
+        if manager_in_state.heartbeat_interval != max(1, int(current.sse_heartbeat_sec)):
+            app.state.sse = SseManager(heartbeat_interval=current.sse_heartbeat_sec)
+            manager_in_state = app.state.sse
+        return await sse_endpoint(request, manager_in_state)
+
+    return app
+
+
+app = create_app()

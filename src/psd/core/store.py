@@ -382,3 +382,115 @@ def store_msb(df: pd.DataFrame) -> int:
         )
         conn.commit()
     return len(records)
+
+
+def _decode_triggers(raw: str | bytes | None) -> list[str]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if isinstance(data, list):
+        return [str(item) for item in data]
+    return []
+
+
+def _normalize_msb_row(row: sqlite3.Row) -> dict[str, Any]:
+    def _maybe_float(value: Any) -> float | None:
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "date": str(row["date"]),
+        "hy": float(row["hy"]),
+        "vx1": float(row["vx1"]),
+        "vx2": float(row["vx2"]),
+        "z_hy": _maybe_float(row["z_hy"]),
+        "term_ratio": _maybe_float(row["term_ratio"]),
+        "cal_spread_pct": _maybe_float(row["cal_spread_pct"]),
+        "cal_spread_abs": _maybe_float(row["cal_spread_abs"]),
+        "saturated": bool(row["saturated"]),
+        "hy_score": int(row["hy_score"]),
+        "vix_score": int(row["vix_score"]),
+        "msb": int(row["msb"]),
+        "color": str(row["color"]),
+        "triggers": _decode_triggers(row["triggers"]),
+        "winsor_clipped_n": int(row["winsor_clipped_n"]),
+        "cooldown_until": (
+            str(row["cooldown_until"]) if row["cooldown_until"] is not None else None
+        ),
+    }
+
+
+def read_msb_current() -> dict[str, Any] | None:
+    """Return the most recent MSB reading if one exists."""
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                date,
+                hy,
+                vx1,
+                vx2,
+                z_hy,
+                term_ratio,
+                cal_spread_pct,
+                cal_spread_abs,
+                saturated,
+                hy_score,
+                vix_score,
+                msb,
+                color,
+                triggers,
+                winsor_clipped_n,
+                cooldown_until
+            FROM msb_readings
+            ORDER BY date DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    if row is None:
+        return None
+    return _normalize_msb_row(row)
+
+
+def read_msb_history(days: int = 365) -> list[dict[str, Any]]:
+    """Return up to ``days`` MSB readings ordered by descending date."""
+    try:
+        limit = int(days)
+    except (TypeError, ValueError):
+        limit = 0
+    if limit <= 0:
+        return []
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                date,
+                hy,
+                vx1,
+                vx2,
+                z_hy,
+                term_ratio,
+                cal_spread_pct,
+                cal_spread_abs,
+                saturated,
+                hy_score,
+                vix_score,
+                msb,
+                color,
+                triggers,
+                winsor_clipped_n,
+                cooldown_until
+            FROM msb_readings
+            ORDER BY date DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [_normalize_msb_row(row) for row in rows]

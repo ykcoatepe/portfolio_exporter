@@ -11,7 +11,7 @@ THRESH ?= 3
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev fmt test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate agent-digest agent-rotate msb-compute serve-api web-build psd-ci
+.PHONY: setup dev fmt test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate agent-digest agent-rotate msb-compute msb-emit serve-api web-build psd-ci
 .PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
@@ -144,6 +144,10 @@ agent-rotate:
 .PHONY: msb-compute
 msb-compute:
 	python scripts/msb_compute.py --hy-csv data/vendor/hy.csv --vx1-csv data/vendor/vx1.csv --vx2-csv data/vendor/vx2.csv --spx-csv data/vendor/spx_ret.csv --out data/msb_readings.csv
+
+.PHONY: msb-emit
+msb-emit:
+	python scripts/msb_emit.py
 
 # ------------------------------------------------------------------
 # Sanity helpers
