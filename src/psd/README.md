@@ -20,10 +20,11 @@
 - `GET /state`, `/positions/stocks`, `/positions/options`, and `/session` return normalized portfolio state.
 - `GET /rules/summary`, `/rules/catalog`, and `/metrics` surface sentinel findings and Prometheus counters.
 - `GET /msb/current` and `/msb/history?days=N` expose the Market Stress Barometer as JSON for dashboards and scripts.
+- `POST /msb/broadcast` triggers an `msb.update` SSE when the latest reading is available (used by the `msb_emit` CLI).
 - Standard FastAPI metadata endpoints (`/docs`, `/openapi.json`) remain available for interactive exploration.
 
 ## Testing
-- Use `psd.web.app.create_app(Settings(test_mode=True, disable_background=True))` when exercising the API in tests to avoid background tasks and long-lived loops.
+- Use `psd.web.app.create_app(Settings(test_mode=True, disable_background=True))` when exercising the API in tests to avoid background tasks and long-lived loops. The CLI `scripts/msb_emit.py` calls the live server at `/msb/broadcast`, so ensure the API is running locally (default `http://127.0.0.1:51127`).
 
 ## Troubleshooting
 - Port conflicts on 8000 → override with `uvicorn apps.api.main:app --port 8080` or adjust reverse-proxy upstreams.

@@ -7,7 +7,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from prometheus_client import Counter, Gauge
 from pydantic import BaseModel, ConfigDict
@@ -258,6 +258,14 @@ def msb_current() -> MsbDTO:
 def msb_history(days: int = 365) -> list[MsbDTO]:
     history = read_msb_history(days)
     return [MsbDTO.model_validate(entry) for entry in history]
+
+
+@router.post("/msb/broadcast", status_code=status.HTTP_200_OK)
+async def msb_broadcast(request: Request) -> JSONResponse:
+    success = broadcast_latest_msb(request.app)
+    if not success:
+        raise HTTPException(status_code=404, detail="MSB reading unavailable")
+    return JSONResponse({"ok": True})
 
 
 def broadcast_latest_msb(app: FastAPI) -> bool:
