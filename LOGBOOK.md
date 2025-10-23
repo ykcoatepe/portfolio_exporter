@@ -4,6 +4,14 @@ Scope: scan_once, memos JSONL, CLI table, rules & tests
 Key files: src/psd/**, config/rules.yaml, scripts/run_sentinel.py, tests/test_*
 Status: merged @ v0.1 scaffold → implementation
 
+# 2025-10-23 • Task: MSB sentinel scheduler & live bar • Branch: feature/msb-api-sse-v1
+Owner: codex (session/ai)
+Scope: TRT 17:30 scheduler, Rule A/B/C evaluation w/ cooldown, SSE alerts, live hedge CSV, Prometheus metrics, docs/tests
+Key files: src/psd/sentinel/sched.py, src/psd/sentinel/msb_actions.py, src/psd/ui/livebar.py, tests/test_msb_*.py
+Status: open → PR #173
+Next: monitor metrics rollout, consider UI surfacing of live bar
+Risks/Notes: Vendor CSV freshness gates scheduler; live bar CSV ignored by git, ensure ops collects artifacts
+
 # 2025-09-14 • Task: Scaffold PSD (v0.1) • Branch: feature/psd-sentinel-v0
 Owner: codex (session/codex)
 Scope: Create structure and placeholders for PSD; no logic yet
@@ -59,3 +67,16 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Next:** Draft remediation plan for avg_cost defaults, timestamp propagation, and quote backfill heuristics.
 
 **Notes:** Evidence pack under debug/: psd_diagnose.md, psd_trace_map.md, psd_fail_repros.sh, psd_logs.txt, psd_checklist.json.
+
+### 2025-10-23 • Task: PSD v0.1 Hardening • Branch: feature/psd-v0-1-hardening
+**Owner:** session/ai
+
+**Scope:** dataclass fix + SPA build + docs
+
+**Interfaces:** none (non-functional changes)
+
+**Status:** open → merged @ <sha>
+
+**Next:** MSB feature
+
+**Notes:** CI gate now builds SPA  |  Ref: <PR link>

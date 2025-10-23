@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import time
+from datetime import date
 from typing import Any
 
 from ..analytics.combos import recognize
@@ -25,6 +27,157 @@ def _now_ts() -> int:
 _last_alert_ts: dict[tuple[str, str], int] = {}
 _snooze_until: dict[tuple[str, str], int] = {}
 _state_loaded: bool = False
+
+_MSB_ACTIONS: dict[str, dict[str, str]] = {
+    "A": {
+        "hedge": "VIX 25/35 call spread (2–4w)",
+        "cost_pct_nav": "0.10–0.35",
+        "status": "STAGED",
+        "expiry_hint": "+21D",
+        "trigger": "RULE_A_VIX_BACKWARDATION",
+    },
+    "B": {
+        "hedge": "SPX put spread (2–4w)",
+        "cost_pct_nav": "0.15–0.40",
+        "status": "STAGED",
+        "expiry_hint": "+21D",
+        "trigger": "RULE_B_HY_SHOCK",
+    },
+    "C": {
+        "hedge": "Reduce beta (−20–40%)",
+        "cost_pct_nav": "—",
+        "status": "LIVE",
+        "expiry_hint": "+5B",
+        "trigger": "RULE_C_MSB_60x3D",
+    },
+}
+
+
+def evaluate_msb_triggers(
+    msb_row: dict[str, Any],
+    cooldown_state: dict[str, Any] | None = None,
+) -> list[Alert]:
+    """Evaluate MSB rules A/B/C returning alert payloads."""
+    if not isinstance(msb_row, dict):
+        raise TypeError("msb_row must be a dictionary")
+    cooldown_state = cooldown_state or {}
+    date_str = str(msb_row.get("date") or "")
+    today: date | None = cooldown_state.get("today")
+    if today is None and date_str:
+        try:
+            today = date.fromisoformat(date_str)
+        except ValueError:
+            today = None
+    vx1 = float(msb_row.get("vx1", 0.0) or 0.0)
+    vx2 = float(msb_row.get("vx2", 0.0) or 0.0)
+    hy_score = int(msb_row.get("hy_score", 0) or 0)
+    vix_score = int(msb_row.get("vix_score", 0) or 0)
+    msb_value = int(msb_row.get("msb", 0) or 0)
+    color = str(msb_row.get("color") or "")
+    triggers = msb_row.get("triggers") or []
+    triggers_set = {str(flag).upper() for flag in triggers if isinstance(flag, str)}
+    term_ratio = msb_row.get("term_ratio")
+    vx_ratio = None
+    if vx2 not in (0.0, 0):
+        try:
+            vx_ratio = vx1 / vx2
+        except ZeroDivisionError:
+            vx_ratio = None
+
+    spx_ret = cooldown_state.get("spx_ret")
+    hy_d1_bps = cooldown_state.get("hy_d1_bps")
+    hy_d5_bps = cooldown_state.get("hy_d5_bps")
+    streak = int(cooldown_state.get("streak_ge_60", 0) or 0)
+    cooldown_raw = cooldown_state.get("cooldown_until")
+    cooldown_started_today = bool(cooldown_state.get("cooldown_started_today"))
+
+    cooldown_until: date | None = None
+    if isinstance(cooldown_raw, date):
+        cooldown_until = cooldown_raw
+    elif isinstance(cooldown_raw, str):
+        try:
+            cooldown_until = date.fromisoformat(cooldown_raw)
+        except ValueError:
+            cooldown_until = None
+
+    alerts: list[Alert] = []
+
+    def _build_alert(rule: str, message: str, why: dict[str, Any]) -> Alert:
+        action = dict(_MSB_ACTIONS.get(rule, {}))
+        payload = {
+            "rule": rule,
+            "msb": msb_value,
+            "color": color,
+            "hy_score": hy_score,
+            "vix_score": vix_score,
+            "term_ratio": term_ratio,
+            "vx_ratio": vx_ratio,
+            "why": why,
+            "actions": [action] if action else [],
+        }
+        if cooldown_until:
+            payload["cooldown_until"] = cooldown_until.isoformat()
+        uid = f"msb:{date_str}:{rule.lower()}"
+        severity = "action" if rule == "C" else "warn"
+        return Alert(uid=uid, rule=rule, severity=severity, message=message, data=payload)
+
+    spx_check = (
+        isinstance(spx_ret, (int, float))
+        and not isinstance(spx_ret, bool)
+        and math.isfinite(float(spx_ret))
+    )
+    if vx1 > vx2 and spx_check and float(spx_ret) < 0:
+        why = {
+            "vx1": vx1,
+            "vx2": vx2,
+            "spx_ret": float(spx_ret),
+            "vx_ratio": vx_ratio,
+        }
+        alerts.append(
+            _build_alert(
+                "A",
+                "Rule A: VX1 backwardation with negative SPX return",
+                why,
+            )
+        )
+
+    d1_check = isinstance(hy_d1_bps, (int, float)) and math.isfinite(float(hy_d1_bps))
+    d5_check = isinstance(hy_d5_bps, (int, float)) and math.isfinite(float(hy_d5_bps))
+    if (d1_check and float(hy_d1_bps) >= 25.0) or (d5_check and float(hy_d5_bps) >= 60.0):
+        why = {
+            "hy_d1_bps": float(hy_d1_bps) if d1_check else None,
+            "hy_d5_bps": float(hy_d5_bps) if d5_check else None,
+        }
+        alerts.append(
+            _build_alert(
+                "B",
+                "Rule B: HY spread shock",
+                why,
+            )
+        )
+
+    cooldown_blocked = (
+        cooldown_until is not None
+        and today is not None
+        and today < cooldown_until
+        and not cooldown_started_today
+    )
+    if (
+        msb_value >= 60
+        and streak >= 3
+        and not cooldown_blocked
+        and ("C" in triggers_set or cooldown_started_today)
+    ):
+        why = {"msb": msb_value, "streak_ge_60": streak}
+        alerts.append(
+            _build_alert(
+                "C",
+                "Rule C: MSB ≥ 60 for three consecutive sessions",
+                why,
+            )
+        )
+
+    return alerts
 
 
 def _rebuild_state_from_memos(memo_path: str) -> None:

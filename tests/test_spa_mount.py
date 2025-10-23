@@ -1,14 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
 from starlette.testclient import TestClient
-
-pytestmark = pytest.mark.skipif(
-    not Path("apps/web/dist/index.html").exists(),
-    reason="PSD bundle has not been built (apps/web/dist/index.html missing)",
-)
 
 
 def test_spa_mount_serves_psd_and_preserves_api():

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections import deque
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 from starlette.testclient import TestClient
-
-import sys
 
 SRC_ROOT = Path(__file__).resolve().parents[1]
 SRC_SRC = SRC_ROOT / "src"
@@ -17,8 +17,8 @@ if str(SRC_ROOT) not in sys.path:
 if str(SRC_SRC) not in sys.path:
     sys.path.insert(0, str(SRC_SRC))
 
-from psd.core import store
 import psd.web.app as web_app
+from psd.web.config import Settings
 
 
 def _read_events(
@@ -60,11 +60,6 @@ def test_sse_bootstrap_and_monotonic_ids(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     _ = tmp_path  # ensure fixture consumed for API compatibility
-    monkeypatch.setenv("PSD_SSE_TEST_MODE", "1")
-    monkeypatch.setattr(web_app, "TEST_MODE", True)
-    monkeypatch.setattr(web_app, "init", lambda _app=None: None)
-    monkeypatch.setattr(store, "init", lambda: None)
-
     snapshot = {
         "ts": "2024-01-01T00:00:00Z",
         "positions": [],
@@ -94,7 +89,8 @@ def test_sse_bootstrap_and_monotonic_ids(
 
     monkeypatch.setattr(web_app, "tail_events", fake_tail_events)
 
-    with TestClient(web_app.app) as client:
+    app = web_app.create_app(Settings(test_mode=True, disable_background=True))
+    with TestClient(app) as client:
         url = (
             "/stream?test_limit_ids=5&test_limit_frames=50&"
             "test_idle_ms=1000&test_max_ms=2000"
@@ -113,11 +109,6 @@ def test_sse_bootstrap_and_monotonic_ids(
 
 def test_sse_resume(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _ = tmp_path  # ensure fixture consumed for API compatibility
-    monkeypatch.setenv("PSD_SSE_TEST_MODE", "1")
-    monkeypatch.setattr(web_app, "TEST_MODE", True)
-    monkeypatch.setattr(web_app, "init", lambda _app=None: None)
-    monkeypatch.setattr(store, "init", lambda: None)
-
     snapshot = {
         "ts": "2024-01-02T00:00:00Z",
         "positions": [],
@@ -152,7 +143,8 @@ def test_sse_resume(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "Last-Event-ID": str(last),
     }
     url = "/stream?test_limit_ids=3&test_idle_ms=500&test_max_ms=2000"
-    with TestClient(web_app.app) as client:
+    app = web_app.create_app(Settings(test_mode=True, disable_background=True))
+    with TestClient(app) as client:
         with client.stream("GET", url, headers=headers, timeout=5.0) as resp:
             events = _read_events(resp)
 

@@ -10,7 +10,8 @@ try:
 except (RuntimeError, ModuleNotFoundError) as exc:  # pragma: no cover - optional dep
     pytest.skip(str(exc), allow_module_level=True)
 
-from psd.web.app import app
+from psd.web.app import create_app
+from psd.web.config import Settings
 
 
 @pytest.fixture(name="sample_snapshot")
@@ -95,7 +96,8 @@ def test_stats_endpoint_returns_payload(
     store.init()
     store.write_snapshot(sample_snapshot)
 
-    with TestClient(app) as client:
+    test_app = create_app(Settings(test_mode=True, disable_background=True))
+    with TestClient(test_app) as client:
         response = client.get("/stats")
     assert response.status_code == 200
     payload = response.json()
@@ -114,7 +116,8 @@ def test_stats_endpoint_empty_snapshot(
     monkeypatch.setenv("PSD_DB", str(db_path))
     store.init()
 
-    with TestClient(app) as client:
+    test_app = create_app(Settings(test_mode=True, disable_background=True))
+    with TestClient(test_app) as client:
         response = client.get("/stats")
     assert response.status_code == 200
     payload = response.json()
