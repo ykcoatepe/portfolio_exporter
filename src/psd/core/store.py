@@ -9,6 +9,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 _JSON_SEPARATORS = (",", ":")
 _VALID_CHECKPOINT_MODES = {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}
 _DEFAULT_AUTOCHECKPOINT_PAGES = 1000
@@ -97,6 +99,25 @@ def init() -> None:
                 ibkr_connected INTEGER NOT NULL,
                 data_age_s REAL NOT NULL,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS msb_readings (
+                date TEXT PRIMARY KEY,
+                hy REAL NOT NULL,
+                vx1 REAL NOT NULL,
+                vx2 REAL NOT NULL,
+                z_hy REAL,
+                term_ratio REAL,
+                cal_spread_pct REAL,
+                cal_spread_abs REAL,
+                saturated INTEGER NOT NULL,
+                hy_score INTEGER NOT NULL,
+                vix_score INTEGER NOT NULL,
+                msb INTEGER NOT NULL,
+                color TEXT NOT NULL,
+                triggers TEXT NOT NULL,
+                winsor_clipped_n INTEGER NOT NULL,
+                cooldown_until TEXT
             );
             """
         )
@@ -271,3 +292,93 @@ def write_health(ibkr_connected: bool, data_age_s: float) -> None:
         "health",
         {"ibkr_connected": bool(ibkr_connected), "data_age_s": float(data_age_s)},
     )
+
+
+def store_msb(df: pd.DataFrame) -> int:
+    """Persist MSB readings via upsert; returns affected row count."""
+    if df.empty:
+        return 0
+    expected_columns = {
+        "hy",
+        "vx1",
+        "vx2",
+        "z_hy",
+        "term_ratio",
+        "cal_spread_pct",
+        "cal_spread_abs",
+        "saturated",
+        "hy_score",
+        "vix_score",
+        "msb",
+        "color",
+        "triggers",
+        "winsor_clipped_n",
+        "cooldown_until",
+    }
+    missing = expected_columns.difference(df.columns)
+    if missing:
+        missing_sorted = ", ".join(sorted(missing))
+        raise ValueError(f"Missing MSB columns: {missing_sorted}")
+
+    records = []
+    frame = df.sort_index().reset_index()
+    for row in frame.itertuples(index=False):
+        current_date = pd.Timestamp(row.date).date().isoformat()
+        cooldown_raw = getattr(row, "cooldown_until", None)
+        if pd.notna(cooldown_raw):
+            cooldown_value = pd.Timestamp(cooldown_raw).date().isoformat()
+        else:
+            cooldown_value = None
+        triggers_value = list(getattr(row, "triggers", []))
+        triggers_encoded = json.dumps(triggers_value, separators=_JSON_SEPARATORS)
+        records.append(
+            (
+                current_date,
+                float(row.hy),
+                float(row.vx1),
+                float(row.vx2),
+                None if pd.isna(row.z_hy) else float(row.z_hy),
+                None if pd.isna(row.term_ratio) else float(row.term_ratio),
+                None if pd.isna(row.cal_spread_pct) else float(row.cal_spread_pct),
+                None if pd.isna(row.cal_spread_abs) else float(row.cal_spread_abs),
+                int(bool(row.saturated)),
+                int(row.hy_score),
+                int(row.vix_score),
+                int(row.msb),
+                str(row.color),
+                triggers_encoded,
+                int(row.winsor_clipped_n),
+                cooldown_value,
+            )
+        )
+    with _connect() as conn:
+        conn.executemany(
+            """
+            INSERT INTO msb_readings (
+                date, hy, vx1, vx2, z_hy, term_ratio, cal_spread_pct, cal_spread_abs,
+                saturated, hy_score, vix_score, msb, color, triggers,
+                winsor_clipped_n, cooldown_until
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+            ON CONFLICT(date) DO UPDATE SET
+                hy=excluded.hy,
+                vx1=excluded.vx1,
+                vx2=excluded.vx2,
+                z_hy=excluded.z_hy,
+                term_ratio=excluded.term_ratio,
+                cal_spread_pct=excluded.cal_spread_pct,
+                cal_spread_abs=excluded.cal_spread_abs,
+                saturated=excluded.saturated,
+                hy_score=excluded.hy_score,
+                vix_score=excluded.vix_score,
+                msb=excluded.msb,
+                color=excluded.color,
+                triggers=excluded.triggers,
+                winsor_clipped_n=excluded.winsor_clipped_n,
+                cooldown_until=excluded.cooldown_until
+            """,
+            records,
+        )
+        conn.commit()
+    return len(records)
