@@ -1623,6 +1623,29 @@ def _resolve_option_stale_seconds_entry(
             value = getattr(entry, key, None)
         return value
 
+    aware_now = _ensure_aware(now)
+
+    if mark_source == "PREV":
+        resolved = _resolve_stale_seconds_entry(entry, mark_source, aware_now)
+        if resolved is not None:
+            return resolved
+
+    elif mark_source == "MID":
+        timestamp = _latest_timestamp_from_entry(entry, _OPTION_MID_TIMESTAMP_KEYS)
+        if timestamp is not None:
+            return _seconds_between_datetimes(aware_now, timestamp)
+        fallback = _extract_timestamp_from_entry(entry, _OPTION_UPDATED_TIMESTAMP_KEYS)
+        if fallback is not None:
+            return _seconds_between_datetimes(aware_now, fallback)
+
+    elif mark_source == "LAST":
+        timestamp = _extract_timestamp_from_entry(entry, _OPTION_LAST_TIMESTAMP_KEYS)
+        if timestamp is not None:
+            return _seconds_between_datetimes(aware_now, timestamp)
+        fallback = _extract_timestamp_from_entry(entry, _OPTION_UPDATED_TIMESTAMP_KEYS)
+        if fallback is not None:
+            return _seconds_between_datetimes(aware_now, fallback)
+
     timestamp: datetime | None = None
     for key in ("ts", "last_ts", "prev_ts"):
         candidate = _entry_value(key)
@@ -1633,32 +1656,8 @@ def _resolve_option_stale_seconds_entry(
             timestamp = parsed
             break
 
-    aware_now = _ensure_aware(now)
-
     if timestamp is not None:
         return _seconds_between_datetimes(aware_now, timestamp)
-
-    if mark_source == "PREV":
-        resolved = _resolve_stale_seconds_entry(entry, mark_source, aware_now)
-        return resolved if resolved is not None else existing
-
-    if mark_source == "MID":
-        timestamp = _latest_timestamp_from_entry(entry, _OPTION_MID_TIMESTAMP_KEYS)
-        if timestamp is not None:
-            return _seconds_between_datetimes(aware_now, timestamp)
-        fallback = _extract_timestamp_from_entry(entry, _OPTION_UPDATED_TIMESTAMP_KEYS)
-        if fallback is not None:
-            return _seconds_between_datetimes(aware_now, fallback)
-        return existing
-
-    if mark_source == "LAST":
-        timestamp = _extract_timestamp_from_entry(entry, _OPTION_LAST_TIMESTAMP_KEYS)
-        if timestamp is not None:
-            return _seconds_between_datetimes(aware_now, timestamp)
-        fallback = _extract_timestamp_from_entry(entry, _OPTION_UPDATED_TIMESTAMP_KEYS)
-        if fallback is not None:
-            return _seconds_between_datetimes(aware_now, fallback)
-        return existing
 
     return existing
 
