@@ -794,13 +794,16 @@ def broadcast(dto: dict) -> None:
     except RuntimeError:
         loop = None
 
-    if loop is not None:
-        loop.create_task(_send_all())
-        return
-
     target_loop = _broadcast_loop
     if target_loop is None or target_loop.is_closed():
+        target_loop = loop
+
+    if target_loop is None:
         _logger.debug("[psd-web] dropping broadcast; no active event loop")
+        return
+
+    if loop is target_loop:
+        loop.create_task(_send_all())
         return
 
     fut = asyncio.run_coroutine_threadsafe(_send_all(), target_loop)

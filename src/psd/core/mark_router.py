@@ -30,11 +30,11 @@ def choose_mark(
     now = time.time()
     stale_s = float(max(0.0, now - ts_value))
 
-    order = (
-        ["mid", "last", "model", "yahoo"]
-        if session != "RTH"
-        else ["last", "mid", "model", "yahoo"]
-    )
+    if session == "RTH":
+        order = ["last", "mid", "model", "yahoo"]
+    else:
+        # Keep "last" in the non-RTH priority list so after-hours quotes remain visible
+        order = ["mid", "last", "model", "yahoo"]
 
     for key in order:
         candidate = _coerce_tick_value(snapshot.get(key))

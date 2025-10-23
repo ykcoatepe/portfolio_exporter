@@ -36,20 +36,20 @@ class OptionLegSnapshot:
     quantity: Decimal
     ratio: Decimal
     multiplier: Decimal
-    avg_cost: Decimal | None
-    mark: Decimal | None
     mark_source: str
-    stale_seconds: int | None
-    previous_close: Decimal | None
-    delta: Decimal | None
-    gamma: Decimal | None
-    theta: Decimal | None
-    vega: Decimal | None
-    iv: Decimal | None
-    day_pnl: Decimal | None
-    total_pnl: Decimal | None
-    day_basis: Decimal | None
-    total_basis: Decimal | None
+    avg_cost: Decimal | None = None
+    mark: Decimal | None = None
+    stale_seconds: int | None = None
+    previous_close: Decimal | None = None
+    delta: Decimal | None = None
+    gamma: Decimal | None = None
+    theta: Decimal | None = None
+    vega: Decimal | None = None
+    iv: Decimal | None = None
+    day_pnl: Decimal | None = None
+    total_pnl: Decimal | None = None
+    day_basis: Decimal | None = None
+    total_basis: Decimal | None = None
     feed_strategy_id: str | None = None
     feed_combo_id: str | None = None
     notes: tuple[str, ...] = field(default_factory=tuple)

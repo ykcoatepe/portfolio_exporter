@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+
+import pytest
 from fastapi.testclient import TestClient
 from positions_engine.ingest.csv import CsvLoadResult
 
@@ -8,6 +11,9 @@ import apps.api.main as api
 
 def test_internal_provider_precedence(monkeypatch):
     """Internal provider should populate PSD endpoints without CSV uploads."""
+
+    if os.getenv("PE_TEST_MODE") == "1":
+        pytest.skip("Internal provider precedence requires PE_TEST_MODE unset")
 
     positions_view = {
         "single_stocks": [

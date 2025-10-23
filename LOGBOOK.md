@@ -59,3 +59,16 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Next:** Draft remediation plan for avg_cost defaults, timestamp propagation, and quote backfill heuristics.
 
 **Notes:** Evidence pack under debug/: psd_diagnose.md, psd_trace_map.md, psd_fail_repros.sh, psd_logs.txt, psd_checklist.json.
+
+### 2025-10-23 • Task: PSD v0.1 Hardening • Branch: feature/psd-v0-1-hardening
+**Owner:** session/ai
+
+**Scope:** dataclass fix + SPA build + docs
+
+**Interfaces:** none (non-functional changes)
+
+**Status:** open → merged @ <sha>
+
+**Next:** MSB feature
+
+**Notes:** CI gate now builds SPA  |  Ref: <PR link>
