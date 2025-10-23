@@ -22,6 +22,7 @@ from psd.core.store import (
     read_msb_history,
     tail_events,
 )
+from psd.sentinel.sched import start_msb_scheduler, stop_msb_scheduler
 from psd.web.config import Settings, get_settings
 from psd.web.ready import router as ready_router
 from psd.web.sse import SseManager, sse_endpoint
@@ -73,7 +74,11 @@ def _create_lifespan(settings: Settings) -> Any:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         init()
-        yield
+        start_msb_scheduler(_app)
+        try:
+            yield
+        finally:
+            stop_msb_scheduler()
 
     return lifespan
 

@@ -2,6 +2,7 @@
 historic_prices.csv
 portfolio_*.csv
 data/vendor/
+data/live_status_bar.csv
 logs/
 
 # Ignore Python cache files

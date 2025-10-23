@@ -16,3 +16,8 @@
 - The test guards against regressions where static mounting might shadow REST endpoints or ship stale assets—keeping it enabled requires building the SPA as part of CI.
 - Local runs can reproduce the same contract by executing `make web-build` before `pytest -q tests/test_spa_mount.py`.
 - Backend tests spin up the API with `create_app(Settings(test_mode=True, disable_background=True))` to skip background jobs and keep suites fast.
+
+## Live Status Bar
+- The scheduler writes hedge intents to `data/live_status_bar.csv` with columns `Hedge, Cost % NAV, Status, Expiry, Trigger, TriggerTimeTRT, Notes`.
+- Rule defaults map to `RULE_A_VIX_BACKWARDATION`, `RULE_B_HY_SHOCK`, and `RULE_C_MSB_60x3D`; rule C rows are marked `LIVE` and deduped by appending “already hedged; maintain size”.
+- UI consumers can tail the CSV for automation while `/metrics` surfaces `psd_livebar_rows_total` to monitor row churn.
