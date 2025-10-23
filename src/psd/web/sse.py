@@ -24,7 +24,7 @@ class SseManager:
     ) -> None:
         self._heartbeat_interval = max(1, int(heartbeat_interval))
         self._queue_size = max(1, int(queue_size))
-        self._queues: set[asyncio.Queue[str]] = set()
+        self._queues: dict[asyncio.Queue[str], asyncio.AbstractEventLoop] = {}
         self._event_id = 0
         self._lock = threading.Lock()
 
@@ -34,13 +34,14 @@ class SseManager:
 
     def subscribe(self) -> asyncio.Queue[str]:
         queue: asyncio.Queue[str] = asyncio.Queue(maxsize=self._queue_size)
+        loop = asyncio.get_running_loop()
         with self._lock:
-            self._queues.add(queue)
+            self._queues[queue] = loop
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue[str]) -> None:
         with self._lock:
-            self._queues.discard(queue)
+            self._queues.pop(queue, None)
 
     def broadcast(self, event_type: str, payload: dict[str, Any]) -> None:
         if not isinstance(payload, dict):
@@ -48,24 +49,33 @@ class SseManager:
         with self._lock:
             self._event_id += 1
             event_id = self._event_id
-            queues = list(self._queues)
-
+            targets = list(self._queues.items())
         message = _format_event(event_id, event_type, payload)
-        for queue in queues:
+        for queue, loop in targets:
             try:
-                queue.put_nowait(message)
-            except asyncio.QueueFull:
-                try:
-                    _ = queue.get_nowait()
-                except QueueEmpty:
-                    pass
-                try:
-                    queue.put_nowait(message)
-                except asyncio.QueueFull:
-                    self.unsubscribe(queue)
+                loop.call_soon_threadsafe(self._deliver_message, queue, message)
+            except RuntimeError:
+                with self._lock:
+                    self._queues.pop(queue, None)
 
     def heartbeat_message(self) -> str:
         return "event: heartbeat\ndata: {}\n\n"
+
+    def _deliver_message(self, queue: asyncio.Queue[str], message: str) -> None:
+        try:
+            queue.put_nowait(message)
+            return
+        except asyncio.QueueFull:
+            try:
+                _ = queue.get_nowait()
+            except QueueEmpty:
+                pass
+            try:
+                queue.put_nowait(message)
+                return
+            except asyncio.QueueFull:
+                with self._lock:
+                    self._queues.pop(queue, None)
 
 
 def _format_event(event_id: int, event_type: str, payload: dict[str, Any]) -> str:
