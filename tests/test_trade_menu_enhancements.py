@@ -2,19 +2,36 @@ import builtins
 import importlib
 import json
 import os
+from datetime import date
 from pathlib import Path
+
+import pandas as pd
 
 import main
 
 
 def _drive_menu(monkeypatch, inputs, fmt="excel", quiet=True):
     inp = iter(inputs)
-    mock_input = lambda _="": next(inp)
+    mock_input = lambda _="": next(inp, "0")
     # Route both top-level and prompt-aware inputs through the same iterator
     monkeypatch.setattr(builtins, "input", mock_input)
     monkeypatch.setattr(main, "input", mock_input)
     import portfolio_exporter.menus.trade as trade
+
     monkeypatch.setattr(trade, "prompt_input", mock_input)
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.trades_report._load_trades",
+        lambda: pd.DataFrame(),
+    )
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.trades_report._load_open_orders",
+        lambda: pd.DataFrame(),
+    )
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.trades_report.prompt_date_range",
+        lambda: (date(2025, 1, 1), date(2025, 1, 1)),
+        raising=False,
+    )
     # Configure args
     main.parse_args = lambda: type(
         "Args",
@@ -52,6 +69,7 @@ def test_open_last_ticket_copies_json(monkeypatch, tmp_path):
     p.write_text(json.dumps(ticket))
 
     import portfolio_exporter.menus.trade as trade
+
     monkeypatch.setattr(trade, "_copy_to_clipboard", lambda txt: True)
     monkeypatch.setattr(
         "portfolio_exporter.core.io.latest_file", lambda base, fmt=None: str(p)
@@ -68,7 +86,16 @@ def test_filters_persist_in_memory(monkeypatch, tmp_path):
     os.chdir(tmp_path)
     (tmp_path / ".codex").mkdir(exist_ok=True)
     (tmp_path / ".codex" / "memory.json").write_text(
-        json.dumps({"preferences": {}, "decisions": [], "changelog": [], "tasks": [], "questions": [], "workflows": {}})
+        json.dumps(
+            {
+                "preferences": {},
+                "decisions": [],
+                "changelog": [],
+                "tasks": [],
+                "questions": [],
+                "workflows": {},
+            }
+        )
     )
 
     # Stub trades_report.main to emit outputs
@@ -76,6 +103,7 @@ def test_filters_persist_in_memory(monkeypatch, tmp_path):
         "portfolio_exporter.scripts.trades_report.main",
         lambda argv: {"outputs": [str(tmp_path / "trades_filtered.csv")]},
     )
+
     # Point settings.output_dir to tmp_path
     class S:
         output_dir = tmp_path
@@ -104,4 +132,3 @@ def test_filters_persist_in_memory(monkeypatch, tmp_path):
     assert prefs.get("effect") == "Open"
     assert prefs.get("structure") == "vertical"
     assert prefs.get("top_n") == 10
-

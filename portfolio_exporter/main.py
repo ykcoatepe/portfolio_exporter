@@ -15,10 +15,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional
-
 
 SCRIPTS_PACKAGE_DIR = Path(__file__).parent / "scripts"
 DEFAULT_MEMORY_PATH = Path(".codex/memory.json")
@@ -70,11 +69,7 @@ def read_workflow(memory_path: Path, workflow_name: str) -> list[str]:
         return []
 
     # Expected shape: { "workflows": { "submenu_queue": { "<name>": ["task", ...] } } }
-    wf = (
-        data.get("workflows", {})
-        .get("submenu_queue", {})
-        .get(workflow_name, [])
-    )
+    wf = data.get("workflows", {}).get("submenu_queue", {}).get(workflow_name, [])
     if isinstance(wf, list):
         return [str(x) for x in wf]
     return []
@@ -148,9 +143,7 @@ def _print_registry(tasks: list[Task]) -> None:
         print(f"  {i:>2}. {t.name}  ({t.module})")
 
 
-def _resolve_queue(
-    registry: list[Task], requested: list[str]
-) -> list[Task]:
+def _resolve_queue(registry: list[Task], requested: list[str]) -> list[Task]:
     reg_by_name = {t.name: t for t in registry}
     queue: list[Task] = []
     for name in requested:
@@ -210,7 +203,7 @@ def _print_plan(queue: list[Task]) -> None:
     print(f"Total tasks: {len(queue)}")
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -218,9 +211,12 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Custom tasks registry (functions executed in-process)
     def micro_momo() -> None:
-        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
-        import datetime as _dt
         import pathlib
+
+        # Lightweight import; used only when symbols provided
+        from portfolio_exporter.core.symbols import load_alias_map, normalize_symbols
+        from portfolio_exporter.scripts import micro_momo_analyzer as _mm
+
         # Import lazily to keep CLI startup fast
         from tools.logbook import logbook_on_success
 
@@ -233,11 +229,49 @@ def main(argv: Optional[List[str]] = None) -> int:
             ("tests/data/micro_momo_config.json" if pe_test else None),
         ]
         cfg = next((p for p in cfg_candidates if p and os.path.exists(p)), None)
-        inp = os.getenv("MOMO_INPUT") or "tests/data/meme_scan_sample.csv"
+        inp = os.getenv("MOMO_INPUT")
+        if not inp:
+            search_dirs = [
+                os.getenv("MOMO_INPUT_DIR"),
+                ".",
+                "./data",
+                "./scans",
+                "./inputs",
+                "tests/data" if pe_test else None,
+            ]
+            patterns = tuple(
+                (os.getenv("MOMO_INPUT_GLOB") or "meme_scan_*.csv").split(",")
+            )
+            latest: tuple[float, pathlib.Path] | None = None
+            for directory in search_dirs:
+                if not directory:
+                    continue
+                base = pathlib.Path(directory)
+                if not base.exists():
+                    continue
+                for pattern in patterns:
+                    if not pattern:
+                        continue
+                    for candidate in sorted(base.glob(pattern)):
+                        try:
+                            cand_mtime = candidate.stat().st_mtime
+                        except OSError:
+                            continue
+                        if latest is None or cand_mtime >= latest[0]:
+                            latest = (cand_mtime, candidate)
+            if latest:
+                inp = str(latest[1])
+            elif pe_test:
+                inp = "tests/data/meme_scan_sample.csv"
         out_dir = os.getenv("MOMO_OUT") or "out"
-        argv2: list[str] = ["--input", inp, "--out_dir", out_dir]
+        argv2: list[str] = ["--out_dir", out_dir]
         if cfg:
             argv2 += ["--cfg", cfg]
+        session_env = os.getenv("MOMO_SESSION")
+        if session_env:
+            argv2 += ["--session", session_env]
+        if inp:
+            argv2 += ["--input", inp]
         chd = os.getenv("MOMO_CHAINS_DIR")
         if chd:
             argv2 += ["--chains_dir", chd]
@@ -251,7 +285,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             except Exception:
                 sym = ""
         if sym:
-            argv2 += ["--symbols", sym]
+            # Normalize symbols using alias map (env path has priority)
+            alias_map = load_alias_map([os.getenv("MOMO_ALIASES_PATH") or ""])  # type: ignore[arg-type]
+            normalized = normalize_symbols(sym.split(","), alias_map)
+            argv2 += ["--symbols", ",".join(normalized)]
         # Optional data mode/providers/offline passthrough via environment
         dm = os.getenv("MOMO_DATA_MODE")
         if dm:
@@ -277,15 +314,94 @@ def main(argv: Optional[List[str]] = None) -> int:
                 files=["portfolio_exporter/scripts/micro_momo_analyzer.py"],
             )
 
-    CUSTOM_TASKS: Dict[str, Callable[[], None]] = {
+    def micro_momo_go() -> None:
+        import os as _os
+
+        from portfolio_exporter.scripts import micro_momo_go as _go
+
+        argv: list[str] = []
+        pe_test = _os.getenv("PE_TEST_MODE")
+
+        cfg_env = _os.getenv("MOMO_CFG")
+        if cfg_env:
+            argv += ["--cfg", cfg_env]
+        else:
+            for path in (
+                "micro_momo_config.json",
+                "config/micro_momo_config.json",
+                "configs/micro_momo_config.json",
+                ("tests/data/micro_momo_config.json" if pe_test else None),
+            ):
+                if path and _os.path.exists(path):
+                    argv += ["--cfg", path]
+                    break
+
+        out_dir = _os.getenv("MOMO_OUT")
+        if out_dir:
+            argv += ["--out_dir", out_dir]
+
+        providers = _os.getenv("MOMO_PROVIDERS")
+        if providers:
+            argv += ["--providers", providers]
+
+        data_mode = _os.getenv("MOMO_DATA_MODE")
+        if data_mode:
+            argv += ["--data-mode", data_mode]
+
+        webhook = _os.getenv("MOMO_WEBHOOK")
+        if webhook:
+            argv += ["--webhook", webhook]
+
+        thread = _os.getenv("MOMO_THREAD")
+        if thread:
+            argv += ["--thread", thread]
+
+        if _os.getenv("MOMO_OFFLINE") in ("1", "true", "True", "yes", "YES"):
+            argv += ["--offline"]
+        if _os.getenv("MOMO_AUTO_PRODUCERS") in ("1", "true", "True", "yes", "YES"):
+            argv += ["--auto-producers"]
+        if _os.getenv("MOMO_START_SENTINEL") in ("1", "true", "True", "yes", "YES"):
+            argv += ["--start-sentinel"]
+
+        symbols = _os.getenv("MOMO_SYMBOLS") or ""
+        if not symbols:
+            try:
+                from portfolio_exporter.core.memory import get_pref
+
+                symbols = get_pref("micro_momo.symbols") or ""
+            except Exception:
+                symbols = ""
+        if symbols:
+            try:
+                from portfolio_exporter.core.symbols import (
+                    load_alias_map,
+                    normalize_symbols,
+                )
+
+                alias_map = load_alias_map([_os.getenv("MOMO_ALIASES_PATH") or ""])
+                normalized = normalize_symbols(
+                    [s for s in symbols.split(",") if s.strip()], alias_map
+                )
+                if normalized:
+                    argv += ["--symbols", ",".join(normalized)]
+            except Exception:
+                # Fallback: pass raw symbols string if normalization fails
+                argv += ["--symbols", symbols]
+
+        _go.main(argv)
+
+    CUSTOM_TASKS: dict[str, Callable[[], None]] = {
         "micro-momo": micro_momo,
         "momo": micro_momo,
+        "micro-momo-go": micro_momo_go,
+        "momo-go": micro_momo_go,
     }
 
     # Optional bootstrap of memory file
     if args.bootstrap_memory:
         try:
-            import subprocess, sys
+            import subprocess
+            import sys
 
             cmd = [
                 sys.executable,

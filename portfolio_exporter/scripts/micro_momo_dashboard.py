@@ -3,9 +3,9 @@ from __future__ import annotations
 import argparse
 import csv
 import html
-import os
+from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 CSS = (
     "body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px}"
@@ -19,8 +19,14 @@ CSS = (
 )
 
 
-def _count_tiers(rows: List[Dict[str, Any]]) -> Dict[str, int]:
-    out: Dict[str, int] = {"A": 0, "B": 0, "C": 0}
+def _count_post_halt(triggers: list[dict[str, Any]]) -> int:
+    return sum(
+        1 for r in triggers if (str(r.get("event_type") or "").lower() == "post_halt")
+    )
+
+
+def _count_tiers(rows: list[dict[str, Any]]) -> dict[str, int]:
+    out: dict[str, int] = {"A": 0, "B": 0, "C": 0}
     for r in rows:
         t = (r.get("tier") or "").strip()
         if t in out:
@@ -28,8 +34,10 @@ def _count_tiers(rows: List[Dict[str, Any]]) -> Dict[str, int]:
     return out
 
 
-def _count_provenance(rows: List[Dict[str, Any]], field: str = "src_vwap") -> Dict[str, int]:
-    out: Dict[str, int] = {"artifact": 0, "yahoo": 0, "csv": 0, "": 0}
+def _count_provenance(
+    rows: list[dict[str, Any]], field: str = "src_vwap"
+) -> dict[str, int]:
+    out: dict[str, int] = {"artifact": 0, "yahoo": 0, "csv": 0, "": 0}
     for r in rows:
         v = (r.get(field) or "").strip().lower()
         if v in out:
@@ -39,7 +47,20 @@ def _count_provenance(rows: List[Dict[str, Any]], field: str = "src_vwap") -> Di
     return out
 
 
-def _sum_concurrency(rows: List[Dict[str, Any]]) -> int:
+def _count_data_errors(rows: list[dict[str, Any]]) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for r in rows:
+        raw = str(r.get("data_errors") or "")
+        if not raw:
+            continue
+        for part in raw.split(";"):
+            key = part.strip()
+            if key:
+                counts[key] += 1
+    return counts
+
+
+def _sum_concurrency(rows: list[dict[str, Any]]) -> int:
     s = 0
     for r in rows:
         try:
@@ -49,10 +70,11 @@ def _sum_concurrency(rows: List[Dict[str, Any]]) -> int:
     return s
 
 
-def _summary_block(scored: List[Dict[str, Any]]) -> str:
+def _summary_block(scored: list[dict[str, Any]]) -> str:
     tiers = _count_tiers(scored)
     prov = _count_provenance(scored, "src_vwap")
     guards = _sum_concurrency(scored)
+    errors = _count_data_errors(scored)
     html_parts = [
         "<div class='small' style='margin:6px 0 14px 0'>",
         f"Tiers: <span class='badge A'>A {tiers['A']}</span> · ",
@@ -65,23 +87,43 @@ def _summary_block(scored: List[Dict[str, Any]]) -> str:
         f"Guards: <kbd>concurrency_guard</kbd> {guards}",
         "</div>",
     ]
+    if errors:
+        err_bits = " · ".join(
+            f"{html.escape(k)} {v}" for k, v in sorted(errors.items())
+        )
+        html_parts.append(f"<div class='small'>Data issues: {err_bits}</div>")
+    warn_warmup = any(
+        "warming up" in str(r.get("entry_trigger", "")).lower()
+        and str(r.get("structure_template") or r.get("structure")) == "Template"
+        for r in scored
+    )
+    if warn_warmup:
+        html_parts.append(
+            "<div class='small'>Heads-up: Force-live refresh shows 'Warming up' Template rows until intraday bars arrive.</div>"
+        )
     return "".join(html_parts)
 
 
-def _read_csv(path: Path) -> List[Dict[str, Any]]:
+def _read_csv(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     with path.open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
-
     # (Note: _summary_block replaces the older _summary implementation.)
 
 
-def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
+def _section(title: str, rows: list[dict[str, Any]], anchor: str) -> str:
     if not rows:
         return f"<h2 id='{html.escape(anchor)}'>{html.escape(title)}</h2><div class='small'>No data</div>"
-    cols = list(rows[0].keys())
+    # build union of columns across all rows to avoid dropping sparse diagnostics
+    cols: list[str] = []
+    seen_cols: set[str] = set()
+    for row in rows:
+        for col in row.keys():
+            if col not in seen_cols:
+                seen_cols.add(col)
+                cols.append(col)
     wanted = [
         c
         for c in [
@@ -104,13 +146,15 @@ def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
     seen = set(wanted)
     cols = wanted + [c for c in cols if c not in seen]
     head = "".join(f"<th>{html.escape(c)}</th>" for c in cols)
-    body_rows: List[str] = []
+    body_rows: list[str] = []
     for r in rows:
-        tds: List[str] = []
+        tds: list[str] = []
         for c in cols:
             val = r.get(c, "")
             if c == "tier" and val:
-                tds.append(f"<td><span class='badge {html.escape(val)}'>{html.escape(val)}</span></td>")
+                tds.append(
+                    f"<td><span class='badge {html.escape(val)}'>{html.escape(val)}</span></td>"
+                )
             else:
                 tds.append(f"<td>{html.escape(str(val))}</td>")
         body_rows.append("<tr>" + "".join(tds) + "</tr>")
@@ -118,7 +162,7 @@ def _section(title: str, rows: List[Dict[str, Any]], anchor: str) -> str:
     return f"<h2 id='{html.escape(anchor)}'>{html.escape(title)}</h2>" + table
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser("micro-momo-dashboard")
     ap.add_argument("--out_dir", default="out")
     args = ap.parse_args(argv)
@@ -132,7 +176,19 @@ def main(argv: List[str] | None = None) -> int:
     eod = _read_csv(out / "micro_momo_eod_summary.csv")
     triggers = _read_csv(out / "micro_momo_triggers_log.csv")
 
-    summary = _summary_block(scored) if scored else "<div class='small'>No scored rows to summarize.</div>"
+    summary = (
+        _summary_block(scored)
+        if scored
+        else "<div class='small'>No scored rows to summarize.</div>"
+    )
+    # Add post-halt re-arm count when trigger log present
+    try:
+        post_halt_n = _count_post_halt(triggers)
+        summary += (
+            f"<div class='small'>Post-halt re-arms used: <kbd>{post_halt_n}</kbd></div>"
+        )
+    except Exception:
+        pass
 
     html_doc = [
         "<!doctype html><meta charset='utf-8'><title>Micro-MOMO Dashboard</title>",

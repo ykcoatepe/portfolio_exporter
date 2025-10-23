@@ -46,6 +46,7 @@ def test_daily_report_full(monkeypatch, tmp_path):
 
 def test_daily_report_missing(monkeypatch, tmp_path):
     data_dir = Path(__file__).parent / "data"
+
     def _latest(name: str, fmt: str = "csv", outdir: str | None = None):
         mapping = {"portfolio_greeks_positions": data_dir / "positions_sample.csv"}
         return mapping.get(name)
@@ -94,6 +95,8 @@ def test_daily_report_debug_timings_file(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "portfolio_exporter.core.io.latest_file", _fake_latest_factory(data_dir)
     )
-    res = daily_report.main(["--json", "--output-dir", str(tmp_path), "--debug-timings"])
+    res = daily_report.main(
+        ["--json", "--output-dir", str(tmp_path), "--debug-timings"]
+    )
     assert any(str(p).endswith("timings.csv") for p in res["outputs"])
     assert (tmp_path / "timings.csv").exists()

@@ -44,4 +44,3 @@ def test_export_ib_basket_and_notes(tmp_path: Path) -> None:
     assert notes.exists()
     txt = notes.read_text()
     assert "ABC DebitCall" in txt and "XYZ BearCallCredit" in txt
-

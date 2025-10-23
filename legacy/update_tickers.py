@@ -10,7 +10,7 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     IB = None  # type: ignore
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 4  # dedicated clientId
+IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7496, 4  # dedicated clientId (set 7497 for paper)
 PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}
 TICKERS_FILE = "tickers_live.txt"
 

@@ -84,8 +84,32 @@ def test_expiry_picker_in_window_prefers_oi():
     for e, oi in ((e_low_oi, 100), (e_high_oi, 500)):
         for k in range(-2, 3):
             strike = spot * (1 + k * 0.01)
-            chain.append({"symbol": "TEST", "expiry": e, "right": "C", "strike": strike, "bid": 1.0, "ask": 1.2, "last": 1.1, "volume": 0, "oi": oi})
-            chain.append({"symbol": "TEST", "expiry": e, "right": "P", "strike": strike, "bid": 1.0, "ask": 1.2, "last": 1.1, "volume": 0, "oi": oi})
+            chain.append(
+                {
+                    "symbol": "TEST",
+                    "expiry": e,
+                    "right": "C",
+                    "strike": strike,
+                    "bid": 1.0,
+                    "ask": 1.2,
+                    "last": 1.1,
+                    "volume": 0,
+                    "oi": oi,
+                }
+            )
+            chain.append(
+                {
+                    "symbol": "TEST",
+                    "expiry": e,
+                    "right": "P",
+                    "strike": strike,
+                    "bid": 1.0,
+                    "ask": 1.2,
+                    "last": 1.1,
+                    "volume": 0,
+                    "oi": oi,
+                }
+            )
 
     picked = _pick_expiry_by_dte(chain, spot, dte_min=3, dte_max=10, today=today)
     assert picked == e_high_oi
@@ -101,7 +125,9 @@ def test_expiry_picker_weekly_above_max():
     # No in-window expiries; one just above max and on Friday
     dte_min, dte_max = 3, 7
     e1 = yyyymmdd(today + timedelta(days=2))  # below min
-    e2 = yyyymmdd(today + timedelta(days=10))  # above max by 3 (prefer, and it's a Monday 2025-01-20)
+    e2 = yyyymmdd(
+        today + timedelta(days=10)
+    )  # above max by 3 (prefer, and it's a Monday 2025-01-20)
     # Ensure a Friday within +7: next Friday after dte_max
     e_friday = yyyymmdd(today + timedelta(days=7))  # exact +7 and Friday 2025-01-17
 
@@ -109,9 +135,23 @@ def test_expiry_picker_weekly_above_max():
     for e in (e1, e2, e_friday):
         for k in range(-2, 3):
             strike = spot * (1 + k * 0.01)
-            chain.append({"symbol": "TEST", "expiry": e, "right": "C", "strike": strike, "bid": 1.0, "ask": 1.2, "last": 1.1, "volume": 0, "oi": 100})
+            chain.append(
+                {
+                    "symbol": "TEST",
+                    "expiry": e,
+                    "right": "C",
+                    "strike": strike,
+                    "bid": 1.0,
+                    "ask": 1.2,
+                    "last": 1.1,
+                    "volume": 0,
+                    "oi": 100,
+                }
+            )
 
-    picked = _pick_expiry_by_dte(chain, spot, dte_min=dte_min, dte_max=dte_max, today=today)
+    picked = _pick_expiry_by_dte(
+        chain, spot, dte_min=dte_min, dte_max=dte_max, today=today
+    )
     # Prefer the Friday within +7 days above max (e_friday)
     assert picked == e_friday
 

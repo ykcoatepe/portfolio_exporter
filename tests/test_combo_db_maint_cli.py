@@ -30,7 +30,9 @@ def test_json_only(tmp_path):
 
 
 def test_fix_writes_files(tmp_path):
-    result = _run(["--fix", "--output-dir", str(tmp_path), "--json", "--debug-timings"], tmp_path)
+    result = _run(
+        ["--fix", "--output-dir", str(tmp_path), "--json", "--debug-timings"], tmp_path
+    )
     data = json.loads(result.stdout)
     assert (tmp_path / "combo_db_before.csv").exists()
     assert (tmp_path / "combo_db_after.csv").exists()

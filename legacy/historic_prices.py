@@ -33,7 +33,7 @@ try:
 except ImportError:
     IB_AVAILABLE = False
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 3  # separate clientId for historic pull
+IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7496, 3  # separate clientId for historic pull (use 7497 for paper)
 
 EXTRA_TICKERS = ["SPY", "QQQ", "IWM", "^VIX", "DX-Y.NYB"]  # core indices
 PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}

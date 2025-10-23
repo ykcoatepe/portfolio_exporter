@@ -1,18 +1,17 @@
 import io
 import os
+import socket
 import sys
 import zipfile
-import socket
 from argparse import ArgumentParser
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, List, Tuple
 from zoneinfo import ZoneInfo
-
-from portfolio_exporter.core.config import settings
 
 from fpdf import FPDF
 from pypdf import PdfWriter
+from rich.console import Console
 from rich.progress import (
     BarColumn,
     Progress,
@@ -20,7 +19,8 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from rich.console import Console
+
+from portfolio_exporter.core.config import settings
 
 # Directory where orchestrated dataset and script outputs are stored.
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
@@ -29,7 +29,7 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 _PREFLIGHT_CACHE: dict | None = None
 
 
-def run_script(func: Callable[[], None]) -> List[str]:
+def run_script(func: Callable[[], None]) -> list[str]:
     """Run a script callable and return new or modified files in OUTPUT_DIR."""
     out_dir = OUTPUT_DIR
     before_mtimes: dict[str, float] = {}
@@ -53,7 +53,7 @@ def run_script(func: Callable[[], None]) -> List[str]:
     return files_out
 
 
-def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
+def merge_pdfs(files_by_script: list[tuple[str, list[str]]], dest: str) -> None:
     """Merge the given PDF files into a single output, adding bookmarks for each script and title pages, skipping non-PDF files."""
     merger = PdfWriter()
     for title, files in files_by_script:
@@ -86,7 +86,7 @@ def merge_pdfs(files_by_script: List[Tuple[str, List[str]]], dest: str) -> None:
     merger.close()
 
 
-def create_zip(files: List[str], dest: str | Path) -> tuple[int, list[str]]:
+def create_zip(files: list[str], dest: str | Path) -> tuple[int, list[str]]:
     """Create a zip archive containing the given files, skipping missing.
 
     - De-duplicates input paths while preserving order to avoid duplicate
@@ -121,7 +121,7 @@ def create_zip(files: List[str], dest: str | Path) -> tuple[int, list[str]]:
     return added, missing
 
 
-def cleanup(files: List[str]) -> None:
+def cleanup(files: list[str]) -> None:
     """Delete the given files, ignoring missing paths."""
     for path in files:
         try:
@@ -155,7 +155,7 @@ def run(
         ("daily_pulse", lambda: daily_pulse.run(fmt=fmt)),
     ]
 
-    files_by_script: List[Tuple[str, List[str]]] = []
+    files_by_script: list[tuple[str, list[str]]] = []
     failed: list[str] = []
     # Honor PE_QUIET by routing progress output to a sink
     quiet_env = os.getenv("PE_QUIET") not in (None, "", "0")
@@ -238,7 +238,7 @@ def run(
             if not quiet and not no_pretty:
                 try:
                     from rich.table import Table
-                    
+
                     tbl = Table(title="Missing files", show_header=True)
                     tbl.add_column("Path")
                     limit = 30
@@ -408,20 +408,23 @@ def preflight_check(no_pretty: bool = False) -> dict:
     # IBKR socket check (best-effort)
     if report["imports"]["ib_insync"]:
         try:
-            with socket.create_connection(("127.0.0.1", 7497), timeout=0.25):
+            with socket.create_connection(("127.0.0.1", 7496), timeout=0.25):
                 pass
             report["ibkr_socket_ok"] = True
         except Exception:
             report["ibkr_socket_ok"] = False
             report["warnings"].append(
-                "IBKR TWS/Gateway not reachable on 127.0.0.1:7497"
+                "IBKR TWS/Gateway not reachable on 127.0.0.1:7496 (use 7497 for paper)"
             )
 
     # CSV header sanity checks (best-effort)
     from portfolio_exporter.core import io as io_core
 
     checks = [
-        ("portfolio_greeks_positions", {"underlying", "right", "strike", "expiry", "qty"}),
+        (
+            "portfolio_greeks_positions",
+            {"underlying", "right", "strike", "expiry", "qty"},
+        ),
         ("live_quotes", {"symbol", "bid", "ask"}),
     ]
     for name, expected in checks:
@@ -436,7 +439,7 @@ def preflight_check(no_pretty: bool = False) -> dict:
         if path and Path(path).exists():
             try:
                 # minimal header reader without pandas dependency
-                with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+                with open(path, encoding="utf-8", errors="ignore") as fh:
                     header = fh.readline().strip().split(",")
                 present = {h.strip().strip('"').lower() for h in header if h}
                 missing = sorted(col for col in expected if col not in present)
@@ -473,7 +476,7 @@ def main() -> None:
     parser.add_argument(
         "--expect",
         metavar="JSON",
-        help="path to JSON list or {\"files\":[...]} of expected output files",
+        help='path to JSON list or {"files":[...]} of expected output files',
     )
     parser.add_argument(
         "--preflight",
@@ -503,9 +506,13 @@ def main() -> None:
         try:
             import json
 
-            with open(args.expect, "r", encoding="utf-8") as fh:
+            with open(args.expect, encoding="utf-8") as fh:
                 data = json.load(fh)
-            if isinstance(data, dict) and "files" in data and isinstance(data["files"], list):
+            if (
+                isinstance(data, dict)
+                and "files" in data
+                and isinstance(data["files"], list)
+            ):
                 expect = [str(x) for x in data["files"]]
             elif isinstance(data, list):
                 expect = [str(x) for x in data]

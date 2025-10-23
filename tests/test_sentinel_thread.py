@@ -31,20 +31,27 @@ def test_sentinel_posts_thread_ts(monkeypatch, tmp_path: Path):
         providers_pkg.ib_provider, "get_quote", fake_get_quote, raising=True
     )
     monkeypatch.setattr(
-        providers_pkg.ib_provider, "get_intraday_bars", fake_get_intraday_bars, raising=True
+        providers_pkg.ib_provider,
+        "get_intraday_bars",
+        fake_get_intraday_bars,
+        raising=True,
     )
 
     # Capture emit_alerts call
     captured = {"called": False, "per_item": None, "extra": None}
 
-    def fake_emit(alerts, url, dry_run, offline, per_item=False, extra=None):  # noqa: ANN001
+    def fake_emit(
+        alerts, url, dry_run, offline, per_item=False, extra=None
+    ):  # noqa: ANN001
         captured["called"] = True
         captured["per_item"] = per_item
         captured["extra"] = extra
         return {"sent": len(alerts), "failed": []}
 
     monkeypatch.setattr(
-        "portfolio_exporter.scripts.micro_momo_sentinel.emit_alerts", fake_emit, raising=True
+        "portfolio_exporter.scripts.micro_momo_sentinel.emit_alerts",
+        fake_emit,
+        raising=True,
     )
 
     # Stop the loop after first iteration
@@ -73,4 +80,7 @@ def test_sentinel_posts_thread_ts(monkeypatch, tmp_path: Path):
 
     assert captured["called"] is True
     assert captured["per_item"] is True
-    assert isinstance(captured["extra"], dict) and captured["extra"].get("thread_ts") == "12345"
+    assert (
+        isinstance(captured["extra"], dict)
+        and captured["extra"].get("thread_ts") == "12345"
+    )

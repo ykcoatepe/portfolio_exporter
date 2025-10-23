@@ -1,4 +1,5 @@
 """Environment and data sanity checks."""
+
 from __future__ import annotations
 
 import argparse
@@ -30,7 +31,7 @@ def cli(ns: argparse.Namespace) -> dict[str, Any]:
             fixes.extend(
                 [
                     "fix: export OUTPUT_DIR=~/pe",
-                    "fix: mkdir -p \"$OUTPUT_DIR\"",
+                    'fix: mkdir -p "$OUTPUT_DIR"',
                 ]
             )
         if "CP_REFRESH_TOKEN" in missing:

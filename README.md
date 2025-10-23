@@ -12,10 +12,65 @@ yfinance can be found in [docs/PDR.md](docs/PDR.md).
 | Script | Description |
 | ------ | ----------- |
 | `market_analyzer.py` | A unified tool for market analysis, including pre-market reports, live data feeds, technical signals, portfolio greeks, and option chain snapshots. Use `--mode pre-market`, `--mode live`, `--mode tech-signals`, `--greeks`, or `--option-chain <SYMBOL>`. |
-| `update_tickers.py` | Writes the current IBKR stock positions to `tickers_live.txt` so other scripts always use a fresh portfolio. |
+| `update_tickers.py` | Syncs IBKR equities and option underlyings (deduped) to `tickers_live.txt` so other scripts always use fresh data. |
 | `net_liq_history_export.py` | Creates an end-of-day Net-Liq history CSV from TWS logs or Client Portal data and can optionally plot an equity curve. Supports `--excel` and `--pdf` outputs. |
 | `trades_report.py` | Exports executions and open orders from IBKR to CSV for a chosen date range. Add `--excel` or `--pdf` for formatted reports. |
 | `daily_report.py` | Render a one-page HTML/PDF snapshot from the latest portfolio greeks CSVs. |
+
+## Session Detection & Overrides
+
+- `GET /session` returns a canonical market session (`RTH`, `ETH`, or `CLOSED`) with `as_of`, `rth_open`, `rth_close`, and timezone metadata in `America/New_York`.
+- `/stats` now surfaces `session` in the root payload, while `/state` keeps the legacy string field and adds a structured `session_info` (and mirrors it under `meta.session`).
+- Detection prefers `exchange_calendars` (or `pandas_market_calendars`) for the XNYS schedule, falling back to fixed weekday windows (04:00–09:30, 09:30–16:00, 16:00–20:00 ET) when calendars are unavailable.
+- Development override: set `FORCE_SESSION_STATE=RTH|ETH|CLOSED` or hit `/debug/session/override/{state}` and `/debug/session/clear` to pin the backend state during local testing.
+- The PSD Stats ribbon consumes the same object through `useSession`, so the UI reflects overrides instantly and shows an `updated …` timer derived from `as_of`.
+
+### Utilities → Sentinel (Micro‑MOMO)
+
+A lightweight background watcher that monitors scored Micro‑MOMO candidates and posts triggers.
+
+- Start/Stop/Status live in the TUI under Pre‑Market → Sentinel.
+- Writes PID and metadata under `out/.pid/` for safe lifecycle management.
+- Shows an “Active positions” view sourced from `out/micro_momo_journal.csv` (Pending/Triggered).
+
+TR-local schedule: Sentinel computes today’s Turkey-local times from U.S. RTH 09:30–16:00 ET via timezone conversion (DST-aware). By default it hard-resets at RTH open, optionally re-arms at 13:30 ET (TR-local time displayed), disallows new signals after 15:30 ET, and can honor a single post-halt re-arm per day. You can toggle afternoon/halts behavior from the Sentinel menu. Times shown/logged are Europe/Istanbul while staying aligned to the U.S. session and DST automatically.
+
+Config precedence at runtime: CLI > ENV (`MOMO_SEN_*`) > Menu preferences (`.codex/memory.json` → `preferences.sentinel.*`) > `micro_momo_config.json` > defaults. This keeps runtime overrides in the environment while persisting simple operator toggles in repo memory; TR-local schedule remains DST-safe via `zoneinfo`.
+
+Early close aware: set `MOMO_SEN_EARLY_CLOSE_TODAY=1` or provide a JSON list via `MOMO_SEN_EARLY_CLOSE_JSON` to auto-shift today’s ET close to 1:00 p.m. and adjust the TR-local schedule accordingly.
+
+Menu usage
+
+1. `python main.py` → select `Pre‑Market` → `Sentinel`.
+2. Options: `Start` (background), `Stop` (graceful), `Status`, `Active positions`.
+
+Environment (optional)
+
+- `MOMO_SCORED` default `out/micro_momo_scored.csv`
+- `MOMO_CFG` default `micro_momo_config.json`
+- `MOMO_OUT` default `out`
+- `MOMO_INTERVAL` default `10` seconds
+- `MOMO_WEBHOOK`, `MOMO_THREAD` for alerting
+- `MOMO_OFFLINE=1` to avoid live fetches
+
+Files created
+
+- `out/.pid/momo_sentinel.pid`
+- `out/.pid/momo_sentinel.meta.json`
+
+Behavior
+
+- Start uses a detached `subprocess.Popen` of `portfolio_exporter.scripts.micro_momo_sentinel` and writes a PID file.
+- Stop sends a graceful terminate (SIGTERM) and falls back to kill if needed.
+- Status validates the PID (uses `psutil` when available; falls back to `os.kill(pid, 0)`).
+
+Direct CLI (advanced)
+
+```bash
+python -m portfolio_exporter.scripts.micro_momo_sentinel \
+  --scored-csv out/micro_momo_scored.csv --cfg micro_momo_config.json \
+  --out_dir out --interval 10 [--webhook ...] [--thread ...] [--offline]
+```
 
 ## Strike Enrichment in Combos
 
@@ -308,6 +363,8 @@ Micro-MOMO is a lightweight shortlist analyzer that operates entirely offline fo
 - Inputs: a scan CSV and optional per-symbol option chain CSVs named `{SYMBOL}_{YYYYMMDD}.csv`.
 - Flow: filters → scoring → tier & direction → structure pick (DebitCall for long, BearCallCredit for short) → sizing → TP/SL → entry trigger.
 
+- Off-hours safety: when the market is closed (TR-local) or intraday signals are unavailable (VWAP/RVOL N/A), the analyzer emits a neutral `Template` structure with a "market-closed" preview trigger to avoid suggesting short entries.
+
 Examples:
 
 ```bash
@@ -331,11 +388,42 @@ python -m portfolio_exporter.scripts.micro_momo_analyzer \
 
 In the app (Pre-Market → Micro‑MOMO Analyzer), you can optionally type a comma‑separated symbol list; leave blank to use the latest `meme_scan_*.csv`.
 
+Clear scanner list: In the Analyzer menu, choose C and type CLEAR to wipe the saved symbols. (We confirm destructive actions per HIG/NNg.)
+
 Outputs when files are enabled:
 - `out/micro_momo_scored.csv`
 - `out/micro_momo_orders.csv`
 
 If a chain file is missing for a symbol, a `Template` structure is emitted with `needs_chain=1` so you can add data or switch to live providers in a later version.
+
+### PSD × Micro-MOMO
+
+Use the PSD CLI wrapper when you want analyzer output formatted like other PSD analyzers.
+
+- JSON-only (offline) mode keeps artifacts disabled and emits results to stdout:
+
+  ```bash
+  python -m apps.cli.run \
+    --analyzer micro_momo_analyzer \
+    --json-only \
+    --out out/micro_momo
+  # or the Make wrapper
+  make psd-run-momo
+  ```
+
+- Full-artifacts mode enables the analyzer's CSV/HTML outputs and returns their paths under `notes.artifacts`:
+
+  ```bash
+  python -m apps.cli.run \
+    --analyzer micro_momo_analyzer \
+    --no-json-only \
+    --full-artifacts \
+    --out out/micro_momo
+  # or the Make wrapper
+  make psd-run-momo-full
+  ```
+
+The CLI understands `--scan-csv`, `--chains-dir`, `--symbols`, and `--cfg-json=@path.json` to mirror the analyzer's native parameters. Outputs respect `--out` and map key files to `scored_csv`, `orders_csv`, `journal_json`, `basket_csv`, and `dashboard_html` when present.
 
 Run via task or menu
 - Task runner: `python main.py --task micro-momo`
@@ -451,6 +539,47 @@ make momo-dashboard
 ```
 
 Includes Scored, Orders, Journal, EOD Summary, and Trigger Log when present.
+
+### Go-Live Orchestrator
+One command for pre-market: analyze → journal → basket → dashboard (optional sentinel).
+
+```bash
+# task runner
+python main.py --task micro-momo-go
+
+# env overrides (examples)
+MOMO_SYMBOLS="F,LDI" MOMO_DATA_MODE=enrich MOMO_PROVIDERS=yahoo \
+MOMO_WEBHOOK=https://hooks.slack.com/services/... MOMO_THREAD=169... \
+MOMO_AUTO_PRODUCERS=1 MOMO_START_SENTINEL=1 \
+python main.py --task micro-momo-go
+```
+
+The orchestrator respects `--offline` and uses your cache/artifacts first.
+
+Make helper:
+
+```bash
+make momo-go
+```
+
+#### Acceptance
+- `make lint`
+- Dry run:
+
+```bash
+MOMO_SYMBOLS="F,LDI" MOMO_DATA_MODE=csv-only \
+python main.py --task micro-momo-go
+```
+
+Expect analyzer+dashboard; sentinel only if `MOMO_START_SENTINEL=1`.
+
+Go‑Live publishes a curated pack to `out/publish/YYYY-MM-DD/` and, on macOS, opens the dashboard in your default browser. Use `--publish-dir` to override the publish root and `--publish` to keep the step enabled (default).
+
+Slack digest (optional)
+- Env switch: set `MOMO_POST_DIGEST=1` to post a one‑shot Block Kit digest after publish.
+- Webhook path: also set `MOMO_WEBHOOK=…` to post via incoming webhooks (no `ts` returned).
+- Web API path: set `MOMO_SLACK_TOKEN=xoxb-…` and `MOMO_SLACK_CHANNEL=C123…` to post with `chat.postMessage` and capture the message `ts`; it is saved under `preferences.slack.digest_ts` and used to auto‑thread the Sentinel when started.
+- Threading: replies are posted by including `thread_ts` in the payload.
 
 ## Micro-MOMO — Operator Runbook (v1.4+)
 
@@ -1044,8 +1173,9 @@ week or the first Friday that is available.
 Scripts that use `ib_insync` (`historic_prices.py`, `live_feed.py` and
 `tech_signals_ibkr.py`) expect the IBKR Trader Workstation or IB Gateway to be
 running locally with API access enabled (default host `127.0.0.1` and port
-`7497`). Ensure your IBKR configuration allows API connections from your machine
-and that the account is logged in before running these scripts.
+`7496`; switch to `7497` for paper/simulated accounts). Ensure your IBKR
+configuration allows API connections from your machine and that the account is
+logged in before running these scripts.
 ## Automation
 
 Schedule `update_tickers.py` with cron or another task scheduler to run daily:
@@ -1054,7 +1184,7 @@ Schedule `update_tickers.py` with cron or another task scheduler to run daily:
 0 8 * * * /usr/bin/python3 /path/to/repo/update_tickers.py
 ```
 
-This keeps `tickers_live.txt` synced with your IBKR portfolio.
+This keeps `tickers_live.txt` synced with your IBKR portfolio (equities + option underlyings, no duplicates).
 
 ## Utilities
 
@@ -1180,3 +1310,44 @@ Troubleshooting
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+### Browser Dashboard (PSD)
+
+Quick start via the Rich ops menu - no manual process juggling required:
+
+```bash
+make run-menu
+# [4] Start PSD   -> ingestor + scanner + web start and the dashboard opens automatically
+# [1] Status      -> show running services and PIDs
+# [2] Stop PSD    -> graceful shutdown (SIGINT->SIGTERM->SIGKILL)
+```
+
+PID file lives at `run/psd-pids.json`; logs stream to `run/ingestor.log`, `run/scanner.log`, and `run/web.log`.
+
+- Access via TUI only: open the app and navigate to "Portfolio Sentinel". The dashboard auto-starts once per session (web + browser + loop).
+- Disable auto-start by setting `psd.auto.start_on_menu: false` in `config/rules.yaml`; then use the menu action `o = Open in browser` to trigger the starter on demand.
+- The server is a minimal FastAPI + WebSocket app; broadcasts are pushed from the in-process scheduler each iteration.
+- PSD now auto-loads positions/quotes via the repo's snapshot normalizer; CSV drops are still picked up when present and demo data remains as the final fallback.
+- Prometheus scrape target: `http://localhost:51127/metrics` (see ingest tick histogram, data age gauge, event counters, and SSE stream gauges).
+- Readiness gate: `GET /ready` returns `{ "ok": true, "data_age_s": <float>, "threshold_s": <float> }` when a snapshot is available and the latest health row is newer than `PSD_READY_MAX_AGE` (default 15s). Missing or stale data yields `503` with `{ "ok": false, "reason": "...", "data_age_s": <float|null> }`.
+
+---
+
+Quick smoke (local):
+- `python -m psd.menus.ops` -> press **4** to start -> `run/psd-pids.json` appears and `run/*.log` fills.
+- Press **1** for status, **2** to stop; confirm the PID file updates or disappears accordingly.
+- `POSITIONS_ENGINE_DEMO=1 python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000` launches the API with the demo dataset if no CSVs are present.
+
+> **SSE Troubleshooting:** If events appear in bursts, check proxy buffering or ensure `X-Accel-Buffering: no` is not ignored by `proxy_ignore_headers`.
+
+#### SSE latency check
+
+- Local smoke: `make sse-check URL=https://your.domain/stream THRESH=3` runs `tools/check_sse.sh` and passes when median inter-arrival stays under the threshold (seconds).
+- CI dispatch: `.github/workflows/psd-smoke.yml` runs the same script against `${{ secrets.PSD_SSE_URL }}` when triggered via `workflow_dispatch`.
+
+#### WAL FAQ
+
+SQLite runs the dashboard database in write-ahead logging mode, so a `*.db-wal` file sits next to the main file while writes stream in. That log lets readers keep working without blocking writers. Checkpoints will roll the changes back into the main file periodically, so seeing the `-wal` file grow and then shrink over time is expected.
+
+#### Ops (optional)
+
+- For systemd/launchd integrations, call `python scripts/psd_start.py` to run the internal starter. This is not a public CLI command.

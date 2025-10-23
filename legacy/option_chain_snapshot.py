@@ -125,7 +125,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 10
+IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7496, 10  # use 7497 for paper
 LOG_FMT = "%(asctime)s %(levelname)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FMT)
 

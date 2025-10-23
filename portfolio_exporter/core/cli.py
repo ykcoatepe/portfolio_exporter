@@ -5,13 +5,14 @@ consistent.  Each helper is intentionally tiny and free of any
 third‑party dependencies so importing this module has negligible
 startup cost.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from .config import settings
 
@@ -20,7 +21,7 @@ def add_common_output_args(
     parser: argparse.ArgumentParser,
     *,
     include_excel: bool = False,
-    defaults: Dict[str, Any] | None = None,
+    defaults: dict[str, Any] | None = None,
 ) -> argparse.ArgumentParser:
     """Register shared output-related flags on ``parser``.
 
@@ -35,7 +36,9 @@ def add_common_output_args(
     """
 
     defaults = defaults or {}
-    parser.add_argument("--json", action="store_true", default=defaults.get("json", False))
+    parser.add_argument(
+        "--json", action="store_true", default=defaults.get("json", False)
+    )
     parser.add_argument(
         "--no-pretty", action="store_true", default=defaults.get("no_pretty", False)
     )
@@ -96,8 +99,8 @@ def decide_file_writes(
     args: Any,
     *,
     json_only_default: bool,
-    defaults: Dict[str, bool],
-) -> Dict[str, bool]:
+    defaults: dict[str, bool],
+) -> dict[str, bool]:
     """Determine which output formats should be written.
 
     ``defaults`` maps format names to their default enabled state.
@@ -112,13 +115,17 @@ def decide_file_writes(
     if any(formats.values()):
         return formats
 
-    if json_only_default and getattr(args, "json", False) and getattr(args, "output_dir", None) is None:
+    if (
+        json_only_default
+        and getattr(args, "json", False)
+        and getattr(args, "output_dir", None) is None
+    ):
         return {k: False for k in defaults}
 
     return defaults
 
 
-def print_json(data: Dict[str, Any], quiet: bool) -> None:
+def print_json(data: dict[str, Any], quiet: bool) -> None:
     """Emit JSON to STDOUT.
 
     Always prints compact JSON (no whitespace).  ``quiet`` is accepted so

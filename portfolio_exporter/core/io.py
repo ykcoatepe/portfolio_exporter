@@ -1,8 +1,10 @@
-from pathlib import Path
+import json
 import os
 import sqlite3
-import json
+from pathlib import Path
+
 import pandas as pd
+
 from .config import settings
 
 
@@ -50,9 +52,20 @@ def save(
         Destination directory; defaults to :data:`settings.output_dir`.
     """
 
-    base = outdir or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
+    base = (
+        outdir
+        or os.getenv("OUTPUT_DIR")
+        or os.getenv("PE_OUTPUT_DIR")
+        or settings.output_dir
+    )
     outdir = _ensure_writable_dir(Path(base))
-    ext_map = {"csv": "csv", "excel": "xlsx", "pdf": "pdf", "json": "json", "html": "html"}
+    ext_map = {
+        "csv": "csv",
+        "excel": "xlsx",
+        "pdf": "pdf",
+        "json": "json",
+        "html": "html",
+    }
     fname = outdir / f"{name}.{ext_map[fmt]}"
     if fmt == "csv":
         assert isinstance(obj, pd.DataFrame)
@@ -110,7 +123,12 @@ def latest_file(
         Path to most recent matching file or ``None`` if none found.
     """
 
-    base = outdir or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR") or settings.output_dir
+    base = (
+        outdir
+        or os.getenv("OUTPUT_DIR")
+        or os.getenv("PE_OUTPUT_DIR")
+        or settings.output_dir
+    )
     outdir = Path(base).expanduser()
     pattern = f"{name}*.{fmt}"
     files = sorted(outdir.glob(pattern))

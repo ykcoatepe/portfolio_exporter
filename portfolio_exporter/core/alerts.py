@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def emit_alerts(
-    alerts: List[Dict[str, Any]],
-    webhook_url: Optional[str],
+    alerts: list[dict[str, Any]],
+    webhook_url: str | None,
     dry_run: bool,
     offline: bool,
     per_item: bool = False,
-    extra: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """POST alerts to webhook_url unless dry_run or offline; return {"sent":N,"failed":[...]}.
 
     Network use is disabled when dry_run or offline is True. Minimal timeout and
     no retries; caller should handle failures.
     """
-    result: Dict[str, Any] = {"sent": 0, "failed": []}
+    result: dict[str, Any] = {"sent": 0, "failed": []}
     if not webhook_url or dry_run or offline or not alerts:
         return result
     try:
@@ -33,7 +33,9 @@ def emit_alerts(
                     data=json.dumps(payload).encode("utf-8"),
                     headers={"Content-Type": "application/json"},
                 )
-                with urllib.request.urlopen(req, timeout=5) as resp:  # nosec - caller controls URL
+                with urllib.request.urlopen(
+                    req, timeout=5
+                ) as resp:  # nosec - caller controls URL
                     if 200 <= resp.status < 300:
                         result["sent"] += 1
                     else:
@@ -44,7 +46,9 @@ def emit_alerts(
                 data=json.dumps(alerts).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec - caller controls URL
+            with urllib.request.urlopen(
+                req, timeout=5
+            ) as resp:  # nosec - caller controls URL
                 if 200 <= resp.status < 300:
                     result["sent"] = len(alerts)
                 else:

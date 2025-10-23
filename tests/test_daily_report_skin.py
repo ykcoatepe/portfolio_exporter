@@ -40,7 +40,9 @@ def test_html_dom_snapshot(monkeypatch, tmp_path):
     lines = [
         line
         for line in soup.get_text("\n").splitlines()
-        if line and not line.startswith("Generated:") and not line.startswith("Output dir:")
+        if line
+        and not line.startswith("Generated:")
+        and not line.startswith("Output dir:")
     ]
     text = "\n".join(lines)
     expected = (Path(__file__).parent / "data" / "daily_report_dom.txt").read_text()

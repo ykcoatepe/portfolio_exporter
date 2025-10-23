@@ -9,7 +9,8 @@ import pandas as pd
 
 spec = importlib.util.spec_from_file_location(
     "roll_manager",
-    pathlib.Path(__file__).resolve().parents[1] / "portfolio_exporter/scripts/roll_manager.py",
+    pathlib.Path(__file__).resolve().parents[1]
+    / "portfolio_exporter/scripts/roll_manager.py",
 )
 roll_manager = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(roll_manager)
@@ -33,7 +34,14 @@ def _prepare(monkeypatch, tmp_path: Path):
         },
         index=[1, 2],
     )
-    fake_pg = types.SimpleNamespace(_load_positions=lambda: pos_df)
+
+    async def fake_loader():
+        return pos_df
+
+    fake_pg = types.SimpleNamespace(
+        _load_positions=fake_loader,
+        load_positions_sync=lambda: pos_df,
+    )
     monkeypatch.setattr(roll_manager, "portfolio_greeks", fake_pg)
 
     combo_df = pd.DataFrame(
@@ -56,7 +64,9 @@ def _prepare(monkeypatch, tmp_path: Path):
             {"strike": 105.0, "right": "C", "mid": 0.5, "delta": 0.15, "theta": -0.01},
         ]
     )
-    monkeypatch.setattr(roll_manager, "fetch_chain", lambda sym, exp, strikes=None: chain_df)
+    monkeypatch.setattr(
+        roll_manager, "fetch_chain", lambda sym, exp, strikes=None: chain_df
+    )
 
     monkeypatch.setattr(settings, "output_dir", str(tmp_path))
 

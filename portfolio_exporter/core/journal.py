@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import os
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 JOURNAL_COLS = [
     "run_id",
@@ -26,11 +26,11 @@ JOURNAL_COLS = [
 ]
 
 
-def write_journal_template(scored_rows: List[Dict[str, Any]], path: str) -> None:
+def write_journal_template(scored_rows: list[dict[str, Any]], path: str) -> None:
     """Write a journal template with status=Pending."""
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     run_id = time.strftime("%Y%m%d_%H%M%S")
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for s in scored_rows:
         out.append(
             {
@@ -59,7 +59,7 @@ def write_journal_template(scored_rows: List[Dict[str, Any]], path: str) -> None
         w.writerows(out)
 
 
-def update_journal(path: str, updates: Dict[str, Dict[str, Any]]) -> None:
+def update_journal(path: str, updates: dict[str, dict[str, Any]]) -> None:
     """
     updates: { symbol: {"status": "Triggered", "status_ts": "...", "result_R": "0.5", "notes": "..."}, ... }
     Merge per symbol by latest row (same run_id); write back.
@@ -75,4 +75,3 @@ def update_journal(path: str, updates: Dict[str, Dict[str, Any]]) -> None:
             if k in df.columns:
                 df.loc[idx, k] = v
     df.to_csv(path, index=False)
-

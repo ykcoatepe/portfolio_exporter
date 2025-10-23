@@ -4,25 +4,24 @@ daily_pulse.py – Yordam's pre‑market overview
 Run at 07:00 Europe/Istanbul. Produces an Excel workbook in iCloud/Downloads.
 """
 
-import os
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-import pandas as pd
-import yfinance as yf  # pip install yfinance
-
+import asyncio
 import csv
 import logging
 import warnings
-import io
-import contextlib
-from portfolio_exporter.core.config import settings
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pandas as pd
+import yfinance as yf  # pip install yfinance
+
 from portfolio_exporter.core import io
-from utils.progress import iter_progress
 from portfolio_exporter.core import ui as core_ui
+from utils.progress import iter_progress
+
 run_with_spinner = core_ui.run_with_spinner
-from reportlab.lib.pagesizes import letter, landscape  # PDF output (landscape added)
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, letter  # PDF output (landscape added)
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 
 # ── Silence noisy libraries ────────────────────────────────────────────────
 logging.getLogger("ib_insync").setLevel(logging.CRITICAL)
@@ -31,7 +30,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # --- Interactive Brokers live API ---
 # pip install ib_insync (requires TWS or IB Gateway running with API enabled)
-from ib_insync import IB, util
+from ib_insync import IB
+
+_EVENT_LOOP: asyncio.AbstractEventLoop | None = None
 
 # --------------------------------------------------------------------------- #
 # CONFIG – edit these two blocks only                                         #
@@ -75,9 +76,27 @@ INDICATORS = [
 # --------------------------------------------------------------------------- #
 
 
+def _ensure_event_loop() -> asyncio.AbstractEventLoop:
+    """Ensure ib_insync has an event loop even on Python 3.11+."""
+    global _EVENT_LOOP
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        if _EVENT_LOOP is None or _EVENT_LOOP.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+        asyncio.set_event_loop(_EVENT_LOOP)
+        loop = _EVENT_LOOP
+    else:
+        if loop.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+            asyncio.set_event_loop(_EVENT_LOOP)
+            loop = _EVENT_LOOP
+    return loop
+
+
 def load_ib_positions_ib(
     host: str = "127.0.0.1",
-    port: int = 7497,
+    port: int = 7496,
     client_id: int = 999,
 ) -> pd.DataFrame:
     """
@@ -87,6 +106,7 @@ def load_ib_positions_ib(
     Columns returned: symbol · quantity · cost basis · mark price ·
     market_value · unrealized_pnl
     """
+    _ensure_event_loop()  # ib_insync expects a live asyncio loop on modern Python
     ib = IB()
     try:
         ib.connect(host, port, clientId=client_id)
@@ -101,8 +121,7 @@ def load_ib_positions_ib(
     if not positions:
         ib.disconnect()
         raise RuntimeError(
-            "API returned no positions. Confirm account is logged in and the "
-            "API user has permissions."
+            "API returned no positions. Confirm account is logged in and the API user has permissions."
         )
 
     contracts = [p.contract for p in positions]
@@ -150,7 +169,7 @@ def load_ib_positions_ib(
 
 def fetch_ohlc(tickers, days_back=60) -> pd.DataFrame:
     """Download daily OHLCV plus today’s pre‑market quote."""
-    end = datetime.now(timezone.utc)
+    end = datetime.now(UTC)
     start = end - timedelta(days=days_back)
     data = yf.download(
         tickers,
@@ -297,9 +316,6 @@ def generate_report(df: pd.DataFrame, output_path: str, fmt: str = "csv") -> Non
 
 
 def run(fmt: str = "csv") -> None:
-    tz_tr = timezone(timedelta(hours=3))
-    stamp = datetime.now(tz_tr).strftime("%Y%m%d_%H%M")
-
     filetype = fmt if fmt in {"xlsx", "csv", "flatcsv", "pdf", "txt"} else "csv"
 
     # 1. positions

@@ -25,31 +25,52 @@ OUTPUT_DIR="$TMP" PE_QUIET=1 ${DAILY_REPORT_CMD[@]} --json --no-files --prefligh
 PE_QUIET=1 "$PY_BIN" - <<'PY' \
  | jq -e '.ok==true and (.sections.candidates>=0) and (.outputs|length)==0' >/dev/null \
  && ok "roll-manager dry-run preview (stub) JSON-only" || die "roll-manager preview failed"
-import os, json, hashlib
-import pandas as pd
+import json
+import hashlib
+from pathlib import Path
 from types import SimpleNamespace
+
+import pandas as pd
+
 from portfolio_exporter.scripts import roll_manager, portfolio_greeks
 
-pos_csv = os.path.join('tests','data','portfolio_greeks_positions.csv')
+data_dir = Path('tests') / 'data'
+for candidate in (
+    data_dir / 'portfolio_greeks_positions.csv',
+    data_dir / 'positions_sample.csv',
+):
+    if candidate.exists():
+        pos_csv = candidate
+        break
+else:  # pragma: no cover - sanity script guard
+    raise FileNotFoundError('No positions fixture found for sanity dry-run')
+
 df = pd.read_csv(pos_csv)
 
 # Ensure required columns
 if 'secType' not in df.columns:
     df['secType'] = 'OPT'
+if 'underlying' not in df.columns and 'symbol' in df.columns:
+    df['underlying'] = df['symbol']
 
-# Synthesize stable negative conIds
-def synth_conid(row):
-    key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike','')}"
-    v = int.from_bytes(hashlib.sha1(key.encode()).digest()[:4], 'big')
-    return -int(v)
-df['conId'] = df.apply(synth_conid, axis=1)
+# Synthesize stable negative conIds when absent
+if 'conId' not in df.columns:
+    def synth_conid(row):
+        key = f"{row.get('underlying','')}|{row.get('expiry','')}|{row.get('right','')}|{row.get('strike','')}"
+        v = int.from_bytes(hashlib.sha1(key.encode()).digest()[:4], 'big')
+        return -int(v)
+    df['conId'] = df.apply(synth_conid, axis=1)
 
 # Minimal normalization
 df['right'] = df['right'].astype(str).str.upper().str[0]
 pos_df = df.set_index('conId')
 
 # Monkeypatch loader
-portfolio_greeks._load_positions = lambda: pos_df
+async def _fake_load_positions():
+    return pos_df
+
+portfolio_greeks._load_positions = _fake_load_positions
+portfolio_greeks.load_positions_sync = lambda: pos_df
 
 # Stub option chain fetcher to avoid network/optional deps
 def _fake_fetch_chain(symbol: str, expiry: str, strikes=None):

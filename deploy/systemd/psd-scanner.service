@@ -1,0 +1,14 @@
+[Unit]
+Description=Portfolio Sentinel Dashboard - Sentinel Scanner
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/psd
+EnvironmentFile=/etc/psd.env
+ExecStart=/usr/bin/env python -m psd.sentinel.scan
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

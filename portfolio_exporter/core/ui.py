@@ -1,15 +1,14 @@
-from contextlib import contextmanager
 import os
 import sys
+from contextlib import contextmanager
 
+import pandas as pd
 from rich.align import Align
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
-
-import pandas as pd
 
 console = Console()
 

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
-from typing import Iterable, List, Literal, Tuple
+from typing import Literal
 
 try:
     import dateparser  # type: ignore
@@ -30,16 +29,16 @@ from rich.table import Table
 from portfolio_exporter.core import chain as core_chain
 from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
-from portfolio_exporter.core.config import settings
-from portfolio_exporter.core import io as core_io
-from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core.io import save as io_save
 from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.io import save as io_save
+from portfolio_exporter.core.runlog import RunLog
+
 render_chain = core_ui.render_chain
 run_with_spinner = core_ui.run_with_spinner
 
 
-def _calc_strikes(symbol: str, width: int) -> List[float]:
+def _calc_strikes(symbol: str, width: int) -> list[float]:
     """Return a list of strikes around ATM using 5-point increments."""
     try:
         from portfolio_exporter.core.ib import quote_stock
@@ -53,7 +52,7 @@ def _calc_strikes(symbol: str, width: int) -> List[float]:
 def run(
     symbol: str | None = None,
     expiry: str | None = None,
-    strikes: List[float] | None = None,
+    strikes: list[float] | None = None,
     width: int = 5,
 ) -> None:
     """Interactive Rich-based option-chain browser with natural-language expiry parsing."""
@@ -250,7 +249,9 @@ def _ensure_delta(df: pd.DataFrame) -> pd.DataFrame:
         d["delta"] = pd.NA
     d["delta"] = d["delta"].apply(_norm_delta)
     # Best-effort BS fallback if IV and last/mid are present
-    missing = d["delta"].isna() | (~d["delta"].apply(lambda v: isinstance(v, (int, float))))
+    missing = d["delta"].isna() | (
+        ~d["delta"].apply(lambda v: isinstance(v, (int, float)))
+    )
     if missing.any():
         try:
             from portfolio_exporter.core.greeks import bs_greeks
@@ -329,7 +330,9 @@ def _same_delta_by_expiry(
                 best = calls.loc[calls["dist"].idxmin()]
                 out.loc[g.index, "call_same_delta_strike"] = best.get("strike")
                 out.loc[g.index, "call_same_delta_delta"] = best.get("delta")
-                out.loc[g.index, "call_same_delta_mid"] = best.get("mid") if "mid" in best else best.get("last")
+                out.loc[g.index, "call_same_delta_mid"] = (
+                    best.get("mid") if "mid" in best else best.get("last")
+                )
                 out.loc[g.index, "call_same_delta_iv"] = best.get("iv")
         if side in {"put", "both"}:
             puts = g[g["right"].astype(str).str.upper() == "P"]
@@ -338,7 +341,9 @@ def _same_delta_by_expiry(
                 best = puts.loc[puts["dist"].idxmin()]
                 out.loc[g.index, "put_same_delta_strike"] = best.get("strike")
                 out.loc[g.index, "put_same_delta_delta"] = best.get("delta")
-                out.loc[g.index, "put_same_delta_mid"] = best.get("mid") if "mid" in best else best.get("last")
+                out.loc[g.index, "put_same_delta_mid"] = (
+                    best.get("mid") if "mid" in best else best.get("last")
+                )
                 out.loc[g.index, "put_same_delta_iv"] = best.get("iv")
 
     for exp, grp in d.groupby("expiry"):
@@ -347,7 +352,9 @@ def _same_delta_by_expiry(
     return out
 
 
-def _filter_tenor(df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]) -> pd.DataFrame:
+def _filter_tenor(
+    df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]
+) -> pd.DataFrame:
     if df is None or df.empty or tenor == "all":
         return df
     d = df.copy()
@@ -358,12 +365,14 @@ def _filter_tenor(df: pd.DataFrame, tenor: Literal["weekly", "monthly", "all"]) 
         return d.loc[kinds == "weekly"].copy()
 
 
-
-
 def _run_cli_v3() -> int:
-    parser = argparse.ArgumentParser(description="Quick-Chain v3: Same-Delta & Tenor Filters")
+    parser = argparse.ArgumentParser(
+        description="Quick-Chain v3: Same-Delta & Tenor Filters"
+    )
     parser.add_argument("--chain-csv", help="Offline chain CSV (fixture)", default=None)
-    parser.add_argument("--symbols", nargs="*", help="Symbols to fetch (demo)", default=None)
+    parser.add_argument(
+        "--symbols", nargs="*", help="Symbols to fetch (demo)", default=None
+    )
     parser.add_argument("--target-delta", type=float, default=0.30)
     parser.add_argument("--side", choices=["call", "put", "both"], default="both")
     parser.add_argument("--tenor", choices=["weekly", "monthly", "all"], default="all")
@@ -373,7 +382,9 @@ def _run_cli_v3() -> int:
     parser.add_argument("--no-pretty", action="store_true", default=False)
     parser.add_argument("--no-files", action="store_true", default=False)
     parser.add_argument("--output-dir", help="Override output directory", default=None)
-    parser.add_argument("--json", action="store_true", default=False, help="Emit summary JSON and exit")
+    parser.add_argument(
+        "--json", action="store_true", default=False, help="Emit summary JSON and exit"
+    )
     parser.add_argument("--debug-timings", action="store_true")
     args = parser.parse_args()
 
@@ -413,7 +424,9 @@ def _run_cli_v3() -> int:
                     except Exception:
                         continue
                 df = (
-                    pd.concat(frames, ignore_index=True, sort=False) if frames else pd.DataFrame()
+                    pd.concat(frames, ignore_index=True, sort=False)
+                    if frames
+                    else pd.DataFrame()
                 )
 
             if df is None or df.empty:
@@ -467,7 +480,9 @@ def _run_cli_v3() -> int:
 
             if args.debug_timings:
                 if written:
-                    tpath = io_save(pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir)
+                    tpath = io_save(
+                        pd.DataFrame(rl.timings), "timings", fmt="csv", outdir=outdir
+                    )
                     outputs["timings"] = str(tpath)
                     written.append(tpath)
 
@@ -477,17 +492,22 @@ def _run_cli_v3() -> int:
         meta = {
             "underlyings": [
                 str(u)
-                for u in df_out.get("underlying", pd.Series(dtype=str)).dropna().unique().tolist()
+                for u in df_out.get("underlying", pd.Series(dtype=str))
+                .dropna()
+                .unique()
+                .tolist()
             ],
             "tenor": args.tenor or "",
-            "target_delta": float(args.target_delta)
-            if args.target_delta is not None
-            else None,
+            "target_delta": (
+                float(args.target_delta) if args.target_delta is not None else None
+            ),
             "side": args.side or "",
         }
         if args.debug_timings:
             meta["timings"] = rl.timings
-        summary = json_helpers.report_summary({"chain": int(len(df_out))}, outputs, meta=meta)
+        summary = json_helpers.report_summary(
+            {"chain": int(len(df_out))}, outputs, meta=meta
+        )
         if manifest_path:
             summary["outputs"].append(str(manifest_path))
         if args.json:

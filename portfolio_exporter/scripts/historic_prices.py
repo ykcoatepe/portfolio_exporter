@@ -1,9 +1,11 @@
-import os
+import asyncio
 import csv
-import argparse
-from portfolio_exporter.core.config import settings
+import os
+
 from portfolio_exporter.core import io
 from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+
 run_with_spinner = core_ui.run_with_spinner
 import pandas as pd
 import yfinance as yf
@@ -14,8 +16,8 @@ except Exception:  # pragma: no cover - optional
     xlsxwriter = None  # type: ignore
 
 try:
-    from reportlab.lib.pagesizes import letter, landscape
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import landscape, letter
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
@@ -31,23 +33,47 @@ from datetime import datetime
 
 # ---------- IBKR optional integration ----------
 try:
-    from ib_insync import IB, Stock
+    from ib_insync import IB
 
     IB_AVAILABLE = True
 except ImportError:
     IB_AVAILABLE = False
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
+
 IB_CID = _cid("historic_prices", default=3)  # separate clientId for historic pull
 
 EXTRA_TICKERS = ["SPY", "QQQ", "IWM", "^VIX", "DX-Y.NYB"]  # core indices
 PROXY_MAP = {"VIX": "^VIX", "VVIX": "^VVIX", "DXY": "DX-Y.NYB"}
+
+_EVENT_LOOP: asyncio.AbstractEventLoop | None = None
+
+
+def _ensure_event_loop() -> asyncio.AbstractEventLoop:
+    """Ensure ib_insync has an event loop ready before initiating any async connect."""
+    global _EVENT_LOOP
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        if _EVENT_LOOP is None or _EVENT_LOOP.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+        asyncio.set_event_loop(_EVENT_LOOP)
+        loop = _EVENT_LOOP
+    else:
+        if loop.is_closed():
+            _EVENT_LOOP = asyncio.new_event_loop()
+            asyncio.set_event_loop(_EVENT_LOOP)
+            loop = _EVENT_LOOP
+    return loop
 
 
 def _tickers_from_ib() -> list[str]:
     """Return unique stock tickers from current IBKR account positions."""
     if not IB_AVAILABLE:
         return []
+    _ensure_event_loop()
     ib = IB()
     try:
         ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)

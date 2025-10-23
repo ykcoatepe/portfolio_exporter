@@ -3,23 +3,29 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
-from typing import Iterable, List
 
 
 class RunLog:
     """Context manager to capture run metadata and optionally write a manifest."""
 
-    def __init__(self, *, script: str, args: dict | None = None, output_dir: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        script: str,
+        args: dict | None = None,
+        output_dir: str | Path | None = None,
+    ) -> None:
         self.script = script
         self.argv = args or {}
         self.output_dir = Path(output_dir) if output_dir else None
         self.start_ts = ""
         self._start = 0.0
-        self.outputs: List[Path] = []
+        self.outputs: list[Path] = []
         self.timings: list[dict[str, int]] = []
         self.meta: dict = {}
         self.env = {
@@ -30,12 +36,14 @@ class RunLog:
             "CP_REFRESH_TOKEN": bool(os.getenv("CP_REFRESH_TOKEN")),
         }
 
-    def __enter__(self) -> "RunLog":
+    def __enter__(self) -> RunLog:
         self._start = perf_counter()
         self.start_ts = datetime.utcnow().isoformat()
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - no special handling
+    def __exit__(
+        self, exc_type, exc, tb
+    ) -> None:  # pragma: no cover - no special handling
         return None
 
     def add_outputs(self, paths: Iterable[str | Path]) -> None:
@@ -73,13 +81,15 @@ class RunLog:
                 return {k: _json_sanitize(v) for k, v in obj.items()}
             if isinstance(obj, (list, tuple)):
                 return [
-                    _json_sanitize(v) for v in (list(obj) if isinstance(obj, tuple) else obj)
+                    _json_sanitize(v)
+                    for v in (list(obj) if isinstance(obj, tuple) else obj)
                 ]
             try:
                 json.dumps(obj)
                 return obj
             except Exception:
                 return str(obj)
+
         outs: list[dict[str, object]] = []
         for p in self.outputs:
             try:

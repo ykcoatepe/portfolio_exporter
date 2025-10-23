@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
-import json
 
 import pandas as pd
 
@@ -57,4 +57,3 @@ def _json_default(o: object) -> Any:
     except Exception:
         pass
     return str(o)
-

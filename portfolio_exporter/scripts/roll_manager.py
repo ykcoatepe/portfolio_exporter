@@ -14,18 +14,21 @@ from __future__ import annotations
 import argparse
 import calendar
 import datetime as dt
-import json
 import os
 import pathlib
-from typing import Any, List
+from typing import Any
 
 import pandas as pd
-from portfolio_exporter.core import cli as cli_helpers, io, json as json_helpers
-from portfolio_exporter.core.combo import detect_combos
+
+from portfolio_exporter.core import cli as cli_helpers
+from portfolio_exporter.core import io
+from portfolio_exporter.core import json as json_helpers
+from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.chain import fetch_chain
+from portfolio_exporter.core.combo import detect_combos
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core import ui as core_ui
+
 # Back-compat: expose run_with_spinner alias for tests to monkeypatch
 run_with_spinner = core_ui.run_with_spinner
 
@@ -74,7 +77,8 @@ def _write_files(
     combos_out = []
     for _, row in df.iterrows():
         legs_close = [
-            {"conId": int(l), "qty": int(pos_df.loc[l, "qty"])} for l in row.legs_old
+            {"conId": int(leg_id), "qty": int(pos_df.loc[leg_id, "qty"])}
+            for leg_id in row.legs_old
         ]
         legs_open = [
             {
@@ -158,7 +162,9 @@ def run(
 
         portfolio_greeks = _pg
 
-    pos_df = core_ui.run_with_spinner("Fetching positions…", portfolio_greeks._load_positions)
+    pos_df = core_ui.run_with_spinner(
+        "Fetching positions…", portfolio_greeks.load_positions_sync
+    )
     if pos_df.empty:
         if return_df:
             return pd.DataFrame()
@@ -177,6 +183,7 @@ def run(
     mask = combos_df["expiry"] <= today + dt.timedelta(days=days)
     soon = combos_df[mask]
     if tenor != "all":
+
         def _is_weekly(d: dt.date) -> bool:
             return d != _third_friday(d.year, d.month)
 
@@ -195,7 +202,7 @@ def run(
         from rich.table import Table
 
         console = Console(force_terminal=True)
-    rows: List[dict] = []
+    rows: list[dict] = []
     for cid, cmb in soon.iterrows():
         new_exp = _next_expiry(today, weekly)
         legs = cmb.legs
@@ -212,7 +219,7 @@ def run(
         new_gamma = 0.0
         new_vega = 0.0
         net_mid = 0.0
-        for strike, right, qty in zip(strikes, rights, qtys):
+        for strike, right, qty in zip(strikes, rights, qtys, strict=True):
             # --- ensure columns exist even if fetch_chain() set them as index ---
             if "strike" not in chain.columns:
                 chain = chain.reset_index(drop=False, names=["strike"])  # pandas ≥2
@@ -254,8 +261,16 @@ def run(
 
         old_delta = float((pos_df.loc[legs, "delta"] * pos_df.loc[legs, "qty"]).sum())
         old_theta = float((pos_df.loc[legs, "theta"] * pos_df.loc[legs, "qty"]).sum())
-        old_gamma = float((pos_df.loc[legs, "gamma"] * pos_df.loc[legs, "qty"]).sum()) if "gamma" in pos_df.columns else 0.0
-        old_vega = float((pos_df.loc[legs, "vega"] * pos_df.loc[legs, "qty"]).sum()) if "vega" in pos_df.columns else 0.0
+        old_gamma = (
+            float((pos_df.loc[legs, "gamma"] * pos_df.loc[legs, "qty"]).sum())
+            if "gamma" in pos_df.columns
+            else 0.0
+        )
+        old_vega = (
+            float((pos_df.loc[legs, "vega"] * pos_df.loc[legs, "qty"]).sum())
+            if "vega" in pos_df.columns
+            else 0.0
+        )
         band = slippage * sum(qtys)
         debit_credit = net_mid + band
         price_lo = net_mid - band
@@ -364,25 +379,36 @@ def cli(args: argparse.Namespace | None = None) -> dict:
     parser.add_argument("--include-cal", action="store_true", help="Include calendars")
     parser.add_argument("--days", type=int, default=default_days, help="Expiry window")
     parser.add_argument(
-        "--tenor", choices=["weekly", "monthly", "all"], default="all", help="Filter candidates"
+        "--tenor",
+        choices=["weekly", "monthly", "all"],
+        default="all",
+        help="Filter candidates",
     )
-    parser.add_argument("--limit-per-underlying", type=int, help="Cap candidates per symbol")
+    parser.add_argument(
+        "--limit-per-underlying", type=int, help="Cap candidates per symbol"
+    )
     parser.add_argument("--dry-run", action="store_true", help="Preview only; no files")
     parser.add_argument("--debug-timings", action="store_true")
     parser.add_argument("--no-pretty", action="store_true", help="Disable rich tables")
     parser.add_argument("--json", action="store_true", help="Print JSON summary")
     parser.add_argument("--output-dir", help="Override output directory")
-    parser.add_argument("--no-files", action="store_true", help="Disable all file writes")
+    parser.add_argument(
+        "--no-files", action="store_true", help="Disable all file writes"
+    )
     if args is None:
         args = parser.parse_args()
 
     outdir = cli_helpers.resolve_output_dir(getattr(args, "output_dir", None))
     defaults = {
         "preview": bool(
-            getattr(args, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR")
+            getattr(args, "output_dir", None)
+            or os.getenv("OUTPUT_DIR")
+            or os.getenv("PE_OUTPUT_DIR")
         ),
         "ticket": bool(
-            getattr(args, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR")
+            getattr(args, "output_dir", None)
+            or os.getenv("OUTPUT_DIR")
+            or os.getenv("PE_OUTPUT_DIR")
         ),
     }
     formats = cli_helpers.decide_file_writes(
@@ -437,7 +463,9 @@ def cli(args: argparse.Namespace | None = None) -> dict:
         written: list[pathlib.Path] = []
         if not args.dry_run and any(formats.values()):
             with rl.time("write_outputs"):
-                pos_df = run_with_spinner("Fetching positions…", portfolio_greeks._load_positions)
+                pos_df = run_with_spinner(
+                    "Fetching positions…", portfolio_greeks.load_positions_sync
+                )
                 paths = _write_files(df, pos_df, outdir)
                 for k, p in paths.items():
                     outputs[k] = str(p)

@@ -19,22 +19,26 @@ def _make_chain(spot=100.0):
         put_mid = max(0.5, (k - spot) * 0.6 + 2)
         c_spread = max(0.02, 0.02 * call_mid)
         p_spread = max(0.02, 0.02 * put_mid)
-        calls.append({
-            "strike": float(k),
-            "bid": call_mid - c_spread / 2,
-            "ask": call_mid + c_spread / 2,
-            "impliedVolatility": 0.25,
-            "openInterest": 1000,
-            "volume": 500,
-        })
-        puts.append({
-            "strike": float(k),
-            "bid": put_mid - p_spread / 2,
-            "ask": put_mid + p_spread / 2,
-            "impliedVolatility": 0.25,
-            "openInterest": 1000,
-            "volume": 500,
-        })
+        calls.append(
+            {
+                "strike": float(k),
+                "bid": call_mid - c_spread / 2,
+                "ask": call_mid + c_spread / 2,
+                "impliedVolatility": 0.25,
+                "openInterest": 1000,
+                "volume": 500,
+            }
+        )
+        puts.append(
+            {
+                "strike": float(k),
+                "bid": put_mid - p_spread / 2,
+                "ask": put_mid + p_spread / 2,
+                "impliedVolatility": 0.25,
+                "openInterest": 1000,
+                "volume": 500,
+            }
+        )
     return pd.DataFrame(calls), pd.DataFrame(puts)
 
 

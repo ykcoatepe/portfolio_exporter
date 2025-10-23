@@ -153,6 +153,25 @@ Notes:
 - CLI override: --prior-positions-csv takes precedence when provided.
 - Without a prior snapshot, intent still works using streaming deltas (stocks keyed by symbol) and openClose overrides, but accuracy improves with a strictly prior snapshot.
 
+4.8 Sentinel preferences and config precedence
+
+- Preferences (persisted under `preferences.sentinel.*`):
+  - `allow_afternoon_rearm` (bool, default true)
+  - `halt_rearm` (bool, default true)
+  - `require_vwap_recross` (bool, default true)
+  - `cooldown_bars` (int, default 10)
+  - `halt_mini_orb_minutes` (int, default 3)
+  - `halt_rearm_grace_sec` (int, default 45)
+  - `max_halts_per_day` (int, default 1)
+  - Optional: `early_close_dates_json` (path to JSON with ET dates for 1:00 pm early closes)
+
+- Runtime precedence (effective config):
+  - CLI > ENV (`MOMO_SEN_*`) > Memory (`.codex/memory.json` → `preferences.sentinel.*`) > Config file (`micro_momo_config.json`) > defaults.
+
+- Early-closes (ET):
+  - `MOMO_SEN_EARLY_CLOSE_TODAY=1` forces 1:00 pm ET close today.
+  - Or set `MOMO_SEN_EARLY_CLOSE_JSON=/path/to/dates.json` (list of ET YYYY-MM-DD) to auto-adjust. Times are converted to TR via `zoneinfo`.
+
 ⸻
 
 5) Security & Configuration

@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import builtins
-import datetime as dt
 import datetime as _dt
+import datetime as dt
 import json
 import pathlib
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
     from prompt_toolkit import prompt  # retained for optional environments
 except Exception:  # pragma: no cover - optional dependency
+
     def prompt(message: str) -> str:  # type: ignore
         return input(message)
+
 
 try:
     from yfinance import Ticker
@@ -21,13 +23,19 @@ except Exception:  # pragma: no cover - optional dependency
     Ticker = None  # type: ignore
 
 from portfolio_exporter.core.config import settings
+
 try:
     from portfolio_exporter.core.input import parse_order_line
 except Exception:  # pragma: no cover - optional dependency for interactive shorthand
+
     def parse_order_line(raw):  # type: ignore
         return None
-from portfolio_exporter.core.ui import banner_delta_theta, console, prompt_input
+
+
 from rich.table import Table
+
+from portfolio_exporter.core.ui import banner_delta_theta, console, prompt_input
+
 try:  # pragma: no cover - ib_insync optional in tests
     from portfolio_exporter.core.ib import quote_option, quote_stock  # type: ignore
 except Exception:  # pragma: no cover
@@ -44,16 +52,16 @@ setattr(builtins, "prompt_toolkit.prompt", prompt)
 _expiry_cache: dict[str, list[str]] = {}
 
 # ── repo memory helpers (lightweight) -----------------------------------------
-from pathlib import Path as _Path
 import json as _json
 import os as _os
+from pathlib import Path as _Path
 
 
 def _memory_path() -> _Path:
     return _Path(".codex/memory.json")
 
 
-def _load_wizard_prefs() -> Dict[str, Any]:
+def _load_wizard_prefs() -> dict[str, Any]:
     p = _memory_path()
     try:
         if not p.exists():
@@ -67,16 +75,18 @@ def _load_wizard_prefs() -> Dict[str, Any]:
     return {}
 
 
-def _save_wizard_prefs(upd: Dict[str, Any]) -> None:
+def _save_wizard_prefs(upd: dict[str, Any]) -> None:
     p = _memory_path()
     try:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         if p.exists():
             try:
                 data = _json.loads(p.read_text())
             except Exception:
                 data = {}
-        prefs = data.setdefault("preferences", {}).setdefault("order_builder_wizard", {})
+        prefs = data.setdefault("preferences", {}).setdefault(
+            "order_builder_wizard", {}
+        )
         prefs.update(upd)
         tmp = p.with_suffix(".json.tmp")
         tmp.parent.mkdir(parents=True, exist_ok=True)
@@ -134,7 +144,7 @@ def _nearest_friday(on_or_after: _dt.date) -> _dt.date:
     return on_or_after + _dt.timedelta(days=days_ahead)
 
 
-def _parse_date_like(text: str) -> Optional[_dt.date]:
+def _parse_date_like(text: str) -> _dt.date | None:
     # Try ISO first to avoid optional deps
     try:
         return _dt.date.fromisoformat(text)
@@ -149,7 +159,7 @@ def _parse_date_like(text: str) -> Optional[_dt.date]:
         return None
 
 
-def _parse_month_shorthand(text: str) -> Optional[_dt.date]:
+def _parse_month_shorthand(text: str) -> _dt.date | None:
     """Parse inputs like 'nov', 'nov24', 'nov-2025', '2025-11', '11/2025'.
 
     Returns the 3rd Friday for the given or inferred month/year.
@@ -177,7 +187,10 @@ def _parse_month_shorthand(text: str) -> Optional[_dt.date]:
     }
 
     # Pattern: nov, nov24, nov-24, nov-2025, nov 2025
-    m = _re.match(r"^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)(?:[\s\-/]?([0-9]{2,4}))?$", raw)
+    m = _re.match(
+        r"^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)(?:[\s\-/]?([0-9]{2,4}))?$",
+        raw,
+    )
     if m:
         mon = months[m.group(1)]
         yr_s = m.group(2)
@@ -231,7 +244,7 @@ def _normalize_expiry(symbol: str, raw: str | None) -> str:
     return d.isoformat()
 
 
-def _ask(question: str, default: Optional[str] = None) -> str | None:
+def _ask(question: str, default: str | None = None) -> str | None:
     """Prompt for a value with Live-aware echo so typing is visible.
 
     Uses ``prompt_input`` which pauses the global StatusBar (if active)
@@ -252,7 +265,7 @@ def _ask(question: str, default: Optional[str] = None) -> str | None:
 
 def _price_leg(
     symbol: str, expiry: str | None, strike: float | None, right: str | None
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Return pricing for a leg, with graceful offline fallbacks.
 
     - Options: prefers IBKR quote via quote_option; if unavailable, returns a
@@ -271,13 +284,15 @@ def _price_leg(
         if quote_stock is None:
             raise RuntimeError("quote_stock not available")
         data = quote_stock(symbol)
-        data.update({
-            "delta": 1.0,
-            "gamma": 0.0,
-            "theta": 0.0,
-            "vega": 0.0,
-            "iv": 0.0,
-        })
+        data.update(
+            {
+                "delta": 1.0,
+                "gamma": 0.0,
+                "theta": 0.0,
+                "vega": 0.0,
+                "iv": 0.0,
+            }
+        )
         return data
     except Exception:
         # Offline or quoting backend not present: return a safe, zeroed quote
@@ -293,7 +308,7 @@ def _price_leg(
         }
 
 
-def _render_preview_table(rows: List[Dict[str, Any]]) -> Table:
+def _render_preview_table(rows: list[dict[str, Any]]) -> Table:
     tbl = Table(show_header=True, header_style="bold")
     tbl.add_column("Underlying", justify="left")
     tbl.add_column("Strategy", justify="left")
@@ -348,7 +363,7 @@ def _base_ticket(
     symbol: str,
     expiry: str,
     qty: int,
-    strikes: List[float],
+    strikes: list[float],
     right: str,
     account: str | None = None,
 ):
@@ -369,46 +384,96 @@ def build_vertical(
     symbol: str,
     expiry: str,
     right: str,
-    strikes: List[float],
+    strikes: list[float],
     qty: int,
     account: str | None = None,
     *,
     credit: bool | None = None,
 ):
     k_low, k_high = sorted(strikes)
-    ticket = _base_ticket("vertical", symbol, expiry, qty, [k_low, k_high], right, account)
+    ticket = _base_ticket(
+        "vertical", symbol, expiry, qty, [k_low, k_high], right, account
+    )
     # Default orientation to preserve legacy behavior if credit/debit not provided:
     # - Calls default to debit (buy low, sell high)
     # - Puts default to credit (sell high, buy low)
     if credit is None:
-        is_credit = (right == "P")
+        is_credit = right == "P"
     else:
         is_credit = bool(credit)
     if right == "C":
         if is_credit:
             # Credit call: sell low / buy high
             legs = [
-                {"secType": "OPT", "right": "C", "strike": k_low, "qty": -qty, "expiry": expiry},
-                {"secType": "OPT", "right": "C", "strike": k_high, "qty": qty, "expiry": expiry},
+                {
+                    "secType": "OPT",
+                    "right": "C",
+                    "strike": k_low,
+                    "qty": -qty,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "C",
+                    "strike": k_high,
+                    "qty": qty,
+                    "expiry": expiry,
+                },
             ]
         else:
             # Debit call: buy low / sell high
             legs = [
-                {"secType": "OPT", "right": "C", "strike": k_low, "qty": qty, "expiry": expiry},
-                {"secType": "OPT", "right": "C", "strike": k_high, "qty": -qty, "expiry": expiry},
+                {
+                    "secType": "OPT",
+                    "right": "C",
+                    "strike": k_low,
+                    "qty": qty,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "C",
+                    "strike": k_high,
+                    "qty": -qty,
+                    "expiry": expiry,
+                },
             ]
     else:  # Puts
         if is_credit:
             # Credit put: sell high / buy low
             legs = [
-                {"secType": "OPT", "right": "P", "strike": k_high, "qty": -qty, "expiry": expiry},
-                {"secType": "OPT", "right": "P", "strike": k_low, "qty": qty, "expiry": expiry},
+                {
+                    "secType": "OPT",
+                    "right": "P",
+                    "strike": k_high,
+                    "qty": -qty,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "P",
+                    "strike": k_low,
+                    "qty": qty,
+                    "expiry": expiry,
+                },
             ]
         else:
             # Debit put: buy high / sell low
             legs = [
-                {"secType": "OPT", "right": "P", "strike": k_high, "qty": qty, "expiry": expiry},
-                {"secType": "OPT", "right": "P", "strike": k_low, "qty": -qty, "expiry": expiry},
+                {
+                    "secType": "OPT",
+                    "right": "P",
+                    "strike": k_high,
+                    "qty": qty,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "P",
+                    "strike": k_low,
+                    "qty": -qty,
+                    "expiry": expiry,
+                },
             ]
     ticket["legs"] = legs
     return ticket
@@ -417,7 +482,7 @@ def build_vertical(
 def build_iron_condor(
     symbol: str,
     expiry: str,
-    strikes: List[float],
+    strikes: list[float],
     qty: int,
     account: str | None = None,
 ):
@@ -439,12 +504,14 @@ def build_butterfly(
     symbol: str,
     expiry: str,
     right: str,
-    strikes: List[float],
+    strikes: list[float],
     qty: int,
     account: str | None = None,
 ):
     k1, k2, k3 = sorted(strikes)
-    ticket = _base_ticket("butterfly", symbol, expiry, qty, [k1, k2, k3], right, account)
+    ticket = _base_ticket(
+        "butterfly", symbol, expiry, qty, [k1, k2, k3], right, account
+    )
     legs = [
         {"secType": "OPT", "right": right, "strike": k1, "qty": qty, "expiry": expiry},
         {
@@ -474,7 +541,13 @@ def build_calendar(
     expiry = far  # ticket expiry = far
     ticket = _base_ticket("calendar", symbol, expiry, qty, [strike], right, account)
     legs = [
-        {"secType": "OPT", "right": right, "strike": strike, "qty": -qty, "expiry": near},
+        {
+            "secType": "OPT",
+            "right": right,
+            "strike": strike,
+            "qty": -qty,
+            "expiry": near,
+        },
         {"secType": "OPT", "right": right, "strike": strike, "qty": qty, "expiry": far},
     ]
     ticket["legs"] = legs
@@ -494,10 +567,24 @@ def build_diagonal(
 ):
     near, far = sorted([exp_near, exp_far])
     expiry = far  # ticket expiry = far
-    ticket = _base_ticket("diagonal", symbol, expiry, qty, [strike_near, strike_far], right, account)
+    ticket = _base_ticket(
+        "diagonal", symbol, expiry, qty, [strike_near, strike_far], right, account
+    )
     legs = [
-        {"secType": "OPT", "right": right, "strike": strike_near, "qty": -qty, "expiry": near},
-        {"secType": "OPT", "right": right, "strike": strike_far, "qty": qty, "expiry": far},
+        {
+            "secType": "OPT",
+            "right": right,
+            "strike": strike_near,
+            "qty": -qty,
+            "expiry": near,
+        },
+        {
+            "secType": "OPT",
+            "right": right,
+            "strike": strike_far,
+            "qty": qty,
+            "expiry": far,
+        },
     ]
     ticket["legs"] = legs
     return ticket
@@ -512,8 +599,20 @@ def build_straddle(
 ):
     ticket = _base_ticket("straddle", symbol, expiry, qty, [strike], "", account)
     legs = [
-        {"secType": "OPT", "right": "C", "strike": strike, "qty": qty, "expiry": expiry},
-        {"secType": "OPT", "right": "P", "strike": strike, "qty": qty, "expiry": expiry},
+        {
+            "secType": "OPT",
+            "right": "C",
+            "strike": strike,
+            "qty": qty,
+            "expiry": expiry,
+        },
+        {
+            "secType": "OPT",
+            "right": "P",
+            "strike": strike,
+            "qty": qty,
+            "expiry": expiry,
+        },
     ]
     ticket["legs"] = legs
     return ticket
@@ -528,12 +627,16 @@ def build_strangle(
     account: str | None = None,
 ):
     k_put, k_call = sorted([put_strike, call_strike])
-    ticket = _base_ticket(
-        "strangle", symbol, expiry, qty, [k_put, k_call], "", account
-    )
+    ticket = _base_ticket("strangle", symbol, expiry, qty, [k_put, k_call], "", account)
     legs = [
         {"secType": "OPT", "right": "P", "strike": k_put, "qty": qty, "expiry": expiry},
-        {"secType": "OPT", "right": "C", "strike": k_call, "qty": qty, "expiry": expiry},
+        {
+            "secType": "OPT",
+            "right": "C",
+            "strike": k_call,
+            "qty": qty,
+            "expiry": expiry,
+        },
     ]
     ticket["legs"] = legs
     return ticket
@@ -566,6 +669,7 @@ def build_covered_call(
 
 # ---- preset helpers ---------------------------------------------------------
 
+
 def build_preset(
     preset: str,
     symbol: str,
@@ -574,7 +678,7 @@ def build_preset(
     width: float = 5.0,
     wings: float = 5.0,
     account: str | None = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return a ticket for simple strategy presets.
 
     Presets avoid external lookups by using synthetic strikes around 100.
@@ -583,32 +687,80 @@ def build_preset(
     if preset == "bull_put":
         short, long = base, base - width
         legs = [
-            {"secType": "OPT", "right": "P", "strike": short, "qty": -qty, "expiry": expiry},
-            {"secType": "OPT", "right": "P", "strike": long, "qty": qty, "expiry": expiry},
+            {
+                "secType": "OPT",
+                "right": "P",
+                "strike": short,
+                "qty": -qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "P",
+                "strike": long,
+                "qty": qty,
+                "expiry": expiry,
+            },
         ]
         strikes = [long, short]
         right = "P"
     elif preset == "bear_call":
         short, long = base, base + width
         legs = [
-            {"secType": "OPT", "right": "C", "strike": short, "qty": -qty, "expiry": expiry},
-            {"secType": "OPT", "right": "C", "strike": long, "qty": qty, "expiry": expiry},
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": short,
+                "qty": -qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": long,
+                "qty": qty,
+                "expiry": expiry,
+            },
         ]
         strikes = [short, long]
         right = "C"
     elif preset == "bull_call":
         long_, short = base, base + width
         legs = [
-            {"secType": "OPT", "right": "C", "strike": long_, "qty": qty, "expiry": expiry},
-            {"secType": "OPT", "right": "C", "strike": short, "qty": -qty, "expiry": expiry},
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": long_,
+                "qty": qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": short,
+                "qty": -qty,
+                "expiry": expiry,
+            },
         ]
         strikes = [long_, short]
         right = "C"
     elif preset == "bear_put":
         long_, short = base, base - width
         legs = [
-            {"secType": "OPT", "right": "P", "strike": long_, "qty": qty, "expiry": expiry},
-            {"secType": "OPT", "right": "P", "strike": short, "qty": -qty, "expiry": expiry},
+            {
+                "secType": "OPT",
+                "right": "P",
+                "strike": long_,
+                "qty": qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "P",
+                "strike": short,
+                "qty": -qty,
+                "expiry": expiry,
+            },
         ]
         strikes = [short, long_]
         right = "P"
@@ -618,10 +770,34 @@ def build_preset(
         call_short = base + wings
         call_long = base + 2 * wings
         legs = [
-            {"secType": "OPT", "right": "P", "strike": put_short, "qty": -qty, "expiry": expiry},
-            {"secType": "OPT", "right": "P", "strike": put_long, "qty": qty, "expiry": expiry},
-            {"secType": "OPT", "right": "C", "strike": call_short, "qty": -qty, "expiry": expiry},
-            {"secType": "OPT", "right": "C", "strike": call_long, "qty": qty, "expiry": expiry},
+            {
+                "secType": "OPT",
+                "right": "P",
+                "strike": put_short,
+                "qty": -qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "P",
+                "strike": put_long,
+                "qty": qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": call_short,
+                "qty": -qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": call_long,
+                "qty": qty,
+                "expiry": expiry,
+            },
         ]
         strikes = [put_long, put_short, call_short, call_long]
         right = ""
@@ -630,10 +806,34 @@ def build_preset(
         call_long = base + wings
         center = base
         legs = [
-            {"secType": "OPT", "right": "P", "strike": center, "qty": -qty, "expiry": expiry},
-            {"secType": "OPT", "right": "P", "strike": put_long, "qty": qty, "expiry": expiry},
-            {"secType": "OPT", "right": "C", "strike": center, "qty": -qty, "expiry": expiry},
-            {"secType": "OPT", "right": "C", "strike": call_long, "qty": qty, "expiry": expiry},
+            {
+                "secType": "OPT",
+                "right": "P",
+                "strike": center,
+                "qty": -qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "P",
+                "strike": put_long,
+                "qty": qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": center,
+                "qty": -qty,
+                "expiry": expiry,
+            },
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": call_long,
+                "qty": qty,
+                "expiry": expiry,
+            },
         ]
         strikes = [put_long, center, call_long]
         right = ""
@@ -643,8 +843,20 @@ def build_preset(
         near = near_dt.date().isoformat()
         strike = base
         legs = [
-            {"secType": "OPT", "right": "C", "strike": strike, "qty": -qty, "expiry": near},
-            {"secType": "OPT", "right": "C", "strike": strike, "qty": qty, "expiry": far},
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": strike,
+                "qty": -qty,
+                "expiry": near,
+            },
+            {
+                "secType": "OPT",
+                "right": "C",
+                "strike": strike,
+                "qty": qty,
+                "expiry": far,
+            },
         ]
         strikes = [strike]
         right = "C"
@@ -657,7 +869,7 @@ def build_preset(
     return ticket
 
 
-def compute_risk_summary(ticket: Dict[str, Any]) -> Dict[str, Any] | None:
+def compute_risk_summary(ticket: dict[str, Any]) -> dict[str, Any] | None:
     """Compute basic max gain/loss and breakevens for option combos."""
 
     legs = ticket.get("legs", [])
@@ -670,7 +882,9 @@ def compute_risk_summary(ticket: Dict[str, Any]) -> Dict[str, Any] | None:
     # Price legs for spread price
     net = 0.0
     for leg in legs:
-        q = _price_leg(ticket["underlying"], leg.get("expiry"), leg.get("strike"), leg.get("right"))
+        q = _price_leg(
+            ticket["underlying"], leg.get("expiry"), leg.get("strike"), leg.get("right")
+        )
         net += leg.get("qty", 0) * q.get("mid", 0)
 
     strikes = [leg.get("strike") for leg in legs if leg.get("strike") is not None]
@@ -678,8 +892,8 @@ def compute_risk_summary(ticket: Dict[str, Any]) -> Dict[str, Any] | None:
         return None
     width = max(strikes) - min(strikes)
     if len(legs) == 2:
-        short = next((l for l in legs if l.get("qty", 0) < 0), None)
-        long = next((l for l in legs if l.get("qty", 0) > 0), None)
+        short = next((leg for leg in legs if leg.get("qty", 0) < 0), None)
+        long = next((leg for leg in legs if leg.get("qty", 0) > 0), None)
         if not short or not long:
             return None
         if net < 0:  # credit
@@ -708,11 +922,15 @@ def compute_risk_summary(ticket: Dict[str, Any]) -> Dict[str, Any] | None:
     elif len(legs) == 4:
         # Treat as iron condor / fly credit structure
         credit = -net if net < 0 else 0
-        shorts = [l for l in legs if l.get("qty", 0) < 0]
-        short_put = next((l for l in shorts if l.get("right") == "P"), None)
-        short_call = next((l for l in shorts if l.get("right") == "C"), None)
-        put_longs = [l for l in legs if l.get("right") == "P" and l.get("qty", 0) > 0]
-        call_longs = [l for l in legs if l.get("right") == "C" and l.get("qty", 0) > 0]
+        shorts = [leg for leg in legs if leg.get("qty", 0) < 0]
+        short_put = next((leg for leg in shorts if leg.get("right") == "P"), None)
+        short_call = next((leg for leg in shorts if leg.get("right") == "C"), None)
+        put_longs = [
+            leg for leg in legs if leg.get("right") == "P" and leg.get("qty", 0) > 0
+        ]
+        call_longs = [
+            leg for leg in legs if leg.get("right") == "C" and leg.get("qty", 0) > 0
+        ]
         width_put = (
             short_put["strike"] - put_longs[0]["strike"]
             if short_put and put_longs
@@ -745,7 +963,7 @@ def run() -> bool:
     underlying_default = ""
     qty_default = "1"
     strikes_default = ""
-    right: Optional[str] = None
+    right: str | None = None
 
     if parsed:
         underlying_default = parsed.underlying
@@ -798,16 +1016,20 @@ def run() -> bool:
     if parsed:
         expiry = expiry_default
     else:
-        expiry_in = _ask("Expiry (YYYY-MM-DD or DTE days)", expiry_default) or expiry_default
+        expiry_in = (
+            _ask("Expiry (YYYY-MM-DD or DTE days)", expiry_default) or expiry_default
+        )
         if str(expiry_in).strip().isdigit():
-            expiry = (today + dt.timedelta(days=int(str(expiry_in).strip()))).isoformat()
+            expiry = (
+                today + dt.timedelta(days=int(str(expiry_in).strip()))
+            ).isoformat()
         else:
             expiry = _normalize_expiry(underlying, expiry_in)
 
     # ------------------------------------------------------------------
     # 4) QTY & STRIKES
     # ------------------------------------------------------------------
-    is_credit_choice: Optional[bool] = None
+    is_credit_choice: bool | None = None
 
     if parsed:
         qty = int(qty_default)
@@ -817,43 +1039,76 @@ def run() -> bool:
         # For verticals, ask orientation before strikes to make intent explicit
         if strat == "vert":
             if not right:
-                right = ((_ask("Right (C/P)", "C") or "C").upper())
+                right = (_ask("Right (C/P)", "C") or "C").upper()
             kind = (_ask("Vertical type (debit/credit)", "debit") or "debit").lower()
             is_credit_choice = kind.startswith("c")
         # Optional Auto suggestions for supported strategies (Phase A)
         auto_used = False
-        if _pe is not None and strat in {"vert", "ic", "iron_condor", "cal", "calendar", "fly", "butterfly"}:
-            auto = (_ask("Auto suggestions from live data? (Y/n)", "Y") or "Y").strip().lower()
+        if _pe is not None and strat in {
+            "vert",
+            "ic",
+            "iron_condor",
+            "cal",
+            "calendar",
+            "fly",
+            "butterfly",
+        }:
+            auto = (
+                (_ask("Auto suggestions from live data? (Y/n)", "Y") or "Y")
+                .strip()
+                .lower()
+            )
             if auto in {"", "y"}:
                 # Load/prompt persisted preferences
                 _prefs = _load_wizard_prefs()
-                profile = (_ask("Profile (conservative/balanced/aggressive)", str(_prefs.get("profile", "balanced"))) or _prefs.get("profile", "balanced")).lower()
+                profile = (
+                    _ask(
+                        "Profile (conservative/balanced/aggressive)",
+                        str(_prefs.get("profile", "balanced")),
+                    )
+                    or _prefs.get("profile", "balanced")
+                ).lower()
                 avoid_default = "Y" if _prefs.get("avoid_earnings", True) else "N"
-                avoid_e = (_ask("Avoid earnings within 7 days? (Y/n)", avoid_default) or avoid_default).strip().lower() in {"", "y"}
+                avoid_e = (
+                    _ask("Avoid earnings within 7 days? (Y/n)", avoid_default)
+                    or avoid_default
+                ).strip().lower() in {"", "y"}
                 min_oi_def = str(_prefs.get("min_oi", 200))
                 min_volume_def = str(_prefs.get("min_volume", 50))
                 max_spread_def = str(_prefs.get("max_spread_pct", 0.02))
-                min_oi = int((_ask("Min OI", min_oi_def) or min_oi_def))
-                min_volume = int((_ask("Min Volume", min_volume_def) or min_volume_def))
+                min_oi = int(_ask("Min OI", min_oi_def) or min_oi_def)
+                min_volume = int(_ask("Min Volume", min_volume_def) or min_volume_def)
                 try:
-                    max_spread_pct = float((_ask("Max spread fraction of mid", max_spread_def) or max_spread_def))
+                    max_spread_pct = float(
+                        _ask("Max spread fraction of mid", max_spread_def)
+                        or max_spread_def
+                    )
                 except Exception:
                     max_spread_pct = float(max_spread_def)
-                rb_in = _ask("Risk budget % of NetLiq for sizing", str(_prefs.get("risk_budget_pct", 2))) or str(_prefs.get("risk_budget_pct", 2))
+                rb_in = _ask(
+                    "Risk budget % of NetLiq for sizing",
+                    str(_prefs.get("risk_budget_pct", 2)),
+                ) or str(_prefs.get("risk_budget_pct", 2))
                 try:
                     rb_pct = float(rb_in)
                     if rb_pct > 1:
                         rb_pct = rb_pct / 100.0
                 except Exception:
                     rb_pct = None
-                _save_wizard_prefs({
-                    "profile": profile,
-                    "avoid_earnings": avoid_e,
-                    "min_oi": min_oi,
-                    "min_volume": min_volume,
-                    "max_spread_pct": max_spread_pct,
-                    "risk_budget_pct": float(rb_in) if str(rb_in).replace('.', '', 1).isdigit() else _prefs.get("risk_budget_pct", 2),
-                })
+                _save_wizard_prefs(
+                    {
+                        "profile": profile,
+                        "avoid_earnings": avoid_e,
+                        "min_oi": min_oi,
+                        "min_volume": min_volume,
+                        "max_spread_pct": max_spread_pct,
+                        "risk_budget_pct": (
+                            float(rb_in)
+                            if str(rb_in).replace(".", "", 1).isdigit()
+                            else _prefs.get("risk_budget_pct", 2)
+                        ),
+                    }
+                )
                 # Build candidates
                 cands = []
                 resolved_exp = expiry
@@ -873,7 +1128,11 @@ def run() -> bool:
                                 expiry,
                                 side,
                                 profile,
-                                rules=_pe.LiquidityRules(min_oi=min_oi, min_volume=min_volume, max_spread_pct=max_spread_pct),
+                                rules=_pe.LiquidityRules(
+                                    min_oi=min_oi,
+                                    min_volume=min_volume,
+                                    max_spread_pct=max_spread_pct,
+                                ),
                                 avoid_earnings=avoid_e,
                                 earnings_window_days=7,
                                 risk_budget_pct=rb_pct,
@@ -884,20 +1143,28 @@ def run() -> bool:
                                 expiry,
                                 side,
                                 profile,
-                                rules=_pe.LiquidityRules(min_oi=min_oi, min_volume=min_volume, max_spread_pct=max_spread_pct),
+                                rules=_pe.LiquidityRules(
+                                    min_oi=min_oi,
+                                    min_volume=min_volume,
+                                    max_spread_pct=max_spread_pct,
+                                ),
                                 avoid_earnings=avoid_e,
                                 earnings_window_days=7,
                             )
                     elif strat in {"fly", "butterfly"}:
                         # Ensure right is known
                         if not right:
-                            right = ((_ask("Right (C/P)", "C") or "C").upper())
+                            right = (_ask("Right (C/P)", "C") or "C").upper()
                         cands = _pe.suggest_butterfly(
                             underlying,
                             expiry,
                             right,
                             profile,
-                            rules=_pe.LiquidityRules(min_oi=min_oi, min_volume=min_volume, max_spread_pct=max_spread_pct),
+                            rules=_pe.LiquidityRules(
+                                min_oi=min_oi,
+                                min_volume=min_volume,
+                                max_spread_pct=max_spread_pct,
+                            ),
                             avoid_earnings=avoid_e,
                             earnings_window_days=7,
                         )
@@ -907,17 +1174,27 @@ def run() -> bool:
                                 underlying,
                                 expiry,
                                 profile,
-                                rules=_pe.LiquidityRules(min_oi=min_oi, min_volume=min_volume, max_spread_pct=max_spread_pct),
+                                rules=_pe.LiquidityRules(
+                                    min_oi=min_oi,
+                                    min_volume=min_volume,
+                                    max_spread_pct=max_spread_pct,
+                                ),
                                 avoid_earnings=avoid_e,
                                 earnings_window_days=7,
                                 risk_budget_pct=rb_pct,
                             )
                         else:  # calendar/diagonal
                             if not right:
-                                right = ((_ask("Right (C/P)", "C") or "C").upper())
+                                right = (_ask("Right (C/P)", "C") or "C").upper()
                             so_def = str(_prefs.get("strike_offset", 0))
                             try:
-                                strike_offset = int((_ask("Diagonal far strike offset steps (0=calendar)", so_def) or so_def))
+                                strike_offset = int(
+                                    _ask(
+                                        "Diagonal far strike offset steps (0=calendar)",
+                                        so_def,
+                                    )
+                                    or so_def
+                                )
                             except Exception:
                                 strike_offset = int(so_def)
                             _save_wizard_prefs({"strike_offset": strike_offset})
@@ -926,7 +1203,11 @@ def run() -> bool:
                                 expiry,
                                 right,
                                 profile,
-                                rules=_pe.LiquidityRules(min_oi=min_oi, min_volume=min_volume, max_spread_pct=max_spread_pct),
+                                rules=_pe.LiquidityRules(
+                                    min_oi=min_oi,
+                                    min_volume=min_volume,
+                                    max_spread_pct=max_spread_pct,
+                                ),
                                 avoid_earnings=avoid_e,
                                 earnings_window_days=7,
                                 strike_offset=strike_offset,
@@ -937,6 +1218,7 @@ def run() -> bool:
                     cands = []
                 if cands:
                     from rich.table import Table as _Tbl
+
                     tbl = _Tbl(title=f"Candidates ({underlying} {resolved_exp})")
                     tbl.add_column("#", justify="right")
                     tbl.add_column("Strikes", justify="left")
@@ -947,8 +1229,12 @@ def run() -> bool:
                     tbl.add_column("POP", justify="right")
                     tbl.add_column("Qty*", justify="right")
                     for i, c in enumerate(cands, 1):
-                        ks = sorted({float(leg.get("strike")) for leg in c.get("legs", [])})
-                        typ = "CR" if "credit" in c else ("DR" if "debit" in c else "CR")
+                        ks = sorted(
+                            {float(leg.get("strike")) for leg in c.get("legs", [])}
+                        )
+                        typ = (
+                            "CR" if "credit" in c else ("DR" if "debit" in c else "CR")
+                        )
                         price = c.get("credit", c.get("debit", 0.0))
                         riskv = c.get("max_loss", c.get("debit", 0.0))
                         tbl.add_row(
@@ -956,36 +1242,70 @@ def run() -> bool:
                             ",".join(f"{k:g}" for k in ks),
                             typ,
                             f"{price:.2f}",
-                            f"{c.get('width',0):.2f}",
+                            f"{c.get('width', 0):.2f}",
                             f"{riskv:.2f}",
-                            f"{c.get('pop_proxy',0):.2f}",
-                            str(c.get('suggested_qty','')),
+                            f"{c.get('pop_proxy', 0):.2f}",
+                            str(c.get("suggested_qty", "")),
                         )
                     console.print(tbl)
-                    sel = (_ask("Select candidate # (or Enter to skip)", "") or "").strip()
+                    sel = (
+                        _ask("Select candidate # (or Enter to skip)", "") or ""
+                    ).strip()
                     if sel.isdigit() and 1 <= int(sel) <= len(cands):
                         pick = cands[int(sel) - 1]
                         expiry = pick.get("expiry", resolved_exp)
-                        ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
+                        ks = sorted(
+                            {float(leg.get("strike")) for leg in pick.get("legs", [])}
+                        )
                         if strat == "vert" and len(ks) >= 2:
                             strikes = [ks[0], ks[1]]
                             # suggested qty if provided
                             if pick.get("suggested_qty"):
-                                use_auto = (_ask(f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)", "Y") or "Y").strip().lower()
+                                use_auto = (
+                                    (
+                                        _ask(
+                                            f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)",
+                                            "Y",
+                                        )
+                                        or "Y"
+                                    )
+                                    .strip()
+                                    .lower()
+                                )
                                 if use_auto in {"", "y"}:
                                     qty = int(pick.get("suggested_qty"))
                             auto_used = True
                         elif strat in {"ic", "iron_condor"} and len(ks) >= 4:
                             strikes = ks[:4]
                             if pick.get("suggested_qty"):
-                                use_auto = (_ask(f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)", "Y") or "Y").strip().lower()
+                                use_auto = (
+                                    (
+                                        _ask(
+                                            f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)",
+                                            "Y",
+                                        )
+                                        or "Y"
+                                    )
+                                    .strip()
+                                    .lower()
+                                )
                                 if use_auto in {"", "y"}:
                                     qty = int(pick.get("suggested_qty"))
                             auto_used = True
                         elif strat in {"fly", "butterfly"} and len(ks) >= 3:
                             strikes = ks[:3]
                             if pick.get("suggested_qty"):
-                                use_auto = (_ask(f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)", "Y") or "Y").strip().lower()
+                                use_auto = (
+                                    (
+                                        _ask(
+                                            f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)",
+                                            "Y",
+                                        )
+                                        or "Y"
+                                    )
+                                    .strip()
+                                    .lower()
+                                )
                                 if use_auto in {"", "y"}:
                                     qty = int(pick.get("suggested_qty"))
                             auto_used = True
@@ -996,7 +1316,17 @@ def run() -> bool:
                             auto_far_strike = pick.get("strike_far", ks[0])
                             strikes = [pick.get("strike_near", ks[0])]
                             if pick.get("suggested_qty"):
-                                use_auto = (_ask(f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)", "Y") or "Y").strip().lower()
+                                use_auto = (
+                                    (
+                                        _ask(
+                                            f"Use suggested qty {int(pick.get('suggested_qty'))}? (Y/n)",
+                                            "Y",
+                                        )
+                                        or "Y"
+                                    )
+                                    .strip()
+                                    .lower()
+                                )
                                 if use_auto in {"", "y"}:
                                     qty = int(pick.get("suggested_qty"))
                             auto_used = True
@@ -1004,9 +1334,9 @@ def run() -> bool:
         if not locals().get("strikes", []):
             strikes = []
         if not auto_used and strat in {"cc", "csp", "vert"}:
-            strikes_in = (
-                _ask("Strike(s) (comma-sep)", strikes_default) or ""
-            ).replace(" ", "")
+            strikes_in = (_ask("Strike(s) (comma-sep)", strikes_default) or "").replace(
+                " ", ""
+            )
             strikes = [float(s) for s in strikes_in.split(",") if s]
         elif not auto_used and strat in {"ic", "iron_condor"}:
             raw = _ask("Strikes P_low,P_high,C_low,C_high", "") or ""
@@ -1040,7 +1370,19 @@ def run() -> bool:
             strikes = []
 
     if not right:
-        if strat in {"csp", "strad", "straddle", "stran", "strangle", "ic", "iron_condor", "fly", "butterfly", "cov", "covered_call"}:
+        if strat in {
+            "csp",
+            "strad",
+            "straddle",
+            "stran",
+            "strangle",
+            "ic",
+            "iron_condor",
+            "fly",
+            "butterfly",
+            "cov",
+            "covered_call",
+        }:
             # handled per-leg or strategy
             right = ""
         else:
@@ -1048,9 +1390,9 @@ def run() -> bool:
 
     # For verticals, make right explicit when using the wizard
     if strat == "vert" and not parsed and not right:
-        right = ((_ask("Right (C/P)", "C") or "C").upper())
+        right = (_ask("Right (C/P)", "C") or "C").upper()
 
-    legs: List[Dict[str, Any]] = []
+    legs: list[dict[str, Any]] = []
     if strat == "cc":
         legs.append(
             {
@@ -1174,15 +1516,21 @@ def run() -> bool:
         ]
     elif strat in {"cal", "calendar"}:
         r = (_ask("Right (C/P)", "C") or "C").upper() if not right else right
-        near_in = _ask("Near expiry (YYYY-MM-DD)", auto_near or expiry) or (auto_near or expiry)
-        far_in = _ask("Far expiry (YYYY-MM-DD)", auto_far or expiry) or (auto_far or expiry)
+        near_in = _ask("Near expiry (YYYY-MM-DD)", auto_near or expiry) or (
+            auto_near or expiry
+        )
+        far_in = _ask("Far expiry (YYYY-MM-DD)", auto_far or expiry) or (
+            auto_far or expiry
+        )
         near = _normalize_expiry(underlying, near_in)
         far = _normalize_expiry(underlying, far_in)
         if not strikes:
             raise ValueError("Calendar requires a strike")
         strike = float(strikes[0])
         if auto_far_strike is not None and float(auto_far_strike) != float(strike):
-            t = build_diagonal(underlying, far, r, near, far, strike, float(auto_far_strike), qty, None)
+            t = build_diagonal(
+                underlying, far, r, near, far, strike, float(auto_far_strike), qty, None
+            )
         else:
             t = build_calendar(underlying, far, r, near, far, strike, qty, None)
         legs = [
@@ -1250,10 +1598,10 @@ def run() -> bool:
     theta_cap = getattr(cfg, "theta_cap", float("-inf"))
     confirm_caps = getattr(cfg, "confirm_above_caps", True)
 
-    mid_prices: List[float] = []
+    mid_prices: list[float] = []
     net_mid = net_limit = 0.0
     net_delta = net_theta = net_gamma = net_vega = 0.0
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for leg in legs:
         price = _price_leg(
             leg["symbol"], leg.get("expiry"), leg.get("strike"), leg.get("right")
@@ -1292,7 +1640,9 @@ def run() -> bool:
         )
 
     # If all legs are options with standard 100 multiplier, compute spread prices (per contract)
-    all_opts_100 = all((leg.get("right") in {"C", "P"}) and leg.get("mult") == 100 for leg in legs)
+    all_opts_100 = all(
+        (leg.get("right") in {"C", "P"}) and leg.get("mult") == 100 for leg in legs
+    )
     spread_mid = (net_mid / 100.0) if all_opts_100 else ""
     spread_limit = (net_limit / 100.0) if all_opts_100 else ""
 
@@ -1395,15 +1745,18 @@ def run() -> bool:
     return True
 
 
-def cli(argv: List[str] | None = None) -> int:
+def cli(argv: list[str] | None = None) -> int:
     """Non-interactive ticket builder CLI."""
     import argparse
+
     try:
         from portfolio_exporter.core.io import save as io_save  # type: ignore
     except Exception:
+
         def io_save(obj, name, fmt="json", outdir=None):  # type: ignore
-            from pathlib import Path as _P
             import json as _json
+            from pathlib import Path as _P
+
             p = _P(outdir or ".") / f"{name}.{fmt if fmt != 'excel' else 'xlsx'}"
             p.parent.mkdir(parents=True, exist_ok=True)
             if fmt == "json":
@@ -1411,6 +1764,7 @@ def cli(argv: List[str] | None = None) -> int:
             elif fmt == "csv":
                 try:
                     import pandas as _pd
+
                     assert isinstance(obj, _pd.DataFrame)
                     obj.to_csv(p, index=False)
                 except Exception:
@@ -1418,6 +1772,7 @@ def cli(argv: List[str] | None = None) -> int:
             else:
                 p.write_text("")
             return p
+
     parser = argparse.ArgumentParser(description="Build option strategy tickets")
     parser.add_argument("--strategy")
     parser.add_argument(
@@ -1440,8 +1795,12 @@ def cli(argv: List[str] | None = None) -> int:
     parser.add_argument("--strikes", default="")
     # Vertical orientation
     g = parser.add_mutually_exclusive_group()
-    g.add_argument("--credit", action="store_true", help="Build vertical as a credit spread")
-    g.add_argument("--debit", action="store_true", help="Build vertical as a debit spread")
+    g.add_argument(
+        "--credit", action="store_true", help="Build vertical as a credit spread"
+    )
+    g.add_argument(
+        "--debit", action="store_true", help="Build vertical as a debit spread"
+    )
     parser.add_argument("--strike", type=float, default=None)
     parser.add_argument("--put-strike", dest="put_strike", type=float, default=None)
     parser.add_argument("--call-strike", dest="call_strike", type=float, default=None)
@@ -1449,21 +1808,73 @@ def cli(argv: List[str] | None = None) -> int:
     parser.add_argument("--account", default=None)
     parser.add_argument("--width", type=float, default=5.0)
     parser.add_argument("--wings", type=float, default=5.0)
-    parser.add_argument("--json", action="store_true", help="Print ticket JSON to stdout")
-    parser.add_argument("--no-files", action="store_true", help="Do not write ticket files")
+    parser.add_argument(
+        "--json", action="store_true", help="Print ticket JSON to stdout"
+    )
+    parser.add_argument(
+        "--no-files", action="store_true", help="Do not write ticket files"
+    )
     # Auto-selection preview flags (for supported presets)
-    parser.add_argument("--auto", action="store_true", help="Suggest strikes from live data and print candidates JSON (presets: bull_put, bear_call, bull_call, bear_put, iron_condor)")
-    parser.add_argument("--wizard", action="store_true", help="Wizard-style auto preview for strategy/right/credit-debit with JSON output")
-    parser.add_argument("--pick", type=int, default=None, help="When using --auto or --wizard JSON preview, pick Nth candidate and emit ticket JSON")
-    parser.add_argument("--profile", default="balanced", help="Auto profile: conservative|balanced|aggressive")
-    parser.add_argument("--dte", type=int, default=None, help="Days to expiry (alternative to --expiry)")
-    parser.add_argument("--risk-budget-pct", dest="risk_budget_pct", type=float, default=None, help="Risk budget percent of NetLiq for suggested qty (e.g., 2 for 2%)")
-    parser.add_argument("--earnings-window", dest="earnings_window", type=int, default=7, help="Avoid earnings within +/- N days in auto mode")
-    parser.add_argument("--no-avoid-earnings", dest="avoid_earnings", action="store_false", help="Do not avoid earnings proximity in auto mode")
+    parser.add_argument(
+        "--auto",
+        action="store_true",
+        help="Suggest strikes from live data and print candidates JSON (presets: bull_put, bear_call, bull_call, bear_put, iron_condor)",
+    )
+    parser.add_argument(
+        "--wizard",
+        action="store_true",
+        help="Wizard-style auto preview for strategy/right/credit-debit with JSON output",
+    )
+    parser.add_argument(
+        "--pick",
+        type=int,
+        default=None,
+        help="When using --auto or --wizard JSON preview, pick Nth candidate and emit ticket JSON",
+    )
+    parser.add_argument(
+        "--profile",
+        default="balanced",
+        help="Auto profile: conservative|balanced|aggressive",
+    )
+    parser.add_argument(
+        "--dte", type=int, default=None, help="Days to expiry (alternative to --expiry)"
+    )
+    parser.add_argument(
+        "--risk-budget-pct",
+        dest="risk_budget_pct",
+        type=float,
+        default=None,
+        help="Risk budget percent of NetLiq for suggested qty (e.g., 2 for 2%)",
+    )
+    parser.add_argument(
+        "--earnings-window",
+        dest="earnings_window",
+        type=int,
+        default=7,
+        help="Avoid earnings within +/- N days in auto mode",
+    )
+    parser.add_argument(
+        "--no-avoid-earnings",
+        dest="avoid_earnings",
+        action="store_false",
+        help="Do not avoid earnings proximity in auto mode",
+    )
     parser.set_defaults(avoid_earnings=True)
     # Liquidity thresholds for auto mode
-    parser.add_argument("--min-oi", dest="min_oi", type=int, default=200, help="Minimum open interest filter for auto selection")
-    parser.add_argument("--min-volume", dest="min_volume", type=int, default=50, help="Minimum volume filter for auto selection")
+    parser.add_argument(
+        "--min-oi",
+        dest="min_oi",
+        type=int,
+        default=200,
+        help="Minimum open interest filter for auto selection",
+    )
+    parser.add_argument(
+        "--min-volume",
+        dest="min_volume",
+        type=int,
+        default=50,
+        help="Minimum volume filter for auto selection",
+    )
     parser.add_argument(
         "--max-spread-pct",
         dest="max_spread_pct",
@@ -1471,11 +1882,17 @@ def cli(argv: List[str] | None = None) -> int:
         default=0.02,
         help="Maximum bid-ask spread as a fraction of mid (e.g., 0.02 = 2%)",
     )
-    parser.add_argument("--strike-offset", dest="strike_offset", type=int, default=0, help="For calendar/diagonal: far leg strike offset in steps (calls up, puts down)")
+    parser.add_argument(
+        "--strike-offset",
+        dest="strike_offset",
+        type=int,
+        default=0,
+        help="For calendar/diagonal: far leg strike offset in steps (calls up, puts down)",
+    )
     args = parser.parse_args(argv)
 
     qty = int(args.qty)
-    ticket: Dict[str, Any]
+    ticket: dict[str, Any]
 
     # Wizard auto-preview (non-interactive)
     if args.wizard and args.auto:
@@ -1496,25 +1913,70 @@ def cli(argv: List[str] | None = None) -> int:
                 rb_val = float(args.risk_budget_pct)
                 if rb_val > 1:
                     rb_val = rb_val / 100.0
-            rules = _pe.LiquidityRules(min_oi=int(args.min_oi), min_volume=int(args.min_volume), max_spread_pct=float(args.max_spread_pct))
+            rules = _pe.LiquidityRules(
+                min_oi=int(args.min_oi),
+                min_volume=int(args.min_volume),
+                max_spread_pct=float(args.max_spread_pct),
+            )
             if strat == "vertical":
                 if not args.right:
                     parser.error("--right required for vertical wizard preview")
                 side = None
                 if args.right.upper() == "P":
-                    side = "bull_put" if args.credit or (not args.debit and True) else "bear_put"
+                    side = (
+                        "bull_put"
+                        if args.credit or (not args.debit and True)
+                        else "bear_put"
+                    )
                 else:
-                    side = "bear_call" if args.credit or (not args.debit and False) else "bull_call"
+                    side = (
+                        "bear_call"
+                        if args.credit or (not args.debit and False)
+                        else "bull_call"
+                    )
                 if side in {"bull_put", "bear_call"}:
-                    cands = _pe.suggest_credit_vertical(args.symbol, exp_norm, side, args.profile, rules=rules, avoid_earnings=bool(args.avoid_earnings), earnings_window_days=int(args.earnings_window), risk_budget_pct=rb_val)
+                    cands = _pe.suggest_credit_vertical(
+                        args.symbol,
+                        exp_norm,
+                        side,
+                        args.profile,
+                        rules=rules,
+                        avoid_earnings=bool(args.avoid_earnings),
+                        earnings_window_days=int(args.earnings_window),
+                        risk_budget_pct=rb_val,
+                    )
                 else:
-                    cands = _pe.suggest_debit_vertical(args.symbol, exp_norm, side, args.profile, rules=rules, avoid_earnings=bool(args.avoid_earnings), earnings_window_days=int(args.earnings_window))
+                    cands = _pe.suggest_debit_vertical(
+                        args.symbol,
+                        exp_norm,
+                        side,
+                        args.profile,
+                        rules=rules,
+                        avoid_earnings=bool(args.avoid_earnings),
+                        earnings_window_days=int(args.earnings_window),
+                    )
             elif strat == "butterfly":
                 if not args.right:
                     parser.error("--right required for butterfly wizard preview")
-                cands = _pe.suggest_butterfly(args.symbol, exp_norm, args.right.upper(), args.profile, rules=rules, avoid_earnings=bool(args.avoid_earnings), earnings_window_days=int(args.earnings_window))
+                cands = _pe.suggest_butterfly(
+                    args.symbol,
+                    exp_norm,
+                    args.right.upper(),
+                    args.profile,
+                    rules=rules,
+                    avoid_earnings=bool(args.avoid_earnings),
+                    earnings_window_days=int(args.earnings_window),
+                )
             elif strat == "iron_condor":
-                cands = _pe.suggest_iron_condor(args.symbol, exp_norm, args.profile, rules=rules, avoid_earnings=bool(args.avoid_earnings), earnings_window_days=int(args.earnings_window), risk_budget_pct=rb_val)
+                cands = _pe.suggest_iron_condor(
+                    args.symbol,
+                    exp_norm,
+                    args.profile,
+                    rules=rules,
+                    avoid_earnings=bool(args.avoid_earnings),
+                    earnings_window_days=int(args.earnings_window),
+                    risk_budget_pct=rb_val,
+                )
             elif strat == "calendar":
                 if not args.right:
                     parser.error("--right required for calendar wizard preview")
@@ -1529,11 +1991,13 @@ def cli(argv: List[str] | None = None) -> int:
                     strike_offset=int(args.strike_offset),
                 )
             else:
-                parser.error("--wizard --auto currently supports vertical, butterfly, calendar and iron_condor")
+                parser.error(
+                    "--wizard --auto currently supports vertical, butterfly, calendar and iron_condor"
+                )
         except Exception as exc:
             cands = []
             warn = f"auto selection failed: {exc}"
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "ok": True,
             "wizard": True,
             "auto": True,
@@ -1546,7 +2010,11 @@ def cli(argv: List[str] | None = None) -> int:
                 "avoid_earnings": bool(args.avoid_earnings),
                 "earnings_window": int(args.earnings_window),
                 "risk_budget_pct": args.risk_budget_pct,
-                "liquidity": {"min_oi": int(args.min_oi), "min_volume": int(args.min_volume), "max_spread_pct": float(args.max_spread_pct)},
+                "liquidity": {
+                    "min_oi": int(args.min_oi),
+                    "min_volume": int(args.min_volume),
+                    "max_spread_pct": float(args.max_spread_pct),
+                },
             },
             "resolved_expiry": (cands[0].get("expiry") if cands else exp_norm),
             "candidates": cands,
@@ -1557,14 +2025,31 @@ def cli(argv: List[str] | None = None) -> int:
         if args.pick and cands and 1 <= int(args.pick) <= len(cands):
             pick = cands[int(args.pick) - 1]
             expiry = pick.get("expiry", exp_norm)
-            ticket: Dict[str, Any]
+            ticket: dict[str, Any]
             if strat == "vertical":
                 ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
-                credit_flag = True if "credit" in pick else False if "debit" in pick else None
-                ticket = build_vertical(args.symbol, expiry, args.right.upper(), ks[:2], int(args.qty), args.account, credit=credit_flag)
+                credit_flag = (
+                    True if "credit" in pick else False if "debit" in pick else None
+                )
+                ticket = build_vertical(
+                    args.symbol,
+                    expiry,
+                    args.right.upper(),
+                    ks[:2],
+                    int(args.qty),
+                    args.account,
+                    credit=credit_flag,
+                )
             elif strat == "butterfly":
                 ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
-                ticket = build_butterfly(args.symbol, expiry, args.right.upper(), ks[:3], int(args.qty), args.account)
+                ticket = build_butterfly(
+                    args.symbol,
+                    expiry,
+                    args.right.upper(),
+                    ks[:3],
+                    int(args.qty),
+                    args.account,
+                )
             elif strat == "calendar":
                 ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
                 near = pick.get("near") or pick.get("legs")[0].get("expiry")
@@ -1573,12 +2058,33 @@ def cli(argv: List[str] | None = None) -> int:
                 strike_near = pick.get("strike_near", ks[0])
                 strike_far = pick.get("strike_far", ks[0])
                 if float(strike_near) != float(strike_far):
-                    ticket = build_diagonal(args.symbol, far, args.right.upper(), near, far, float(strike_near), float(strike_far), int(args.qty), args.account)
+                    ticket = build_diagonal(
+                        args.symbol,
+                        far,
+                        args.right.upper(),
+                        near,
+                        far,
+                        float(strike_near),
+                        float(strike_far),
+                        int(args.qty),
+                        args.account,
+                    )
                 else:
-                    ticket = build_calendar(args.symbol, far, args.right.upper(), near, far, float(strike_near), int(args.qty), args.account)
+                    ticket = build_calendar(
+                        args.symbol,
+                        far,
+                        args.right.upper(),
+                        near,
+                        far,
+                        float(strike_near),
+                        int(args.qty),
+                        args.account,
+                    )
             else:  # iron condor
                 ks = sorted({float(leg.get("strike")) for leg in pick.get("legs", [])})
-                ticket = build_iron_condor(args.symbol, expiry, ks[:4], int(args.qty), args.account)
+                ticket = build_iron_condor(
+                    args.symbol, expiry, ks[:4], int(args.qty), args.account
+                )
             result["picked"] = int(args.pick)
             result["ticket"] = ticket
         if args.json:
@@ -1591,8 +2097,16 @@ def cli(argv: List[str] | None = None) -> int:
             if _pe is None:
                 parser.error("auto selection is unavailable (preset_engine missing)")
             side = args.preset
-            if side not in {"bull_put", "bear_call", "bull_call", "bear_put", "iron_condor"}:
-                parser.error("--auto supports bull_put, bear_call, bull_call, bear_put, iron_condor")
+            if side not in {
+                "bull_put",
+                "bear_call",
+                "bull_call",
+                "bear_put",
+                "iron_condor",
+            }:
+                parser.error(
+                    "--auto supports bull_put, bear_call, bull_call, bear_put, iron_condor"
+                )
             # Resolve expiry via DTE if provided
             exp_in = args.expiry
             if args.dte is not None and args.dte > 0:
@@ -1648,7 +2162,7 @@ def cli(argv: List[str] | None = None) -> int:
             except Exception as exc:
                 cands = []
                 warn = f"auto selection failed: {exc}"
-            result: Dict[str, Any] = {
+            result: dict[str, Any] = {
                 "ok": True,
                 "preset": args.preset,
                 "auto": True,
@@ -1703,7 +2217,9 @@ def cli(argv: List[str] | None = None) -> int:
             )
         elif strat == "iron_condor":
             strikes = [float(s) for s in args.strikes.split(",") if s]
-            ticket = build_iron_condor(args.symbol, args.expiry, strikes, qty, args.account)
+            ticket = build_iron_condor(
+                args.symbol, args.expiry, strikes, qty, args.account
+            )
         elif strat == "butterfly":
             strikes = [float(s) for s in args.strikes.split(",") if s]
             ticket = build_butterfly(
@@ -1715,7 +2231,9 @@ def cli(argv: List[str] | None = None) -> int:
             if args.expiry and "," in args.expiry:
                 near, far = [p.strip() for p in args.expiry.split(",", 1)]
             if not (near and far):
-                parser.error("calendar requires --expiry-near and --expiry-far or --expiry near,far")
+                parser.error(
+                    "calendar requires --expiry-near and --expiry-far or --expiry near,far"
+                )
             if args.strike is None:
                 parser.error("calendar requires --strike")
             ticket = build_calendar(
@@ -1734,7 +2252,9 @@ def cli(argv: List[str] | None = None) -> int:
                 strike = float(args.strikes)
             if strike is None:
                 parser.error("straddle requires --strike")
-            ticket = build_straddle(args.symbol, args.expiry, float(strike), qty, args.account)
+            ticket = build_straddle(
+                args.symbol, args.expiry, float(strike), qty, args.account
+            )
         elif strat == "strangle":
             if args.put_strike is not None and args.call_strike is not None:
                 put_k, call_k = args.put_strike, args.call_strike
@@ -1760,7 +2280,7 @@ def cli(argv: List[str] | None = None) -> int:
         else:
             parser.error(f"Unknown strategy {args.strategy}")
 
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "ok": True,
         "ticket": ticket,
         "outputs": [],
@@ -1784,7 +2304,7 @@ def cli(argv: List[str] | None = None) -> int:
     return 0
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Console entry wrapper for setuptools scripts."""
     return cli(argv)
 

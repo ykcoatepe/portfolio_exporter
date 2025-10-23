@@ -20,25 +20,26 @@ $ python option_chain_snapshot.py --symbol-expiries 'TSLA:20250620,20250703;AAPL
 """
 
 import argparse
-import csv
 import logging
 import math
-from typing import Any
 import os
 import time
-from portfolio_exporter.core.config import settings
+
 from portfolio_exporter.core import io
 from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+
 run_with_spinner = core_ui.run_with_spinner
-from datetime import datetime, timezone, date
-from typing import List, Sequence
 import zipfile
+from collections.abc import Sequence
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from ib_insync import IB, Option, Stock
+
 from utils.bs import bs_greeks
 
 try:  # optional dependencies
@@ -47,8 +48,8 @@ except Exception:  # pragma: no cover - optional
     xlsxwriter = None  # type: ignore
 
 try:
-    from reportlab.lib.pagesizes import letter, landscape
     from reportlab.lib import colors
+    from reportlab.lib.pagesizes import landscape, letter
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
@@ -125,7 +126,10 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
+
 IB_CID = _cid("option_chain", default=10)
 LOG_FMT = "%(asctime)s %(levelname)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FMT)
@@ -146,14 +150,14 @@ except Exception:  # pragma: no cover - optional
 # ---------------------------------------------------------------------------
 
 
-def create_zip(files: List[str], dest: str) -> None:
+def create_zip(files: list[str], dest: str) -> None:
     """Create a zip archive containing the given files."""
     with zipfile.ZipFile(dest, "w") as zf:
         for path in files:
             zf.write(path, os.path.basename(path))
 
 
-def cleanup(files: List[str]) -> None:
+def cleanup(files: list[str]) -> None:
     """Delete the given files, ignoring missing paths."""
     for path in files:
         try:
@@ -162,7 +166,7 @@ def cleanup(files: List[str]) -> None:
             pass
 
 
-def load_tickers_from_files() -> List[str]:
+def load_tickers_from_files() -> list[str]:
     """Read tickers from the first portfolio file that exists.
 
     Preference: files under ``settings.output_dir``; then current directory.
@@ -178,7 +182,7 @@ def load_tickers_from_files() -> List[str]:
         return [ln.strip().upper() for ln in fh if ln.strip()]
 
 
-def get_portfolio_tickers(ib: IB) -> List[str]:
+def get_portfolio_tickers(ib: IB) -> list[str]:
     """Return all stock / ETF symbols currently held in the account."""
     tickers: set[str] = {
         pos.contract.symbol.upper()
@@ -572,7 +576,6 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
     ts = ts_local.isoformat()
     rows = []
     for con, tk in snapshots:
-        oi_attr = "callOpenInterest" if con.right == "C" else "putOpenInterest"
         iv_val = _g(tk, "impliedVolatility")
         delta_val = _g(tk, "delta")
         gamma_val = _g(tk, "gamma")
@@ -582,12 +585,9 @@ def snapshot_chain(ib: IB, symbol: str, expiry_hint: str | None = None) -> pd.Da
         # Black-Scholes fallback if still NaN
         if any(np.isnan(x) for x in (delta_val, gamma_val, vega_val, theta_val)):
             if spot and iv_val and not np.isnan(iv_val):
-                exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(
-                    tzinfo=timezone.utc
-                )
+                exp_dt = datetime.strptime(expiry, "%Y%m%d").replace(tzinfo=UTC)
                 T = max(
-                    (exp_dt - datetime.now(timezone.utc)).total_seconds()
-                    / (365 * 24 * 3600),
+                    (exp_dt - datetime.now(UTC)).total_seconds() / (365 * 24 * 3600),
                     1 / (365 * 24),
                 )
                 bs = bs_greeks(spot, con.strike, T, 0.01, iv_val, con.right == "C")

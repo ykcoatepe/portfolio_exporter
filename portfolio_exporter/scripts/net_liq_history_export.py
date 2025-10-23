@@ -12,12 +12,10 @@ from __future__ import annotations
 
 import argparse
 import io
-import json
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import requests
@@ -26,8 +24,6 @@ from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core.config import settings
-
 
 # ---------------------------------------------------------------------------
 # data sources
@@ -49,7 +45,7 @@ def _parse_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df.sort_index()
 
 
-def _read_tws_file() -> Optional[pd.DataFrame]:
+def _read_tws_file() -> pd.DataFrame | None:
     if not TWS_NET_LIQ_CSV.exists():
         return None
     df = pd.read_csv(TWS_NET_LIQ_CSV)
@@ -178,7 +174,13 @@ def _run_core(
 
 def cli(ns: argparse.Namespace) -> dict:
     outdir = cli_helpers.resolve_output_dir(getattr(ns, "output_dir", None))
-    defaults = {"csv": bool(getattr(ns, "output_dir", None) or os.getenv("OUTPUT_DIR") or os.getenv("PE_OUTPUT_DIR"))}
+    defaults = {
+        "csv": bool(
+            getattr(ns, "output_dir", None)
+            or os.getenv("OUTPUT_DIR")
+            or os.getenv("PE_OUTPUT_DIR")
+        )
+    }
     defaults.update({"excel": False, "pdf": False})
     formats = cli_helpers.decide_file_writes(
         ns,
@@ -186,7 +188,9 @@ def cli(ns: argparse.Namespace) -> dict:
         defaults=defaults,
     )
 
-    with RunLog(script="net_liq_history_export", args=vars(ns), output_dir=outdir) as rl:
+    with RunLog(
+        script="net_liq_history_export", args=vars(ns), output_dir=outdir
+    ) as rl:
         with rl.time("run_core"):
             df, summary, written = _run_core(ns, formats, outdir)
         if ns.debug_timings:
@@ -211,6 +215,7 @@ def cli(ns: argparse.Namespace) -> dict:
         else:
             print(df_print.to_string(index=False))
     return summary
+
 
 def get_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export Net-Liq history")

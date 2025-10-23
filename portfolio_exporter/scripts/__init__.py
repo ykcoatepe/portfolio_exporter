@@ -28,6 +28,7 @@ __all__ = [
     "quick_chain",
     "validate_json",
     "doctor",
+    "memory",
 ]
 
 

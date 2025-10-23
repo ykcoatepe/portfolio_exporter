@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 import yfinance as yf
 
-from portfolio_exporter.core.ib import quote_option, quote_stock, net_liq as _ib_net_liq
+from portfolio_exporter.core.ib import net_liq as _ib_net_liq
+from portfolio_exporter.core.ib import quote_option
 
 
 @dataclass
@@ -58,7 +59,6 @@ def _earnings_near(symbol: str, expiry: str, window_days: int = 7) -> bool:
     Tries yfinance.get_earnings_dates; falls back to Ticker.calendar if needed.
     If data is unavailable, returns False (do not block).
     """
-    from datetime import date, timedelta
 
     try:
         tkr = yf.Ticker(symbol)
@@ -98,7 +98,7 @@ def _spread_pct(bid: float, ask: float, mid: float) -> float:
     return max(0.0, (ask - bid) / mid)
 
 
-def _nearest_yf_expiry(symbol: str, expiry: str) -> Tuple[str, list[str]]:
+def _nearest_yf_expiry(symbol: str, expiry: str) -> tuple[str, list[str]]:
     """Return an expiry present in Yahoo's options list, preferring the same date,
     else the next later available date, else the last available.
     """
@@ -114,7 +114,9 @@ def _nearest_yf_expiry(symbol: str, expiry: str) -> Tuple[str, list[str]]:
     return exps[-1], exps
 
 
-def _yf_chain(symbol: str, expiry: str) -> Tuple[pd.DataFrame, pd.DataFrame, float, str]:
+def _yf_chain(
+    symbol: str, expiry: str
+) -> tuple[pd.DataFrame, pd.DataFrame, float, str]:
     tkr = yf.Ticker(symbol)
     spot = tkr.history(period="1d")["Close"].iloc[-1]
     resolved, _ = _nearest_yf_expiry(symbol, expiry)
@@ -142,7 +144,9 @@ def _add_delta(df: pd.DataFrame, spot: float, dte: int, right: str) -> pd.DataFr
             return np.nan
         t = max(dte, 1) / 365
         try:
-            d1 = (math.log(spot / float(row["strike"])) + (0.01 + 0.5 * iv * iv) * t) / (iv * math.sqrt(t))
+            d1 = (
+                math.log(spot / float(row["strike"])) + (0.01 + 0.5 * iv * iv) * t
+            ) / (iv * math.sqrt(t))
         except Exception:
             return np.nan
         if right == "C":
@@ -159,21 +163,25 @@ def _add_delta(df: pd.DataFrame, spot: float, dte: int, right: str) -> pd.DataFr
 
 
 def _filter_liquidity(df: pd.DataFrame, rules: LiquidityRules) -> pd.DataFrame:
-    return df[(df["openInterest"] >= rules.min_oi) & (df["volume"] >= rules.min_volume) & (df["spread_pct"] <= rules.max_spread_pct)]
+    return df[
+        (df["openInterest"] >= rules.min_oi)
+        & (df["volume"] >= rules.min_volume)
+        & (df["spread_pct"] <= rules.max_spread_pct)
+    ]
 
 
-def _nearest_strike(strikes: List[float], target: float) -> float:
+def _nearest_strike(strikes: list[float], target: float) -> float:
     return min(strikes, key=lambda k: abs(k - target))
 
 
-def _price_leg(symbol: str, expiry: str, strike: float, right: str) -> Dict[str, float]:
+def _price_leg(symbol: str, expiry: str, strike: float, right: str) -> dict[str, float]:
     try:
         return quote_option(symbol, expiry, strike, right)
     except Exception:
         return {"mid": 0.0, "bid": 0.0, "ask": 0.0}
 
 
-def _mid_from_df(df: Optional[pd.DataFrame], strike: float) -> Optional[float]:
+def _mid_from_df(df: pd.DataFrame | None, strike: float) -> float | None:
     if df is None:
         return None
     try:
@@ -193,14 +201,14 @@ def suggest_credit_vertical(
     profile: str | None = None,
     rules: LiquidityRules | None = None,
     *,
-    df_calls: Optional[pd.DataFrame] = None,
-    df_puts: Optional[pd.DataFrame] = None,
-    spot_override: Optional[float] = None,
+    df_calls: pd.DataFrame | None = None,
+    df_puts: pd.DataFrame | None = None,
+    spot_override: float | None = None,
     avoid_earnings: bool = True,
     earnings_window_days: int = 7,
-    risk_budget_pct: Optional[float] = None,
-    netliq: Optional[float] = None,
-) -> List[Dict[str, Any]]:
+    risk_budget_pct: float | None = None,
+    netliq: float | None = None,
+) -> list[dict[str, Any]]:
     """Return up to 3 candidate credit verticals using target delta profiles.
 
     Each candidate contains: legs, credit, max_loss, pop_proxy, breakevens,
@@ -220,7 +228,12 @@ def suggest_credit_vertical(
     if df_calls is None or df_puts is None or spot_override is None:
         calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
     else:
-        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+        calls, puts, spot, expiry_resolved = (
+            df_calls.copy(),
+            df_puts.copy(),
+            float(spot_override),
+            expiry,
+        )
     # Use the resolved expiry for downstream pricing/labels
     expiry = expiry_resolved
     if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
@@ -233,7 +246,7 @@ def suggest_credit_vertical(
 
     em = _expected_move(spot, float(calls["impliedVolatility"].median() or 0.25), dte)
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     if side not in {"bull_put", "bear_call"}:
         return results
 
@@ -262,7 +275,11 @@ def suggest_credit_vertical(
         if k_long == k_short:
             try:
                 idx = all_strikes.index(k_short)
-                idx_long = max(0, idx - 1) if right == "P" else min(len(all_strikes) - 1, idx + 1)
+                idx_long = (
+                    max(0, idx - 1)
+                    if right == "P"
+                    else min(len(all_strikes) - 1, idx + 1)
+                )
                 k_long = float(all_strikes[idx_long])
             except Exception:
                 continue
@@ -280,33 +297,54 @@ def suggest_credit_vertical(
         if width <= 0:
             continue
         max_loss = max(0.0, width - credit)
-        pop = max(0.0, 1.0 - float(abs(short_row["delta"])) if not math.isnan(short_row["delta"]) else 0.0)
+        pop = max(
+            0.0,
+            (
+                1.0 - float(abs(short_row["delta"]))
+                if not math.isnan(short_row["delta"])
+                else 0.0
+            ),
+        )
         breakeven = (k_short - credit) if right == "P" else (k_short + credit)
 
         cand = {
-                "profile": p.name,
-                "underlying": symbol,
-                "expiry": expiry,
-                "legs": [
-                    {"secType": "OPT", "right": right, "strike": k_short, "qty": -1, "expiry": expiry},
-                    {"secType": "OPT", "right": right, "strike": k_long, "qty": 1, "expiry": expiry},
-                ],
-                "credit": credit,
-                "width": width,
-                "max_loss": max_loss,
-                "pop_proxy": pop,
-                "breakevens": [breakeven],
-                "liquidity": {
-                    "spread_pct_short": float(short_row.get("spread_pct", float("nan"))),
-                    "oi_short": int(short_row.get("openInterest", 0)),
-                    "vol_short": int(short_row.get("volume", 0)),
+            "profile": p.name,
+            "underlying": symbol,
+            "expiry": expiry,
+            "legs": [
+                {
+                    "secType": "OPT",
+                    "right": right,
+                    "strike": k_short,
+                    "qty": -1,
+                    "expiry": expiry,
                 },
-                "em": {
-                    "value": em,
-                    "distance_to_short": (spot - k_short) if right == "P" else (k_short - spot),
+                {
+                    "secType": "OPT",
+                    "right": right,
+                    "strike": k_long,
+                    "qty": 1,
+                    "expiry": expiry,
                 },
-                "rationale": f"target Δ≈{p.target_delta:.2f}, width≈{p.width:g}",
-            }
+            ],
+            "credit": credit,
+            "width": width,
+            "max_loss": max_loss,
+            "pop_proxy": pop,
+            "breakevens": [breakeven],
+            "liquidity": {
+                "spread_pct_short": float(short_row.get("spread_pct", float("nan"))),
+                "oi_short": int(short_row.get("openInterest", 0)),
+                "vol_short": int(short_row.get("volume", 0)),
+            },
+            "em": {
+                "value": em,
+                "distance_to_short": (
+                    (spot - k_short) if right == "P" else (k_short - spot)
+                ),
+            },
+            "rationale": f"target Δ≈{p.target_delta:.2f}, width≈{p.width:g}",
+        }
         # Suggested qty based on risk budget if provided
         if risk_budget_pct is not None:
             nlq = netliq if netliq is not None else _ib_net_liq()
@@ -316,6 +354,7 @@ def suggest_credit_vertical(
                 budget = 0.0
             if budget and max_loss > 0:
                 import math as _math
+
                 cand["suggested_qty"] = max(1, int(_math.floor(budget / max_loss)))
                 cand["risk_budget"] = budget
                 cand["risk_budget_pct"] = risk_budget_pct
@@ -331,12 +370,12 @@ def suggest_debit_vertical(
     profile: str | None = None,
     rules: LiquidityRules | None = None,
     *,
-    df_calls: Optional[pd.DataFrame] = None,
-    df_puts: Optional[pd.DataFrame] = None,
-    spot_override: Optional[float] = None,
+    df_calls: pd.DataFrame | None = None,
+    df_puts: pd.DataFrame | None = None,
+    spot_override: float | None = None,
     avoid_earnings: bool = True,
     earnings_window_days: int = 7,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Suggest debit verticals targeting long-leg delta 0.40–0.50.
 
     Chooses widths from {2.5, 5, 10} to aim for debit ~25–35% of width.
@@ -353,7 +392,12 @@ def suggest_debit_vertical(
     if df_calls is None or df_puts is None or spot_override is None:
         calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
     else:
-        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+        calls, puts, spot, expiry_resolved = (
+            df_calls.copy(),
+            df_puts.copy(),
+            float(spot_override),
+            expiry,
+        )
     expiry = expiry_resolved
     if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
         return []
@@ -364,7 +408,7 @@ def suggest_debit_vertical(
     calls = _filter_liquidity(calls, rules)
     puts = _filter_liquidity(puts, rules)
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     widths = [2.5, 5.0, 10.0]
     if side == "bull_call":
         df = calls.dropna(subset=["delta"]).copy()
@@ -412,8 +456,20 @@ def suggest_debit_vertical(
                 "underlying": symbol,
                 "expiry": expiry,
                 "legs": [
-                    {"secType": "OPT", "right": right, "strike": k_long, "qty": 1, "expiry": expiry},
-                    {"secType": "OPT", "right": right, "strike": k_short, "qty": -1, "expiry": expiry},
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": k_long,
+                        "qty": 1,
+                        "expiry": expiry,
+                    },
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": k_short,
+                        "qty": -1,
+                        "expiry": expiry,
+                    },
                 ],
                 "debit": debit,
                 "width": width,
@@ -421,7 +477,11 @@ def suggest_debit_vertical(
                 "breakeven": (k_long + debit) if right == "C" else (k_long - debit),
                 "rationale": f"long Δ≈{p.target_delta:.2f}, width≈{w:g}, debit≈{frac:.2f} of width",
             }
-            best = min([best, (score, cand)], key=lambda t: (t is None, t[0])) if best else (score, cand)
+            best = (
+                min([best, (score, cand)], key=lambda t: (t is None, t[0]))
+                if best
+                else (score, cand)
+            )
         if best:
             results.append(best[1])
     return results[:3]
@@ -433,14 +493,14 @@ def suggest_iron_condor(
     profile: str | None = None,
     rules: LiquidityRules | None = None,
     *,
-    df_calls: Optional[pd.DataFrame] = None,
-    df_puts: Optional[pd.DataFrame] = None,
-    spot_override: Optional[float] = None,
+    df_calls: pd.DataFrame | None = None,
+    df_puts: pd.DataFrame | None = None,
+    spot_override: float | None = None,
     avoid_earnings: bool = True,
     earnings_window_days: int = 7,
-    risk_budget_pct: Optional[float] = None,
-    netliq: Optional[float] = None,
-) -> List[Dict[str, Any]]:
+    risk_budget_pct: float | None = None,
+    netliq: float | None = None,
+) -> list[dict[str, Any]]:
     profs = [
         _pick_profile("conservative"),
         _pick_profile("balanced"),
@@ -453,7 +513,12 @@ def suggest_iron_condor(
     if df_calls is None or df_puts is None or spot_override is None:
         calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
     else:
-        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+        calls, puts, spot, expiry_resolved = (
+            df_calls.copy(),
+            df_puts.copy(),
+            float(spot_override),
+            expiry,
+        )
     expiry = expiry_resolved
     if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
         return []
@@ -462,15 +527,19 @@ def suggest_iron_condor(
     puts = _add_delta(puts, spot, dte, "P")
     calls = _filter_liquidity(calls, rules)
     puts = _filter_liquidity(puts, rules)
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     for p in profs:
         dfc = calls.dropna(subset=["delta"]).copy()
         dfp = puts.dropna(subset=["delta"]).copy()
         dfc["delta_abs"], dfp["delta_abs"] = dfc["delta"].abs(), dfp["delta"].abs()
         if dfc.empty or dfp.empty:
             continue
-        short_call = dfc.iloc[(dfc["delta_abs"] - p.target_delta).abs().argsort()].iloc[0]
-        short_put = dfp.iloc[(dfp["delta_abs"] - p.target_delta).abs().argsort()].iloc[0]
+        short_call = dfc.iloc[(dfc["delta_abs"] - p.target_delta).abs().argsort()].iloc[
+            0
+        ]
+        short_put = dfp.iloc[(dfp["delta_abs"] - p.target_delta).abs().argsort()].iloc[
+            0
+        ]
         kc_s = float(short_call["strike"])
         kp_s = float(short_put["strike"])
         wings = p.width
@@ -488,10 +557,34 @@ def suggest_iron_condor(
             "underlying": symbol,
             "expiry": expiry,
             "legs": [
-                {"secType": "OPT", "right": "P", "strike": kp_s, "qty": -1, "expiry": expiry},
-                {"secType": "OPT", "right": "P", "strike": kp_l, "qty": 1, "expiry": expiry},
-                {"secType": "OPT", "right": "C", "strike": kc_s, "qty": -1, "expiry": expiry},
-                {"secType": "OPT", "right": "C", "strike": kc_l, "qty": 1, "expiry": expiry},
+                {
+                    "secType": "OPT",
+                    "right": "P",
+                    "strike": kp_s,
+                    "qty": -1,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "P",
+                    "strike": kp_l,
+                    "qty": 1,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "C",
+                    "strike": kc_s,
+                    "qty": -1,
+                    "expiry": expiry,
+                },
+                {
+                    "secType": "OPT",
+                    "right": "C",
+                    "strike": kc_l,
+                    "qty": 1,
+                    "expiry": expiry,
+                },
             ],
             "credit": credit,
             "width": width,
@@ -506,6 +599,7 @@ def suggest_iron_condor(
                 budget = 0.0
             if budget and max_loss > 0:
                 import math as _math
+
                 cand["suggested_qty"] = max(1, int(_math.floor(budget / max_loss)))
                 cand["risk_budget"] = budget
                 cand["risk_budget_pct"] = risk_budget_pct
@@ -520,12 +614,12 @@ def suggest_butterfly(
     profile: str | None = None,
     rules: LiquidityRules | None = None,
     *,
-    df_calls: Optional[pd.DataFrame] = None,
-    df_puts: Optional[pd.DataFrame] = None,
-    spot_override: Optional[float] = None,
+    df_calls: pd.DataFrame | None = None,
+    df_puts: pd.DataFrame | None = None,
+    spot_override: float | None = None,
     avoid_earnings: bool = True,
     earnings_window_days: int = 7,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Suggest debit butterflies centred near ATM with widths {2.5, 5, 10}.
 
     Returns up to 3 profile-based candidates (conservative/balanced/aggressive)
@@ -545,7 +639,12 @@ def suggest_butterfly(
     if df_calls is None or df_puts is None or spot_override is None:
         calls, puts, spot, expiry_resolved = _yf_chain(symbol, expiry)
     else:
-        calls, puts, spot, expiry_resolved = df_calls.copy(), df_puts.copy(), float(spot_override), expiry
+        calls, puts, spot, expiry_resolved = (
+            df_calls.copy(),
+            df_puts.copy(),
+            float(spot_override),
+            expiry,
+        )
     expiry = expiry_resolved
     if avoid_earnings and _earnings_near(symbol, expiry, earnings_window_days):
         return []
@@ -562,7 +661,7 @@ def suggest_butterfly(
     if not strikes:
         return []
     center = _nearest_strike(strikes, float(spot))
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     for name in profs:
         w = widths.get(name, 5.0)
         low = _nearest_strike(strikes, center - w)
@@ -574,20 +673,40 @@ def suggest_butterfly(
         mid_high = _mid_from_df(df, high) or 0.0
         # Debit butterfly: long wings +1, short center -2
         debit = max(0.0, float(mid_low + mid_high - 2 * mid_mid))
-        results.append({
-            "profile": name,
-            "underlying": symbol,
-            "expiry": expiry,
-            "legs": [
-                {"secType": "OPT", "right": right, "strike": low, "qty": 1, "expiry": expiry},
-                {"secType": "OPT", "right": right, "strike": center, "qty": -2, "expiry": expiry},
-                {"secType": "OPT", "right": right, "strike": high, "qty": 1, "expiry": expiry},
-            ],
-            "debit": debit,
-            "width": float(high - low) / 2.0,
-            "debit_frac": (debit / (high - low)) if (high - low) else 1.0,
-            "rationale": f"ATM center≈{center:g}, wings≈{w:g}",
-        })
+        results.append(
+            {
+                "profile": name,
+                "underlying": symbol,
+                "expiry": expiry,
+                "legs": [
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": low,
+                        "qty": 1,
+                        "expiry": expiry,
+                    },
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": center,
+                        "qty": -2,
+                        "expiry": expiry,
+                    },
+                    {
+                        "secType": "OPT",
+                        "right": right,
+                        "strike": high,
+                        "qty": 1,
+                        "expiry": expiry,
+                    },
+                ],
+                "debit": debit,
+                "width": float(high - low) / 2.0,
+                "debit_frac": (debit / (high - low)) if (high - low) else 1.0,
+                "rationale": f"ATM center≈{center:g}, wings≈{w:g}",
+            }
+        )
     return results[:3]
 
 
@@ -600,16 +719,16 @@ def suggest_calendar(
     *,
     near_dte: int = 30,
     far_dte: int = 60,
-    df_calls_near: Optional[pd.DataFrame] = None,
-    df_puts_near: Optional[pd.DataFrame] = None,
-    df_calls_far: Optional[pd.DataFrame] = None,
-    df_puts_far: Optional[pd.DataFrame] = None,
-    spot_override: Optional[float] = None,
+    df_calls_near: pd.DataFrame | None = None,
+    df_puts_near: pd.DataFrame | None = None,
+    df_calls_far: pd.DataFrame | None = None,
+    df_puts_far: pd.DataFrame | None = None,
+    spot_override: float | None = None,
     avoid_earnings: bool = True,
     earnings_window_days: int = 7,
     avoid_inverted_term: bool = False,
     strike_offset: int = 0,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Suggest a simple ATM calendar (short near, long far) with ATM bias.
 
     - Chooses ATM strike via spot to nearest strike
@@ -630,14 +749,23 @@ def suggest_calendar(
     near_resolved, _ = _nearest_yf_expiry(symbol, near_target)
 
     # Load chains (or injected DFs)
-    if df_calls_near is None or df_puts_near is None or df_calls_far is None or df_puts_far is None or spot_override is None:
+    if (
+        df_calls_near is None
+        or df_puts_near is None
+        or df_calls_far is None
+        or df_puts_far is None
+        or spot_override is None
+    ):
         calls_far, puts_far, spot, far_resolved = _yf_chain(symbol, far_resolved)
         calls_near, puts_near, _, near_resolved = _yf_chain(symbol, near_resolved)
     else:
         calls_near, puts_near = df_calls_near.copy(), df_puts_near.copy()
         calls_far, puts_far = df_calls_far.copy(), df_puts_far.copy()
         spot = float(spot_override)
-    if avoid_earnings and (_earnings_near(symbol, near_resolved, earnings_window_days) or _earnings_near(symbol, far_resolved, earnings_window_days)):
+    if avoid_earnings and (
+        _earnings_near(symbol, near_resolved, earnings_window_days)
+        or _earnings_near(symbol, far_resolved, earnings_window_days)
+    ):
         return []
 
     dte_near = _compute_t_days(near_resolved)
@@ -655,7 +783,11 @@ def suggest_calendar(
     df_far = calls_far if right == "C" else puts_far
     if df_near.empty or df_far.empty:
         return []
-    strikes = sorted(set(df_near["strike"].astype(float)).intersection(set(df_far["strike"].astype(float))))
+    strikes = sorted(
+        set(df_near["strike"].astype(float)).intersection(
+            set(df_far["strike"].astype(float))
+        )
+    )
     if not strikes:
         return []
     center = _nearest_strike(strikes, float(spot))
@@ -681,19 +813,37 @@ def suggest_calendar(
     inverted = near_iv > far_iv + 1e-6
     if avoid_inverted_term and inverted:
         return []
-    return [{
-        "profile": (profile or "balanced"),
-        "underlying": symbol,
-        "expiry": far_resolved,
-        "legs": [
-            {"secType": "OPT", "right": right, "strike": center, "qty": -1, "expiry": near_resolved},
-            {"secType": "OPT", "right": right, "strike": far_strike, "qty": 1, "expiry": far_resolved},
-        ],
-        "debit": debit,
-        "near": near_resolved,
-        "far": far_resolved,
-        "strike_near": center,
-        "strike_far": far_strike,
-        "term_structure": {"near_iv": near_iv, "far_iv": far_iv, "inverted": inverted},
-        "rationale": f"ATM calendar near≈{dte_near}D, far≈{dte_far}D",
-    }]
+    return [
+        {
+            "profile": (profile or "balanced"),
+            "underlying": symbol,
+            "expiry": far_resolved,
+            "legs": [
+                {
+                    "secType": "OPT",
+                    "right": right,
+                    "strike": center,
+                    "qty": -1,
+                    "expiry": near_resolved,
+                },
+                {
+                    "secType": "OPT",
+                    "right": right,
+                    "strike": far_strike,
+                    "qty": 1,
+                    "expiry": far_resolved,
+                },
+            ],
+            "debit": debit,
+            "near": near_resolved,
+            "far": far_resolved,
+            "strike_near": center,
+            "strike_far": far_strike,
+            "term_structure": {
+                "near_iv": near_iv,
+                "far_iv": far_iv,
+                "inverted": inverted,
+            },
+            "rationale": f"ATM calendar near≈{dte_near}D, far≈{dte_far}D",
+        }
+    ]

@@ -66,4 +66,3 @@ def test_alerts_offline_no_post(tmp_path: Path, monkeypatch) -> None:
     )
     assert (out_dir / "micro_momo_alerts.json").exists()
     assert posted["called"] is False  # no POST when offline
-

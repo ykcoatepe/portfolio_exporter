@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -17,7 +17,7 @@ class ScanRow:
     trend: float
 
     @staticmethod
-    def from_csv_row(row: Dict[str, str]) -> "ScanRow":
+    def from_csv_row(row: dict[str, str]) -> ScanRow:
         def f(name: str, default: float = 0.0) -> float:
             try:
                 return float(row.get(name, default))
@@ -69,15 +69,15 @@ class ChainRow:
 @dataclass
 class Structure:
     template: str  # DebitCall | BearCallCredit | Template
-    expiry: Optional[str]
-    long_strike: Optional[float]
-    short_strike: Optional[float]
-    debit_or_credit: Optional[str]  # debit | credit
-    width: Optional[float]
+    expiry: str | None
+    long_strike: float | None
+    short_strike: float | None
+    debit_or_credit: str | None  # debit | credit
+    width: float | None
     per_leg_oi_ok: bool
-    per_leg_spread_pct: Optional[float]
+    per_leg_spread_pct: float | None
     needs_chain: bool
-    limit_price: Optional[float]
+    limit_price: float | None
 
 
 @dataclass
@@ -92,22 +92,18 @@ class ResultRow:
     entry_trigger: float | str
     tp: float
     sl: float
-    expiry: Optional[str]
-    long_strike: Optional[float]
-    short_strike: Optional[float]
-    debit_or_credit: Optional[str]
-    width: Optional[float]
+    expiry: str | None
+    long_strike: float | None
+    short_strike: float | None
+    debit_or_credit: str | None
+    width: float | None
     per_leg_oi_ok: bool
-    per_leg_spread_pct: Optional[float]
+    per_leg_spread_pct: float | None
     needs_chain: bool
 
-    def to_orders_csv(self) -> Dict[str, Any]:
-        long_leg = (
-            f"C {self.long_strike}" if self.long_strike is not None else ""
-        )
-        short_leg = (
-            f"C {self.short_strike}" if self.short_strike is not None else ""
-        )
+    def to_orders_csv(self) -> dict[str, Any]:
+        long_leg = f"C {self.long_strike}" if self.long_strike is not None else ""
+        short_leg = f"C {self.short_strike}" if self.short_strike is not None else ""
         structure = self.structure_template
         return {
             "symbol": self.symbol,
@@ -124,4 +120,3 @@ class ResultRow:
             "entry_trigger": self.entry_trigger,
             "notes": "",
         }
-

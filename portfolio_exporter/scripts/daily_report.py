@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -14,19 +12,20 @@ import pandas as pd
 from rich.console import Console
 
 from portfolio_exporter.core import cli as cli_helpers
-from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core import io as core_io
+from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core.runlog import RunLog
-from portfolio_exporter.core.config import settings
 
 try:  # optional dependency for PDF output
-    from reportlab.platypus import (
-        SimpleDocTemplate,
-        Table as RLTable,
-        Paragraph,
-        PageBreak,
-    )
     from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import (
+        PageBreak,
+        Paragraph,
+        SimpleDocTemplate,
+    )
+    from reportlab.platypus import (
+        Table as RLTable,
+    )
 except Exception:  # pragma: no cover - optional
     (
         SimpleDocTemplate,
@@ -40,6 +39,7 @@ except Exception:  # pragma: no cover - optional
 # ---------------------------------------------------------------------------
 # data loaders & helpers
 
+
 def _load_csv(name: str) -> pd.DataFrame:
     path = core_io.latest_file(name)
     if not path or not path.exists():
@@ -50,7 +50,9 @@ def _load_csv(name: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _prep_positions(df: pd.DataFrame, since: str | None, until: str | None) -> pd.DataFrame:
+def _prep_positions(
+    df: pd.DataFrame, since: str | None, until: str | None
+) -> pd.DataFrame:
     if df.empty:
         return df
     if "expiry" in df.columns:
@@ -235,10 +237,12 @@ def _build_html(
             sec_parts.append("<p>No expiries within window.</p>")
         parts.append('<section class="card">' + "".join(sec_parts) + "</section>")
     if delta_buckets is not None:
-        db_df = pd.DataFrame({
-            "bucket": list(delta_buckets.keys()),
-            "count": list(delta_buckets.values()),
-        })
+        db_df = pd.DataFrame(
+            {
+                "bucket": list(delta_buckets.keys()),
+                "count": list(delta_buckets.values()),
+            }
+        )
         parts.append(
             '<section class="card"><h2>Delta Buckets</h2>'
             + db_df.to_html(index=False)
@@ -286,7 +290,9 @@ def _build_pdf_flowables(
         return []
     styles = getSampleStyleSheet()
     flow = [Paragraph("Daily Portfolio Report", styles["Heading1"])]
-    flow.append(Paragraph(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), styles["Normal"]))
+    flow.append(
+        Paragraph(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), styles["Normal"])
+    )
     if account:
         flow.append(Paragraph(f"Account: {account}", styles["Normal"]))
     flow.append(Paragraph(f"Output dir: {outdir}", styles["Normal"]))
@@ -313,10 +319,12 @@ def _build_pdf_flowables(
             flow.append(Paragraph("No expiries within window.", styles["Normal"]))
     if delta_buckets is not None:
         flow.append(Paragraph("Delta Buckets", styles["Heading2"]))
-        df_b = pd.DataFrame({
-            "bucket": list(delta_buckets.keys()),
-            "count": list(delta_buckets.values()),
-        })
+        df_b = pd.DataFrame(
+            {
+                "bucket": list(delta_buckets.keys()),
+                "count": list(delta_buckets.values()),
+            }
+        )
         flow.append(RLTable([df_b.columns.tolist()] + df_b.values.tolist()))
     if theta_decay_5d is not None:
         flow.append(Paragraph("Theta Decay 5d", styles["Heading2"]))
@@ -340,7 +348,9 @@ def _build_pdf_flowables(
 
 
 def get_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Render portfolio report from latest CSVs")
+    parser = argparse.ArgumentParser(
+        description="Render portfolio report from latest CSVs"
+    )
     parser.add_argument("--html", action="store_true")
     parser.add_argument("--pdf", action="store_true")
     cli_helpers.add_common_output_args(parser, include_excel=True)
@@ -396,7 +406,9 @@ def main(argv: list[str] | None = None) -> dict:
         # Provide an actionable hint when inputs are missing
         if missing_any:
             warnings.append("run: portfolio-greeks to generate latest CSVs")
-        summary = json_helpers.report_summary({}, outputs={}, warnings=warnings, meta={"script": "daily_report"})
+        summary = json_helpers.report_summary(
+            {}, outputs={}, warnings=warnings, meta={"script": "daily_report"}
+        )
         summary["ok"] = ok
         if args.json:
             cli_helpers.print_json(summary, quiet)
@@ -434,7 +446,9 @@ def main(argv: list[str] | None = None) -> dict:
             # Expiry radar (exposed at top-level via meta back-compat)
             expiry_radar = None
             if args.expiry_window and args.expiry_window > 0:
-                expiry_radar = _expiry_radar(combos, positions, args.expiry_window, console)
+                expiry_radar = _expiry_radar(
+                    combos, positions, args.expiry_window, console
+                )
                 meta["expiry_radar"] = expiry_radar
 
             # Analytics (live under sections)
@@ -504,7 +518,9 @@ def main(argv: list[str] | None = None) -> dict:
                 except Exception:
                     # Gracefully skip when openpyxl is not installed
                     if console:
-                        console.print("Skipping XLSX: openpyxl not installed", style="yellow")
+                        console.print(
+                            "Skipping XLSX: openpyxl not installed", style="yellow"
+                        )
                 else:
                     xlsx_path = outdir / "daily_report.xlsx"
                     try:
@@ -515,7 +531,9 @@ def main(argv: list[str] | None = None) -> dict:
                             if not combos.empty:
                                 combos.to_excel(xw, index=False, sheet_name="Combos")
                             if not positions.empty:
-                                positions.to_excel(xw, index=False, sheet_name="Positions")
+                                positions.to_excel(
+                                    xw, index=False, sheet_name="Positions"
+                                )
                             # Add small analytics sheets for quick reference
                             if expiry_radar and expiry_radar.get("rows"):
                                 pd.DataFrame(expiry_radar["rows"]).to_excel(
@@ -540,7 +558,9 @@ def main(argv: list[str] | None = None) -> dict:
             if args.debug_timings:
                 meta["timings"] = rl.timings
                 if written:
-                    path_t = core_io.save(pd.DataFrame(rl.timings), "timings", "csv", outdir)
+                    path_t = core_io.save(
+                        pd.DataFrame(rl.timings), "timings", "csv", outdir
+                    )
                     outputs["timings"] = str(path_t)
                     written.append(path_t)
 

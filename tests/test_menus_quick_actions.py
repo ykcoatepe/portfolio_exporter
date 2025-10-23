@@ -53,4 +53,3 @@ def test_preview_json_and_clipboard(monkeypatch):
     assert getattr(dummy, "val") == "hi"
     monkeypatch.delitem(sys.modules, "pyperclip")
     assert trade._copy_to_clipboard("hi") is False
-

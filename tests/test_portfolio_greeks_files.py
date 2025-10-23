@@ -34,7 +34,12 @@ def test_greeks_files(monkeypatch, tmp_path):
         ],
         index=[1, 2],
     )
-    monkeypatch.setattr(portfolio_greeks, "_load_positions", lambda: fake)
+
+    async def fake_loader():
+        return fake
+
+    monkeypatch.setattr(portfolio_greeks, "_load_positions", fake_loader)
+    monkeypatch.setattr(portfolio_greeks, "load_positions_sync", lambda: fake)
     monkeypatch.setattr(
         "portfolio_exporter.core.config.settings",
         type("X", (object,), {"output_dir": str(tmp_path)}),

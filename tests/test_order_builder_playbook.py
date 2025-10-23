@@ -11,7 +11,10 @@ from portfolio_exporter.scripts.order_builder import (
 
 
 def _leg_map(ticket):
-    return [(leg.get("right", ""), leg.get("strike"), leg["qty"], leg.get("expiry")) for leg in ticket["legs"]]
+    return [
+        (leg.get("right", ""), leg.get("strike"), leg["qty"], leg.get("expiry"))
+        for leg in ticket["legs"]
+    ]
 
 
 def test_vertical_calls_qty_flip():

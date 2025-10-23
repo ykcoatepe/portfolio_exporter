@@ -29,7 +29,9 @@ def test_excel_written_when_openpyxl_present(tmp_path):
     xlsx_path = tmp_path / "trades_report.xlsx"
     assert xlsx_path.exists()
     assert summary["ok"] is True
-    assert summary.get("meta", {}).get("outputs", {}).get("trades_report_xlsx") == str(xlsx_path)
+    assert summary.get("meta", {}).get("outputs", {}).get("trades_report_xlsx") == str(
+        xlsx_path
+    )
 
 
 def test_excel_missing_module(monkeypatch, tmp_path, capsys):

@@ -1,5 +1,4 @@
 import math
-from typing import Dict
 
 
 def norm_cdf(x: float) -> float:
@@ -14,7 +13,9 @@ def _bs_delta(S, K, T, r, sigma, call=True):
     return norm_cdf(d1) if call else norm_cdf(d1) - 1.0
 
 
-def bs_greeks(S: float, K: float, T: float, r: float, sigma: float, call: bool = True) -> Dict[str, float]:
+def bs_greeks(
+    S: float, K: float, T: float, r: float, sigma: float, call: bool = True
+) -> dict[str, float]:
     """Closed-form Black–Scholes Greeks per contract."""
     if (
         S <= 0
@@ -25,9 +26,9 @@ def bs_greeks(S: float, K: float, T: float, r: float, sigma: float, call: bool =
     ):
         return dict(delta=math.nan, gamma=math.nan, vega=math.nan, theta=math.nan)
 
-    d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
     d2 = d1 - sigma * math.sqrt(T)
-    pdf_d1 = math.exp(-0.5 * d1 ** 2) / math.sqrt(2 * math.pi)
+    pdf_d1 = math.exp(-0.5 * d1**2) / math.sqrt(2 * math.pi)
 
     if call:
         delta = norm_cdf(d1)

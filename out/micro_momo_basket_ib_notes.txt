@@ -1,2 +1,0 @@
-ABC Template qty=2: TP=1.5 SL=0.5 trigger=Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ 1.5); levels: vwap=NA
-XYZ Template qty=2: TP=1.5 SL=0.5 trigger=Lower-high → VWAP rejection (no fresh halt) (RVOL ≥ 1.5); levels: vwap=NA

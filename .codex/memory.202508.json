@@ -1,0 +1,7 @@
+[
+  {
+    "details": "--preset support in order_builder; trade menu Stage Order preset path; sanity script scripts/sanity_order_builder_presets.sh; Makefile sanity-order-builder; pyproject console entry 'order-builder'.",
+    "event": "Add order builder presets and trade menu preset flow",
+    "timestamp": "2025-08-30T04:38:24Z"
+  }
+]

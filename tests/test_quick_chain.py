@@ -29,6 +29,7 @@ def test_chain_mark_for_builder(monkeypatch):
     quick_chain.run("FAKE", "2099-01-01")
     assert called.get("yes")
 
+
 def test_natural_language_expiry_parsing(monkeypatch):
     import datetime as dt
     import portfolio_exporter.scripts.quick_chain as qc
@@ -39,14 +40,23 @@ def test_natural_language_expiry_parsing(monkeypatch):
 
     # capture expiry passed to fetch_chain and provide minimal DataFrame
     captured = {}
-    fake_df = pd.DataFrame({
-        "strike": [], "right": [], "mid": [],
-        "bid": [], "ask": [], "delta": [],
-        "theta": [], "iv": [],
-    })
+    fake_df = pd.DataFrame(
+        {
+            "strike": [],
+            "right": [],
+            "mid": [],
+            "bid": [],
+            "ask": [],
+            "delta": [],
+            "theta": [],
+            "iv": [],
+        }
+    )
+
     def fake_fetch(sym, exp, strikes):
         captured["expiry"] = exp
         return fake_df
+
     monkeypatch.setattr(
         "portfolio_exporter.core.chain.fetch_chain",
         fake_fetch,

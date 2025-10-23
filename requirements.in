@@ -1,12 +1,21 @@
+fastapi
+httpx
 fpdf
 ib_insync
 numpy
 pandas
 prompt_toolkit
+prometheus-client
+pydantic
 pydantic-settings
+pyyaml
 pypdf
 reportlab
 rich
+uvicorn
+websockets
+wsproto
+# sqlite3 is provided by the Python standard library
 yfinance
 pandas_datareader
 requests

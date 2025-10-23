@@ -3,14 +3,15 @@ ib.py - Centralized IBKR connection and data fetching.
 """
 
 import logging
-from typing import List, Optional, Set, Tuple, Dict, Any
-from datetime import datetime
 import os
 import time
+from datetime import datetime
+from typing import Any
 
+import numpy as np
 import pandas as pd
 import yfinance as yf
-from ib_insync import IB, Contract, Option, Stock, Index, Future, Ticker, Position, util
+from ib_insync import IB, Contract, Future, Index, Option, Stock
 
 try:
     from pandas_datareader import data as web
@@ -21,7 +22,7 @@ except ImportError:
 
 # --- Configuration ---
 IB_HOST = "127.0.0.1"
-IB_PORT = 7497
+IB_PORT = 7496  # use 7497 for paper/sim
 # Use a dedicated client ID for this utility module
 CLIENT_ID = 20
 
@@ -115,8 +116,7 @@ def load_ib_positions_ib(ib: IB) -> pd.DataFrame:
     if not positions:
         ib.disconnect()
         raise RuntimeError(
-            "API returned no positions. Confirm account is logged in and the "
-            "API user has permissions."
+            "API returned no positions. Confirm account is logged in and the API user has permissions."
         )
 
     contracts = [p.contract for p in positions]
@@ -197,10 +197,10 @@ def load_tickers(ib: IB) -> list[str]:
     return sorted(set(mapped + EXTRA_TICKERS))
 
 
-def get_option_positions(ib: IB) -> Tuple[List[Option], Set[str]]:
+def get_option_positions(ib: IB) -> tuple[list[Option], set[str]]:
     """Return option contracts in the IBKR account and their underlying symbols."""
-    opt_cons: List[Option] = []
-    underlyings: Set[str] = set()
+    opt_cons: list[Option] = []
+    underlyings: set[str] = set()
     for pos in ib.positions():
         c = pos.contract
         if getattr(c, "secType", "") == "OPT":
@@ -209,10 +209,10 @@ def get_option_positions(ib: IB) -> Tuple[List[Option], Set[str]]:
     return opt_cons, underlyings
 
 
-def fetch_ib_quotes(ib: IB, tickers: List[str], opt_cons: List[Option]) -> pd.DataFrame:
+def fetch_ib_quotes(ib: IB, tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     """Return DataFrame of quotes for symbols IB can serve; missing ones flagged NaN."""
-    combined_rows: List[Dict] = []
-    reqs: Dict[str, Any] = {}
+    combined_rows: list[dict] = []
+    reqs: dict[str, Any] = {}
 
     for tk in tickers:
         if tk.endswith("=F") or tk in YIELD_MAP:
@@ -291,7 +291,7 @@ def fetch_ib_quotes(ib: IB, tickers: List[str], opt_cons: List[Option]) -> pd.Da
     return pd.DataFrame(combined_rows)
 
 
-def fetch_yf_quotes(tickers: List[str]) -> pd.DataFrame:
+def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
     rows = []
     for t in tickers:
         if t in YIELD_MAP:
@@ -337,7 +337,7 @@ def fetch_yf_quotes(tickers: List[str]) -> pd.DataFrame:
     return df
 
 
-def fetch_fred_yields(tickers: List[str]) -> pd.DataFrame:
+def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
     if not FRED_AVAILABLE:
         return pd.DataFrame()
     rows = []
@@ -376,10 +376,10 @@ def fetch_live_positions(ib: IB) -> pd.DataFrame:
         log.warning("IB positions() failed: %s", e)
         return pd.DataFrame()
 
-    rows: List[Dict] = []
+    rows: list[dict] = []
     ts_now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
 
-    combo_counts: Dict[Tuple[str, str], int] = {}
+    combo_counts: dict[tuple[str, str], int] = {}
     for pos in positions:
         c = pos.contract
         if c.secType == "OPT":

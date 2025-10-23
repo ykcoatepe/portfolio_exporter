@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import json
 
-from portfolio_exporter.core.micro_momo import entry_trigger, passes_filters, score_components, size_and_targets, tier_and_dir
+from portfolio_exporter.core.micro_momo import (
+    entry_trigger,
+    passes_filters,
+    score_components,
+    size_and_targets,
+    tier_and_dir,
+)
 from portfolio_exporter.core.micro_momo_optionpicker import pick_structure
 from portfolio_exporter.core.micro_momo_sources import load_chain_csv, load_scan_csv
 
@@ -66,8 +72,26 @@ def test_b_tier_bull_put_credit_when_debit_fails() -> None:
     # Provide a minimal put chain dict with delta and spreads
     spot = row.price
     chain = [
-        {"expiry": "2025-01-15", "right": "P", "strike": round(spot * 0.9, 2), "bid": 1.0, "ask": 1.2, "mid": 1.1, "oi": 200, "delta": -0.22},
-        {"expiry": "2025-01-15", "right": "P", "strike": round(spot * 0.85, 2), "bid": 0.5, "ask": 0.7, "mid": 0.6, "oi": 180, "delta": -0.15},
+        {
+            "expiry": "2025-01-15",
+            "right": "P",
+            "strike": round(spot * 0.9, 2),
+            "bid": 1.0,
+            "ask": 1.2,
+            "mid": 1.1,
+            "oi": 200,
+            "delta": -0.22,
+        },
+        {
+            "expiry": "2025-01-15",
+            "right": "P",
+            "strike": round(spot * 0.85, 2),
+            "bid": 0.5,
+            "ask": 0.7,
+            "mid": 0.6,
+            "oi": 180,
+            "delta": -0.15,
+        },
     ]
     # Force debit failure by passing empty calls set (no call data)
     struct = pick_structure(row, chain, direction="long", cfg=cfg, tier="B")

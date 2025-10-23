@@ -3,7 +3,11 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from portfolio_exporter.core.fs_utils import auto_chains_dir, auto_config, find_latest_file
+from portfolio_exporter.core.fs_utils import (
+    auto_chains_dir,
+    auto_config,
+    find_latest_file,
+)
 
 
 def test_find_latest_file(tmp_path: Path) -> None:
@@ -31,4 +35,3 @@ def test_auto_chains_dir(tmp_path: Path) -> None:
     chains.mkdir()
     out = auto_chains_dir([str(chains), None])
     assert out and out.endswith("chains")
-

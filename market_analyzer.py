@@ -9,25 +9,27 @@ Usage:
 """
 
 import argparse
+
+import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
-from utils.ib import (
-    IBManager,
-    load_ib_positions_ib,
-    get_option_positions,
-    load_tickers,
-    fetch_ib_quotes,
-    fetch_yf_quotes,
-    fetch_fred_yields,
-    fetch_live_positions,
-)
-from utils.technicals import calculate_indicators
+
 from utils.analysis import (
     get_greeks,
+    get_historical_prices,
     get_option_chain,
     get_technical_signals,
-    get_historical_prices,
 )
+from utils.ib import (
+    IBManager,
+    fetch_fred_yields,
+    fetch_ib_quotes,
+    fetch_live_positions,
+    fetch_yf_quotes,
+    get_option_positions,
+    load_ib_positions_ib,
+    load_tickers,
+)
+from utils.technicals import calculate_indicators
 
 
 def pre_market_analysis(ib_manager):

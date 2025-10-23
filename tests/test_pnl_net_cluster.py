@@ -21,4 +21,3 @@ def test_cluster_pnl_net_includes_commission():
     # commission sum = 2.0 => net = -102.0
     val = float(clusters.loc[0, "pnl_net"]) if not clusters.empty else None
     assert abs(val - (-102.0)) < 1e-6
-

@@ -9,18 +9,17 @@ Columns:
     · beta_SPY · ADV30 · next_earnings · OI_near_ATM
 """
 
+import logging
 import os
 import sys
-import time
-import logging
-import csv
-import argparse
-from math import log, sqrt, erf
 from datetime import datetime
+from math import erf, log, sqrt
 from zoneinfo import ZoneInfo
-from portfolio_exporter.core.config import settings
+
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import ui as core_ui
+from portfolio_exporter.core.config import settings
+
 run_with_spinner = core_ui.run_with_spinner
 
 TR_TZ = ZoneInfo("Europe/Istanbul")
@@ -28,10 +27,10 @@ TR_TZ = ZoneInfo("Europe/Istanbul")
 # Additional import for yfinance fallback
 import numpy as np
 import pandas as pd
-from ib_insync import IB, Stock, Option, util
 
 # Additional import for yfinance fallback
 import yfinance as yf
+from ib_insync import IB, Option, Stock, util
 
 # optional progress bar
 try:
@@ -41,7 +40,7 @@ try:
 except Exception:  # pragma: no cover - optional
     PROGRESS = False
 # Symbol → (Contract class, kwargs) for non‑stock underlyings
-from ib_insync import Index, Future  # already imported IB, Stock, Option, util
+from ib_insync import Future, Index  # already imported IB, Stock, Option, util
 
 SYMBOL_MAP = {
     "VIX": (Index, dict(symbol="VIX", exchange="CBOE")),
@@ -97,7 +96,10 @@ RISK_FREE_RATE = 0.01
 # Store IV history alongside other outputs
 DATA_DIR = os.path.join(OUTPUT_DIR, "iv_history")
 
-from portfolio_exporter.core.ib_config import HOST as IB_HOST, PORT as IB_PORT, client_id as _cid
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import PORT as IB_PORT
+from portfolio_exporter.core.ib_config import client_id as _cid
+
 IB_CID = _cid("tech_signals", default=1)  # tweak if needed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -130,7 +132,7 @@ def load_tickers():
         logging.error("Portfolio file not found; aborting.")
         sys.exit(1)
     with open(p) as f:
-        return [l.strip().upper() for l in f if l.strip()]
+        return [line.strip().upper() for line in f if line.strip()]
 
 
 # Helper to robustly parse IBKR lastTradeDateOrContractMonth and fetch nearest active future
@@ -368,8 +370,8 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
         df.set_index("date", inplace=True)
         # drop timezone info so date intersections succeed
         df.index = pd.to_datetime(df.index).tz_localize(None)
-        c, h, l = df["close"], df["high"], df["low"]
-        c_ff = c.ffill()  # forward‑fill so today’s partial bar isn’t NaN
+        close_series, high_series, low_series = df["close"], df["high"], df["low"]
+        c_ff = close_series.ffill()  # forward‑fill so today’s partial bar isn’t NaN
 
         sma20 = float(c_ff.rolling(20, min_periods=1).mean().iloc[-1])
         sma50 = float(c_ff.rolling(50, min_periods=1).mean().iloc[-1])
@@ -379,11 +381,20 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
         loss = (-delta.clip(upper=0)).rolling(14, min_periods=1).mean()
         rsi14 = 100 - 100 / (1 + gain / (loss + 1e-9))
         tr = pd.concat(
-            [h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1
+            [
+                high_series - low_series,
+                (high_series - close_series.shift()).abs(),
+                (low_series - close_series.shift()).abs(),
+            ],
+            axis=1,
         ).max(axis=1)
         atr14 = tr.rolling(14).mean().iloc[-1]
-        plus_dm = (h.diff()).where((h.diff() > l.diff().abs()) & (h.diff() > 0), 0)
-        minus_dm = (l.diff()).where((l.diff() > h.diff().abs()) & (l.diff() > 0), 0)
+        plus_dm = (high_series.diff()).where(
+            (high_series.diff() > low_series.diff().abs()) & (high_series.diff() > 0), 0
+        )
+        minus_dm = (low_series.diff()).where(
+            (low_series.diff() > high_series.diff().abs()) & (low_series.diff() > 0), 0
+        )
         tr14 = tr.rolling(14).sum()
         pdi = 100 * plus_dm.rolling(14).sum() / tr14
         mdi = 100 * minus_dm.rolling(14).sum() / tr14

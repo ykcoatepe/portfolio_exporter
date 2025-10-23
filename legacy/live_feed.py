@@ -107,7 +107,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"live_quotes_{DATE_TAG}_{TIME_TAG}.csv")
 OUTPUT_POS_CSV = os.path.join(OUTPUT_DIR, f"live_positions_{DATE_TAG}_{TIME_TAG}.csv")
 
-IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7497, 2  # separate clientId
+IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7496, 2  # separate clientId (use 7497 for paper)
 IB_TIMEOUT = 4.0  # seconds to wait per batch
 
 # yfinance proxy map for friendly tickers

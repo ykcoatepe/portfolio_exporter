@@ -1,9 +1,10 @@
+import datetime as _dt
+from time import sleep
+
 from rich.live import Live
 from rich.table import Table
-from time import sleep
-import datetime as _dt
 
-from portfolio_exporter.scripts import theta_cap, gamma_scalp
+from portfolio_exporter.scripts import gamma_scalp, theta_cap
 
 REFRESH = 5  # seconds
 

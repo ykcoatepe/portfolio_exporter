@@ -36,6 +36,11 @@ def test_live_loader_is_overridable(monkeypatch):
         ],
         index=[1, 2],
     )
-    monkeypatch.setattr(portfolio_greeks, "_load_positions", lambda: fake)
+
+    async def fake_loader():
+        return fake
+
+    monkeypatch.setattr(portfolio_greeks, "_load_positions", fake_loader)
+    monkeypatch.setattr(portfolio_greeks, "load_positions_sync", lambda: fake)
     res = portfolio_greeks.run(return_dict=True)
     assert res["legs"]["delta_exposure"] == pytest.approx(0.5 * 100 * 1 + 50 * 1 * 1.0)
