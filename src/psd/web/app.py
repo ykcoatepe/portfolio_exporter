@@ -66,8 +66,8 @@ class MsbDTO(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-def _create_lifespan(settings: Settings | None) -> Any:
-    if settings and settings.disable_background:
+def _create_lifespan(settings: Settings) -> Any:
+    if settings.disable_background:
         return None
 
     @asynccontextmanager
@@ -275,6 +275,8 @@ def broadcast_latest_msb(app: FastAPI) -> bool:
 def create_app(settings: Settings | None = None) -> FastAPI:
     resolved = settings or get_settings()
     lifespan = _create_lifespan(resolved)
+    if lifespan is None:
+        init()
     app = FastAPI(lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,

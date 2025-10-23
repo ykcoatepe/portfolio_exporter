@@ -76,3 +76,15 @@ def test_broadcast_latest_msb_emits_event(monkeypatch):
     assert payload["triggers"] == sample["triggers"]
     serialized = json.dumps(payload, separators=(",", ":"))
     assert len(serialized.encode("utf-8")) <= 1024
+
+
+def test_create_app_initializes_store_when_background_disabled(monkeypatch):
+    calls: list[str] = []
+
+    def fake_init() -> None:
+        calls.append("init")
+
+    monkeypatch.setattr(web_app, "init", fake_init)
+    web_app.create_app(Settings(disable_background=True))
+
+    assert calls == ["init"]
