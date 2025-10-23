@@ -31,7 +31,7 @@ def choose_mark(
     stale_s = float(max(0.0, now - ts_value))
 
     order = (
-        ["mid", "model", "yahoo"]
+        ["mid", "last", "model", "yahoo"]
         if session != "RTH"
         else ["last", "mid", "model", "yahoo"]
     )
