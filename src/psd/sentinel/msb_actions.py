@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from datetime import date, datetime
-from typing import Any, Iterable, List
+from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
-from zoneinfo import ZoneInfo
 
 from psd.core import store
 from psd.sentinel.engine import evaluate_msb_triggers
@@ -132,7 +133,7 @@ def _update_livebar(alerts: Iterable[Any], context: dict[str, Any]) -> None:
 def evaluate_msb_triggers_and_update_livebar(
     app: FastAPI,
     context: dict[str, Any] | None = None,
-) -> List[Any]:
+) -> list[Any]:
     """Evaluate MSB triggers, emit SSE alerts, and update the live status bar."""
     ctx = _ensure_context(context or {})
     msb_row = ctx.get("msb_row")

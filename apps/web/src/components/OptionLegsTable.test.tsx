@@ -26,9 +26,10 @@ const ORPHAN_COUNT = SEED_DATA.legs.filter((leg) => leg.isOrphan).length;
 const MSFT_ORPHAN_COUNT = SEED_DATA.legs.filter(
   (leg) => leg.isOrphan && leg.shortUnderlying === "MSFT",
 ).length;
-const DELTA_RANGE_COUNT = SEED_DATA.legs.filter(
-  (leg) => leg.delta >= 0.1 && leg.delta <= 0.4,
-).length;
+const DELTA_RANGE_COUNT = SEED_DATA.legs.filter((leg) => {
+  const delta = leg.delta;
+  return delta !== null && delta >= 0.1 && delta <= 0.4;
+}).length;
 
 const createMockResult = () => ({
   data: deepClone(SEED_DATA.legs),

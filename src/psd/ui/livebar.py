@@ -4,7 +4,6 @@ import csv
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
-
 from zoneinfo import ZoneInfo
 
 from psd.sentinel.msb_metrics import LIVEBAR_ROWS

@@ -41,6 +41,7 @@ jobs:
       - name: Build SPA assets
         run: make web-build
       - name: Web unit tests
+        # ensure UI regressions block merges alongside the SPA build
         run: make web-test
       - name: Pytest (full suite with PE_TEST_MODE=1)
         run: pytest -q

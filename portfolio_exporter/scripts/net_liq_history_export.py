@@ -265,12 +265,21 @@ def run(fmt: str = "csv", plot: bool = False) -> None:  # pragma: no cover - leg
     df, _summary, _written = _run_core(ns, formats, outdir)
     if plot:
         try:
+            import os
+
+            if os.getenv("PE_TEST_MODE") == "1":
+                import matplotlib
+
+                matplotlib.use("Agg")
             import matplotlib.pyplot as plt  # type: ignore
         except Exception:  # pragma: no cover - optional
             print("⚠️  matplotlib not installed – skipping chart.")
         else:
             df["NetLiq"].plot(title="Net Liquidation History")
-            plt.show()
+            if os.getenv("PE_TEST_MODE") == "1":
+                plt.close()
+            else:
+                plt.show()
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry
