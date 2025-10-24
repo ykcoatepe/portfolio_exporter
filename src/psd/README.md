@@ -14,6 +14,11 @@
 - The SPA hydrates from `/state`, listens to `/stream`, and issues targeted REST calls for rules, combos, and metrics.
 - A daily MSB scheduler runs on Turkey business days at 17:30 (Europe/Istanbul), loading vendor CSVs, persisting the latest reading exactly once per date, emitting `sentinel.alert` SSE frames, and refreshing the Live Status Bar hedge CSV.
 
+## MSB
+- Endpoints: `/msb/current`, `/msb/history?days=365`, `/msb/history.csv`, `/sse` (`event: "msb.update"`).
+- Scheduler: 17:30 TRT business-days, idempotent (skips writes when today already exists).
+- Metrics: `psd_msb_scheduler_runs_total`, `psd_msb_alerts_total{rule}`, `psd_livebar_rows_total`.
+
 ## API Surfaces
 - `GET /psd` returns the compiled dashboard; other static assets flow from `apps/web/dist`.
 - `GET /stream` emits server-sent events (bootstrap snapshot, then diffs and breaches) for the UI and automation hooks.

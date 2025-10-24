@@ -77,3 +77,16 @@ SQLite runs PSD in write-ahead logging mode, so expect a companion `psd.db-wal` 
 
 - Local guard: `make sse-check URL=http://127.0.0.1:51127/stream THRESH=3` runs `tools/check_sse.sh` and passes when the median inter-arrival is below the threshold (seconds).
 - CI smoke: `.github/workflows/psd-smoke.yml` runs the same script against `${{ secrets.PSD_SSE_URL }}` via `workflow_dispatch` for staging checks.
+
+### PSD Quickstart (MSB)
+```bash
+make web-build
+make msb-compute           # uses vendor CSVs under data/vendor/
+python scripts/msb_emit.py # one-shot SSE broadcast for smoke
+make msb-run-now           # manual daily job (scheduler logic)
+```
+
+CI Gates (PSD).
+- Run: `make web-build && make web-test`.
+- Enforce memory digest <800 tokens; gitleaks/osv scanners 0 high/critical.
+- API tests use the app factory with `disable_background=True`; SSE tests use `?test_once=1`.

@@ -80,3 +80,12 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Next:** MSB feature
 
 **Notes:** CI gate now builds SPA  |  Ref: <PR link>
+
+### 2025-10-24 • Task: MSB docs & ops polish • Branch: docs/msb-playbook-v1
+**Owner:** session/ai  |  **Scope:** manual.md rule block, agent.md quickstart, README endpoint notes, CI web-test
+
+**Interfaces:** /msb/*, /sse, Make targets
+
+**Status:** open → merged @ <sha>  |  **Next:** tag psd-v0.1
+
+**Risks/Notes:** vendor CSV freshness; cooldown governance

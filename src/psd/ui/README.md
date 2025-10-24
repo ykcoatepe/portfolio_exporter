@@ -7,10 +7,9 @@
 - MSB widgets read from `/msb/current` and `/msb/history`, while `/sse` emits `msb.update` events with compact payloads for live dashboards.
 
 ## MSB UI
-- `useMsbCurrent` fetches `/msb/current` once, then keeps the cache hot by listening for `msb.update` SSE frames and fanning updates into any active `useMsbHistory(days)` queries.
-- `MSBCard`, `MSBMiniCharts`, and `MSBActionBox` compose the dashboard panel—gauge output uses `aria-live="polite"`, legends spell out color semantics, and spark-lines offer 7D/1Y toggles without network refetches.
-- The action box surfaces the default hedge guidance and exposes `Export MSB (CSV)`, which calls `/msb/history.csv?days=365` for downstream analysis.
-- React Query retry is disabled for current readings (SSE handles freshness) while history keeps standard retry semantics; both hooks expose TypeScript shapes via `MsbReading` in `src/lib/types.ts`.
+- Hooks: `useMsbCurrent` listens for `msb.update` SSE frames and keeps `useMsbHistory(days)` in sync without extra fetches.
+- A11y: the gauge reads aloud “Stress: N — Color” and the legend duplicates color bins as text.
+- Export: the panel’s download link targets `/msb/history.csv` for operators and journals.
 
 ## SPA Build
 - `npm run build` (surfaced via `make web-build`) emits the production bundle into `apps/web/dist`.

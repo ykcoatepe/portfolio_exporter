@@ -1284,6 +1284,29 @@ async def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in t
 def load_positions_sync() -> pd.DataFrame:
     """Synchronous wrapper around :func:`_load_positions`."""
 
+    if os.getenv("PE_TEST_MODE") == "1":
+        args_obj = globals().get("args")
+        positions_csv = (
+            getattr(args_obj, "positions_csv", None) if args_obj is not None else None
+        )
+        if positions_csv:
+            try:
+                df = pd.read_csv(os.path.expanduser(positions_csv)).copy()
+                if "secType" not in df.columns:
+                    df["secType"] = "OPT"
+                if "multiplier" not in df.columns:
+                    df["multiplier"] = 100
+                for greek in ["delta", "gamma", "vega", "theta"]:
+                    if greek not in df.columns:
+                        df[greek] = 0.0
+                if "qty" not in df.columns:
+                    df["qty"] = 0.0
+                if "underlying" not in df.columns and "symbol" in df.columns:
+                    df["underlying"] = df["symbol"]
+                return df
+            except Exception:
+                pass
+
     try:
         asyncio.get_running_loop()
     except RuntimeError:

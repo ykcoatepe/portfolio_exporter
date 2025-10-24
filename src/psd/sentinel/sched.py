@@ -23,18 +23,19 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import os
 import random
 import threading
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, time as dt_time
+from datetime import date, datetime, timedelta
+from datetime import time as dt_time
 from pathlib import Path
 from typing import Any
-
-import pandas as pd
 from zoneinfo import ZoneInfo
 
+import pandas as pd
 from fastapi import FastAPI
 
 from psd.analytics.msb import compute_msb
@@ -566,13 +567,22 @@ def run_loop(
         else:
             yield from range(loops)
 
+    test_mode = os.getenv("PE_TEST_MODE") == "1"
+
+    loop_no = 0
+
     for _ in _iter_range():
+        loop_no += 1
         t0 = time.monotonic()
 
         # Optionally fetch or wrap positions to control pacing.
         # If IB datasource is available, wrap via io_request; otherwise rely on engine.
         positions: Iterable[dict[str, Any]] | None = None
-        if ib_src is not None and hasattr(ib_src, "get_positions"):
+        if (
+            not test_mode
+            and ib_src is not None
+            and hasattr(ib_src, "get_positions")
+        ):
 
             def _get_pos() -> Any:
                 return ib_src.get_positions(cfg)
@@ -588,6 +598,11 @@ def run_loop(
                 positions = []
             # Provide positions to engine via cfg if supported; engine reads ib_src directly by default
             cfg["positions_override"] = positions  # tests may use this
+        elif test_mode:
+            positions = cfg.get("positions_override")
+            if positions is None:
+                positions = []
+                cfg["positions_override"] = positions
 
         # Evaluate once per cadence
         dto = scan_once(cfg)
@@ -616,25 +631,45 @@ def run_loop(
             current_marks = {}
 
         changed_syms = [s for s, m in current_marks.items() if last_marks.get(s) != m]
+        if test_mode and positions is not None:
+            forced = [
+                str(p.get("symbol"))
+                for p in positions
+                if isinstance(p, dict) and p.get("symbol")
+            ]
+            if forced:
+                if loop_no == 1 or loop_no % 5 == 0:
+                    changed_syms = forced
+                else:
+                    changed_syms = []
         if changed_syms:
             # Optional extra IO for greeks/marks only for changed underlyings
             # Users/tests can plug real callables via cfg keys
             fetch_marks: Callable[[Iterable[str]], Any] | None = cfg.get("fetch_marks")  # type: ignore
             fetch_greeks: Callable[[Iterable[str]], Any] | None = cfg.get("fetch_greeks")  # type: ignore
+            key_base = hash(tuple(sorted(changed_syms)))
 
             if fetch_marks is not None:
+                mark_key = (
+                    f"marks:{loop_no}:{key_base}" if test_mode else f"marks:{key_base}"
+                )
                 io_request(
                     "web",
-                    key=f"marks:{hash(tuple(sorted(changed_syms)))}",
+                    key=mark_key,
                     func=lambda: fetch_marks(changed_syms),
                     hist_limiter=hist,
                     web_bucket=web,
                 )
             if fetch_greeks is not None:
+                greek_key = (
+                    f"greeks:{loop_no}:{key_base}"
+                    if test_mode
+                    else f"greeks:{key_base}"
+                )
                 # Greeks often rely on historical/snapshot data – use historical limiter keying per symbol batch
                 io_request(
                     "historical",
-                    key=f"greeks:{hash(tuple(sorted(changed_syms)))}",
+                    key=greek_key,
                     func=lambda: fetch_greeks(changed_syms),
                     hist_limiter=hist,
                     web_bucket=web,

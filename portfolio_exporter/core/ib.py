@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import threading
 from typing import Any
 
@@ -112,6 +113,8 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> dict[st
         Dictionary with keys ``mid``, ``bid``, ``ask``, ``delta``, ``gamma``,
         ``vega``, ``theta`` and ``iv``.
     """
+    test_mode = os.getenv("PE_TEST_MODE") == "1"
+
     ib = _ib()
     if ib is not None and hasattr(ib, "isConnected") and ib.isConnected():
         try:
@@ -189,7 +192,9 @@ def quote_option(symbol: str, expiry: str, strike: float, right: str) -> dict[st
 
         from portfolio_exporter.core.greeks import bs_greeks
 
-        hist = yf_tkr.history(period="1d") if yf_tkr is not None else None
+        hist = None
+        if yf_tkr is not None and not test_mode:
+            hist = yf_tkr.history(period="1d")
         spot = (
             hist["Close"].iloc[-1] if (hist is not None and not hist.empty) else strike
         )
