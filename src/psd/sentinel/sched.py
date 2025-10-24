@@ -40,6 +40,8 @@ from fastapi import FastAPI
 
 from psd.analytics.msb import compute_msb
 from psd.core import store
+from psd.datasources import resolve_msb_source
+from psd.datasources.fred import refresh_hy_csv
 from psd.sentinel.msb_actions import evaluate_msb_triggers_and_update_livebar
 from psd.sentinel.msb_metrics import MSB_SCHEDULER_RUNS
 
@@ -370,6 +372,18 @@ def run_msb_scheduler_once(
         _log_scheduler("skipped", reason="already_up_to_date", date=today_iso)
         MSB_SCHEDULER_RUNS.inc()
         return False
+
+    msb_source = resolve_msb_source(os.environ)
+    if msb_source == "fred":
+        hy_path = vendor_root / "hy.csv"
+        try:
+            refreshed = refresh_hy_csv(hy_path, env=os.environ)
+        except Exception as exc:  # pragma: no cover - depends on network/env
+            _SCHED_LOG.warning("FRED HY refresh failed: %s", exc)
+            _log_scheduler("warn", date=today_iso, reason="fred_refresh_failed", error=str(exc))
+        else:
+            if refreshed:
+                _log_scheduler("refresh", date=today_iso, source="fred", path=str(hy_path))
 
     attempt = 0
     backoff = 5.0

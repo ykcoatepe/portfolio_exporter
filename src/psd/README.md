@@ -15,7 +15,7 @@
 - A daily MSB scheduler runs on Turkey business days at 17:30 (Europe/Istanbul), loading vendor CSVs, persisting the latest reading exactly once per date, emitting `sentinel.alert` SSE frames, and refreshing the Live Status Bar hedge CSV.
 
 ## MSB
-- Endpoints: `/msb/current`, `/msb/history?days=365`, `/msb/history.csv`, `/sse` (`event: "msb.update"`).
+- Endpoints: `/msb/current`, `/msb/history?days=365`, `/msb/history.csv`, `/msb/history.parquet`, `/sse` (`event: "msb.update"`).
 - Scheduler: 17:30 TRT business-days, idempotent (skips writes when today already exists).
 - Metrics: `psd_msb_scheduler_runs_total`, `psd_msb_alerts_total{rule}`, `psd_livebar_rows_total`.
 
@@ -24,16 +24,18 @@
 - `GET /stream` emits server-sent events (bootstrap snapshot, then diffs and breaches) for the UI and automation hooks.
 - `GET /sse` streams lightweight events (currently `msb.update`) with heartbeats for automation consumers.
 - `GET /state`, `/positions/stocks`, `/positions/options`, and `/session` return normalized portfolio state.
+- `GET /stats/current` returns the last-good portfolio stats regardless of trading session; append `?fresh_within_sec=N` to require freshness in seconds.
 - `GET /rules/summary`, `/rules/catalog`, and `/metrics` surface sentinel findings and Prometheus counters.
 - `GET /msb/current` and `/msb/history?days=N` expose the Market Stress Barometer as JSON for dashboards and scripts.
 - `POST /msb/broadcast` triggers an `msb.update` SSE when the latest reading is available (used by the `msb_emit` CLI).
-- `/metrics` exports Prometheus counters including `psd_msb_scheduler_runs_total`, `psd_msb_alerts_total{rule}`, and `psd_livebar_rows_total` for observability of the MSB pipeline.
+- `/metrics` exports Prometheus counters including `psd_msb_scheduler_runs_total`, `psd_msb_alerts_total{rule}`, `psd_livebar_rows_total`, and `psd_stats_startup_broadcasts_total` for observability of the MSB pipeline.
 - Standard FastAPI metadata endpoints (`/docs`, `/openapi.json`) remain available for interactive exploration.
 
 ## MSB Scheduler & Live Bar
 - Vendor inputs are read from `data/vendor/hy.csv`, `vx1.csv`, `vx2.csv`, and optional `spx_ret.csv`; missing SPX input simply skips Rule A evaluations.
 - Live hedges are mirrored in `data/live_status_bar.csv` with columns `Hedge, Cost % NAV, Status, Expiry, Trigger, TriggerTimeTRT, Notes`. Rule defaults (A/B staged spreads, C beta reduction) are appended, and existing LIVE rows dedupe with the note “already hedged; maintain size”.
 - Trigger the same workflow manually via `make msb-run-now`, which reuses the evaluation and Live Status Bar update logic without waiting for the 17:30 TRT window.
+- Configure HY source via `MSB_SOURCE`: default `vendor`, optional `fred`, `ibkr`, or `yf`. When set to `fred`, provide `FRED_API_KEY` to refresh `data/vendor/hy.csv` (offline/test modes skip the download).
 
 ## Testing
 - Use `psd.web.app.create_app(Settings(test_mode=True, disable_background=True))` when exercising the API in tests to avoid background tasks and long-lived loops. The CLI `scripts/msb_emit.py` calls the live server at `/msb/broadcast`, so ensure the API is running locally (default `http://127.0.0.1:51127`).

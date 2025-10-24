@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import csv
-import io
 import json
 import logging
 import time
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
@@ -20,11 +19,13 @@ from psd.core.store import (
     init,
     latest_snapshot,
     max_event_id,
+    read_last_stats,
     read_msb_current,
     read_msb_history,
     tail_events,
 )
 from psd.sentinel.sched import start_msb_scheduler, stop_msb_scheduler
+from psd.ui.exporters import export_snapshot
 from psd.web.config import Settings, get_settings
 from psd.web.ready import router as ready_router
 from psd.web.sse import SseManager, sse_endpoint
@@ -42,6 +43,10 @@ _DEFAULT_STATS_EMPTY = compute_stats(None)
 
 STREAM_CLIENTS = Gauge("psd_stream_clients", "Connected SSE clients")
 STREAM_EVENTS = Counter("psd_stream_events_total", "SSE events sent", ["kind"])
+STATS_STARTUP_BROADCASTS = Counter(
+    "psd_stats_startup_broadcasts_total",
+    "Initial stats broadcasts emitted during application startup",
+)
 
 router = APIRouter()
 
@@ -77,6 +82,11 @@ def _create_lifespan(settings: Settings) -> Any:
     async def lifespan(_app: FastAPI):
         init()
         start_msb_scheduler(_app)
+        try:
+            if broadcast_latest_stats(_app):
+                STATS_STARTUP_BROADCASTS.inc()
+        except Exception:
+            log.debug("initial stats broadcast failed", exc_info=True)
         try:
             yield
         finally:
@@ -122,6 +132,68 @@ def stats() -> JSONResponse:
     stale_count = int(payload.get("stale_quotes_count") or 0)
     if stale_count > STALE_ALERT_THRESHOLD:
         log.warning("stale_quotes_count exceeded threshold: %s", stale_count)
+    return JSONResponse(payload)
+
+
+def _parse_updated_at(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(value), tz=UTC)
+        except (OverflowError, ValueError):
+            return None
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if text.endswith("Z"):
+            text = text.rstrip("Z") + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    return None
+
+
+def _build_stats_payload(now: datetime | None = None) -> dict[str, Any] | None:
+    stats = read_last_stats()
+    if not stats:
+        return None
+    payload = dict(stats)
+    reference = now or datetime.now(tz=UTC)
+    updated_at = _parse_updated_at(payload.get("updated_at"))
+    staleness = None
+    if updated_at is not None:
+        staleness = max(0.0, (reference - updated_at).total_seconds())
+    payload["staleness_sec"] = staleness
+    payload["served_at"] = reference.isoformat()
+    return payload
+
+
+@router.get("/stats/current")
+def stats_current(fresh_within_sec: float | None = None) -> Response:
+    payload = _build_stats_payload()
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Stats unavailable")
+    staleness = payload.get("staleness_sec")
+    if staleness is not None and fresh_within_sec is not None:
+        try:
+            threshold = float(fresh_within_sec)
+        except (TypeError, ValueError):
+            threshold = None
+        else:
+            if threshold < 0:
+                threshold = 0.0
+        if threshold is not None and staleness > threshold:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
     return JSONResponse(payload)
 
 
@@ -271,47 +343,17 @@ def msb_history(days: int = 365) -> list[MsbDTO]:
 @router.get("/msb/history.csv")
 def msb_history_csv(days: int = 365) -> Response:
     history = read_msb_history(days)
-    fieldnames = [
-        "date",
-        "hy",
-        "vx1",
-        "vx2",
-        "z_hy",
-        "term_ratio",
-        "cal_spread_pct",
-        "cal_spread_abs",
-        "saturated",
-        "hy_score",
-        "vix_score",
-        "msb",
-        "color",
-        "triggers",
-        "winsor_clipped_n",
-        "cooldown_until",
-    ]
-    buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
-    writer.writeheader()
-    for entry in history:
-        normalized = entry.copy()
-        triggers = normalized.get("triggers")
-        if isinstance(triggers, list):
-            normalized["triggers"] = "; ".join(str(item) for item in triggers if item)
-        row: dict[str, str | int | float | bool] = {}
-        for key in fieldnames:
-            value = normalized.get(key)
-            row[key] = "" if value is None else value
-        writer.writerow(row)
+    content, media_type, filename = export_snapshot(history, fmt="csv")
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    return Response(content=content, media_type=media_type, headers=headers)
 
-    csv_bytes = buffer.getvalue()
-    headers = {
-        "Content-Disposition": "attachment; filename=msb_history.csv",
-    }
-    return Response(
-        content=csv_bytes,
-        media_type="text/csv; charset=utf-8",
-        headers=headers,
-    )
+
+@router.get("/msb/history.parquet")
+def msb_history_parquet(days: int = 365) -> Response:
+    history = read_msb_history(days)
+    content, media_type, filename = export_snapshot(history, fmt="parquet")
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    return Response(content=content, media_type=media_type, headers=headers)
 
 
 @router.post("/msb/broadcast", status_code=status.HTTP_200_OK)
@@ -331,6 +373,21 @@ def broadcast_latest_msb(app: FastAPI) -> bool:
         return False
     dto = MsbDTO.model_validate(record).model_dump(mode="json")
     manager.broadcast("msb.update", dto)
+    try:
+        broadcast_latest_stats(app)
+    except Exception:  # pragma: no cover - defensive logging path
+        log.debug("stats broadcast after msb update failed", exc_info=True)
+    return True
+
+
+def broadcast_latest_stats(app: FastAPI) -> bool:
+    manager = getattr(app.state, "sse", None)
+    if not isinstance(manager, SseManager):
+        raise RuntimeError("SSE manager not attached to FastAPI application")
+    payload = _build_stats_payload()
+    if payload is None:
+        return False
+    manager.broadcast("psd.stats.update", payload)
     return True
 
 

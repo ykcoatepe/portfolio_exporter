@@ -20,9 +20,13 @@ describe("PSD page", () => {
   });
 
   test("renders positions view sections and ribbon metrics", async () => {
+    const nowMs = Date.parse("2024-01-01T12:00:00Z");
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(nowMs);
+
     const statsFixture = buildStatsResponse({
       net_liq: 1_245_320.54,
-      var95_1d_pct: 58_320.12,
+      var_95: 58_320.12,
+      margin_pct: 0.45,
       margin_used_pct: 0.45,
       updated_at: "2024-01-01T12:00:00Z",
     });
@@ -110,6 +114,7 @@ describe("PSD page", () => {
     });
 
     server.use(
+      http.get("*/stats/current", () => HttpResponse.json(statsFixture)),
       http.get("*/stats", () => HttpResponse.json(statsFixture)),
       http.get("*/state", () => HttpResponse.json(snapshotFixture)),
     );
@@ -138,6 +143,8 @@ describe("PSD page", () => {
     expect(varValue).toBe("$58,320.12");
     expect(valueFor("Margin %")).toBe("45.00%");
     expect(valueFor("Updated")).toBe("now");
+
+    dateNowSpy.mockRestore();
 
     const stocksSection = await screen.findByRole("region", { name: /Single Stocks/i });
     expect(within(stocksSection).getByRole("grid", { name: /Single Stocks/i })).toBeInTheDocument();
@@ -180,6 +187,7 @@ describe("PSD page", () => {
     delete (fallbackSnapshot as Record<string, unknown>).positions_view;
 
     server.use(
+      http.get("*/stats/current", () => HttpResponse.json(statsFixture)),
       http.get("*/stats", () => HttpResponse.json(statsFixture)),
       http.get("*/state", () => HttpResponse.json(fallbackSnapshot)),
     );
@@ -191,6 +199,14 @@ describe("PSD page", () => {
     });
 
     const statsRegion = await screen.findByRole("region", { name: /portfolio stats/i });
+    await screen.findByRole("region", { name: /MSB hedge actions/i });
+    const exportCsvLink = await screen.findByText(/export msb \(csv\)/i, {
+      selector: "a",
+    });
+    const exportParquetLink = await screen.findByText(/export msb \(parquet\)/i, {
+      selector: "a",
+    });
+
     statsRegion.focus();
     expect(statsRegion).toHaveFocus();
 
@@ -209,8 +225,12 @@ describe("PSD page", () => {
     await act(async () => {
       await user.tab();
     });
-    const exportLink = await screen.findByRole("link", { name: /export msb/i });
-    expect(exportLink).toHaveFocus();
+    expect(exportCsvLink).toHaveFocus();
+
+    await act(async () => {
+      await user.tab();
+    });
+    expect(exportParquetLink).toHaveFocus();
 
     await act(async () => {
       await user.tab();

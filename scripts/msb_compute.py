@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import os
 from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
 
 from psd.analytics.msb import compute_msb
+from psd.datasources import resolve_msb_source
+from psd.datasources.fred import refresh_hy_csv
 
 _JSON_SEPARATORS = (",", ":")
+logger = logging.getLogger("psd.scripts.msb_compute")
 
 
 def _ensure_parent(path: Path) -> None:
@@ -104,6 +109,17 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+
+    env = os.environ
+    msb_source = resolve_msb_source(env)
+    if msb_source == "fred":
+        try:
+            refreshed = refresh_hy_csv(args.hy_csv, env=env)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("FRED refresh skipped: %s", exc)
+        else:
+            if refreshed:
+                logger.info("HY-OAS CSV refreshed from FRED: %s", args.hy_csv)
 
     hy_series = _load_series(args.hy_csv)
     vx1_series = _load_series(args.vx1_csv)

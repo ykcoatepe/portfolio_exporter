@@ -94,3 +94,8 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Owner:** session/ai | **Scope:** versions, changelog, gitleaks/osv gates, artifacts, tag
 **Interfaces:** /msb/*, /sse
 **Status:** open → tagged @ <sha> | **Next:** v0.1.1 deps bump (pypdf/vite/fast-redact)
+
+### 2025-10-24 • Task: v0.1.1 Deps + FRED Parquet • Branch: release/v0.1.1-msb-fred-parquet-deps
+**Owner:** session/ai | **Scope:** pypdf/vite bumps, FRED HY toggle, Parquet export
+**Interfaces:** /msb/history(.csv|.parquet)
+**Status:** open → merged @ <sha> | **Next:** monitor FRED rate limits & front-end parquet UX

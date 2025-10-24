@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "portfolio_exporter"
-version = "0.1.0"
+version = "0.1.1"
 description = "Personal trading utilities: combos, greeks, roll wizard, live quotes"
 readme = "README.md"
 requires-python = ">=3.11"

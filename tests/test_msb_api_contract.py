@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pandas as pd
@@ -66,3 +67,36 @@ def test_msb_history_limits_days(seeded_db: None) -> None:
     dates = [entry["date"] for entry in payload]
     assert dates == ["2024-01-03", "2024-01-02"]
     assert all("triggers" in entry for entry in payload)
+
+
+def test_msb_history_parquet_round_trip(seeded_db: None) -> None:
+    app = web_app.create_app(Settings(test_mode=True, disable_background=True))
+    with TestClient(app) as client:
+        response = client.get("/msb/history.parquet", params={"days": 3})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/octet-stream"
+    assert response.headers["content-disposition"].endswith("msb_history.parquet")
+
+    buffer = io.BytesIO(response.content)
+    frame = pd.read_parquet(buffer)
+    assert list(frame.columns) == [
+        "date",
+        "hy",
+        "vx1",
+        "vx2",
+        "z_hy",
+        "term_ratio",
+        "cal_spread_pct",
+        "cal_spread_abs",
+        "saturated",
+        "hy_score",
+        "vix_score",
+        "msb",
+        "color",
+        "triggers",
+        "winsor_clipped_n",
+        "cooldown_until",
+    ]
+    assert len(frame) == 3
+    assert frame.iloc[0]["date"] == "2024-01-03"

@@ -68,7 +68,7 @@ web-build:
 	cd apps/web && npm ci && npm run build
 
 web-test:
-	cd apps/web && corepack pnpm install && corepack pnpm test:unit -w
+	cd apps/web && corepack pnpm install && corepack pnpm test:unit -- --run
 
 web-e2e:
 	cd apps/web && corepack pnpm install && corepack pnpm exec playwright install --with-deps && corepack pnpm test:e2e -w

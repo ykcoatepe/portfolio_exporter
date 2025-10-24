@@ -9,7 +9,7 @@ import { formatSigned, stalenessTone, valueTone } from "./tableUtils";
 
 const relativeTimeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
-const STALE_THRESHOLD_SECONDS = 300;
+const FALLBACK_STALE_THRESHOLD_SEC = 300;
 
 function toFinite(value: number | null | undefined): number | null {
   if (value === null || value === undefined) {
@@ -72,28 +72,29 @@ export default function StatsRibbon(): JSX.Element {
   const now = Date.now();
 
   const updatedTimestamp = useMemo(() => {
-    const preferred = parseIsoToMs(stats?.latestTs);
-    if (preferred !== null) {
-      return preferred;
-    }
-
     const candidates: number[] = [];
-    const sessionTimestamp = parseIsoToMs(stats?.session?.asOf ?? stats?.sessionInfo?.asOf);
-    if (sessionTimestamp !== null) {
-      candidates.push(sessionTimestamp);
+    const statsUpdated = parseIsoToMs(stats?.updatedAt);
+    if (statsUpdated !== null) {
+      candidates.push(statsUpdated);
+    }
+    const statsSessionTimestamp = parseIsoToMs(
+      stats?.session?.asOf ?? stats?.sessionInfo?.asOf,
+    );
+    if (statsSessionTimestamp !== null) {
+      candidates.push(statsSessionTimestamp);
+    }
+    const resolvedSessionTimestamp = parseIsoToMs(session?.asOf);
+    if (resolvedSessionTimestamp !== null) {
+      candidates.push(resolvedSessionTimestamp);
     }
     const normalizedMetricsTimestamp = normalizeEpochMs(metrics.updatedAt);
     if (normalizedMetricsTimestamp !== null) {
       candidates.push(normalizedMetricsTimestamp);
     }
-    const statsUpdatedTimestamp = parseIsoToMs(stats?.updatedAt);
-    if (statsUpdatedTimestamp !== null) {
-      candidates.push(statsUpdatedTimestamp);
-    }
     return selectLatestTimestamp(candidates);
   }, [
     metrics.updatedAt,
-    stats?.latestTs,
+    session?.asOf,
     stats?.session?.asOf,
     stats?.sessionInfo?.asOf,
     stats?.updatedAt,
@@ -106,8 +107,10 @@ export default function StatsRibbon(): JSX.Element {
     ? new Date(updatedTimestamp).toLocaleString()
     : undefined;
 
-  const stalenessSeconds = metrics.stalenessSeconds;
-  const isStale = stalenessSeconds !== null && stalenessSeconds >= STALE_THRESHOLD_SECONDS;
+  const metricsStaleness = metrics.stalenessSeconds;
+  const stalenessSeconds = stats?.stalenessSec ?? metricsStaleness ?? null;
+  const isStale =
+    stalenessSeconds !== null && stalenessSeconds >= FALLBACK_STALE_THRESHOLD_SEC;
   const stalenessLabel = stalenessSeconds !== null ? formatDuration(stalenessSeconds) : null;
   const stalenessClassName = stalenessTone(stalenessSeconds);
 
@@ -121,50 +124,57 @@ export default function StatsRibbon(): JSX.Element {
     ? new Date(sessionUpdatedTimestamp).toLocaleString()
     : undefined;
 
+  const dayPnlValue = stats?.dayPnl ?? metrics.dayPnl;
+  const unrealizedValue = stats?.unrealizedPnl ?? metrics.totalPnl;
+  const sigmaTotalValue = stats?.sigmaTotal ?? metrics.sumDelta;
+  const sigmaPerDayValue = stats?.sigmaPerDay ?? metrics.sumTheta;
+  const netLiqValue = stats?.netLiq;
+  const var95Value = stats?.var95;
+  const marginValue = stats?.marginPct;
   const dataSourceLabel = stats?.dataSource ?? "—";
 
   const cards = [
     {
       key: "day-pnl",
       label: "Day P&L",
-      value: formatMoney(metrics.dayPnl),
-      tone: valueTone(metrics.dayPnl),
+      value: formatMoney(dayPnlValue),
+      tone: valueTone(dayPnlValue),
     },
     {
       key: "unrealized-pnl",
       label: "Unrealized P&L",
-      value: formatMoney(metrics.totalPnl),
-      tone: valueTone(metrics.totalPnl),
+      value: formatMoney(unrealizedValue),
+      tone: valueTone(unrealizedValue),
     },
     {
       key: "sum-delta",
       label: "ΣΔ",
-      value: formatSigned(metrics.sumDelta, 2),
-      tone: valueTone(metrics.sumDelta),
+      value: formatSigned(sigmaTotalValue, 2),
+      tone: valueTone(sigmaTotalValue),
     },
     {
       key: "sum-theta",
       label: "ΣΘ / day",
-      value: formatSigned(metrics.sumTheta, 2),
-      tone: valueTone(metrics.sumTheta),
+      value: formatSigned(sigmaPerDayValue, 2),
+      tone: valueTone(sigmaPerDayValue),
     },
     {
       key: "net-liq",
       label: "Net Liq",
-      value: formatMoney(toFinite(stats?.netLiq)),
-      tone: valueTone(toFinite(stats?.netLiq)),
+      value: formatMoney(toFinite(netLiqValue)),
+      tone: valueTone(toFinite(netLiqValue)),
     },
     {
       key: "var-95",
       label: "VaR 95%",
-      value: formatMoney(toFinite(stats?.var95)),
-      tone: valueTone(toFinite(stats?.var95)),
+      value: formatMoney(toFinite(var95Value)),
+      tone: valueTone(toFinite(var95Value)),
     },
     {
       key: "margin",
       label: "Margin %",
-      value: formatPercent(toFinite(stats?.marginPct), { alreadyScaled: true }),
-      tone: valueTone(toFinite(stats?.marginPct)),
+      value: formatPercent(toFinite(marginValue), { alreadyScaled: true }),
+      tone: valueTone(toFinite(marginValue)),
     },
     {
       key: "updated",
@@ -204,16 +214,17 @@ export default function StatsRibbon(): JSX.Element {
           >
             DATA • {dataSourceLabel}
           </span>
-          {isStale && stalenessLabel ? (
+          {isStale ? (
             <span
+              data-testid="stale-chip"
               className={clsx(
                 "rounded-full border px-2.5 py-1 text-xs font-medium uppercase tracking-wide",
                 stalenessClassName,
                 "border-current bg-slate-900/60",
               )}
-              title={`Stale for ${stalenessLabel}`}
+              title={stalenessLabel ? `Stale for ${stalenessLabel}` : undefined}
             >
-              stale {stalenessLabel}
+              STALE {stalenessLabel ?? "—"}
             </span>
           ) : null}
         </div>
@@ -227,7 +238,11 @@ export default function StatsRibbon(): JSX.Element {
             <dt className="text-xs uppercase tracking-wide text-slate-400">{card.label}</dt>
             <dd
               data-testid="stat-value"
-              className={clsx("mt-1 font-mono text-lg", card.tone)}
+              className={clsx(
+                "mt-1 font-mono text-lg",
+                card.tone,
+                isStale ? "opacity-70" : undefined,
+              )}
               title={card.title}
             >
               {card.value}
