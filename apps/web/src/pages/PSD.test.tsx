@@ -197,6 +197,24 @@ describe("PSD page", () => {
     await act(async () => {
       await user.tab();
     });
+    const msb7dToggle = await screen.findByRole("button", { name: "7D" });
+    expect(msb7dToggle).toHaveFocus();
+
+    await act(async () => {
+      await user.tab();
+    });
+    const msb1yToggle = await screen.findByRole("button", { name: "1Y" });
+    expect(msb1yToggle).toHaveFocus();
+
+    await act(async () => {
+      await user.tab();
+    });
+    const exportLink = await screen.findByRole("link", { name: /export msb/i });
+    expect(exportLink).toHaveFocus();
+
+    await act(async () => {
+      await user.tab();
+    });
     const filter = await screen.findByRole("searchbox", { name: /filter symbols/i });
     expect(filter).toHaveFocus();
 

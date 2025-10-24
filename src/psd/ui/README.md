@@ -6,6 +6,12 @@
 - Query keys follow the `["psd", "..."]` convention so cache invalidation is predictable across panels and tests reusable in `src/hooks/*test.tsx`.
 - MSB widgets read from `/msb/current` and `/msb/history`, while `/sse` emits `msb.update` events with compact payloads for live dashboards.
 
+## MSB UI
+- `useMsbCurrent` fetches `/msb/current` once, then keeps the cache hot by listening for `msb.update` SSE frames and fanning updates into any active `useMsbHistory(days)` queries.
+- `MSBCard`, `MSBMiniCharts`, and `MSBActionBox` compose the dashboard panel—gauge output uses `aria-live="polite"`, legends spell out color semantics, and spark-lines offer 7D/1Y toggles without network refetches.
+- The action box surfaces the default hedge guidance and exposes `Export MSB (CSV)`, which calls `/msb/history.csv?days=365` for downstream analysis.
+- React Query retry is disabled for current readings (SSE handles freshness) while history keeps standard retry semantics; both hooks expose TypeScript shapes via `MsbReading` in `src/lib/types.ts`.
+
 ## SPA Build
 - `npm run build` (surfaced via `make web-build`) emits the production bundle into `apps/web/dist`.
 - `apps/api/main.py` mounts the dist directory at `/psd`, and the fallback middleware serves `index.html` for unknown routes to support client-side routing.

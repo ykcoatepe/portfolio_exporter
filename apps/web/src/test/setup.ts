@@ -24,6 +24,15 @@ if (!globalThis.cancelAnimationFrame) {
   }) as typeof globalThis.cancelAnimationFrame;
 }
 
+if (!("ResizeObserver" in globalThis)) {
+  class ResizeObserverMock {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof globalThis.ResizeObserver;
+}
+
 const rafSpy = vi
   .spyOn(globalThis, "requestAnimationFrame")
   .mockImplementation((callback: FrameRequestCallback): number => {

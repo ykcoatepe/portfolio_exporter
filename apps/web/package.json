@@ -11,6 +11,7 @@
     "test": "npm run test:all",
     "test:watch": "vitest",
     "test:unit": "vitest run --project unit",
+    "test:e2e": "playwright test --config=playwright.config.ts",
     "test:contracts": "vitest run --project contracts",
     "test:all": "vitest run"
   },
@@ -22,10 +23,12 @@
     "@tanstack/react-query": "^5.89.0",
     "clsx": "^2.1.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.6"
   },
   "devDependencies": {
     "@pact-foundation/pact": "^15.0.1",
+    "@playwright/test": "^1.49.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^15.0.7",
     "@testing-library/user-event": "^14.6.1",
