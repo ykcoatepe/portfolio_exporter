@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 
 import CombosTable from "../components/CombosTable";
+import MSBActionBox from "../components/MSBActionBox";
+import MSBCard from "../components/MSBCard";
+import MSBMiniCharts from "../components/MSBMiniCharts";
 import OptionLegsTable from "../components/OptionLegsTable";
 import RulesPanel from "../components/RulesPanel";
 import StatsRibbon from "../components/StatsRibbon";
@@ -240,6 +243,16 @@ const PSDPage = () => {
 
       <main className="mx-auto max-w-[1400px] space-y-10 px-6 py-8" aria-label="Portfolio Sentinel sections">
         <StatsRibbon />
+        <section
+          aria-label="Market Stress Barometer overview"
+          className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+        >
+          <div className="space-y-6">
+            <MSBCard />
+            <MSBMiniCharts />
+          </div>
+          <MSBActionBox />
+        </section>
 
         {hasView ? (
           <>

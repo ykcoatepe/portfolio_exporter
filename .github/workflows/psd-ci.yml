@@ -40,6 +40,8 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - name: Build SPA assets
         run: make web-build
+      - name: Web unit tests
+        run: make web-test
       - name: Pytest (full suite with PE_TEST_MODE=1)
         run: pytest -q
         env:
@@ -208,3 +210,17 @@ PY
           name: pacts
           path: apps/web/pacts/**/*.json
           retention-days: 14
+
+  web-e2e:
+    name: Web E2E
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Enable pnpm
+        run: corepack enable pnpm
+      - name: Run Playwright smoke test
+        run: make web-e2e

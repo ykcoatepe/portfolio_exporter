@@ -1,5 +1,24 @@
 export type MarkSource = "MID" | "LAST" | "PREV" | "MISSING";
 
+export interface MsbReading {
+  date: string;
+  hy: number;
+  vx1: number;
+  vx2: number;
+  z_hy: number | null;
+  term_ratio: number | null;
+  cal_spread_pct: number | null;
+  cal_spread_abs: number | null;
+  saturated: boolean;
+  hy_score: number;
+  vix_score: number;
+  msb: number;
+  color: string;
+  triggers: string[];
+  winsor_clipped_n: number;
+  cooldown_until: string | null;
+}
+
 export interface StockPositionApi {
   symbol: string;
   quantity: number;

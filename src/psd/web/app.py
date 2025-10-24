@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
 import logging
 import time
@@ -264,6 +266,52 @@ def msb_current() -> MsbDTO:
 def msb_history(days: int = 365) -> list[MsbDTO]:
     history = read_msb_history(days)
     return [MsbDTO.model_validate(entry) for entry in history]
+
+
+@router.get("/msb/history.csv")
+def msb_history_csv(days: int = 365) -> Response:
+    history = read_msb_history(days)
+    fieldnames = [
+        "date",
+        "hy",
+        "vx1",
+        "vx2",
+        "z_hy",
+        "term_ratio",
+        "cal_spread_pct",
+        "cal_spread_abs",
+        "saturated",
+        "hy_score",
+        "vix_score",
+        "msb",
+        "color",
+        "triggers",
+        "winsor_clipped_n",
+        "cooldown_until",
+    ]
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for entry in history:
+        normalized = entry.copy()
+        triggers = normalized.get("triggers")
+        if isinstance(triggers, list):
+            normalized["triggers"] = "; ".join(str(item) for item in triggers if item)
+        row: dict[str, str | int | float | bool] = {}
+        for key in fieldnames:
+            value = normalized.get(key)
+            row[key] = "" if value is None else value
+        writer.writerow(row)
+
+    csv_bytes = buffer.getvalue()
+    headers = {
+        "Content-Disposition": "attachment; filename=msb_history.csv",
+    }
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv; charset=utf-8",
+        headers=headers,
+    )
 
 
 @router.post("/msb/broadcast", status_code=status.HTTP_200_OK)
