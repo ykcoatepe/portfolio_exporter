@@ -79,6 +79,29 @@
     {
       "event": "session_start",
       "timestamp": "2025-10-23T10:49:12Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-10-23T12:56:14Z"
+    },
+    {
+      "details": "Added TRT 17:30 scheduler, trigger evaluation, sentinel.alert SSE, live status bar writer, metrics, and tests.",
+      "event": "MSB daily scheduler integrated",
+      "timestamp": "2025-10-23T13:46:10Z"
+    },
+    {
+      "details": "Dispatch broadcast via loop.call_soon_threadsafe to avoid cross-thread asyncio queue access and added coverage.",
+      "event": "SSE manager thread-safe broadcast",
+      "timestamp": "2025-10-23T13:53:28Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-10-23T14:14:27Z"
+    },
+    {
+      "details": "Hook mocks, fixtures, and Playwright smoke for MSB panel",
+      "event": "Added MSB UI tests",
+      "timestamp": "2025-10-24T07:59:29Z"
     }
   ],
   "decisions": [
@@ -259,6 +282,22 @@
       "rationale": null,
       "timestamp": "2025-09-23T15:14:05Z",
       "title": "Deduplicate option underlyings"
+    },
+    {
+      "context": null,
+      "decision": "Daily TRT scheduler persists MSB, fires alert rules A/B/C with cooldown, updates live hedge bar, and exposes metrics/tests.",
+      "id": 25,
+      "rationale": "Ensures MSB automation covers compute, alerts, live bar artifacts, and observability.",
+      "timestamp": "2025-10-23T13:45:57Z",
+      "title": "MSB Sentinel daily run"
+    },
+    {
+      "context": null,
+      "decision": "Added MSB card, mini charts, action box with SSE-driven hooks and CSV export",
+      "id": 26,
+      "rationale": "Provides accessible stress indicator with deterministic tests and CI targets",
+      "timestamp": "2025-10-24T07:59:15Z",
+      "title": "MSB UI panel shipped"
     }
   ],
   "preferences": {
