@@ -82,8 +82,11 @@ export function useMsbCurrent(
 
     source.addEventListener(SSE_EVENT_NAME, handler);
 
-    const onError = () => {
-      source.close();
+    const onError = (event: Event) => {
+      if (import.meta.env?.DEV) {
+        // eslint-disable-next-line no-console -- surface SSE errors in development only.
+        console.warn("MSB SSE connection error", event);
+      }
     };
 
     source.addEventListener("error", onError);
