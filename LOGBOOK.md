@@ -89,3 +89,8 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Status:** open → merged @ <sha>  |  **Next:** tag psd-v0.1
 
 **Risks/Notes:** vendor CSV freshness; cooldown governance
+
+### 2025-10-24 • Task: v0.1 Release Cut • Branch: release/psd-v0.1
+**Owner:** session/ai | **Scope:** versions, changelog, gitleaks/osv gates, artifacts, tag
+**Interfaces:** /msb/*, /sse
+**Status:** open → tagged @ <sha> | **Next:** v0.1.1 deps bump (pypdf/vite/fast-redact)

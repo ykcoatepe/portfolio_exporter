@@ -105,6 +105,17 @@ PY
         env:
           MOMO_OFFLINE: "1"
           PE_QUIET: "1"
+      - name: OSV scan (fail on High/Critical)
+        uses: google/osv-scanner-action@v1
+        with:
+          directory: .
+          severity: HIGH,CRITICAL
+      - name: gitleaks
+        uses: zricethezav/gitleaks-action@v2
+        with:
+          config: .gitleaks.toml
+      - name: Memory digest
+        run: python -m portfolio_exporter.scripts.memory digest > memory_digest.txt
       - name: Micro-MOMO CLI (full-artifacts)
         if: startsWith(github.ref, 'refs/tags/')
         run: python -m apps.cli.run --analyzer micro_momo_analyzer --no-json-only --full-artifacts --out out/micro_momo --scan-csv tests/data/meme_scan_sample.csv --chains-dir tests/data --cfg-json tests/data/micro_momo_config.json
@@ -116,6 +127,15 @@ PY
           name: micro-momo-artifacts
           path: out/micro_momo/**
           retention-days: 14
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: psd-v0.1
+          path: |
+            memory_digest.txt
+            apps/web/dist
+            coverage/**
+          if-no-files-found: warn
 
   ingest-internal:
     name: Internal Ingest
