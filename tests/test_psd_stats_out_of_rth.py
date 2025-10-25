@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from prometheus_client import REGISTRY
 
 from psd.core import store
 from psd.web.app import broadcast_latest_stats, create_app
@@ -96,6 +97,10 @@ def test_broadcast_latest_stats_emits_event(tmp_db, monkeypatch: pytest.MonkeyPa
         events.append((event_type, payload))
 
     monkeypatch.setattr(app.state.sse, "broadcast", _capture)
+    before = REGISTRY.get_sample_value(
+        "psd_stats_broadcasts_total",
+        {"trigger": "manual"},
+    ) or 0.0
     broadcasted = broadcast_latest_stats(app)
 
     assert broadcasted is True
@@ -104,3 +109,8 @@ def test_broadcast_latest_stats_emits_event(tmp_db, monkeypatch: pytest.MonkeyPa
     assert event_name == "psd.stats.update"
     assert payload["staleness_sec"] >= 0
     assert payload["day_pnl"] == pytest.approx(1250.5)
+    after = REGISTRY.get_sample_value(
+        "psd_stats_broadcasts_total",
+        {"trigger": "manual"},
+    ) or 0.0
+    assert after == pytest.approx(before + 1.0)

@@ -22,13 +22,13 @@
 ## API Surfaces
 - `GET /psd` returns the compiled dashboard; other static assets flow from `apps/web/dist`.
 - `GET /stream` emits server-sent events (bootstrap snapshot, then diffs and breaches) for the UI and automation hooks.
-- `GET /sse` streams lightweight events (currently `msb.update`) with heartbeats for automation consumers.
+- `GET /sse` streams lightweight events (`msb.update`, `psd.stats.update`) with heartbeats for automation consumers.
 - `GET /state`, `/positions/stocks`, `/positions/options`, and `/session` return normalized portfolio state.
 - `GET /stats/current` returns the last-good portfolio stats regardless of trading session; append `?fresh_within_sec=N` to require freshness in seconds.
 - `GET /rules/summary`, `/rules/catalog`, and `/metrics` surface sentinel findings and Prometheus counters.
 - `GET /msb/current` and `/msb/history?days=N` expose the Market Stress Barometer as JSON for dashboards and scripts.
 - `POST /msb/broadcast` triggers an `msb.update` SSE when the latest reading is available (used by the `msb_emit` CLI).
-- `/metrics` exports Prometheus counters including `psd_msb_scheduler_runs_total`, `psd_msb_alerts_total{rule}`, `psd_livebar_rows_total`, and `psd_stats_startup_broadcasts_total` for observability of the MSB pipeline.
+- `/metrics` exports Prometheus counters including `psd_msb_scheduler_runs_total`, `psd_msb_alerts_total{rule}`, `psd_livebar_rows_total`, `psd_stats_startup_broadcasts_total`, and `psd_stats_broadcasts_total{trigger}` for observability of the MSB pipeline.
 - Standard FastAPI metadata endpoints (`/docs`, `/openapi.json`) remain available for interactive exploration.
 
 ## MSB Scheduler & Live Bar
