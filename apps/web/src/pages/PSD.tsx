@@ -16,16 +16,31 @@ import type { PSDLeg, PSDPositionsView } from "../lib/types";
 import { formatSigned, valueTone } from "../components/tableUtils";
 
 const columns = [
-  "Symbol",
-  "Qty",
-  "Mark",
-  "P&L",
-  "Δ",
-  "Γ",
-  "Θ",
-  "Source",
-  "Staleness",
-];
+  { key: "symbol", label: "Symbol", align: "left" },
+  { key: "qty", label: "Qty", align: "right" },
+  { key: "mark", label: "Mark", align: "right" },
+  { key: "pnl", label: "P&L", align: "right" },
+  { key: "delta", label: "Δ", align: "right" },
+  { key: "gamma", label: "Γ", align: "right" },
+  { key: "theta", label: "Θ", align: "right" },
+  { key: "source", label: "Source", align: "left" },
+  { key: "staleness", label: "Staleness", align: "right" },
+] as const;
+
+type ColumnDefinition = (typeof columns)[number];
+type ColumnKey = ColumnDefinition["key"];
+type ColumnAlignment = ColumnDefinition["align"];
+
+const columnAlignmentByKey = columns.reduce<Record<ColumnKey, ColumnAlignment>>(
+  (acc, column) => {
+    acc[column.key] = column.align;
+    return acc;
+  },
+  {} as Record<ColumnKey, ColumnAlignment>,
+);
+
+const alignmentClass = (key: ColumnKey) =>
+  columnAlignmentByKey[key] === "right" ? "text-right" : "text-left";
 
 const finiteOrNull = (value: number | undefined | null): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -66,19 +81,37 @@ function LegRow({ leg, tabIndex = -1, className = "", underlyingHint }: { leg: P
       tabIndex={tabIndex}
       className={clsx("border-b border-slate-800/60 last:border-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60", className)}
     >
-      <th scope="row" className="px-4 py-3 text-left font-semibold text-slate-100">
+      <th
+        scope="row"
+        className={clsx("px-4 py-3 font-semibold text-slate-100", alignmentClass("symbol"))}
+      >
         <span title={labelTooltip}>{labelText}</span>
       </th>
-      <td className="px-4 py-3 text-right font-mono text-sm text-slate-300">{formatQty(leg.qty)}</td>
-      <td className="px-4 py-3 text-right font-mono text-sm text-slate-200">{formatMoneyMaybe(leg.mark)}</td>
-      <td className={clsx("px-4 py-3 text-right font-mono text-sm", valueTone(pnlValue))}>{formatMoneyMaybe(leg.pnl_intraday)}</td>
-      <td className="px-4 py-3 text-right font-mono text-xs text-slate-300">{formatGreek(greeks.delta)}</td>
-      <td className="px-4 py-3 text-right font-mono text-xs text-slate-300">{formatGreek(greeks.gamma)}</td>
-      <td className="px-4 py-3 text-right font-mono text-xs text-slate-300">{formatGreek(greeks.theta)}</td>
-      <td className="px-4 py-3 text-right text-xs uppercase tracking-wide text-slate-400">
+      <td className={clsx("px-4 py-3 font-mono text-sm text-slate-300", alignmentClass("qty"))}>{formatQty(leg.qty)}</td>
+      <td className={clsx("px-4 py-3 font-mono text-sm text-slate-200", alignmentClass("mark"))}>{formatMoneyMaybe(leg.mark)}</td>
+      <td
+        className={clsx(
+          "px-4 py-3 font-mono text-sm",
+          alignmentClass("pnl"),
+          valueTone(pnlValue),
+        )}
+      >
+        {formatMoneyMaybe(leg.pnl_intraday)}
+      </td>
+      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("delta"))}>{formatGreek(greeks.delta)}</td>
+      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("gamma"))}>{formatGreek(greeks.gamma)}</td>
+      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("theta"))}>{formatGreek(greeks.theta)}</td>
+      <td
+        className={clsx(
+          "px-4 py-3 text-xs uppercase tracking-wide text-slate-400",
+          alignmentClass("source"),
+        )}
+      >
         {leg.price_source ? leg.price_source.toUpperCase() : "—"}
       </td>
-      <td className="px-4 py-3 text-right text-xs text-slate-400">{formatStaleness(leg.stale_s)}</td>
+      <td className={clsx("px-4 py-3 text-xs text-slate-400", alignmentClass("staleness"))}>
+        {formatStaleness(leg.stale_s)}
+      </td>
     </tr>
   );
 }
@@ -155,9 +188,13 @@ function CombosSection({ view }: { view: PSDPositionsView }) {
                 <table className="min-w-full" role="grid" aria-label={`${combo.name} legs`}>
                   <thead>
                     <tr className="text-xs uppercase tracking-wide text-slate-400">
-                      {columns.map((col) => (
-                        <th key={`${combo.combo_id}-${col}`} scope="col" className="px-4 py-2 text-left">
-                          {col}
+                      {columns.map(({ key, label }) => (
+                        <th
+                          key={`${combo.combo_id}-${key}`}
+                          scope="col"
+                          className={clsx("px-4 py-2", alignmentClass(key))}
+                        >
+                          {label}
                         </th>
                       ))}
                     </tr>
@@ -192,9 +229,9 @@ function LegsTable({ label, legs }: { label: string; legs: PSDLeg[] }) {
       <table className="min-w-full" role="grid" aria-label={label}>
         <thead>
           <tr className="text-xs uppercase tracking-wide text-slate-400">
-            {columns.map((col) => (
-              <th key={`${label}-${col}`} scope="col" className="px-4 py-2 text-left">
-                {col}
+            {columns.map(({ key, label }) => (
+              <th key={`${label}-${key}`} scope="col" className={clsx("px-4 py-2", alignmentClass(key))}>
+                {label}
               </th>
             ))}
           </tr>

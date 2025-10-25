@@ -146,10 +146,29 @@ describe("PSD page", () => {
 
     dateNowSpy.mockRestore();
 
+    const expectAlignClass = (element: HTMLElement | null, align: "left" | "right") => {
+      expect(element).not.toBeNull();
+      const className = align === "right" ? "text-right" : "text-left";
+      expect(element as HTMLElement).toHaveClass(className);
+    };
+
     const stocksSection = await screen.findByRole("region", { name: /Single Stocks/i });
-    expect(within(stocksSection).getByRole("grid", { name: /Single Stocks/i })).toBeInTheDocument();
+    const stocksGrid = within(stocksSection).getByRole("grid", { name: /Single Stocks/i });
+    expect(stocksGrid).toBeInTheDocument();
     expect(within(stocksSection).getByText("TSLA")).toBeInTheDocument();
     expect(within(stocksSection).getByText("$75.00")).toBeInTheDocument();
+
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Symbol" }), "left");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Qty" }), "right");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Mark" }), "right");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Source" }), "left");
+
+    const stockRowHeader = within(stocksGrid).getByRole("rowheader", { name: /TSLA/i });
+    expectAlignClass(stockRowHeader, "left");
+    expectAlignClass(within(stocksGrid).getByText("+15").closest("td"), "right");
+    expectAlignClass(within(stocksGrid).getByText("$215.00").closest("td"), "right");
+    expectAlignClass(within(stocksGrid).getByText("LAST").closest("td"), "left");
+    expectAlignClass(within(stocksGrid).getByText("00:12").closest("td"), "right");
 
     const combosSection = await screen.findByRole("region", { name: /Options — Combos/i });
     const comboToggle = within(combosSection).getByRole("button", { name: /TSLA CALL SPREAD/i });
@@ -170,6 +189,14 @@ describe("PSD page", () => {
     expect(comboRowHeader.textContent).not.toMatch(osiPattern);
     expect(comboLabelSpan?.getAttribute("title")).toMatch(osiPattern);
 
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Symbol" }), "left");
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Qty" }), "right");
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Source" }), "left");
+
+    expectAlignClass(comboRowHeader, "left");
+    expectAlignClass(within(legsGrid).getByText("+1").closest("td"), "right");
+    expectAlignClass(within(legsGrid).getAllByText("MID")[0].closest("td"), "left");
+
     const singlesSection = await screen.findByRole("region", { name: /Options — Singles/i });
     const singlesGrid = within(singlesSection).getByRole("grid", { name: /Options — Singles/i });
     const singleRowHeader = within(singlesGrid).getAllByRole("rowheader")[0];
@@ -178,6 +205,14 @@ describe("PSD page", () => {
     expect(singleRowHeader.textContent).toMatch(/MSFT 290P/i);
     expect(singleRowHeader.textContent).not.toMatch(osiPattern);
     expect(singleLabelSpan?.getAttribute("title")).toMatch(osiPattern);
+
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Symbol" }), "left");
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Qty" }), "right");
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Source" }), "left");
+
+    expectAlignClass(singleRowHeader, "left");
+    expectAlignClass(within(singlesGrid).getByText("-1").closest("td"), "right");
+    expectAlignClass(within(singlesGrid).getByText("MID").closest("td"), "left");
   });
 
   test("tabs through ribbon into fallback stocks table", async () => {
