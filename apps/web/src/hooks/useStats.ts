@@ -1,5 +1,10 @@
 import { useEffect } from "react";
-import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+  type DefaultError,
+} from "@tanstack/react-query";
 
 import type { PortfolioStats, PortfolioStatsApiResponse } from "../lib/types";
 import { normalizeSession } from "../lib/session";
@@ -129,7 +134,9 @@ export const fetchStats = async (baseUrl = ""): Promise<PortfolioStats> => {
   return parseStatsPayload(payload ?? null);
 };
 
-export function useStats(baseUrl?: string): UseQueryResult<PortfolioStats, Error> {
+export function useStats(
+  baseUrl?: string,
+): UseQueryResult<PortfolioStats, DefaultError> {
   const queryClient = useQueryClient();
   const resolvedBaseUrl = resolveBaseUrl(baseUrl ?? "");
 
@@ -146,10 +153,48 @@ export function useStats(baseUrl?: string): UseQueryResult<PortfolioStats, Error
       try {
         const data = event.data ? JSON.parse(event.data) : null;
         const parsed = parseStatsPayload(data);
-        queryClient.setQueryData(PSD_STATS_QUERY_KEY, (current) => ({
-          ...current,
-          ...parsed,
-        }));
+        const raw = (data && typeof data === "object" ? data : null) as
+          | Record<string, unknown>
+          | null;
+        queryClient.setQueryData(PSD_STATS_QUERY_KEY, (current) => {
+          if (!current) {
+            return parsed;
+          }
+
+          const mergedCounts = current.counts
+            ? { ...current.counts }
+            : { ...parsed.counts };
+
+          if (raw) {
+            if ("equity_count" in raw) {
+              mergedCounts.equities = parsed.counts.equities;
+            }
+            if ("quote_count" in raw) {
+              mergedCounts.quotes = parsed.counts.quotes;
+            }
+            if ("option_legs_count" in raw) {
+              mergedCounts.optionLegs = parsed.counts.optionLegs;
+            }
+            if ("combos_matched" in raw) {
+              mergedCounts.combos = parsed.counts.combos;
+            }
+            if ("stale_quotes_count" in raw) {
+              mergedCounts.staleQuotes = parsed.counts.staleQuotes;
+            }
+            if ("rules_count" in raw) {
+              mergedCounts.rules = parsed.counts.rules;
+            }
+            if ("breaches_count" in raw) {
+              mergedCounts.breaches = parsed.counts.breaches;
+            }
+          }
+
+          return {
+            ...current,
+            ...parsed,
+            counts: mergedCounts,
+          };
+        });
       } catch (error) {
         if (import.meta.env?.DEV) {
           // eslint-disable-next-line no-console -- useful for diagnosing malformed payloads.

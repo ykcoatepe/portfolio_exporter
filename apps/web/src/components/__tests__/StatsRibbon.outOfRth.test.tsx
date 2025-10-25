@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 
 import StatsRibbon from "../StatsRibbon";
 import { buildPsdSnapshot, buildStatsResponse } from "../../mocks/handlers";
@@ -35,7 +35,6 @@ describe("StatsRibbon out of RTH", () => {
       session_info: null,
     });
     expect(statsPayload.session?.state).toBe("ETH");
-    // console.log("stats session state", statsPayload.session?.state);
 
     const snapshotFixture = buildPsdSnapshot();
     const view = snapshotFixture.positions_view;

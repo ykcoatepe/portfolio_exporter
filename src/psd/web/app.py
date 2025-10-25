@@ -47,6 +47,11 @@ STATS_STARTUP_BROADCASTS = Counter(
     "psd_stats_startup_broadcasts_total",
     "Initial stats broadcasts emitted during application startup",
 )
+STATS_BROADCASTS = Counter(
+    "psd_stats_broadcasts_total",
+    "Portfolio stats SSE broadcasts emitted",
+    ["trigger"],
+)
 
 router = APIRouter()
 
@@ -83,7 +88,7 @@ def _create_lifespan(settings: Settings) -> Any:
         init()
         start_msb_scheduler(_app)
         try:
-            if broadcast_latest_stats(_app):
+            if broadcast_latest_stats(_app, trigger="startup"):
                 STATS_STARTUP_BROADCASTS.inc()
         except Exception:
             log.debug("initial stats broadcast failed", exc_info=True)
@@ -374,13 +379,13 @@ def broadcast_latest_msb(app: FastAPI) -> bool:
     dto = MsbDTO.model_validate(record).model_dump(mode="json")
     manager.broadcast("msb.update", dto)
     try:
-        broadcast_latest_stats(app)
+        broadcast_latest_stats(app, trigger="msb")
     except Exception:  # pragma: no cover - defensive logging path
         log.debug("stats broadcast after msb update failed", exc_info=True)
     return True
 
 
-def broadcast_latest_stats(app: FastAPI) -> bool:
+def broadcast_latest_stats(app: FastAPI, *, trigger: str = "manual") -> bool:
     manager = getattr(app.state, "sse", None)
     if not isinstance(manager, SseManager):
         raise RuntimeError("SSE manager not attached to FastAPI application")
@@ -388,6 +393,11 @@ def broadcast_latest_stats(app: FastAPI) -> bool:
     if payload is None:
         return False
     manager.broadcast("psd.stats.update", payload)
+    try:
+        label = str(trigger or "manual")
+    except Exception:  # pragma: no cover - extremely defensive
+        label = "manual"
+    STATS_BROADCASTS.labels(trigger=label).inc()
     return True
 
 
