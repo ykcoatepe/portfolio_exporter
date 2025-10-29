@@ -248,7 +248,10 @@ def _compute_leg_unrealized(leg: dict[str, Any]) -> float | None:
         or leg.get("lastPrice")
     )
     avg_cost = _coerce_float(
-        leg.get("avg_cost") or leg.get("avgCost") or leg.get("cost_basis")
+        leg.get("avg_cost_unit")
+        or leg.get("avg_cost")
+        or leg.get("avgCost")
+        or leg.get("cost_basis")
     )
     qty = _coerce_float(leg.get("qty") or leg.get("quantity") or leg.get("position"))
     multiplier = _coerce_float(leg.get("multiplier"))
@@ -320,11 +323,19 @@ def read_last_stats() -> dict[str, Any] | None:
                     return value
         return None
 
-    def _accumulate(target: str, value: float | None) -> None:
+    def _accumulate_into(
+        bucket: dict[str, float],
+        counter: dict[str, int],
+        target: str,
+        value: float | None,
+    ) -> None:
         if value is None:
             return
-        totals[target] += value
-        counts[target] += 1
+        bucket[target] += value
+        counter[target] += 1
+
+    def _accumulate(target: str, value: float | None) -> None:
+        _accumulate_into(totals, counts, target, value)
 
     totals = {
         "pnl_day": 0.0,
@@ -333,12 +344,32 @@ def read_last_stats() -> dict[str, Any] | None:
         "sum_theta": 0.0,
     }
     counts = {"pnl_day": 0, "unrealized": 0, "sum_delta": 0, "sum_theta": 0}
+    fallback_totals = {
+        "pnl_day": 0.0,
+        "unrealized": 0.0,
+        "sum_delta": 0.0,
+        "sum_theta": 0.0,
+    }
+    fallback_counts = {
+        "pnl_day": 0,
+        "unrealized": 0,
+        "sum_delta": 0,
+        "sum_theta": 0,
+    }
+
+    def _accumulate_fallback(target: str, value: float | None) -> None:
+        _accumulate_into(fallback_totals, fallback_counts, target, value)
+
+    view_day_nonzero = False
+    view_unreal_nonzero = False
 
     for stock in stocks:
         day_value = _extract_row_value(
             stock, "pnl_day", "pnl_intraday", "pnlIntraday", "pnl_leg"
         )
         _accumulate("pnl_day", day_value)
+        if day_value not in (None, 0.0):
+            view_day_nonzero = True
 
         unreal_value = _extract_row_value(
             stock,
@@ -353,6 +384,8 @@ def read_last_stats() -> dict[str, Any] | None:
         if unreal_value is None:
             unreal_value = _compute_leg_unrealized(stock)
         _accumulate("unrealized", unreal_value)
+        if unreal_value not in (None, 0.0):
+            view_unreal_nonzero = True
 
         greeks = stock.get("greeks")
         if isinstance(greeks, dict):
@@ -361,11 +394,43 @@ def read_last_stats() -> dict[str, Any] | None:
             )
             _accumulate("sum_theta", _coerce_float(greeks.get("theta")))
 
+    positions_raw = snapshot.get("positions")
+    if isinstance(positions_raw, list):
+        for position in positions_raw:
+            if not isinstance(position, dict):
+                continue
+            raw_day = _extract_row_value(
+                position, "pnl_day", "pnl_intraday", "pnlIntraday", "pnl_leg"
+            )
+            _accumulate_fallback("pnl_day", raw_day)
+
+            raw_unreal = _extract_row_value(
+                position,
+                "unrealizedPNL",
+                "pnl_unrealized",
+                "total_pnl",
+                "totalPnl",
+                "pnl_total",
+                "pnlTotal",
+            )
+            if raw_unreal is None:
+                raw_unreal = _compute_leg_unrealized(position)
+                if raw_unreal is None:
+                    raw_unreal = _coerce_float(position.get("__fallback_unrealized"))
+                    if raw_unreal is None:
+                        raw_unreal = _coerce_float(position.get("pnl_leg"))
+            _accumulate_fallback("unrealized", raw_unreal)
+
+            _accumulate_fallback("sum_delta", _coerce_float(position.get("delta")))
+            _accumulate_fallback("sum_theta", _coerce_float(position.get("theta")))
+
     for combo in combos:
         day_value = _extract_row_value(
             combo, "pnl_day", "pnl_intraday", "pnlIntraday", "pnl_leg"
         )
         _accumulate("pnl_day", day_value)
+        if day_value not in (None, 0.0):
+            view_day_nonzero = True
 
         unreal_value = _extract_row_value(
             combo,
@@ -390,6 +455,8 @@ def read_last_stats() -> dict[str, Any] | None:
             if has_leg_total:
                 unreal_value = leg_total
         _accumulate("unrealized", unreal_value)
+        if unreal_value not in (None, 0.0):
+            view_unreal_nonzero = True
 
         _accumulate("sum_delta", _sum_combo_greek(combo, "delta"))
         _accumulate("sum_theta", _sum_combo_greek(combo, "theta"))
@@ -399,6 +466,8 @@ def read_last_stats() -> dict[str, Any] | None:
             single, "pnl_day", "pnl_intraday", "pnlIntraday", "pnl_leg"
         )
         _accumulate("pnl_day", day_value)
+        if day_value not in (None, 0.0):
+            view_day_nonzero = True
 
         unreal_value = _extract_row_value(
             single,
@@ -413,6 +482,8 @@ def read_last_stats() -> dict[str, Any] | None:
         if unreal_value is None:
             unreal_value = _compute_leg_unrealized(single)
         _accumulate("unrealized", unreal_value)
+        if unreal_value not in (None, 0.0):
+            view_unreal_nonzero = True
 
         greeks = single.get("greeks")
         if isinstance(greeks, dict):
@@ -420,6 +491,25 @@ def read_last_stats() -> dict[str, Any] | None:
                 "sum_delta", _coerce_float(greeks.get("delta") or greeks.get("Δ"))
             )
             _accumulate("sum_theta", _coerce_float(greeks.get("theta")))
+
+    if fallback_counts["pnl_day"] > 0:
+        if counts["pnl_day"] == 0 or (
+            not view_day_nonzero and fallback_totals["pnl_day"] != 0.0
+        ):
+            totals["pnl_day"] = fallback_totals["pnl_day"]
+            counts["pnl_day"] = fallback_counts["pnl_day"]
+
+    if fallback_counts["unrealized"] > 0:
+        if counts["unrealized"] == 0 or (
+            not view_unreal_nonzero and fallback_totals["unrealized"] != 0.0
+        ):
+            totals["unrealized"] = fallback_totals["unrealized"]
+            counts["unrealized"] = fallback_counts["unrealized"]
+
+    for key in ("sum_delta", "sum_theta"):
+        if counts[key] == 0 and fallback_counts[key] > 0:
+            totals[key] = fallback_totals[key]
+            counts[key] = fallback_counts[key]
 
     totals_payload = {key: (totals[key] if counts[key] > 0 else None) for key in totals}
 
