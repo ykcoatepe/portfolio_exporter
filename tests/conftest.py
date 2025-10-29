@@ -3,12 +3,39 @@
 from __future__ import annotations
 
 import atexit
+import contextlib
 import os
 import threading
 
 os.environ.setdefault("PE_QUIET", "1")
+os.environ.setdefault("PE_TEST_MODE", "1")
 os.environ.setdefault("MOMO_OFFLINE", "1")
 os.environ.setdefault("MOMO_DATA_MODE", "offline")
+os.environ.setdefault("MPLBACKEND", "Agg")
+
+with contextlib.suppress(Exception):
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+    with contextlib.suppress(Exception):
+        import matplotlib.pyplot as plt
+
+        def _noop_show(*_args, **_kwargs) -> None:
+            """Avoid GUI waits in test environments."""
+
+            return None
+
+        plt.show = _noop_show  # type: ignore[assignment]
+
+with contextlib.suppress(Exception):
+    from src.psd.datasources import yfin as _yfin
+
+    def _offline_fill(symbols: list[str]) -> dict[str, float | None]:
+        """Prevent live Yahoo Finance lookups during tests."""
+
+        return {sym.strip().upper(): None for sym in symbols if sym}
+
+    _yfin.fill_equity_marks_from_yf = _offline_fill  # type: ignore[assignment]
 
 
 @atexit.register

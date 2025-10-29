@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import sqlite3
 from collections.abc import Iterable
@@ -151,7 +152,7 @@ def _coerce_float(value: Any) -> float | None:
         result = float(value)
     except (TypeError, ValueError):
         return None
-    if result != result:  # NaN guard
+    if math.isnan(result) or not math.isfinite(result):
         return None
     return result
 
@@ -165,19 +166,44 @@ def _normalize_timestamp(value: Any) -> datetime | None:
         return value.astimezone(UTC)
     if isinstance(value, (int, float)):
         try:
-            return datetime.fromtimestamp(float(value), tz=UTC)
+            number = float(value)
+        except (OverflowError, ValueError):
+            return None
+        if math.isnan(number) or not math.isfinite(number):
+            return None
+        if number > 1e12 or number < -1e12:
+            number /= 1000.0
+        try:
+            return datetime.fromtimestamp(number, tz=UTC)
         except (OverflowError, ValueError):
             return None
     if isinstance(value, str):
         text = value.strip()
         if not text:
             return None
+        try:
+            number = float(text)
+        except ValueError:
+            number = None
+        else:
+            if math.isnan(number) or not math.isfinite(number):
+                number = None
+        if number is not None:
+            if number > 1e12 or number < -1e12:
+                number /= 1000.0
+            try:
+                return datetime.fromtimestamp(number, tz=UTC)
+            except (OverflowError, ValueError):
+                return None
         if text.endswith("Z"):
             text = text.rstrip("Z") + "+00:00"
         try:
-            return datetime.fromisoformat(text)
+            parsed = datetime.fromisoformat(text)
         except ValueError:
             return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
     return None
 
 
@@ -188,15 +214,29 @@ def _legs_from_combo(combo: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-def _collect_positions_view(view: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def _collect_positions_view(
+    view: Any,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     if not isinstance(view, dict):
         return [], [], []
     stocks = view.get("single_stocks")
     combos = view.get("option_combos")
     singles = view.get("single_options")
-    stocks_list = [row for row in stocks if isinstance(row, dict)] if isinstance(stocks, list) else []
-    combos_list = [row for row in combos if isinstance(row, dict)] if isinstance(combos, list) else []
-    singles_list = [row for row in singles if isinstance(row, dict)] if isinstance(singles, list) else []
+    stocks_list = (
+        [row for row in stocks if isinstance(row, dict)]
+        if isinstance(stocks, list)
+        else []
+    )
+    combos_list = (
+        [row for row in combos if isinstance(row, dict)]
+        if isinstance(combos, list)
+        else []
+    )
+    singles_list = (
+        [row for row in singles if isinstance(row, dict)]
+        if isinstance(singles, list)
+        else []
+    )
     return stocks_list, combos_list, singles_list
 
 
@@ -207,7 +247,9 @@ def _compute_leg_unrealized(leg: dict[str, Any]) -> float | None:
         or leg.get("marketPrice")
         or leg.get("lastPrice")
     )
-    avg_cost = _coerce_float(leg.get("avg_cost") or leg.get("avgCost") or leg.get("cost_basis"))
+    avg_cost = _coerce_float(
+        leg.get("avg_cost") or leg.get("avgCost") or leg.get("cost_basis")
+    )
     qty = _coerce_float(leg.get("qty") or leg.get("quantity") or leg.get("position"))
     multiplier = _coerce_float(leg.get("multiplier"))
     if multiplier is None:
@@ -270,94 +312,135 @@ def read_last_stats() -> dict[str, Any] | None:
     view = snapshot.get("positions_view")
     stocks, combos, singles = _collect_positions_view(view)
 
+    def _extract_row_value(row: dict[str, Any], *keys: str) -> float | None:
+        for key in keys:
+            if key in row:
+                value = _coerce_float(row.get(key))
+                if value is not None:
+                    return value
+        return None
+
+    def _accumulate(target: str, value: float | None) -> None:
+        if value is None:
+            return
+        totals[target] += value
+        counts[target] += 1
+
     totals = {
-        "day": 0.0,
+        "pnl_day": 0.0,
         "unrealized": 0.0,
-        "delta": 0.0,
-        "theta": 0.0,
+        "sum_delta": 0.0,
+        "sum_theta": 0.0,
     }
-    counts = {"day": 0, "unrealized": 0, "delta": 0, "theta": 0}
+    counts = {"pnl_day": 0, "unrealized": 0, "sum_delta": 0, "sum_theta": 0}
 
     for stock in stocks:
-        day_value = _coerce_float(stock.get("day_pnl") or stock.get("pnl_intraday"))
-        if day_value is not None:
-            totals["day"] += day_value
-            counts["day"] += 1
-        unreal_value = _coerce_float(
-            stock.get("pnl_unrealized")
-            or stock.get("total_pnl")
-            or stock.get("unrealized_pnl")
+        day_value = _extract_row_value(
+            stock, "pnl_day", "pnl_intraday", "pnlIntraday", "pnl_leg"
+        )
+        _accumulate("pnl_day", day_value)
+
+        unreal_value = _extract_row_value(
+            stock,
+            "unrealizedPNL",
+            "pnl_unrealized",
+            "total_pnl",
+            "totalPnl",
+            "pnl_total",
+            "pnlTotal",
+            "__fallback_unrealized",
         )
         if unreal_value is None:
             unreal_value = _compute_leg_unrealized(stock)
-        if unreal_value is not None:
-            totals["unrealized"] += unreal_value
-            counts["unrealized"] += 1
+        _accumulate("unrealized", unreal_value)
+
         greeks = stock.get("greeks")
         if isinstance(greeks, dict):
-            delta_val = _coerce_float(greeks.get("delta"))
-            if delta_val is not None:
-                totals["delta"] += delta_val
-                counts["delta"] += 1
-            theta_val = _coerce_float(greeks.get("theta"))
-            if theta_val is not None:
-                totals["theta"] += theta_val
-                counts["theta"] += 1
+            _accumulate(
+                "sum_delta", _coerce_float(greeks.get("delta") or greeks.get("Δ"))
+            )
+            _accumulate("sum_theta", _coerce_float(greeks.get("theta")))
 
     for combo in combos:
-        day_value = _coerce_float(combo.get("pnl_intraday") or combo.get("day_pnl"))
-        if day_value is not None:
-            totals["day"] += day_value
-            counts["day"] += 1
-        legs = _legs_from_combo(combo)
-        leg_total = 0.0
-        has_leg_total = False
-        for leg in legs:
-            leg_unreal = _compute_leg_unrealized(leg)
-            if leg_unreal is None:
-                continue
-            leg_total += leg_unreal
-            has_leg_total = True
-        if has_leg_total:
-            totals["unrealized"] += leg_total
-            counts["unrealized"] += 1
-        delta_val = _sum_combo_greek(combo, "delta")
-        if delta_val is not None:
-            totals["delta"] += delta_val
-            counts["delta"] += 1
-        theta_val = _sum_combo_greek(combo, "theta")
-        if theta_val is not None:
-            totals["theta"] += theta_val
-            counts["theta"] += 1
+        day_value = _extract_row_value(
+            combo, "pnl_day", "pnl_intraday", "pnlIntraday", "pnl_leg"
+        )
+        _accumulate("pnl_day", day_value)
+
+        unreal_value = _extract_row_value(
+            combo,
+            "unrealizedPNL",
+            "pnl_unrealized",
+            "total_pnl",
+            "totalPnl",
+            "pnl_total",
+            "pnlTotal",
+            "__fallback_unrealized",
+        )
+        if unreal_value is None:
+            legs = _legs_from_combo(combo)
+            leg_total = 0.0
+            has_leg_total = False
+            for leg in legs:
+                leg_unreal = _compute_leg_unrealized(leg)
+                if leg_unreal is None:
+                    continue
+                leg_total += leg_unreal
+                has_leg_total = True
+            if has_leg_total:
+                unreal_value = leg_total
+        _accumulate("unrealized", unreal_value)
+
+        _accumulate("sum_delta", _sum_combo_greek(combo, "delta"))
+        _accumulate("sum_theta", _sum_combo_greek(combo, "theta"))
 
     for single in singles:
-        day_value = _coerce_float(single.get("pnl_intraday") or single.get("day_pnl"))
-        if day_value is not None:
-            totals["day"] += day_value
-            counts["day"] += 1
-        unreal_value = _compute_leg_unrealized(single)
-        if unreal_value is not None:
-            totals["unrealized"] += unreal_value
-            counts["unrealized"] += 1
+        day_value = _extract_row_value(
+            single, "pnl_day", "pnl_intraday", "pnlIntraday", "pnl_leg"
+        )
+        _accumulate("pnl_day", day_value)
+
+        unreal_value = _extract_row_value(
+            single,
+            "unrealizedPNL",
+            "pnl_unrealized",
+            "total_pnl",
+            "totalPnl",
+            "pnl_total",
+            "pnlTotal",
+            "__fallback_unrealized",
+        )
+        if unreal_value is None:
+            unreal_value = _compute_leg_unrealized(single)
+        _accumulate("unrealized", unreal_value)
+
         greeks = single.get("greeks")
         if isinstance(greeks, dict):
-            delta_val = _coerce_float(greeks.get("delta"))
-            if delta_val is not None:
-                totals["delta"] += delta_val
-                counts["delta"] += 1
-            theta_val = _coerce_float(greeks.get("theta"))
-            if theta_val is not None:
-                totals["theta"] += theta_val
-                counts["theta"] += 1
+            _accumulate(
+                "sum_delta", _coerce_float(greeks.get("delta") or greeks.get("Δ"))
+            )
+            _accumulate("sum_theta", _coerce_float(greeks.get("theta")))
 
-    if day_pnl is None and counts["day"] > 0:
-        day_pnl = totals["day"]
-    if unrealized_pnl is None and counts["unrealized"] > 0:
-        unrealized_pnl = totals["unrealized"]
-    if sigma_total is None and counts["delta"] > 0:
-        sigma_total = totals["delta"]
-    if sigma_per_day is None and counts["theta"] > 0:
-        sigma_per_day = totals["theta"]
+    totals_payload = {key: (totals[key] if counts[key] > 0 else None) for key in totals}
+
+    if counts["pnl_day"] > 0:
+        day_pnl = totals_payload["pnl_day"]
+    if counts["unrealized"] > 0:
+        unrealized_pnl = totals_payload["unrealized"]
+    if counts["sum_delta"] > 0:
+        sigma_total = totals_payload["sum_delta"]
+    if counts["sum_theta"] > 0:
+        sigma_per_day = totals_payload["sum_theta"]
+
+    snapshot_ts = _normalize_timestamp(
+        snapshot.get("ts") or snapshot.get("timestamp") or snapshot.get("served_at")
+    )
+    now_dt = datetime.now(tz=UTC)
+    staleness_secs = None
+    if snapshot_ts is not None:
+        delta = (now_dt - snapshot_ts).total_seconds()
+        staleness_secs = int(max(0.0, delta))
+    totals_payload["staleness_secs"] = staleness_secs
 
     risk = snapshot.get("risk") if isinstance(snapshot.get("risk"), dict) else {}
     if net_liq is None:
@@ -373,9 +456,7 @@ def read_last_stats() -> dict[str, Any] | None:
         )
     if margin_pct is None and isinstance(risk, dict):
         margin_pct = _coerce_float(
-            risk.get("margin_pct")
-            or risk.get("margin_used_pct")
-            or risk.get("margin")
+            risk.get("margin_pct") or risk.get("margin_used_pct") or risk.get("margin")
         )
 
     updated_at_raw = stats_raw.get("updated_at") or stats_raw.get("updatedAt")
@@ -390,19 +471,35 @@ def read_last_stats() -> dict[str, Any] | None:
     if data_source_raw is None:
         data_source_raw = snapshot.get("data_source") or snapshot.get("dataSource")
     data_source = (
-        data_source_raw.strip() if isinstance(data_source_raw, str) and data_source_raw.strip() else None
+        data_source_raw.strip()
+        if isinstance(data_source_raw, str) and data_source_raw.strip()
+        else None
     )
 
     session_raw = stats_raw.get("session") if isinstance(stats_raw, dict) else None
     session = session_raw if isinstance(session_raw, dict) else snapshot.get("session")
-    session_info_raw = stats_raw.get("session_info") if isinstance(stats_raw, dict) else None
-    session_info = session_info_raw if isinstance(session_info_raw, dict) else snapshot.get("session_info")
+    session_info_raw = (
+        stats_raw.get("session_info") if isinstance(stats_raw, dict) else None
+    )
+    session_info = (
+        session_info_raw
+        if isinstance(session_info_raw, dict)
+        else snapshot.get("session_info")
+    )
 
-    values = [day_pnl, unrealized_pnl, sigma_total, sigma_per_day, net_liq, var_95, margin_pct]
+    values = [
+        day_pnl,
+        unrealized_pnl,
+        sigma_total,
+        sigma_per_day,
+        net_liq,
+        var_95,
+        margin_pct,
+    ]
     if all(value is None for value in values) and updated_at is None:
         return None
 
-    return {
+    payload = {
         "day_pnl": day_pnl,
         "unrealized_pnl": unrealized_pnl,
         "sigma_total": sigma_total,
@@ -415,6 +512,8 @@ def read_last_stats() -> dict[str, Any] | None:
         "session_info": session_info if isinstance(session_info, dict) else None,
         "data_source": data_source,
     }
+    payload["totals"] = totals_payload
+    return payload
 
 
 def latest_health() -> dict[str, Any] | None:

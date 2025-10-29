@@ -1150,6 +1150,13 @@ export const buildStatsResponse = (
     session: baseSession,
     session_info: baseSession,
     meta: { latest_ts: nowIso },
+    totals: {
+      pnl_day: 355.0,
+      unrealized: 255.0,
+      sum_delta: 15.1,
+      sum_theta: -0.03,
+      staleness_secs: 90,
+    },
   };
 
   const hasOwn = (key: keyof PortfolioStatsApiResponse) =>
@@ -1209,6 +1216,7 @@ export const buildStatsResponse = (
     session: sessionValue,
     session_info: sessionInfoValue,
     meta: metaValue,
+    totals: pickMany(["totals"], base.totals ?? null),
     data_source: pickMany(["data_source", "dataSource"], base.data_source ?? null),
   };
 };

@@ -1,15 +1,13 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
+import { resolveApiBaseUrl } from "../lib/http";
 import type { PSDSnapshot, PSDPositionsView } from "../lib/types";
 
 export const PSD_SNAPSHOT_QUERY_KEY = ["psd", "snapshot"] as const;
 
 export async function fetchPsdSnapshot(baseUrl = ""): Promise<PSDSnapshot> {
-  const origin =
-    baseUrl ||
-    (typeof window !== "undefined" ? window.location.origin : "http://localhost");
-  const sanitizedBase = origin.replace(/\/+$/, "");
-  const endpoint = `${sanitizedBase}/state`;
+  const origin = resolveApiBaseUrl(baseUrl);
+  const endpoint = `${origin}/state`;
   const response = await fetch(endpoint, {
     headers: { Accept: "application/json" },
     credentials: "include",

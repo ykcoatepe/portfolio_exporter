@@ -107,8 +107,10 @@ export default function StatsRibbon(): JSX.Element {
     ? new Date(updatedTimestamp).toLocaleString()
     : undefined;
 
+  const totals = stats?.totals ?? null;
   const metricsStaleness = metrics.stalenessSeconds;
-  const stalenessSeconds = stats?.stalenessSec ?? metricsStaleness ?? null;
+  const stalenessSeconds =
+    stats?.stalenessSec ?? totals?.stalenessSecs ?? metricsStaleness ?? null;
   const isStale =
     stalenessSeconds !== null && stalenessSeconds >= FALLBACK_STALE_THRESHOLD_SEC;
   const stalenessLabel = stalenessSeconds !== null ? formatDuration(stalenessSeconds) : null;
@@ -124,10 +126,10 @@ export default function StatsRibbon(): JSX.Element {
     ? new Date(sessionUpdatedTimestamp).toLocaleString()
     : undefined;
 
-  const dayPnlValue = stats?.dayPnl ?? metrics.dayPnl;
-  const unrealizedValue = stats?.unrealizedPnl ?? metrics.totalPnl;
-  const sigmaTotalValue = stats?.sigmaTotal ?? metrics.sumDelta;
-  const sigmaPerDayValue = stats?.sigmaPerDay ?? metrics.sumTheta;
+  const dayPnlValue = totals?.pnlDay ?? stats?.dayPnl ?? metrics.dayPnl;
+  const unrealizedValue = totals?.unrealized ?? stats?.unrealizedPnl ?? metrics.totalPnl;
+  const sigmaTotalValue = stats?.sigmaTotal ?? totals?.sumDelta ?? metrics.sumDelta;
+  const sigmaPerDayValue = stats?.sigmaPerDay ?? totals?.sumTheta ?? metrics.sumTheta;
   const netLiqValue = stats?.netLiq;
   const var95Value = stats?.var95;
   const marginValue = stats?.marginPct;

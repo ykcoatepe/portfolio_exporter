@@ -6,20 +6,18 @@ import {
   type DefaultError,
 } from "@tanstack/react-query";
 
-import type { PortfolioStats, PortfolioStatsApiResponse } from "../lib/types";
+import type {
+  PortfolioStats,
+  PortfolioStatsApiResponse,
+  PortfolioTotals,
+  PortfolioTotalsApiResponse,
+} from "../lib/types";
 import { normalizeSession } from "../lib/session";
+import { resolveApiBaseUrl } from "../lib/http";
 
-const DEFAULT_BASE_URL = "http://localhost";
 export const PSD_STATS_QUERY_KEY = ["psd", "stats", "current"] as const;
 const STATS_SSE_EVENT = "psd.stats.update";
 const SSE_PATH = "/sse";
-
-const resolveBaseUrl = (baseUrl = ""): string => {
-  const origin =
-    baseUrl ||
-    (typeof window !== "undefined" ? window.location.origin : DEFAULT_BASE_URL);
-  return origin.replace(/\/+$/, "");
-};
 
 const toNullableNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) {
@@ -45,6 +43,32 @@ const toNullableString = (value: unknown): string | null => {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+const parseTotalsPayload = (
+  payload: PortfolioTotalsApiResponse | null | undefined,
+): PortfolioTotals | null => {
+  if (!payload) {
+    return null;
+  }
+  const source = typeof payload === "object" ? payload : null;
+  if (!source) {
+    return null;
+  }
+  const pnlDay = toNullableNumber(source.pnl_day ?? source.pnlDay);
+  const unrealized = toNullableNumber(source.unrealized);
+  const sumDelta = toNullableNumber(source.sum_delta ?? source.sumDelta);
+  const sumTheta = toNullableNumber(source.sum_theta ?? source.sumTheta);
+  const stalenessSecs = toNullableNumber(
+    source.staleness_secs ?? source.stalenessSecs,
+  );
+  return {
+    pnlDay,
+    unrealized,
+    sumDelta,
+    sumTheta,
+    stalenessSecs,
+  };
 };
 
 const parseStatsPayload = (payload: PortfolioStatsApiResponse | null): PortfolioStats => {
@@ -73,11 +97,13 @@ const parseStatsPayload = (payload: PortfolioStatsApiResponse | null): Portfolio
       tradesPriorPositions: false,
       session: null,
       sessionInfo: null,
+      totals: null,
     };
   }
 
   const session = normalizeSession(payload.session ?? null);
   const sessionInfo = normalizeSession(payload.session_info ?? null);
+  const totals = parseTotalsPayload(payload.totals ?? null);
 
   return {
     netLiq: toNullableNumber(payload.net_liq ?? payload.netLiq),
@@ -111,11 +137,12 @@ const parseStatsPayload = (payload: PortfolioStatsApiResponse | null): Portfolio
     tradesPriorPositions: Boolean(payload.trades_prior_positions ?? false),
     session,
     sessionInfo,
+    totals,
   };
 };
 
 export const fetchStats = async (baseUrl = ""): Promise<PortfolioStats> => {
-  const origin = resolveBaseUrl(baseUrl);
+  const origin = resolveApiBaseUrl(baseUrl);
   const endpoint = `${origin}/stats/current`;
   const response = await fetch(endpoint, {
     headers: { Accept: "application/json" },
@@ -138,7 +165,7 @@ export function useStats(
   baseUrl?: string,
 ): UseQueryResult<PortfolioStats, DefaultError> {
   const queryClient = useQueryClient();
-  const resolvedBaseUrl = resolveBaseUrl(baseUrl ?? "");
+  const resolvedBaseUrl = resolveApiBaseUrl(baseUrl ?? "");
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.EventSource === "undefined") {
@@ -189,10 +216,16 @@ export function useStats(
             }
           }
 
+          const hasTotals = Boolean(raw && typeof raw === "object" && "totals" in raw);
+          const nextTotals = hasTotals
+            ? parsed.totals
+            : current.totals ?? parsed.totals;
+
           return {
             ...current,
             ...parsed,
             counts: mergedCounts,
+            totals: nextTotals,
           };
         });
       } catch (error) {

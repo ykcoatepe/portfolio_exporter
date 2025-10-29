@@ -159,6 +159,13 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
     if pnl_leg_raw is not None:
         base["pnl_leg"] = pnl_leg_raw
 
+    pnl_intraday_value = _coerce_float(base.get("pnl_intraday"))
+    if pnl_intraday_value is not None:
+        base["pnl_day"] = float(pnl_intraday_value)
+
+    fallback_unrealized = (mark_value - avg_cost) * qty * multiplier
+    base.setdefault("__fallback_unrealized", fallback_unrealized)
+
     if sec in {"OPT", "FOP"}:
         base.update(
             {

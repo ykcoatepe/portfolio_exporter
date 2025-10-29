@@ -449,6 +449,7 @@ export interface PortfolioStatsApiResponse {
   updatedAt?: string | null;
   session?: MarketSessionApiResponse | null;
   session_info?: MarketSessionApiResponse | null;
+  totals?: PortfolioTotalsApiResponse | null;
   meta?: {
     latest_ts?: string | null;
     [key: string]: unknown;
@@ -463,6 +464,26 @@ export interface PortfolioStatsCounts {
   staleQuotes: number;
   rules?: number;
   breaches?: number;
+}
+
+export interface PortfolioTotalsApiResponse {
+  pnl_day?: number | null;
+  pnlDay?: number | null;
+  unrealized?: number | null;
+  sum_delta?: number | null;
+  sumDelta?: number | null;
+  sum_theta?: number | null;
+  sumTheta?: number | null;
+  staleness_secs?: number | null;
+  stalenessSecs?: number | null;
+}
+
+export interface PortfolioTotals {
+  pnlDay: number | null;
+  unrealized: number | null;
+  sumDelta: number | null;
+  sumTheta: number | null;
+  stalenessSecs: number | null;
 }
 
 export type MarketSessionState = "RTH" | "ETH" | "CLOSED";
@@ -510,6 +531,7 @@ export interface PortfolioStats {
   session: MarketSession | null;
   sessionInfo?: MarketSession | null;
   latestTs: string | null;
+  totals: PortfolioTotals | null;
 }
 
 export type PSDGreeks = {

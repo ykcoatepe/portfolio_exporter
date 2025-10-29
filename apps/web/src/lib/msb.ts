@@ -1,6 +1,5 @@
+import { resolveApiBaseUrl } from "./http";
 import type { MsbReading } from "./types";
-
-const DEFAULT_BASE_URL = "http://localhost";
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
@@ -59,15 +58,7 @@ const toStringArray = (value: unknown): string[] => {
     .filter((item): item is string => item.length > 0);
 };
 
-export const resolveMsbBaseUrl = (baseUrl?: string): string => {
-  if (baseUrl && baseUrl.trim().length > 0) {
-    return baseUrl.replace(/\/+$/, "");
-  }
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin.replace(/\/+$/, "");
-  }
-  return DEFAULT_BASE_URL;
-};
+export const resolveMsbBaseUrl = (baseUrl?: string): string => resolveApiBaseUrl(baseUrl);
 
 export const MSB_CURRENT_QUERY_KEY = ["msb.current"] as const;
 
