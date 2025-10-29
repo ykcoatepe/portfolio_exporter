@@ -415,6 +415,61 @@ def test_read_last_stats_falls_back_to_raw_positions(tmp_db):
     assert totals["sum_theta"] == pytest.approx(-0.1)
 
 
+def test_read_last_stats_ignores_near_zero_view_when_fallback_has_signal(tmp_db):
+    snapshot_time = datetime.now(tz=timezone.utc)
+    snapshot = {
+        "ts": snapshot_time.timestamp(),
+        "positions_view": {
+            "single_stocks": [],
+            "option_combos": [],
+            "single_options": [
+                {
+                    "secType": "OPT",
+                    "symbol": "FOO   250101C00050000",
+                    "qty": 1.0,
+                    "avg_cost": 100.0,
+                    "mark": 100.0,
+                    "pnl_intraday": 0.001,  # effectively zero; should defer to fallback
+                    "greeks": {"delta": 0.0, "theta": 0.0},
+                }
+            ],
+        },
+        "positions": [
+            {
+                "secType": "OPT",
+                "symbol": "FOO   250101C00050000",
+                "qty": 1.0,
+                "avg_cost": 100.0,
+                "avg_cost_unit": 1.0,
+                "price": 1.75,
+                "multiplier": 100.0,
+                "pnl_leg": 75.0,
+                "delta": 0.5,
+                "theta": -0.2,
+            }
+        ],
+        "stats": {
+            "day_pnl": 0.0,
+            "unrealized_pnl": 0.0,
+            "updated_at": snapshot_time.isoformat(),
+        },
+    }
+    store.write_snapshot(snapshot)
+
+    stats = store.read_last_stats()
+
+    assert stats is not None
+    assert stats["day_pnl"] == pytest.approx(75.0)
+    assert stats["unrealized_pnl"] == pytest.approx(75.0)
+
+    totals = stats.get("totals")
+    assert isinstance(totals, dict)
+    assert totals["pnl_day"] == pytest.approx(75.0)
+    assert totals["unrealized"] == pytest.approx(75.0)
+    assert totals["sum_delta"] == pytest.approx(0.5)
+    assert totals["sum_theta"] == pytest.approx(-0.2)
+
+
 def test_stats_current_with_explicit_marks(tmp_db):
     timestamp = datetime.now(tz=timezone.utc)
     snapshot = {
