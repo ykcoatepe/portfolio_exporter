@@ -1,17 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { X } from "lucide-react";
 
 import {
     formatKeyCombo,
     getHotkeysByCategory,
-    registerHotkey,
 } from "../../lib/hotkeys";
 
 /**
  * PSD Hotkeys Help Modal
  *
  * Displays all registered keyboard shortcuts grouped by category.
- * Trigger: ? key (registered on mount)
+ * Trigger: ? key (registered in PsdShell)
  */
 
 interface HotkeysHelpProps {
@@ -146,29 +145,5 @@ export function HotkeysHelp({ open, onClose }: HotkeysHelpProps) {
     );
 }
 
-/**
- * Hook to manage help modal state and register ? hotkey
- */
-export function useHotkeysHelp() {
-    const [open, setOpen] = useState(false);
-
-    useEffect(() => {
-        const unregister = registerHotkey({
-            id: "help-modal",
-            keys: "?",
-            description: "Show keyboard shortcuts",
-            category: "system",
-            handler: () => setOpen(true),
-        });
-
-        return unregister;
-    }, []);
-
-    return {
-        open,
-        onClose: () => setOpen(false),
-        onOpen: () => setOpen(true),
-    };
-}
-
 export default HotkeysHelp;
+

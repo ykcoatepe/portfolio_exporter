@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import clsx from "clsx";
 import {
     BarChart3,
@@ -21,53 +22,61 @@ import { usePsdPreferences } from "../../state/psdPreferencesStore";
 interface NavItem {
     id: string;
     label: string;
-    icon: React.ReactNode;
-    href?: string;
+    icon: ReactNode;
     onClick?: () => void;
 }
 
-const navItems: NavItem[] = [
-    {
-        id: "dashboard",
-        label: "Dashboard",
-        icon: <LayoutDashboard size={20} />,
-        href: "#",
-    },
-    {
-        id: "positions",
-        label: "Positions",
-        icon: <Table2 size={20} />,
-        href: "#",
-    },
-    {
-        id: "charts",
-        label: "Charts",
-        icon: <BarChart3 size={20} />,
-        href: "#",
-    },
-    {
-        id: "sentinel",
-        label: "Sentinel",
-        icon: <Shield size={20} />,
-        href: "#",
-    },
-];
-
-const bottomItems: NavItem[] = [
-    {
-        id: "settings",
-        label: "Settings",
-        icon: <Settings size={20} />,
-        href: "#",
-    },
-];
-
 interface PsdSidebarProps {
     className?: string;
+    onSettingsClick?: () => void;
 }
 
-export function PsdSidebar({ className }: PsdSidebarProps) {
+export function PsdSidebar({ className, onSettingsClick }: PsdSidebarProps) {
     const { sidebarCollapsed, toggleSidebar } = usePsdPreferences();
+
+    const navItems: NavItem[] = [
+        {
+            id: "dashboard",
+            label: "Dashboard",
+            icon: <LayoutDashboard size={20} />,
+            onClick: () => {
+                document.querySelector('[aria-label="Portfolio Sentinel sections"]')?.scrollIntoView({ behavior: "auto" });
+            },
+        },
+        {
+            id: "positions",
+            label: "Positions",
+            icon: <Table2 size={20} />,
+            onClick: () => {
+                document.querySelector('[aria-label="Single Stocks"]')?.scrollIntoView({ behavior: "auto" });
+            },
+        },
+        {
+            id: "charts",
+            label: "Charts",
+            icon: <BarChart3 size={20} />,
+            onClick: () => {
+                document.querySelector('[aria-label="Market Stress Barometer overview"]')?.scrollIntoView({ behavior: "auto" });
+            },
+        },
+        {
+            id: "sentinel",
+            label: "Sentinel",
+            icon: <Shield size={20} />,
+            onClick: () => {
+                document.querySelector('[aria-label="Rules & Fundamentals"]')?.scrollIntoView({ behavior: "auto" });
+            },
+        },
+    ];
+
+    const bottomItems: NavItem[] = [
+        {
+            id: "settings",
+            label: "Settings",
+            icon: <Settings size={20} />,
+            onClick: onSettingsClick,
+        },
+    ];
 
     return (
         <aside
@@ -100,39 +109,32 @@ export function PsdSidebar({ className }: PsdSidebarProps) {
             {/* Main Nav */}
             <nav className="flex-1 space-y-1 px-2 py-4" aria-label="Primary">
                 {navItems.map((item) => (
-                    <NavLink key={item.id} item={item} collapsed={sidebarCollapsed} />
+                    <NavButton key={item.id} item={item} collapsed={sidebarCollapsed} />
                 ))}
             </nav>
 
             {/* Bottom Nav */}
             <nav className="border-t border-slate-800/60 px-2 py-4" aria-label="Secondary">
                 {bottomItems.map((item) => (
-                    <NavLink key={item.id} item={item} collapsed={sidebarCollapsed} />
+                    <NavButton key={item.id} item={item} collapsed={sidebarCollapsed} />
                 ))}
             </nav>
         </aside>
     );
 }
 
-interface NavLinkProps {
+interface NavButtonProps {
     item: NavItem;
     collapsed: boolean;
 }
 
-function NavLink({ item, collapsed }: NavLinkProps) {
-    const handleClick = (e: React.MouseEvent) => {
-        if (item.onClick) {
-            e.preventDefault();
-            item.onClick();
-        }
-    };
-
+function NavButton({ item, collapsed }: NavButtonProps) {
     return (
-        <a
-            href={item.href || "#"}
-            onClick={handleClick}
+        <button
+            type="button"
+            onClick={item.onClick}
             className={clsx(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-400 psd-transition",
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-slate-400 psd-transition",
                 "hover:bg-slate-800/80 hover:text-slate-200",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60",
                 collapsed && "justify-center px-2",
@@ -144,8 +146,9 @@ function NavLink({ item, collapsed }: NavLinkProps) {
             {!collapsed && (
                 <span className="text-sm font-medium">{item.label}</span>
             )}
-        </a>
+        </button>
     );
 }
 
 export default PsdSidebar;
+

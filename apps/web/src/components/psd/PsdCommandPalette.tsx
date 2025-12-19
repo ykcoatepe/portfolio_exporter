@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
 import {
@@ -13,12 +14,13 @@ import {
 } from "lucide-react";
 
 import { formatKeyCombo, registerHotkey } from "../../lib/hotkeys";
+import { usePsdPreferences } from "../../state/psdPreferencesStore";
 
 /**
  * PSD Command Palette
  *
  * Keyboard-first navigation for the dashboard.
- * Trigger: Cmd+K (registered on mount)
+ * Trigger: Cmd+K (Mac) or Ctrl+K (Windows) - both registered
  *
  * Design:
  * - Glass effect on overlay per plan (framing UI)
@@ -30,7 +32,7 @@ export interface CommandItem {
     id: string;
     label: string;
     description?: string;
-    icon?: React.ReactNode;
+    icon?: ReactNode;
     shortcut?: string;
     category: "navigation" | "actions" | "view" | "system";
     onSelect: () => void;
@@ -43,121 +45,142 @@ interface PsdCommandPaletteProps {
     onOpenChange?: (open: boolean) => void;
     /** Custom commands to add */
     commands?: CommandItem[];
+    /** Callback to open settings */
+    onOpenSettings?: () => void;
+    /** Callback to open help */
+    onOpenHelp?: () => void;
 }
 
-const defaultCommands: CommandItem[] = [
-    {
-        id: "nav-dashboard",
-        label: "Go to Dashboard",
-        icon: <LayoutDashboard size={16} />,
-        category: "navigation",
-        onSelect: () => {
-            // TODO: Wire to router when implemented
-            console.log("[cmd] Navigate: Dashboard");
-        },
-    },
-    {
-        id: "nav-stocks",
-        label: "Go to Stocks Table",
-        icon: <Table2 size={16} />,
-        category: "navigation",
-        onSelect: () => {
-            document.querySelector('[aria-label="Single Stocks"]')?.scrollIntoView({ behavior: "smooth" });
-        },
-    },
-    {
-        id: "nav-options",
-        label: "Go to Options",
-        icon: <Grid3X3 size={16} />,
-        category: "navigation",
-        onSelect: () => {
-            document.querySelector('[aria-label="Options"]')?.scrollIntoView({ behavior: "smooth" });
-        },
-    },
-    {
-        id: "action-refresh",
-        label: "Refresh Data",
-        icon: <RefreshCw size={16} />,
-        shortcut: "cmd+r",
-        category: "actions",
-        onSelect: () => {
-            // TODO: Wire to data refresh
-            console.log("[cmd] Action: Refresh");
-        },
-    },
-    {
-        id: "view-toggle-sidebar",
-        label: "Toggle Sidebar",
-        icon: <Sliders size={16} />,
-        shortcut: "cmd+b",
-        category: "view",
-        onSelect: () => {
-            // TODO: Wire to preferences store
-            console.log("[cmd] View: Toggle Sidebar");
-        },
-    },
-    {
-        id: "view-charts",
-        label: "Show Charts",
-        icon: <BarChart3 size={16} />,
-        category: "view",
-        onSelect: () => {
-            console.log("[cmd] View: Charts");
-        },
-    },
-    {
-        id: "system-settings",
-        label: "Open Settings",
-        icon: <Settings size={16} />,
-        shortcut: "cmd+,",
-        category: "system",
-        onSelect: () => {
-            // TODO: Open settings modal
-            console.log("[cmd] System: Settings");
-        },
-    },
-    {
-        id: "system-help",
-        label: "Keyboard Shortcuts",
-        icon: <HelpCircle size={16} />,
-        shortcut: "?",
-        category: "system",
-        onSelect: () => {
-            // TODO: Open help modal
-            console.log("[cmd] System: Help");
-        },
-    },
-];
-
-const categoryLabels: Record<CommandItem["category"], string> = {
-    navigation: "Navigation",
-    actions: "Actions",
-    view: "View",
-    system: "System",
-};
+/**
+ * Get scroll behavior respecting reduced motion preference
+ */
+function getScrollBehavior(): ScrollBehavior {
+    if (typeof window === "undefined") return "auto";
+    const reducedMotion = document.documentElement.dataset.reducedMotion === "true";
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return reducedMotion || prefersReduced ? "auto" : "smooth";
+}
 
 export function PsdCommandPalette({
     open: controlledOpen,
     onOpenChange,
     commands = [],
+    onOpenSettings,
+    onOpenHelp,
 }: PsdCommandPaletteProps) {
     const [internalOpen, setInternalOpen] = useState(false);
     const [search, setSearch] = useState("");
+    const { toggleSidebar } = usePsdPreferences();
 
     const isOpen = controlledOpen ?? internalOpen;
     const setOpen = onOpenChange ?? setInternalOpen;
 
-    // Register Cmd+K hotkey
+    const defaultCommands: CommandItem[] = [
+        {
+            id: "nav-dashboard",
+            label: "Go to Dashboard",
+            icon: <LayoutDashboard size={16} />,
+            category: "navigation",
+            onSelect: () => {
+                document.querySelector('[aria-label="Portfolio Sentinel sections"]')?.scrollIntoView({ behavior: getScrollBehavior() });
+            },
+        },
+        {
+            id: "nav-stocks",
+            label: "Go to Stocks Table",
+            icon: <Table2 size={16} />,
+            category: "navigation",
+            onSelect: () => {
+                document.querySelector('[aria-label="Single Stocks"]')?.scrollIntoView({ behavior: getScrollBehavior() });
+            },
+        },
+        {
+            id: "nav-options",
+            label: "Go to Options",
+            icon: <Grid3X3 size={16} />,
+            category: "navigation",
+            onSelect: () => {
+                // Target Options section - try both possible labels
+                const optionsSection =
+                    document.querySelector('[aria-label="Options — Combos"]') ||
+                    document.querySelector('[aria-label="Options"]') ||
+                    document.querySelector('[aria-label="Options — Singles"]');
+                optionsSection?.scrollIntoView({ behavior: getScrollBehavior() });
+            },
+        },
+        {
+            id: "action-refresh",
+            label: "Refresh Data",
+            icon: <RefreshCw size={16} />,
+            category: "actions",
+            onSelect: () => {
+                // Trigger page refresh for now
+                window.location.reload();
+            },
+        },
+        {
+            id: "view-toggle-sidebar",
+            label: "Toggle Sidebar",
+            icon: <Sliders size={16} />,
+            shortcut: "cmd+b",
+            category: "view",
+            onSelect: () => {
+                toggleSidebar();
+            },
+        },
+        {
+            id: "view-charts",
+            label: "Show Charts",
+            icon: <BarChart3 size={16} />,
+            category: "view",
+            onSelect: () => {
+                document.querySelector('[aria-label="Market Stress Barometer overview"]')?.scrollIntoView({ behavior: getScrollBehavior() });
+            },
+        },
+        {
+            id: "system-settings",
+            label: "Open Settings",
+            icon: <Settings size={16} />,
+            shortcut: "cmd+,",
+            category: "system",
+            onSelect: () => {
+                onOpenSettings?.();
+            },
+        },
+        {
+            id: "system-help",
+            label: "Keyboard Shortcuts",
+            icon: <HelpCircle size={16} />,
+            shortcut: "?",
+            category: "system",
+            onSelect: () => {
+                onOpenHelp?.();
+            },
+        },
+    ];
+
+    // Register Cmd+K and Ctrl+K hotkeys for cross-platform support
     useEffect(() => {
-        const unregister = registerHotkey({
-            id: "command-palette",
+        const unregisterCmd = registerHotkey({
+            id: "command-palette-cmd",
             keys: "cmd+k",
             description: "Open command palette",
             category: "system",
             handler: () => setOpen(true),
         });
 
-        return unregister;
+        const unregisterCtrl = registerHotkey({
+            id: "command-palette-ctrl",
+            keys: "ctrl+k",
+            description: "Open command palette (Windows)",
+            category: "system",
+            handler: () => setOpen(true),
+        });
+
+        return () => {
+            unregisterCmd();
+            unregisterCtrl();
+        };
     }, [setOpen]);
 
     // Close on escape
@@ -190,6 +213,13 @@ export function PsdCommandPalette({
         },
         {} as Record<CommandItem["category"], CommandItem[]>,
     );
+
+    const categoryLabels: Record<CommandItem["category"], string> = {
+        navigation: "Navigation",
+        actions: "Actions",
+        view: "View",
+        system: "System",
+    };
 
     if (!isOpen) return null;
 
@@ -306,3 +336,4 @@ export function PsdCommandPalette({
 }
 
 export default PsdCommandPalette;
+

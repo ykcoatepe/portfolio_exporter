@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Monitor, Moon, Sparkles, Volume2, VolumeX } from "lucide-react";
 import clsx from "clsx";
 
@@ -80,7 +81,7 @@ interface SettingToggleProps {
     id: string;
     label: string;
     description: string;
-    icon: React.ReactNode;
+    icon: ReactNode;
     checked: boolean;
     onChange: (value: boolean) => void;
 }
@@ -93,6 +94,9 @@ function SettingToggle({
     checked,
     onChange,
 }: SettingToggleProps) {
+    const labelId = `${id}-label`;
+    const descId = `${id}-desc`;
+
     return (
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -100,18 +104,20 @@ function SettingToggle({
                     {icon}
                 </span>
                 <div>
-                    <label htmlFor={id} className="text-sm font-medium text-slate-200">
+                    <span id={labelId} className="text-sm font-medium text-slate-200">
                         {label}
-                    </label>
-                    <div className="text-xs text-slate-500">{description}</div>
+                    </span>
+                    <div id={descId} className="text-xs text-slate-500">{description}</div>
                 </div>
             </div>
 
-            {/* Toggle Switch */}
+            {/* Toggle Switch - using aria-labelledby for accessible name */}
             <button
-                id={id}
+                type="button"
                 role="switch"
                 aria-checked={checked}
+                aria-labelledby={labelId}
+                aria-describedby={descId}
                 onClick={() => onChange(!checked)}
                 className={clsx(
                     "relative h-6 w-11 rounded-full psd-transition",
@@ -131,3 +137,4 @@ function SettingToggle({
 }
 
 export default PsdSettings;
+

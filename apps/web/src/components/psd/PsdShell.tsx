@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
-import { initHotkeys } from "../../lib/hotkeys";
-import { initPreferencesFromSystem, usePsdPreferences } from "../../state/psdPreferencesStore";
+import { initHotkeys, registerHotkey } from "../../lib/hotkeys";
+import { initPreferencesFromSystem } from "../../state/psdPreferencesStore";
+import { HotkeysHelp } from "./HotkeysHelp";
 import PsdCommandPalette from "./PsdCommandPalette";
+import { PsdSettings } from "./PsdSettings";
 import PsdSidebar from "./PsdSidebar";
 
 /**
@@ -12,6 +15,8 @@ import PsdSidebar from "./PsdSidebar";
  * Main application shell providing:
  * - Sidebar navigation
  * - Command palette (Cmd+K)
+ * - Settings modal (Cmd+,)
+ * - Help modal (?)
  * - Content area for child components
  *
  * This component initializes the hotkey system and preferences on mount.
@@ -22,22 +27,33 @@ interface PsdShellProps {
 }
 
 export function PsdShell({ children }: PsdShellProps) {
-    const { sidebarCollapsed } = usePsdPreferences();
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [helpOpen, setHelpOpen] = useState(false);
 
     // Initialize systems on mount
     useEffect(() => {
         initPreferencesFromSystem();
         const cleanupHotkeys = initHotkeys();
 
+        // Register ? hotkey for help
+        const unregisterHelp = registerHotkey({
+            id: "help-modal",
+            keys: "?",
+            description: "Show keyboard shortcuts",
+            category: "system",
+            handler: () => setHelpOpen(true),
+        });
+
         return () => {
             cleanupHotkeys();
+            unregisterHelp();
         };
     }, []);
 
     return (
         <div className="flex h-screen overflow-hidden bg-slate-950">
             {/* Sidebar */}
-            <PsdSidebar />
+            <PsdSidebar onSettingsClick={() => setSettingsOpen(true)} />
 
             {/* Main Content */}
             <div className="flex flex-1 flex-col overflow-hidden">
@@ -69,9 +85,39 @@ export function PsdShell({ children }: PsdShellProps) {
             </div>
 
             {/* Command Palette (global overlay) */}
-            <PsdCommandPalette />
+            <PsdCommandPalette
+                onOpenSettings={() => setSettingsOpen(true)}
+                onOpenHelp={() => setHelpOpen(true)}
+            />
+
+            {/* Settings Modal */}
+            {settingsOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div
+                        className="absolute inset-0"
+                        style={{ background: "rgba(0, 0, 0, 0.6)" }}
+                        onClick={() => setSettingsOpen(false)}
+                        aria-hidden="true"
+                    />
+                    <div className="relative z-10 w-full max-w-md">
+                        <button
+                            type="button"
+                            onClick={() => setSettingsOpen(false)}
+                            className="absolute -right-2 -top-2 rounded-full bg-slate-800 p-1.5 text-slate-400 hover:text-slate-200"
+                            aria-label="Close settings"
+                        >
+                            <X size={16} />
+                        </button>
+                        <PsdSettings />
+                    </div>
+                </div>
+            )}
+
+            {/* Help Modal */}
+            <HotkeysHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
         </div>
     );
 }
 
 export default PsdShell;
+
