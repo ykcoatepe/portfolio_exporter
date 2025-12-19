@@ -127,8 +127,8 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 
 from portfolio_exporter.core.ib_config import HOST as IB_HOST
-from portfolio_exporter.core.ib_config import PORT as IB_PORT
 from portfolio_exporter.core.ib_config import client_id as _cid
+from portfolio_exporter.core.ib_config import connect_ib
 
 IB_CID = _cid("option_chain", default=10)
 LOG_FMT = "%(asctime)s %(levelname)s %(message)s"
@@ -694,7 +694,7 @@ def run(
 
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
+        connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=10)
 
         # try live → frozen → delayed-streaming → delayed snapshot
         for _md_type in (1, 2, 3, 4):

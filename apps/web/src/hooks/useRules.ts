@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { useQuery, useQueryClient, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
 
 import type { components } from "../lib/api";
+import { resolveApiBaseUrl } from "../lib/http";
 
 type RawRulesSummary = components["schemas"]["RulesSummaryResponseModel"];
 type RawRuleBreach = components["schemas"]["RulesSummaryTopModel"];
@@ -173,15 +174,7 @@ const sanitizeFundamentalsMap = (value: unknown): FundamentalsMap | null => {
   return Object.keys(result).length > 0 ? result : null;
 };
 
-const resolveOrigin = (baseUrl = ""): string => {
-  if (baseUrl) {
-    return baseUrl.replace(/\/+$/, "");
-  }
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin;
-  }
-  return "http://localhost";
-};
+const resolveOrigin = (baseUrl = ""): string => resolveApiBaseUrl(baseUrl);
 
 export async function fetchRulesSummary(baseUrl = ""): Promise<RulesSummaryResponse> {
   const origin = resolveOrigin(baseUrl);

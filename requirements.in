@@ -4,6 +4,7 @@ fpdf
 ib_insync
 numpy
 pandas
+pyarrow
 prompt_toolkit
 prometheus-client
 pydantic

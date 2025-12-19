@@ -1,4 +1,5 @@
-const EXPORT_PATH = "/msb/history.csv?days=365";
+const EXPORT_CSV_PATH = "/msb/history.csv?days=365";
+const EXPORT_PARQUET_PATH = "/msb/history.parquet?days=365";
 
 export default function MSBActionBox(): JSX.Element {
   return (
@@ -19,16 +20,23 @@ export default function MSBActionBox(): JSX.Element {
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
         <a
-          href={EXPORT_PATH}
+          href={EXPORT_CSV_PATH}
           download
           className="inline-flex items-center gap-2 rounded-full bg-sky-500/90 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-slate-950 transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
         >
           Export MSB (CSV)
         </a>
-        <p className="text-xs text-slate-400">
-          CSV includes the latest 365 readings for downstream analysis.
-        </p>
+        <a
+          href={EXPORT_PARQUET_PATH}
+          download
+          className="inline-flex items-center gap-2 rounded-full bg-sky-500/20 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-slate-200 transition hover:bg-sky-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+        >
+          Export MSB (Parquet)
+        </a>
       </div>
+      <p className="mt-2 text-xs text-slate-400">
+        CSV suits spreadsheets; Parquet keeps schema fidelity for notebooks and pipelines.
+      </p>
     </section>
   );
 }

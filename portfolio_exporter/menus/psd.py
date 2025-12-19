@@ -22,6 +22,7 @@ PSD_ENV_PATH = REPO_ROOT / ".psd.env"
 _DASH_URL = f"http://{API_HOST}:{API_PORT}/psd"
 
 _AUTO_STARTED = False
+_DEFAULT_STARTUP_TIMEOUT_S = 20.0
 
 
 def _build_uvicorn_command() -> list[str]:
@@ -47,6 +48,17 @@ def _format_start_failure(exit_code: int | None) -> str:
         "Portfolio Sentinel API failed to start"
         f"{code}. Try running `{_uvicorn_command_display()}` from the repo root for details."
     )
+
+
+def _startup_timeout_s() -> float:
+    raw = os.getenv("PSD_API_STARTUP_TIMEOUT_S")
+    if raw is None:
+        return _DEFAULT_STARTUP_TIMEOUT_S
+    try:
+        timeout = float(raw)
+    except ValueError:
+        return _DEFAULT_STARTUP_TIMEOUT_S
+    return max(timeout, 1.0)
 
 
 def _notify_psd_error(status: Any, message: str) -> None:
@@ -139,7 +151,9 @@ def start_psd_dashboard() -> None:
         env=env,
     )
 
-    for _ in range(25):
+    timeout_s = _startup_timeout_s()
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
         if _port_open(API_HOST, API_PORT):
             break
         if proc.poll() is not None:
@@ -149,8 +163,10 @@ def start_psd_dashboard() -> None:
         if proc.poll() is not None:
             raise RuntimeError(_format_start_failure(proc.returncode))
         raise TimeoutError(
-            f"Timed out waiting for Portfolio Sentinel API on {API_HOST}:{API_PORT}. "
-            f"Run `{_uvicorn_command_display()}` for diagnostics."
+            "Timed out waiting "
+            f"({timeout_s:.1f}s) for Portfolio Sentinel API on {API_HOST}:{API_PORT}. "
+            f"Run `{_uvicorn_command_display()}` for diagnostics or set "
+            "PSD_API_STARTUP_TIMEOUT_S to increase the wait."
         )
 
     if not _port_open(API_HOST, API_PORT):

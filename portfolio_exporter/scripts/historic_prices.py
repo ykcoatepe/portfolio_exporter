@@ -40,8 +40,8 @@ except ImportError:
     IB_AVAILABLE = False
 
 from portfolio_exporter.core.ib_config import HOST as IB_HOST
-from portfolio_exporter.core.ib_config import PORT as IB_PORT
 from portfolio_exporter.core.ib_config import client_id as _cid
+from portfolio_exporter.core.ib_config import connect_ib
 
 IB_CID = _cid("historic_prices", default=3)  # separate clientId for historic pull
 
@@ -76,7 +76,7 @@ def _tickers_from_ib() -> list[str]:
     _ensure_event_loop()
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)
+        connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=3)
     except Exception:
         return []
     positions = ib.positions()

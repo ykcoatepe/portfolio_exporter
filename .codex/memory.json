@@ -106,6 +106,57 @@
     {
       "event": "session_start",
       "timestamp": "2025-10-24T11:54:49Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-10-25T08:27:32Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-10-25T11:38:33Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-12-19T10:04:24Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-12-19T11:28:43Z"
+    },
+    {
+      "details": "Increase wait for PSD API startup to 20s by default; add PSD_API_STARTUP_TIMEOUT_S override.",
+      "event": "PSD startup timeout configurable",
+      "timestamp": "2025-12-19T11:33:58Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-12-19T11:46:56Z"
+    },
+    {
+      "details": "Run initial provider refresh in a background thread so uvicorn startup is not blocked by IBKR connectivity.",
+      "event": "Make PSD API startup non-blocking",
+      "timestamp": "2025-12-19T11:58:54Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-12-19T12:46:40Z"
+    },
+    {
+      "details": "Add connect_ib/connect_ports helpers, update script callsites and ops defaults, refresh docs/.env, and add IB_GATEWAY_SETUP.md.",
+      "event": "Implement Gateway-first IB connections",
+      "timestamp": "2025-12-19T13:00:30Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-12-19T13:36:23Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-12-19T15:10:04Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2025-12-19T15:13:44Z"
     }
   ],
   "decisions": [
@@ -302,6 +353,14 @@
       "rationale": "Provides accessible stress indicator with deterministic tests and CI targets",
       "timestamp": "2025-10-24T07:59:15Z",
       "title": "MSB UI panel shipped"
+    },
+    {
+      "context": "IB Gateway migration v3.1",
+      "decision": "Use IB Gateway (4001) as default and fall back to TWS live (7496) only when IB_PORT is unset; explicit ports disable fallback and paper requires IB_PORT=4002/7497.",
+      "id": 27,
+      "rationale": "Simplifies live defaults while preserving explicit overrides without adding IB_PAPER flags.",
+      "timestamp": "2025-12-19T13:00:25Z",
+      "title": "IB Gateway-first default"
     }
   ],
   "preferences": {

@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import math
 
 from ..models import OptionLeg, Position
 
@@ -57,41 +58,59 @@ def _dte(expiry_yyyymmdd: str) -> int:
         return 0
 
 
-def _pair_vertical(
+def _pair_verticals(
     shorts: list[OptionLeg], longs: list[OptionLeg], side: str
-) -> tuple[tuple[OptionLeg, OptionLeg, int] | None, float, float]:
-    """Pick a single-quantity vertical credit pair and return (legs, width, credit_per_contract).
+) -> list[tuple[OptionLeg, OptionLeg, float, float, float]]:
+    """Return all feasible vertical credit pairs with contract allocation.
 
-    Returns ((short, long, contracts), width, credit) or (None, 0, 0) if unavailable.
+    Returns a list of (short_leg, long_leg, contracts, width, credit_per_contract).
     """
-    # Choose first feasible pair by strike ordering for credit spreads
-    for short_leg in shorts:
-        for long_leg in longs:
+    if side == "C":
+        shorts_sorted = sorted(shorts, key=lambda leg: leg.strike)
+        longs_sorted = sorted(longs, key=lambda leg: leg.strike)
+    else:
+        shorts_sorted = sorted(shorts, key=lambda leg: leg.strike, reverse=True)
+        longs_sorted = sorted(longs, key=lambda leg: leg.strike, reverse=True)
+
+    remaining_short = {id(leg): abs(float(leg.qty)) for leg in shorts_sorted}
+    remaining_long = {id(leg): abs(float(leg.qty)) for leg in longs_sorted}
+    pairs: list[tuple[OptionLeg, OptionLeg, float, float, float]] = []
+
+    for short_leg in shorts_sorted:
+        s_rem = remaining_short.get(id(short_leg), 0.0)
+        if s_rem <= 0:
+            continue
+        for long_leg in longs_sorted:
+            l_rem = remaining_long.get(id(long_leg), 0.0)
+            if l_rem <= 0:
+                continue
             if short_leg.expiry != long_leg.expiry:
                 continue
-            if side == "C" and short_leg.strike < long_leg.strike:
-                contracts = max(0, min(abs(short_leg.qty), abs(long_leg.qty)))
-                if contracts == 0:
-                    continue
-                credit = float(short_leg.price) - float(long_leg.price)
-                if credit <= 0:
-                    continue
-                width = float(long_leg.strike) - float(short_leg.strike)
-                if width <= 0:
-                    continue
-                return (short_leg, long_leg, contracts), width, credit
-            if side == "P" and short_leg.strike > long_leg.strike:
-                contracts = max(0, min(abs(short_leg.qty), abs(long_leg.qty)))
-                if contracts == 0:
-                    continue
-                credit = float(short_leg.price) - float(long_leg.price)
-                if credit <= 0:
-                    continue
-                width = float(short_leg.strike) - float(long_leg.strike)
-                if width <= 0:
-                    continue
-                return (short_leg, long_leg, contracts), width, credit
-    return None, 0.0, 0.0
+            if side == "C" and short_leg.strike >= long_leg.strike:
+                continue
+            if side == "P" and short_leg.strike <= long_leg.strike:
+                continue
+            credit = float(short_leg.price) - float(long_leg.price)
+            if credit <= 0:
+                continue
+            width = (
+                float(long_leg.strike) - float(short_leg.strike)
+                if side == "C"
+                else float(short_leg.strike) - float(long_leg.strike)
+            )
+            if width <= 0:
+                continue
+            contracts = min(s_rem, l_rem)
+            if contracts <= 0:
+                continue
+            pairs.append((short_leg, long_leg, contracts, width, credit))
+            s_rem -= contracts
+            l_rem -= contracts
+            remaining_short[id(short_leg)] = s_rem
+            remaining_long[id(long_leg)] = l_rem
+            if s_rem <= 0:
+                break
+    return pairs
 
 
 def recognize(
@@ -117,16 +136,21 @@ def recognize(
 
     combos: list[Combo] = []
     for (sym, exp), b in by_key.items():
-        pair_c, w_c, cr_c = _pair_vertical(b["C_short"], b["C_long"], "C")
-        pair_p, w_p, cr_p = _pair_vertical(b["P_short"], b["P_long"], "P")
+        pairs_c = _pair_verticals(b["C_short"], b["C_long"], "C")
+        pairs_p = _pair_verticals(b["P_short"], b["P_long"], "P")
         dte = _dte(exp)
         total_credit = 0.0
         total_max_loss = 0.0
-        if pair_c and pair_p:
-            # Iron condor – sum side losses
-            total_credit = cr_c + cr_p
-            loss_c = (w_c - cr_c) * 100 * pair_c[2]
-            loss_p = (w_p - cr_p) * 100 * pair_p[2]
+        if (
+            len(pairs_c) == 1
+            and len(pairs_p) == 1
+            and math.isclose(pairs_c[0][2], pairs_p[0][2], rel_tol=1e-9, abs_tol=1e-9)
+        ):
+            pair_c = pairs_c[0]
+            pair_p = pairs_p[0]
+            total_credit = pair_c[4] + pair_p[4]
+            loss_c = (pair_c[3] - pair_c[4]) * 100 * pair_c[2]
+            loss_p = (pair_p[3] - pair_p[4]) * 100 * pair_p[2]
             total_max_loss = max(loss_c, loss_p)
             combos.append(
                 Combo(
@@ -137,51 +161,52 @@ def recognize(
                     long_calls=[pair_c[1]],
                     short_puts=[pair_p[0]],
                     long_puts=[pair_p[1]],
-                    width_call=w_c,
-                    width_put=w_p,
+                    width_call=pair_c[3],
+                    width_put=pair_p[3],
                     credit=total_credit,
                     max_loss=total_max_loss,
                     dte=dte,
                 )
             )
-        elif pair_c:
-            total_credit = cr_c
-            total_max_loss = (w_c - cr_c) * 100 * pair_c[2]
-            combos.append(
-                Combo(
-                    kind="credit_spread",
-                    symbol=sym,
-                    expiry=exp,
-                    short_calls=[pair_c[0]],
-                    long_calls=[pair_c[1]],
-                    short_puts=[],
-                    long_puts=[],
-                    width_call=w_c,
-                    width_put=0.0,
-                    credit=total_credit,
-                    max_loss=total_max_loss,
-                    dte=dte,
+        else:
+            for pair_c in pairs_c:
+                total_credit = pair_c[4]
+                total_max_loss = (pair_c[3] - pair_c[4]) * 100 * pair_c[2]
+                combos.append(
+                    Combo(
+                        kind="credit_spread",
+                        symbol=sym,
+                        expiry=exp,
+                        short_calls=[pair_c[0]],
+                        long_calls=[pair_c[1]],
+                        short_puts=[],
+                        long_puts=[],
+                        width_call=pair_c[3],
+                        width_put=0.0,
+                        credit=total_credit,
+                        max_loss=total_max_loss,
+                        dte=dte,
+                    )
                 )
-            )
-        elif pair_p:
-            total_credit = cr_p
-            total_max_loss = (w_p - cr_p) * 100 * pair_p[2]
-            combos.append(
-                Combo(
-                    kind="credit_spread",
-                    symbol=sym,
-                    expiry=exp,
-                    short_calls=[],
-                    long_calls=[],
-                    short_puts=[pair_p[0]],
-                    long_puts=[pair_p[1]],
-                    width_call=0.0,
-                    width_put=w_p,
-                    credit=total_credit,
-                    max_loss=total_max_loss,
-                    dte=dte,
+            for pair_p in pairs_p:
+                total_credit = pair_p[4]
+                total_max_loss = (pair_p[3] - pair_p[4]) * 100 * pair_p[2]
+                combos.append(
+                    Combo(
+                        kind="credit_spread",
+                        symbol=sym,
+                        expiry=exp,
+                        short_calls=[],
+                        long_calls=[],
+                        short_puts=[pair_p[0]],
+                        long_puts=[pair_p[1]],
+                        width_call=0.0,
+                        width_put=pair_p[3],
+                        credit=total_credit,
+                        max_loss=total_max_loss,
+                        dte=dte,
+                    )
                 )
-            )
         # orphan short without hedge for any unmatched quantity on each side
         short_call_qty = sum(abs(leg.qty) for leg in b["C_short"])
         long_call_qty = sum(abs(leg.qty) for leg in b["C_long"])

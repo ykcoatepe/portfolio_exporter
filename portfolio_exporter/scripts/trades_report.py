@@ -27,14 +27,28 @@ from portfolio_exporter.core.config import settings
 
 try:  # optional IBKR config
     from portfolio_exporter.core.ib_config import HOST as IB_HOST
-    from portfolio_exporter.core.ib_config import PORT as IB_PORT
     from portfolio_exporter.core.ib_config import client_id as _cid
+    from portfolio_exporter.core.ib_config import connect_ib
 except Exception:  # pragma: no cover - fallback defaults
     IB_HOST = "127.0.0.1"  # type: ignore
-    IB_PORT = 7496  # type: ignore  # set 7497 for paper/sim
+    IB_PORT = 4001  # type: ignore  # Gateway live; set 4002/7497 for paper
 
     def _cid(name: str, default: int = 0) -> int:  # type: ignore
         return default
+
+    def connect_ib(  # type: ignore
+        ib,
+        *,
+        host: str | None = None,
+        port: int | None = None,
+        client_id: int = 0,
+        timeout: int = 10,
+        silent_first: bool = True,
+    ) -> int:
+        target_host = host if host is not None else IB_HOST
+        target_port = port if port is not None else IB_PORT
+        ib.connect(target_host, target_port, clientId=client_id, timeout=timeout)
+        return target_port
 
 
 import logging
@@ -386,12 +400,11 @@ def _load_open_orders() -> pd.DataFrame:
         return pd.DataFrame()
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_OPEN_CID, timeout=5)
+        connect_ib(ib, host=IB_HOST, client_id=IB_OPEN_CID, timeout=5)
     except Exception as exc:  # pragma: no cover - connection optional
         logger.warning(
-            "IBKR connection failed for open orders: host=%s port=%s cid=%s err=%s",
+            "IBKR connection failed for open orders: host=%s cid=%s err=%s",
             IB_HOST,
-            IB_PORT,
             IB_OPEN_CID,
             exc,
         )
@@ -936,13 +949,12 @@ def fetch_trades_ib(start: date, end: date) -> tuple[list[Trade], list[OpenOrder
     ib = IB()
 
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=10)
+        connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=10)
     except Exception as exc:
         # Align with other scripts: downgrade to a warning and continue offline
         logger.warning(
-            "IBKR connection failed for executions: host=%s port=%s cid=%s err=%s",
+            "IBKR connection failed for executions: host=%s cid=%s err=%s",
             IB_HOST,
-            IB_PORT,
             IB_CID,
             exc,
         )

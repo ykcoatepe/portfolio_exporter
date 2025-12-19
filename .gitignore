@@ -17,6 +17,10 @@ combos_preview.txt
 # ignore outputs
 out/
 
+# Debug artifacts
+debug/*.log
+debug/*_logs.txt
+
 # PSD
 var/memos/
 .pytest_cache/

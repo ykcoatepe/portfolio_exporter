@@ -7,8 +7,8 @@ from pathlib import Path
 
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.ib_config import HOST as IB_HOST
-from portfolio_exporter.core.ib_config import PORT as IB_PORT
 from portfolio_exporter.core.ib_config import client_id as _cid
+from portfolio_exporter.core.ib_config import connect_ib
 
 try:
     from ib_insync import IB
@@ -26,7 +26,7 @@ def fetch_ib_symbols() -> tuple[list[str], list[str], int]:
         return [], [], 0
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)
+        connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=3)
     except Exception:
         return [], [], 0
 

@@ -256,12 +256,27 @@ try:
     from portfolio_exporter.core.ib_config import HOST as IB_HOST
     from portfolio_exporter.core.ib_config import PORT as IB_PORT
     from portfolio_exporter.core.ib_config import client_id as _cid
+    from portfolio_exporter.core.ib_config import connect_ib
 except Exception:  # pragma: no cover - optional fallback
     IB_HOST = "127.0.0.1"  # type: ignore
-    IB_PORT = 7497  # type: ignore
+    IB_PORT = 4001  # type: ignore  # Gateway live; set 4002/7497 for paper
 
     def _cid(name: str, default: int = 0) -> int:  # type: ignore
         return default
+
+    def connect_ib(  # type: ignore
+        ib,
+        *,
+        host: str | None = None,
+        port: int | None = None,
+        client_id: int = 0,
+        timeout: int = 10,
+        silent_first: bool = True,
+    ) -> int:
+        target_host = host if host is not None else IB_HOST
+        target_port = port if port is not None else IB_PORT
+        ib.connect(target_host, target_port, clientId=client_id, timeout=timeout)
+        return target_port
 
 
 IB_CID = _cid("portfolio_greeks", default=11)  # separate clientId from snapshots
@@ -795,8 +810,9 @@ def main_cli() -> None:
 
     ib = IB()
     try:
-        logger.info(f"Connecting to IBKR on {IB_HOST}:{IB_PORT} with CID {IB_CID} …")
-        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
+        logger.info("Connecting to IBKR on %s with CID %s …", IB_HOST, IB_CID)
+        used_port = connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=10)
+        logger.info("Connected to IBKR on port %d", used_port)
     except Exception as exc:
         logger.error(f"IBKR connection failed: {exc}", exc_info=True)
         sys.exit(1)

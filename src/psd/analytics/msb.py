@@ -194,14 +194,14 @@ def compute_msb(
     z_hy = _z_score(w_df["hy"], window, fallback)
 
     vx2_safe = w_df["vx2"].replace(0.0, np.nan)
-    term_ratio = w_df["vx1"] / vx2_safe
+    term_ratio = (w_df["vx1"] / vx2_safe) - 1.0
     cal_spread_abs = w_df["vx1"] - w_df["vx2"]
     cal_spread_pct = cal_spread_abs / vx2_safe
 
     saturated = (
         (w_df["vx1"] >= 40)
         & (cal_spread_abs >= 3)
-        & (term_ratio.between(0.95, 1.05, inclusive="both"))
+        & (term_ratio.between(-0.05, 0.05, inclusive="both"))
     )
 
     hy_calibrated = _calibrated_score(

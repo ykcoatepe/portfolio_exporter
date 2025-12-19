@@ -28,7 +28,8 @@ Config
   - PSD_PORT         Web port (default 51127)
   - PSD_RUN_DIR      Runtime dir for logs & PID file (default "run")
   - App-specific:    PSD_SNAPSHOT_FN / PSD_RULES_FN, IB_*... (read by the services)
-  - IB_PORT          Default: TWS live port 7496 (paper/simulated uses 7497)
+  - IB_PORT          Unset by default -> Gateway (4001) with TWS fallback (7496).
+                     Set explicitly for paper (4002/7497) or to disable fallback.
 
 Idempotency & safety
 --------------------
@@ -118,7 +119,8 @@ def _with_defaults(base: Mapping[str, str]) -> dict[str, str]:
     out.setdefault("PSD_SNAPSHOT_FN", "portfolio_exporter.psd_adapter:snapshot_once")
     out.setdefault("PSD_RULES_FN", "portfolio_exporter.psd_rules:evaluate")
     out.setdefault("IB_HOST", "127.0.0.1")
-    out.setdefault("IB_PORT", "7496")
+    # IB_PORT intentionally NOT set to allow Gateway->TWS auto-fallback.
+    # For paper, set IB_PORT=4002 or IB_PORT=7497 in .env.
     if not out.get("IB_CLIENT_ID"):
         seed = 1000 + (os.getpid() % 7000) + random.randint(0, 999)
         out["IB_CLIENT_ID"] = str(seed)
