@@ -97,8 +97,8 @@ RISK_FREE_RATE = 0.01
 DATA_DIR = os.path.join(OUTPUT_DIR, "iv_history")
 
 from portfolio_exporter.core.ib_config import HOST as IB_HOST
-from portfolio_exporter.core.ib_config import PORT as IB_PORT
 from portfolio_exporter.core.ib_config import client_id as _cid
+from portfolio_exporter.core.ib_config import connect_ib
 
 IB_CID = _cid("tech_signals", default=1)  # tweak if needed
 
@@ -224,9 +224,14 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
 
     ib.errorEvent += _quiet_error_handler
     try:
-        run_with_spinner(
-            "Connecting to IBKR…", ib.connect, IB_HOST, IB_PORT, clientId=IB_CID
+        used_port = run_with_spinner(
+            "Connecting to IBKR…",
+            connect_ib,
+            ib,
+            host=IB_HOST,
+            client_id=IB_CID,
         )
+        logging.info("Connected to IBKR on port %s", used_port)
         USE_IB = True
     except Exception:
         logging.warning("IBKR Gateway not reachable – using yfinance only.")

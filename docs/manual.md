@@ -59,3 +59,9 @@
 **KPIs & Gates.**
 - Compute p95 < **50 ms** for ~1k points; SSE payload < **1 KiB**.
 - CI gates: SPA build present; UI unit tests pass; memory digest < **800 tokens**; gitleaks/osv clean.
+
+## Portfolio Sentinel
+
+**Startup.**
+- `PSD_API_STARTUP_TIMEOUT_S` controls how long the launcher waits for the API to bind
+  (default 20s). Increase it if the API needs more time to initialize.

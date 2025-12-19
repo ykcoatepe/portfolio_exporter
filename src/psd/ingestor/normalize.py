@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from collections import defaultdict
 from collections.abc import Iterable
@@ -187,6 +189,12 @@ def _leg_key(entry: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+def _stable_combo_id(parts: object, prefix: str) -> str:
+    payload = json.dumps(parts, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}:{digest}"
+
+
 def _aggregate_greeks(legs: Iterable[dict[str, Any]]) -> dict[str, float]:
     totals = {"delta": 0.0, "gamma": 0.0, "theta": 0.0}
     for leg in legs:
@@ -256,8 +264,9 @@ def split_positions(
             legs_of_combo.add(id(match))
         if not legs:
             continue
-        combo_id = str(
-            hash(tuple(sorted((leg.get("conId"), leg.get("qty")) for leg in legs)))
+        combo_id = _stable_combo_id(
+            sorted((leg.get("conId"), leg.get("qty")) for leg in legs),
+            "combo",
         )
         combos.append(
             {
@@ -298,7 +307,10 @@ def split_positions(
             legs_of_combo.add(id(short_leg))
             combo_name_parts = [str(val) for val in key if val]
             combo_name = " ".join(combo_name_parts) or "Vertical"
-            combo_id = f"vertical:{hash((long_leg.get('conId'), short_leg.get('conId'), qty_long))}"
+            combo_id = _stable_combo_id(
+                (long_leg.get("conId"), short_leg.get("conId"), qty_long),
+                "vertical",
+            )
             combo_legs = [long_leg, short_leg]
             combos.append(
                 {

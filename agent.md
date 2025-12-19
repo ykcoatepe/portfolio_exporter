@@ -50,7 +50,8 @@ The menu auto-loads `.env` (or `PSD_ENV_FILE`) and fills safe defaults if keys a
 Set these before launching PSD locally or in production:
 - `PSD_SNAPSHOT_FN=portfolio_exporter.psd_adapter:snapshot_once`
 - `PSD_RULES_FN=portfolio_exporter.psd_rules:evaluate`
-- `IB_HOST=127.0.0.1` and `IB_PORT=7496` (use 7497 for paper; override if Gateway maps to 4001/4002)
+- `IB_HOST=127.0.0.1` (leave `IB_PORT` unset for Gateway->TWS auto-fallback)
+- For paper: set `IB_PORT=4002` (Gateway) or `IB_PORT=7497` (TWS)
 - `IB_CLIENT_ID=<unique>` per process/tool to avoid TWS collisions
 - Optional: `PSD_HEARTBEAT_S=2.0` to keep the ingestor loop cadence explicit
 - Leave `PSD_SSE_TEST_MODE` unset outside of tests; labs toggle it to fake SSE frames

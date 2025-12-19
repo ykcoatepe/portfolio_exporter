@@ -86,7 +86,7 @@ def run_dash(cfg: dict[str, Any] | None = None) -> None:
     if cfg is None:
         cfg = {}
     # Lazy imports to keep CLI + TUI startup snappy
-    from src.psd.sentinel.engine import scan_once  # type: ignore
+    from psd.sentinel.engine import scan_once  # type: ignore
 
     dto = scan_once(cfg)
     print(render_dashboard(dto))

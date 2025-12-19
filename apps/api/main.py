@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import dataclasses
+import threading
 import logging
 import os
 import sys
@@ -248,7 +249,7 @@ class StatsResponse(BaseModel):
 
 @app.on_event("startup")
 async def _on_startup() -> None:  # pragma: no cover - exercised by integration tests
-    _refresh_from_providers()
+    _kickoff_startup_refresh()
     refresh_loop.start()
     if _greeks_refresh_loop is not None:
         _greeks_refresh_loop.start()
@@ -450,6 +451,21 @@ def _refresh_from_providers() -> None:
 
 def _refresh_from_disk() -> None:
     _refresh_from_providers()
+
+
+def _kickoff_startup_refresh() -> None:
+    """Run the initial provider refresh without blocking API startup."""
+
+    def _runner() -> None:
+        try:
+            _refresh_from_providers()
+        except Exception:  # pragma: no cover - defensive
+            logger.info("[startup] provider refresh failed", exc_info=True)
+
+    thread = threading.Thread(
+        target=_runner, name="psd-startup-refresh", daemon=True
+    )
+    thread.start()
 
 
 def _guard_quotes(quotes: list[Quote]) -> list[Quote]:

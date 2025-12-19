@@ -32,6 +32,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # pip install ib_insync (requires TWS or IB Gateway running with API enabled)
 from ib_insync import IB
 
+from portfolio_exporter.core.ib_config import connect_ib
+
 _EVENT_LOOP: asyncio.AbstractEventLoop | None = None
 
 # --------------------------------------------------------------------------- #
@@ -96,7 +98,7 @@ def _ensure_event_loop() -> asyncio.AbstractEventLoop:
 
 def load_ib_positions_ib(
     host: str = "127.0.0.1",
-    port: int = 7496,
+    port: int | None = None,
     client_id: int = 999,
 ) -> pd.DataFrame:
     """
@@ -109,12 +111,13 @@ def load_ib_positions_ib(
     _ensure_event_loop()  # ib_insync expects a live asyncio loop on modern Python
     ib = IB()
     try:
-        ib.connect(host, port, clientId=client_id)
+        connect_ib(ib, host=host, port=port, client_id=client_id)
         # suppress per‑contract error spam from IB
         ib.errorEvent += lambda *a, **k: None
     except Exception as e:
+        port_label = f"{host}:{port}" if port is not None else f"{host} (auto ports)"
         raise ConnectionError(
-            f"❌ Cannot connect to IB API at {host}:{port}  →  {e}"
+            f"❌ Cannot connect to IB API at {port_label}  →  {e}"
         ) from e
 
     positions = ib.positions()

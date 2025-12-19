@@ -8,7 +8,7 @@ from typing import Any
 
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.ib_config import HOST as _IB_HOST
-from portfolio_exporter.core.ib_config import PORT as _IB_PORT
+from portfolio_exporter.core.ib_config import connect_ports
 from portfolio_exporter.core.ib_config import client_id as _client_id
 
 _IB_CID = _client_id("core", default=29)
@@ -45,12 +45,15 @@ def _ib():
     _ib_singleton = IB()
 
     async def _try_connect():
-        try:
-            await _ib_singleton.connectAsync(
-                _IB_HOST, _IB_PORT, clientId=_IB_CID, timeout=2
-            )
-        except Exception:
-            pass
+        ports = connect_ports()
+        for port in ports:
+            try:
+                await _ib_singleton.connectAsync(
+                    _IB_HOST, port, clientId=_IB_CID, timeout=2
+                )
+                return
+            except Exception:
+                continue
 
     loop = _ensure_loop()
     if loop.is_running():
