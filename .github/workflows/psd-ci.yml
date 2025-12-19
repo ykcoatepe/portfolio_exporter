@@ -131,11 +131,13 @@ jobs:
         env:
           MOMO_OFFLINE: "1"
           PE_QUIET: "1"
-      - name: OSV scan (fail on High/Critical)
-        uses: google/osv-scanner-action@v1
+      - name: OSV scan (fail on vuln)
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.1
         with:
-          directory: .
-          severity: HIGH,CRITICAL
+          scan-args: |-
+            --skip-git
+            --recursive
+            ./
       - name: gitleaks
         uses: zricethezav/gitleaks-action@v2
         with:
