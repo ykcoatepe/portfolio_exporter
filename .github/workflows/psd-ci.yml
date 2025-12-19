@@ -1,15 +1,25 @@
+---
 name: PSD CI
 
-on:
+"on":
   pull_request:
-    branches: [ main, PSD, integrate, "feature/**" ]
+    branches:
+      - main
+      - PSD
+      - integrate
+      - "feature/**"
   push:
-    branches: [ PSD ]
-    tags: ["v*", "psd-*" ]
+    branches:
+      - PSD
+    tags:
+      - "v*"
+      - "psd-*"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true  # cancel older runs on same branch
+  group: >-
+    ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # cancel older runs on same branch
+  cancel-in-progress: true
 
 jobs:
   python:
@@ -41,7 +51,7 @@ jobs:
       - name: Build SPA assets
         run: make web-build
       - name: Web unit tests
-        # ensure UI regressions block merges alongside the SPA build
+        # Ensure UI regressions block merges alongside the SPA build.
         run: make web-test
       - name: Pytest (full suite with PE_TEST_MODE=1)
         run: pytest -q
@@ -52,56 +62,72 @@ jobs:
       - name: Micro-MOMO CLI (json-only)
         run: |
           set -euo pipefail
-          out=$(python -m apps.cli.run --analyzer micro_momo_analyzer --json-only --out out/micro_momo --scan-csv tests/data/meme_scan_sample.csv --chains-dir tests/data --cfg-json tests/data/micro_momo_config.json)
+          out=$(
+            python -m apps.cli.run \
+              --analyzer micro_momo_analyzer \
+              --json-only \
+              --out out/micro_momo \
+              --scan-csv tests/data/meme_scan_sample.csv \
+              --chains-dir tests/data \
+              --cfg-json tests/data/micro_momo_config.json
+          )
           printf '%s\n' "$out"
           printf '%s\n' "$out" | python - <<'PY'
-import json
-import sys
+          import json
+          import sys
 
-payload = json.load(sys.stdin)
-if not isinstance(payload, dict):
-    raise SystemExit("Micro-MOMO payload is not a JSON object")
+          payload = json.load(sys.stdin)
+          if not isinstance(payload, dict):
+              raise SystemExit("Micro-MOMO payload is not a JSON object")
 
-for key in ("signals", "artifacts"):
-    if key not in payload:
-        raise SystemExit(f"missing {key} from Micro-MOMO CLI output")
+          for key in ("signals", "artifacts"):
+              if key not in payload:
+                  raise SystemExit(f"missing {key} from Micro-MOMO CLI output")
 
-signals = payload.get("signals")
-if not isinstance(signals, list) or not signals:
-    raise SystemExit("Micro-MOMO produced no signals list")
-for idx, signal in enumerate(signals):
-    if not isinstance(signal, dict):
-        raise SystemExit(f"signal[{idx}] is not a JSON object")
-    for required in ("name", "score", "value"):
-        if required not in signal:
-            raise SystemExit(f"signal[{idx}] missing '{required}' field")
+          signals = payload.get("signals")
+          if not isinstance(signals, list) or not signals:
+              raise SystemExit("Micro-MOMO produced no signals list")
+          for idx, signal in enumerate(signals):
+              if not isinstance(signal, dict):
+                  raise SystemExit(f"signal[{idx}] is not a JSON object")
+              for required in ("name", "score", "value"):
+                  if required not in signal:
+                      raise SystemExit(
+                          f"signal[{idx}] missing '{required}' field"
+                      )
 
-candidates = payload.get("candidates")
-summary = payload.get("summary")
-if candidates is None and isinstance(summary, dict):
-    candidates = summary.get("candidates")
+          candidates = payload.get("candidates")
+          summary = payload.get("summary")
+          if candidates is None and isinstance(summary, dict):
+              candidates = summary.get("candidates")
 
-notes = payload.get("notes")
-if candidates is None and isinstance(notes, dict):
-    note_summary = notes.get("summary")
-    if isinstance(note_summary, dict):
-        candidates = note_summary.get("candidates")
+          notes = payload.get("notes")
+          if candidates is None and isinstance(notes, dict):
+              note_summary = notes.get("summary")
+              if isinstance(note_summary, dict):
+                  candidates = note_summary.get("candidates")
 
-if candidates is None:
-    raise SystemExit("missing candidates from Micro-MOMO CLI output")
-if not isinstance(candidates, list) or not candidates:
-    raise SystemExit("Micro-MOMO candidates payload is empty or not a list")
+          if candidates is None:
+              raise SystemExit("missing candidates from Micro-MOMO CLI output")
+          if not isinstance(candidates, list) or not candidates:
+              raise SystemExit(
+                  "Micro-MOMO candidates payload is empty or not a list"
+              )
 
-if isinstance(summary, dict) and summary.get("candidates"):
-    for idx, candidate in enumerate(summary["candidates"]):
-        if not isinstance(candidate, dict):
-            raise SystemExit(f"summary.candidates[{idx}] is not a JSON object")
-        for required in ("symbol", "direction", "score"):
-            if required not in candidate:
-                raise SystemExit(f"summary.candidates[{idx}] missing '{required}'")
+          if isinstance(summary, dict) and summary.get("candidates"):
+              for idx, candidate in enumerate(summary["candidates"]):
+                  if not isinstance(candidate, dict):
+                      raise SystemExit(
+                          f"summary.candidates[{idx}] is not a JSON object"
+                      )
+                  for required in ("symbol", "direction", "score"):
+                      if required not in candidate:
+                          raise SystemExit(
+                              f"summary.candidates[{idx}] missing '{required}'"
+                          )
 
-print("adapter-smoke: OK")
-PY
+          print("adapter-smoke: OK")
+          PY
         env:
           MOMO_OFFLINE: "1"
           PE_QUIET: "1"
@@ -115,14 +141,25 @@ PY
         with:
           config: .gitleaks.toml
       - name: Memory digest
-        run: python -m portfolio_exporter.scripts.memory digest > memory_digest.txt
+        run: |
+          python -m portfolio_exporter.scripts.memory digest \
+            > memory_digest.txt
       - name: Micro-MOMO CLI (full-artifacts)
         if: startsWith(github.ref, 'refs/tags/')
-        run: python -m apps.cli.run --analyzer micro_momo_analyzer --no-json-only --full-artifacts --out out/micro_momo --scan-csv tests/data/meme_scan_sample.csv --chains-dir tests/data --cfg-json tests/data/micro_momo_config.json
+        run: |
+          python -m apps.cli.run \
+            --analyzer micro_momo_analyzer \
+            --no-json-only \
+            --full-artifacts \
+            --out out/micro_momo \
+            --scan-csv tests/data/meme_scan_sample.csv \
+            --chains-dir tests/data \
+            --cfg-json tests/data/micro_momo_config.json
       - name: Upload Micro-MOMO artifacts
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
-        # Retention is capped by org/repo policy; 14 days keeps tag archives tidy locally.
+        # Retention is capped by org/repo policy.
+        # Fourteen days keeps tag archives tidy locally.
         with:
           name: micro-momo-artifacts
           path: out/micro_momo/**
@@ -156,7 +193,9 @@ PY
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
       - name: Pytest internal provider precedence
-        run: pytest -q tests/test_ingest_internal.py::test_internal_provider_precedence
+        run: |
+          pytest -q \
+            tests/test_ingest_internal.py::test_internal_provider_precedence
         env:
           PE_QUIET: "1"
           MOMO_OFFLINE: "1"
@@ -167,16 +206,21 @@ PY
     steps:
       - uses: actions/checkout@v4
 
-      # Python env for exporting OpenAPI JSON (FastAPI auto-generates the schema)
-      # https://docs.github.com/actions  |  setup-python cache docs
+      # Python env for exporting OpenAPI JSON.
+      # FastAPI auto-generates the schema.
+      # https://docs.github.com/actions (setup-python cache docs)
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-          cache: 'pip'                               # built-in pip cache
+          # Built-in pip cache.
+          cache: 'pip'
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
-      - run: pip install fastapi "uvicorn[standard]" # minimal deps to import the app
+      - name: Install OpenAPI deps
+        run: |
+          # Minimal deps to import the app.
+          pip install fastapi "uvicorn[standard]"
 
       - name: Export OpenAPI JSON (offline, no server)
         run: |
@@ -189,11 +233,15 @@ PY
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'                               # built-in npm cache
+          # Built-in npm cache.
+          cache: 'npm'
           cache-dependency-path: apps/web/package-lock.json
       - name: Generate TS types
         working-directory: apps/web
-        run: npx --yes openapi-typescript ./openapi.json -o src/lib/api.d.ts  # CLI supports local/remote
+        # CLI supports local/remote sources.
+        run: |
+          npx --yes openapi-typescript ./openapi.json \
+            -o src/lib/api.d.ts
 
       - name: Ensure types are up-to-date
         run: git diff --exit-code -- apps/web/src/lib/api.d.ts
@@ -201,7 +249,9 @@ PY
   unit:
     name: Unit
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: apps/web } }
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -215,7 +265,9 @@ PY
   contracts:
     name: Contracts
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: apps/web } }
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
