@@ -115,7 +115,16 @@ export function getRegisteredHotkeys(): Hotkey[] {
 }
 
 /**
+ * Check if running on Mac
+ */
+export function isMac(): boolean {
+    if (typeof navigator === "undefined") return false;
+    return navigator.platform.toUpperCase().includes("MAC");
+}
+
+/**
  * Get hotkeys grouped by category
+ * De-duplicates entries with the same description (e.g., cmd+k and ctrl+k)
  */
 export function getHotkeysByCategory(): Record<Hotkey["category"], Hotkey[]> {
     const result: Record<Hotkey["category"], Hotkey[]> = {
@@ -125,7 +134,14 @@ export function getHotkeysByCategory(): Record<Hotkey["category"], Hotkey[]> {
         system: [],
     };
 
+    const seenDescriptions = new Set<string>();
+
     for (const hotkey of registry.values()) {
+        // Skip duplicates with same description (e.g., cmd+k and ctrl+k for command palette)
+        if (seenDescriptions.has(hotkey.description)) {
+            continue;
+        }
+        seenDescriptions.add(hotkey.description);
         result[hotkey.category].push(hotkey);
     }
 

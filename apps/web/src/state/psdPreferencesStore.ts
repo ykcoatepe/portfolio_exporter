@@ -95,14 +95,17 @@ export function initPreferencesFromSystem(): void {
         return;
     }
 
-    // Initialize from system preferences
-    const prefersReducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-    ).matches;
+    // Initialize from system preferences (with matchMedia guard for jsdom/older browsers)
+    if (typeof window.matchMedia === "function") {
+        const prefersReducedMotion = window.matchMedia(
+            "(prefers-reduced-motion: reduce)",
+        ).matches;
 
-    if (prefersReducedMotion) {
-        store.setReducedMotion(true);
+        if (prefersReducedMotion) {
+            store.setReducedMotion(true);
+        }
     }
 
     syncToDocument(store);
 }
+

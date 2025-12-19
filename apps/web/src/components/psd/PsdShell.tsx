@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
-import { initHotkeys, registerHotkey } from "../../lib/hotkeys";
+import { initHotkeys, isMac, registerHotkey } from "../../lib/hotkeys";
 import { initPreferencesFromSystem } from "../../state/psdPreferencesStore";
 import { HotkeysHelp } from "./HotkeysHelp";
 import PsdCommandPalette from "./PsdCommandPalette";
@@ -72,7 +72,7 @@ export function PsdShell({ children }: PsdShellProps) {
                     <div className="flex items-center gap-2 text-sm text-slate-500">
                         <span>Press</span>
                         <kbd className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
-                            ⌘K
+                            {isMac() ? "⌘K" : "Ctrl+K"}
                         </kbd>
                         <span>for commands</span>
                     </div>
