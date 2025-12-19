@@ -6,6 +6,7 @@ import MSBActionBox from "../components/MSBActionBox";
 import MSBCard from "../components/MSBCard";
 import MSBMiniCharts from "../components/MSBMiniCharts";
 import OptionLegsTable from "../components/OptionLegsTable";
+import { PsdShell } from "../components/psd/PsdShell";
 import RulesPanel from "../components/RulesPanel";
 import StatsRibbon from "../components/StatsRibbon";
 import StocksTable from "../components/StocksTable";
@@ -66,12 +67,12 @@ function LegRow({ leg, tabIndex = -1, className = "", underlyingHint }: { leg: P
   const isOptionLeg = leg.secType === "OPT" || leg.secType === "FOP";
   const friendlyDisplay = isOptionLeg
     ? buildFriendlyLegDisplay({
-        symbol: leg.symbol,
-        underlying: underlyingHint,
-        right: leg.right,
-        strike: leg.strike,
-        expiry: leg.expiry,
-      })
+      symbol: leg.symbol,
+      underlying: underlyingHint,
+      right: leg.right,
+      strike: leg.strike,
+      expiry: leg.expiry,
+    })
     : null;
   const labelText = friendlyDisplay?.label ?? leg.symbol;
   const labelTooltip = friendlyDisplay?.tooltip ?? leg.symbol;
@@ -265,20 +266,8 @@ const PSDPage = () => {
   }, [positionsView]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-900/70 bg-slate-950/80">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Portfolio Sentinel Dashboard</h1>
-            <p className="mt-1 text-sm text-slate-400">Keyboard-first monitoring for equities and derivatives portfolios.</p>
-          </div>
-          <div className="rounded-full border border-slate-800 bg-slate-900/80 px-4 py-2 text-xs uppercase tracking-wide text-slate-400">
-            PSD • Preview
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1400px] space-y-10 px-6 py-8" aria-label="Portfolio Sentinel sections">
+    <PsdShell>
+      <div className="mx-auto max-w-[1400px] space-y-10 px-6 py-8" aria-label="Portfolio Sentinel sections">
         <StatsRibbon />
         <section
           aria-label="Market Stress Barometer overview"
@@ -345,8 +334,8 @@ const PSDPage = () => {
             <RulesPanel />
           </div>
         </section>
-      </main>
-    </div>
+      </div>
+    </PsdShell>
   );
 };
 
