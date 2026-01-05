@@ -187,7 +187,7 @@ def _build_stats_payload(now: datetime | None = None) -> dict[str, Any] | None:
 def stats_current(fresh_within_sec: float | None = None) -> Response:
     payload = _build_stats_payload()
     if payload is None:
-        raise HTTPException(status_code=404, detail="Stats unavailable")
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     staleness = payload.get("staleness_sec")
     if staleness is not None and fresh_within_sec is not None:
         try:
