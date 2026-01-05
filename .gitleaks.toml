@@ -1,0 +1,5 @@
+title = "PSD gitleaks config"
+[allowlist]
+description = "Ignore ANSI sequences and debug log paths"
+regexes = ['''\x1B\[[0-9;]*[mK]''']
+paths = ["debug/"]

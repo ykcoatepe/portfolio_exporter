@@ -28,6 +28,7 @@ import time
 from portfolio_exporter.core import io
 from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import utcnow
 
 run_with_spinner = core_ui.run_with_spinner
 import zipfile
@@ -127,8 +128,8 @@ OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 
 from portfolio_exporter.core.ib_config import HOST as IB_HOST
-from portfolio_exporter.core.ib_config import PORT as IB_PORT
 from portfolio_exporter.core.ib_config import client_id as _cid
+from portfolio_exporter.core.ib_config import connect_ib
 
 IB_CID = _cid("option_chain", default=10)
 LOG_FMT = "%(asctime)s %(levelname)s %(message)s"
@@ -195,7 +196,7 @@ def get_portfolio_tickers(ib: IB) -> list[str]:
 # ────────────── expiry helpers ──────────────
 def choose_expiry(expirations: Sequence[str]) -> str:
     """Pick weekly ≤ 7 days, else first Friday, else earliest."""
-    today = datetime.utcnow().date()
+    today = utcnow().date()
     # within a week
     for e in expirations:
         if (datetime.strptime(e, "%Y%m%d").date() - today).days <= 7:
@@ -694,7 +695,7 @@ def run(
 
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
+        connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=10)
 
         # try live → frozen → delayed-streaming → delayed snapshot
         for _md_type in (1, 2, 3, 4):

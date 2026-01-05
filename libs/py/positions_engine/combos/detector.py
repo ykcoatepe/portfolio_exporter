@@ -689,11 +689,7 @@ def _build_combo(
     ordered = tuple(sorted(legs, key=_leg_sort_key))
     combo_id = _combo_hash(account, underlying, ordered)
     net_price = _sum_optionals(
-        (
-            leg.avg_cost * leg.quantity
-            if leg.avg_cost is not None
-            else None
-        )
+        (leg.avg_cost * leg.quantity if leg.avg_cost is not None else None)
         for leg in ordered
     )
     sum_delta = _sum_greek(ordered, "delta")

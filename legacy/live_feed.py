@@ -19,6 +19,8 @@ import logging
 import csv
 import argparse
 from datetime import datetime
+
+from portfolio_exporter.core.date_utils import utcnow
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -301,7 +303,7 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
 
 def fetch_yf_quotes(tickers: list[str]) -> pd.DataFrame:
     rows = []
-    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    ts = utcnow().isoformat(timespec="seconds") + "Z"
     iterable = iter_progress(tickers, "yfinance") if PROGRESS else tickers
     for t in iterable:
         if t in YIELD_MAP:
@@ -353,7 +355,7 @@ def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
     if not FRED_AVAILABLE:
         return pd.DataFrame()
     rows = []
-    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    ts = utcnow().isoformat(timespec="seconds") + "Z"
     iterable = iter_progress(tickers, "FRED") if PROGRESS else tickers
     for t in iterable:
         series = YIELD_MAP.get(t)

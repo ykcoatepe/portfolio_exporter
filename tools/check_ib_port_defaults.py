@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Guard that ensures live defaults use IBKR port 7496.
+"""Guard that ensures live defaults use IBKR Gateway port 4001.
 
-Flags any lingering 7497 defaults unless the surrounding context explicitly
-mentions paper/simulated/example usage.
+Flags legacy TWS port defaults (7496/7497) unless context mentions
+"fallback", "paper", "simulated", or "example".
 """
 
 from __future__ import annotations
@@ -12,13 +12,19 @@ import re
 import sys
 from collections.abc import Iterable
 
-ALLOW_IF = re.compile(r"(paper|simulated|example)", re.IGNORECASE)
+ALLOW_IF = re.compile(r"(paper|simulated|example|fallback|legacy)", re.IGNORECASE)
 CODE_PATTERNS: tuple[tuple[str, str], ...] = (
-    ("IB_PORT=7497", "env assignment"),
-    ('os.getenv("IB_PORT","7497")', "os.getenv default"),
-    ("os.getenv('IB_PORT','7497')", "os.getenv default"),
-    ("os.environ.get('IB_PORT','7497')", "os.environ default"),
-    ('os.environ.get("IB_PORT","7497")', "os.environ default"),
+    # Legacy TWS defaults that should be 4001 (Gateway)
+    ("IB_PORT=7496", "should be 4001 (Gateway)"),
+    ("IB_PORT=7497", "paper port without context"),
+    ('os.getenv("IB_PORT","7496")', "should be 4001"),
+    ("os.getenv('IB_PORT','7496')", "should be 4001"),
+    ('os.getenv("IB_PORT","7497")', "paper default without context"),
+    ("os.getenv('IB_PORT','7497')", "paper default without context"),
+    ("os.environ.get('IB_PORT','7496')", "should be 4001"),
+    ('os.environ.get("IB_PORT","7496")', "should be 4001"),
+    ("os.environ.get('IB_PORT','7497')", "paper default without context"),
+    ('os.environ.get("IB_PORT","7497")', "paper default without context"),
 )
 
 SKIP_DIRS = {
@@ -30,6 +36,11 @@ SKIP_DIRS = {
     "__pycache__",
     "iv_history",
     ".ruff_cache",
+    "legacy",
+    "run",
+    "local_backup",
+    ".venv_codex",
+    ".venv_pkgtest",
 }
 SKIP_SUFFIXES = {
     ".pyc",
@@ -89,13 +100,14 @@ def main() -> int:
 
     if bad:
         print(
-            "Found unintended 7497 defaults (should be 7496 for live):", file=sys.stderr
+            "Found unintended legacy TWS defaults (should be 4001 for live):",
+            file=sys.stderr,
         )
         for item in bad:
             print(f"  {item}", file=sys.stderr)
         return 1
 
-    print("OK: no unintended 7497 defaults found.")
+    print("OK: no unintended 7496/7497 defaults found.")
     return 0
 
 

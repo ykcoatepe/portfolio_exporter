@@ -151,7 +151,9 @@ class PositionsState:
                 if replacement.metadata != existing.metadata:
                     update_fields["metadata"] = replacement.metadata
                 if update_fields:
-                    updated_positions[symbol] = existing.model_copy(update=update_fields)
+                    updated_positions[symbol] = existing.model_copy(
+                        update=update_fields
+                    )
                     positions_changed = True
                 else:
                     updated_positions[symbol] = existing
@@ -184,9 +186,7 @@ class PositionsState:
 
         session_as_of = _parse_iso_datetime_safe(detect_session().as_of)
         quote_latest = _latest_quote_timestamp(self._quotes.values())
-        self._latest_ts = _max_datetime(
-            [self._latest_ts, quote_latest, session_as_of]
-        )
+        self._latest_ts = _max_datetime([self._latest_ts, quote_latest, session_as_of])
         self._live_seen["quotes"] = quotes_seen
         self._live_seen["greeks"] = greeks_seen
 
@@ -203,7 +203,9 @@ class PositionsState:
 
         if not snapshot:
             if self._greeks_refresh_supported:
-                logger.debug("[refresh] greeks snapshot unavailable from internal provider")
+                logger.debug(
+                    "[refresh] greeks snapshot unavailable from internal provider"
+                )
                 self._greeks_refresh_supported = False
             return
 
@@ -226,7 +228,9 @@ class PositionsState:
                     metadata[key] = value
                     changed = True
             if changed:
-                updated_positions[symbol] = position.model_copy(update={"metadata": metadata})
+                updated_positions[symbol] = position.model_copy(
+                    update={"metadata": metadata}
+                )
                 positions_updated = True
             else:
                 updated_positions[symbol] = position
@@ -803,7 +807,11 @@ def _extract_greeks_map(
 
     greeks_map: dict[str, dict[str, Decimal]] = {}
     for entry in rows:
-        symbol = entry.get("symbol") or entry.get("instrument_symbol") or entry.get("leg_symbol")
+        symbol = (
+            entry.get("symbol")
+            or entry.get("instrument_symbol")
+            or entry.get("leg_symbol")
+        )
         if not isinstance(symbol, str) or not symbol.strip():
             continue
         clean_symbol = symbol.strip()
@@ -1222,9 +1230,7 @@ def _normalize_option_mark_payload(
         if alias_from_last_close and mark_source == "PREV":
             # Preserve a real timestamp for PREV so staleness is accurate.
             prev_ts = (
-                entry.get("last_close_ts")
-                or entry.get("ts")
-                or entry.get("last_ts")
+                entry.get("last_close_ts") or entry.get("ts") or entry.get("last_ts")
             )
             if prev_ts is not None:
                 entry["prev_ts"] = prev_ts
@@ -1384,6 +1390,7 @@ def _normalize_single_stock(entry: dict[str, Any], now: datetime) -> None:
         entry["pnl_unrealized_percent"] = unreal_percent
         entry["pnl_unrealized_pct"] = unreal_percent
         entry.setdefault("total_pnl_percent", unreal_percent)
+
 
 _OPTION_BID_TS_ALIASES = (
     "bid_ts",
@@ -1732,7 +1739,9 @@ def _canonical_mark_source(value: Any) -> str | None:
     return None
 
 
-def _extract_previous_close_timestamp_from_entry(entry: dict[str, Any]) -> datetime | None:
+def _extract_previous_close_timestamp_from_entry(
+    entry: dict[str, Any],
+) -> datetime | None:
     for key in _OPTION_PREVIOUS_CLOSE_TS_ALIASES:
         if key in entry:
             ts = _parse_timestamp_like(entry.get(key))
@@ -1741,9 +1750,7 @@ def _extract_previous_close_timestamp_from_entry(entry: dict[str, Any]) -> datet
     return None
 
 
-_ZEROISH_TIMESTAMP_PATTERN = re.compile(
-    r"^[+-]?(?:0+(?:\.0*)?|\.0+)(?:[eE][+-]?\d+)?$"
-)
+_ZEROISH_TIMESTAMP_PATTERN = re.compile(r"^[+-]?(?:0+(?:\.0*)?|\.0+)(?:[eE][+-]?\d+)?$")
 
 
 def _parse_timestamp_like(value: Any) -> datetime | None:

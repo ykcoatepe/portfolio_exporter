@@ -5,6 +5,7 @@ import os
 from portfolio_exporter.core import io
 from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import utcnow
 
 run_with_spinner = core_ui.run_with_spinner
 import pandas as pd
@@ -29,7 +30,6 @@ try:
     PROGRESS = True
 except Exception:  # pragma: no cover - optional
     PROGRESS = False
-from datetime import datetime
 
 # ---------- IBKR optional integration ----------
 try:
@@ -40,8 +40,8 @@ except ImportError:
     IB_AVAILABLE = False
 
 from portfolio_exporter.core.ib_config import HOST as IB_HOST
-from portfolio_exporter.core.ib_config import PORT as IB_PORT
 from portfolio_exporter.core.ib_config import client_id as _cid
+from portfolio_exporter.core.ib_config import connect_ib
 
 IB_CID = _cid("historic_prices", default=3)  # separate clientId for historic pull
 
@@ -76,7 +76,7 @@ def _tickers_from_ib() -> list[str]:
     _ensure_event_loop()
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)
+        connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=3)
     except Exception:
         return []
     positions = ib.positions()
@@ -93,8 +93,8 @@ def _tickers_from_ib() -> list[str]:
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]  # first existing file wins
 
 # Timestamped output (UTC). Includes time so repeated runs don't overwrite.
-DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
-TIME_TAG = datetime.utcnow().strftime("%H%M")
+DATE_TAG = utcnow().strftime("%Y%m%d")
+TIME_TAG = utcnow().strftime("%H%M")
 OUTPUT_DIR = os.path.expanduser(settings.output_dir)
 OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"historic_prices_{DATE_TAG}_{TIME_TAG}.csv")
 

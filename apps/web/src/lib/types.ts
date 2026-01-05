@@ -1,5 +1,24 @@
 export type MarkSource = "MID" | "LAST" | "PREV" | "MISSING";
 
+export interface MsbReading {
+  date: string;
+  hy: number;
+  vx1: number;
+  vx2: number;
+  z_hy: number | null;
+  term_ratio: number | null;
+  cal_spread_pct: number | null;
+  cal_spread_abs: number | null;
+  saturated: boolean;
+  hy_score: number;
+  vix_score: number;
+  msb: number;
+  color: string;
+  triggers: string[];
+  winsor_clipped_n: number;
+  cooldown_until: string | null;
+}
+
 export interface StockPositionApi {
   symbol: string;
   quantity: number;
@@ -406,6 +425,18 @@ export interface PortfolioStatsApiResponse {
   trades_prior_positions?: boolean | null;
   data_source?: string | null;
   dataSource?: string | null;
+  day_pnl?: number | null;
+  dayPnl?: number | null;
+  unrealized_pnl?: number | null;
+  unrealizedPnl?: number | null;
+  sigma_total?: number | null;
+  sigmaTotal?: number | null;
+  sigma_per_day?: number | null;
+  sigmaPerDay?: number | null;
+  staleness_sec?: number | null;
+  stalenessSec?: number | null;
+  served_at?: string | null;
+  servedAt?: string | null;
   net_liq?: number | null;
   netLiq?: number | null;
   var95?: number | null;
@@ -418,6 +449,7 @@ export interface PortfolioStatsApiResponse {
   updatedAt?: string | null;
   session?: MarketSessionApiResponse | null;
   session_info?: MarketSessionApiResponse | null;
+  totals?: PortfolioTotalsApiResponse | null;
   meta?: {
     latest_ts?: string | null;
     [key: string]: unknown;
@@ -432,6 +464,26 @@ export interface PortfolioStatsCounts {
   staleQuotes: number;
   rules?: number;
   breaches?: number;
+}
+
+export interface PortfolioTotalsApiResponse {
+  pnl_day?: number | null;
+  pnlDay?: number | null;
+  unrealized?: number | null;
+  sum_delta?: number | null;
+  sumDelta?: number | null;
+  sum_theta?: number | null;
+  sumTheta?: number | null;
+  staleness_secs?: number | null;
+  stalenessSecs?: number | null;
+}
+
+export interface PortfolioTotals {
+  pnlDay: number | null;
+  unrealized: number | null;
+  sumDelta: number | null;
+  sumTheta: number | null;
+  stalenessSecs: number | null;
 }
 
 export type MarketSessionState = "RTH" | "ETH" | "CLOSED";
@@ -466,6 +518,12 @@ export interface PortfolioStats {
   var95: number | null;
   marginPct: number | null;
   updatedAt: string | null;
+  dayPnl: number | null;
+  unrealizedPnl: number | null;
+  sigmaTotal: number | null;
+  sigmaPerDay: number | null;
+  stalenessSec: number | null;
+  servedAt: string | null;
   counts: PortfolioStatsCounts;
   rulesEvalMs: number | null;
   tradesPriorPositions: boolean;
@@ -473,6 +531,7 @@ export interface PortfolioStats {
   session: MarketSession | null;
   sessionInfo?: MarketSession | null;
   latestTs: string | null;
+  totals: PortfolioTotals | null;
 }
 
 export type PSDGreeks = {

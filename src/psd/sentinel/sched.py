@@ -20,12 +20,30 @@ directly.
 
 from __future__ import annotations
 
+import csv
+import json
+import logging
+import os
 import random
 import threading
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
+from datetime import time as dt_time
+from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
+
+import pandas as pd
+from fastapi import FastAPI
+
+from psd.analytics.msb import compute_msb
+from psd.core import store
+from psd.datasources import resolve_msb_source
+from psd.datasources.fred import refresh_hy_csv
+from psd.sentinel.msb_actions import evaluate_msb_triggers_and_update_livebar
+from psd.sentinel.msb_metrics import MSB_SCHEDULER_RUNS
 
 # Lazy import to keep CLI startup fast and allow test monkeypatching
 try:  # pragma: no cover - exercised via scripts
@@ -38,6 +56,15 @@ except Exception:  # pragma: no cover - minimal envs
 
 class PacingViolation(Exception):
     pass
+
+
+_TRT = ZoneInfo("Europe/Istanbul")
+_RUN_AT = dt_time(hour=17, minute=30)
+_VENDOR_ROOT = Path("data") / "vendor"
+_SCHED_LOG = logging.getLogger("psd.sentinel.scheduler")
+_SCHED_THREAD: threading.Thread | None = None
+_SCHED_STOP: threading.Event | None = None
+_SCHED_GUARD = threading.Lock()
 
 
 @dataclass
@@ -134,6 +161,364 @@ class HistoricalLimiter:
             return ok
 
 
+def _is_business_day(day: date) -> bool:
+    return day.weekday() < 5
+
+
+def _next_business_run(now: datetime) -> datetime:
+    now_trt = now.astimezone(_TRT)
+    candidate_date = now_trt.date()
+    candidate_dt = datetime.combine(candidate_date, _RUN_AT, tzinfo=_TRT)
+    if now_trt >= candidate_dt:
+        candidate_date += timedelta(days=1)
+        candidate_dt = datetime.combine(candidate_date, _RUN_AT, tzinfo=_TRT)
+    while not _is_business_day(candidate_dt.date()):
+        candidate_date += timedelta(days=1)
+        candidate_dt = datetime.combine(candidate_date, _RUN_AT, tzinfo=_TRT)
+    return candidate_dt
+
+
+def _load_series(csv_path: Path) -> pd.Series:
+    frame = pd.read_csv(csv_path, parse_dates=["date"])
+    if "value" not in frame.columns:
+        raise ValueError(f"{csv_path} missing 'value' column")
+    series = frame.sort_values("date").set_index("date")["value"].astype(float)
+    series.index = pd.to_datetime(series.index)
+    return series
+
+
+def _load_vendor(
+    root: Path,
+) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series | None]:
+    hy = _load_series(root / "hy.csv")
+    vx1 = _load_series(root / "vx1.csv")
+    vx2 = _load_series(root / "vx2.csv")
+    spx_path = root / "spx_ret.csv"
+    spx = _load_series(spx_path) if spx_path.exists() else None
+    return hy, vx1, vx2, spx
+
+
+def _compute_streak_ge_60(msb_series: pd.Series) -> int:
+    streak = 0
+    for value in reversed(msb_series.tolist()):
+        if value >= 60:
+            streak += 1
+        else:
+            break
+    return streak
+
+
+def _prepare_context(
+    df: pd.DataFrame, spx_series: pd.Series | None
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    last_idx = df.index[-1]
+    today = last_idx.date()
+    tail = df.iloc[-1]
+
+    triggers = tail.get("triggers") or []
+    if isinstance(triggers, list):
+        trigger_flags = [str(flag).upper() for flag in triggers]
+    else:
+        trigger_flags = [str(triggers).upper()]
+
+    hy_latest = float(tail["hy"])
+    hy_d1_bps = None
+    hy_d5_bps = None
+    if len(df) >= 2:
+        hy_prev = float(df.iloc[-2]["hy"])
+        hy_d1_bps = (hy_latest - hy_prev) * 100.0
+    if len(df) >= 6:
+        hy_prev_5 = float(df.iloc[-6]["hy"])
+        hy_d5_bps = (hy_latest - hy_prev_5) * 100.0
+
+    spx_ret = None
+    if spx_series is not None and not spx_series.empty:
+        aligned = spx_series.reindex(df.index).ffill(limit=2)
+        spx_tail = aligned.iloc[-1]
+        if pd.notna(spx_tail):
+            spx_ret = float(spx_tail)
+
+    cooldown_until = tail.get("cooldown_until")
+    cooldown_date: date | None = None
+    cooldown_iso: str | None = None
+    if cooldown_until is not None and not pd.isna(cooldown_until):
+        cooldown_ts = pd.Timestamp(cooldown_until)
+        cooldown_date = cooldown_ts.date()
+        cooldown_iso = cooldown_date.isoformat()
+
+    row_dict = {
+        "date": today.isoformat(),
+        "hy": hy_latest,
+        "vx1": float(tail["vx1"]),
+        "vx2": float(tail["vx2"]),
+        "z_hy": float(tail["z_hy"]) if not pd.isna(tail["z_hy"]) else None,
+        "term_ratio": float(tail["term_ratio"])
+        if not pd.isna(tail["term_ratio"])
+        else None,
+        "cal_spread_pct": float(tail["cal_spread_pct"])
+        if not pd.isna(tail["cal_spread_pct"])
+        else None,
+        "cal_spread_abs": float(tail["cal_spread_abs"])
+        if not pd.isna(tail["cal_spread_abs"])
+        else None,
+        "saturated": bool(tail["saturated"]),
+        "hy_score": int(tail["hy_score"]),
+        "vix_score": int(tail["vix_score"]),
+        "msb": int(tail["msb"]),
+        "color": str(tail["color"]),
+        "triggers": trigger_flags,
+        "winsor_clipped_n": int(tail["winsor_clipped_n"]),
+        "cooldown_until": cooldown_iso,
+    }
+
+    context = {
+        "today": today,
+        "spx_ret": spx_ret,
+        "hy_d1_bps": hy_d1_bps,
+        "hy_d5_bps": hy_d5_bps,
+        "streak_ge_60": _compute_streak_ge_60(df["msb"]),
+        "cooldown_started_today": "C" in trigger_flags,
+        "cooldown_until": cooldown_date,
+        "msb_row": row_dict,
+    }
+    return row_dict, context
+
+
+def _log_scheduler(status: str, **extra: Any) -> None:
+    payload = {"event": "msb.scheduler", "status": status}
+    payload.update(extra)
+    try:
+        encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    except Exception:
+        encoded = str(payload)
+    if status == "error":
+        _SCHED_LOG.error(encoded)
+    else:
+        _SCHED_LOG.info(encoded)
+
+
+def _append_trigger_csv(alerts: Iterable[Any], context: dict[str, Any]) -> None:
+    alerts = list(alerts)
+    if not alerts:
+        return
+    row = context.get("msb_row") or {}
+    hy_score = int(row.get("hy_score", 0) or 0)
+    vix_score = int(row.get("vix_score", 0) or 0)
+    msb_value = int(row.get("msb", 0) or 0)
+    color = str(row.get("color") or "")
+    vx1 = float(row.get("vx1", 0.0) or 0.0)
+    vx2 = float(row.get("vx2", 0.0) or 0.0)
+    vx_ratio = None
+    if vx2 not in (0.0, 0):
+        try:
+            vx_ratio = vx1 / vx2
+        except ZeroDivisionError:
+            vx_ratio = None
+
+    hy_d1 = context.get("hy_d1_bps")
+    hy_d5 = context.get("hy_d5_bps")
+    cooldown_until = context.get("cooldown_until")
+    cooldown_iso = (
+        cooldown_until.isoformat() if isinstance(cooldown_until, date) else None
+    )
+
+    path = Path("debug") / "msb_triggers.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not path.exists()
+    with path.open("a", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "date",
+                "rule",
+                "msb",
+                "color",
+                "hy_score",
+                "vix_score",
+                "vx_ratio",
+                "hy_d1_bps",
+                "hy_d5_bps",
+                "cooldown_until",
+                "actions_json",
+            ],
+        )
+        if write_header:
+            writer.writeheader()
+        for alert in alerts:
+            data = getattr(alert, "data", {}) or {}
+            actions = data.get("actions") or []
+            writer.writerow(
+                {
+                    "date": row.get("date"),
+                    "rule": getattr(alert, "rule", ""),
+                    "msb": msb_value,
+                    "color": color,
+                    "hy_score": hy_score,
+                    "vix_score": vix_score,
+                    "vx_ratio": vx_ratio,
+                    "hy_d1_bps": hy_d1,
+                    "hy_d5_bps": hy_d5,
+                    "cooldown_until": cooldown_iso,
+                    "actions_json": json.dumps(
+                        actions, separators=(",", ":"), ensure_ascii=False
+                    ),
+                }
+            )
+
+
+def run_msb_scheduler_once(
+    app: FastAPI,
+    *,
+    vendor_dir: Path | str | None = None,
+    now: datetime | None = None,
+    max_retries: int = 3,
+) -> bool:
+    """Execute the daily MSB scheduler job once."""
+    vendor_root = Path(vendor_dir) if vendor_dir is not None else _VENDOR_ROOT
+    reference = (now or datetime.now(tz=_TRT)).astimezone(_TRT)
+    today = reference.date()
+    today_iso = today.isoformat()
+
+    current = store.read_msb_current()
+    if current and str(current.get("date")) == today_iso:
+        _log_scheduler("skipped", reason="already_up_to_date", date=today_iso)
+        MSB_SCHEDULER_RUNS.inc()
+        return False
+
+    msb_source = resolve_msb_source(os.environ)
+    if msb_source == "fred":
+        hy_path = vendor_root / "hy.csv"
+        try:
+            refreshed = refresh_hy_csv(hy_path, env=os.environ)
+        except Exception as exc:  # pragma: no cover - depends on network/env
+            _SCHED_LOG.warning("FRED HY refresh failed: %s", exc)
+            _log_scheduler(
+                "warn", date=today_iso, reason="fred_refresh_failed", error=str(exc)
+            )
+        else:
+            if refreshed:
+                _log_scheduler(
+                    "refresh", date=today_iso, source="fred", path=str(hy_path)
+                )
+
+    attempt = 0
+    backoff = 5.0
+    while attempt < max_retries:
+        attempt += 1
+        try:
+            hy, vx1, vx2, spx = _load_vendor(vendor_root)
+            df = compute_msb(hy=hy, vx1=vx1, vx2=vx2, spx_ret=spx)
+            if df.empty:
+                _log_scheduler("skipped", reason="empty_frame", date=today_iso)
+                MSB_SCHEDULER_RUNS.inc()
+                return False
+            latest_idx = df.index[-1]
+            latest_date = latest_idx.date()
+            if latest_date != today:
+                _log_scheduler(
+                    "skipped",
+                    reason="pending_vendor_data",
+                    date=today_iso,
+                    latest=latest_date.isoformat(),
+                )
+                MSB_SCHEDULER_RUNS.inc()
+                return False
+
+            row_dict, context = _prepare_context(df, spx)
+            store_frame = df.iloc[[-1]]
+            affected = store.store_msb(store_frame)
+
+            from psd.web.app import broadcast_latest_msb
+
+            broadcast_ok = False
+            try:
+                broadcast_ok = broadcast_latest_msb(app)
+            except Exception as exc:  # pragma: no cover - defensive
+                _log_scheduler(
+                    "warn", reason="broadcast_failed", date=today_iso, error=str(exc)
+                )
+
+            alerts = evaluate_msb_triggers_and_update_livebar(app, context=context)
+            _append_trigger_csv(alerts, context)
+
+            _log_scheduler(
+                "success",
+                date=row_dict.get("date"),
+                rows=affected,
+                alerts=len(alerts),
+                broadcast=broadcast_ok,
+            )
+            MSB_SCHEDULER_RUNS.inc()
+            return True
+        except Exception as exc:  # pragma: no cover - depends on IO state
+            _log_scheduler(
+                "error",
+                date=today_iso,
+                attempt=attempt,
+                error=str(exc),
+            )
+            if attempt >= max_retries:
+                MSB_SCHEDULER_RUNS.inc()
+                raise
+            time.sleep(backoff)
+            backoff = min(backoff * 2.0, 60.0)
+    MSB_SCHEDULER_RUNS.inc()
+    return False
+
+
+def _scheduler_loop(
+    app: FastAPI, stop_event: threading.Event, vendor_root: Path
+) -> None:
+    while not stop_event.is_set():
+        now = datetime.now(tz=_TRT)
+        run_at = _next_business_run(now)
+        wait_seconds = max(0.0, (run_at - now.astimezone(_TRT)).total_seconds())
+        if wait_seconds > 0 and stop_event.wait(wait_seconds):
+            break
+        if stop_event.is_set():
+            break
+        try:
+            run_msb_scheduler_once(app, vendor_dir=vendor_root, now=run_at)
+        except Exception as exc:  # pragma: no cover - background loop
+            _SCHED_LOG.exception("MSB scheduler run failed: %s", exc)
+            _log_scheduler(
+                "error", reason="background_failure", date=run_at.date().isoformat()
+            )
+
+
+def start_msb_scheduler(app: FastAPI, *, vendor_dir: Path | str | None = None) -> None:
+    """Start the background MSB scheduler loop."""
+    global _SCHED_THREAD, _SCHED_STOP
+    with _SCHED_GUARD:
+        if _SCHED_THREAD and _SCHED_THREAD.is_alive():
+            return
+        stop_event = threading.Event()
+        vendor_root = Path(vendor_dir) if vendor_dir is not None else _VENDOR_ROOT
+        thread = threading.Thread(
+            target=_scheduler_loop,
+            name="msb-scheduler",
+            args=(app, stop_event, vendor_root),
+            daemon=True,
+        )
+        _SCHED_STOP = stop_event
+        _SCHED_THREAD = thread
+        thread.start()
+
+
+def stop_msb_scheduler(timeout: float = 5.0) -> None:
+    """Stop the background MSB scheduler loop."""
+    global _SCHED_THREAD, _SCHED_STOP
+    with _SCHED_GUARD:
+        stop_event = _SCHED_STOP
+        thread = _SCHED_THREAD
+        _SCHED_STOP = None
+        _SCHED_THREAD = None
+    if stop_event is not None:
+        stop_event.set()
+    if thread is not None:
+        thread.join(timeout=timeout)
+
+
 def _jitter(seconds: float, ratio: float = 0.15) -> float:
     if seconds <= 0:
         return 0.0
@@ -218,13 +603,18 @@ def run_loop(
         else:
             yield from range(loops)
 
+    test_mode = os.getenv("PE_TEST_MODE") == "1"
+
+    loop_no = 0
+
     for _ in _iter_range():
+        loop_no += 1
         t0 = time.monotonic()
 
         # Optionally fetch or wrap positions to control pacing.
         # If IB datasource is available, wrap via io_request; otherwise rely on engine.
         positions: Iterable[dict[str, Any]] | None = None
-        if ib_src is not None and hasattr(ib_src, "get_positions"):
+        if not test_mode and ib_src is not None and hasattr(ib_src, "get_positions"):
 
             def _get_pos() -> Any:
                 return ib_src.get_positions(cfg)
@@ -240,6 +630,11 @@ def run_loop(
                 positions = []
             # Provide positions to engine via cfg if supported; engine reads ib_src directly by default
             cfg["positions_override"] = positions  # tests may use this
+        elif test_mode:
+            positions = cfg.get("positions_override")
+            if positions is None:
+                positions = []
+                cfg["positions_override"] = positions
 
         # Evaluate once per cadence
         dto = scan_once(cfg)
@@ -268,25 +663,47 @@ def run_loop(
             current_marks = {}
 
         changed_syms = [s for s, m in current_marks.items() if last_marks.get(s) != m]
+        if test_mode and positions is not None:
+            forced = [
+                str(p.get("symbol"))
+                for p in positions
+                if isinstance(p, dict) and p.get("symbol")
+            ]
+            if forced:
+                if loop_no == 1 or loop_no % 5 == 0:
+                    changed_syms = forced
+                else:
+                    changed_syms = []
         if changed_syms:
             # Optional extra IO for greeks/marks only for changed underlyings
             # Users/tests can plug real callables via cfg keys
             fetch_marks: Callable[[Iterable[str]], Any] | None = cfg.get("fetch_marks")  # type: ignore
-            fetch_greeks: Callable[[Iterable[str]], Any] | None = cfg.get("fetch_greeks")  # type: ignore
+            fetch_greeks: Callable[[Iterable[str]], Any] | None = cfg.get(
+                "fetch_greeks"
+            )  # type: ignore
+            key_base = hash(tuple(sorted(changed_syms)))
 
             if fetch_marks is not None:
+                mark_key = (
+                    f"marks:{loop_no}:{key_base}" if test_mode else f"marks:{key_base}"
+                )
                 io_request(
                     "web",
-                    key=f"marks:{hash(tuple(sorted(changed_syms)))}",
+                    key=mark_key,
                     func=lambda: fetch_marks(changed_syms),
                     hist_limiter=hist,
                     web_bucket=web,
                 )
             if fetch_greeks is not None:
+                greek_key = (
+                    f"greeks:{loop_no}:{key_base}"
+                    if test_mode
+                    else f"greeks:{key_base}"
+                )
                 # Greeks often rely on historical/snapshot data – use historical limiter keying per symbol batch
                 io_request(
                     "historical",
-                    key=f"greeks:{hash(tuple(sorted(changed_syms)))}",
+                    key=greek_key,
                     func=lambda: fetch_greeks(changed_syms),
                     hist_limiter=hist,
                     web_bucket=web,

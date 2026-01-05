@@ -24,6 +24,7 @@ import type {
   PlaybookMeta,
   MarkSource,
 } from "../lib/types";
+import { resolveApiBaseUrl } from "../lib/http";
 
 const OPTIONS_QUERY_KEY = ["positions", "options"] as const;
 const MARK_SOURCE_PRIORITY: Record<string, number> = { MID: 0, LAST: 1, PREV: 2, MISSING: 3 };
@@ -919,11 +920,8 @@ const buildGroupsFallback = (
 };
 
 async function fetchOptions(baseUrl = ""): Promise<OptionsApiResponse> {
-  const origin =
-    baseUrl ||
-    (typeof window !== "undefined" ? window.location.origin : "http://localhost");
-  const sanitizedBase = origin.replace(/\/+$/, "");
-  const response = await fetch(`${sanitizedBase}/positions/options`, {
+  const origin = resolveApiBaseUrl(baseUrl);
+  const response = await fetch(`${origin}/positions/options`, {
     headers: { Accept: "application/json" },
     credentials: "include",
   });

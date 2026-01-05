@@ -127,6 +127,11 @@ class TechSignalsTests(unittest.TestCase):
             def utcnow(cls):
                 return cls(2023, 12, 15)
 
+            @classmethod
+            def now(cls, tz=None):
+                dt = cls(2023, 12, 15)
+                return dt.replace(tzinfo=tz) if tz else dt
+
         mod.datetime = FixedDatetime
         fut = mod.front_future("CL", "NYMEX")
         self.assertEqual(fut.lastTradeDateOrContractMonth, "202402")

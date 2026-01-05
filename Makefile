@@ -11,7 +11,7 @@ THRESH ?= 3
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev fmt test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate agent-digest agent-rotate msb-compute msb-emit serve-api web-build psd-ci
+.PHONY: setup dev fmt test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate agent-digest agent-rotate msb-compute msb-emit serve-api web-build web-test web-e2e psd-ci release-tag
 .PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
@@ -47,9 +47,10 @@ fmt:
 	ruff format .
 
 lint:
-	# Ruff + Black share configuration in pyproject.toml
-	ruff check .
-	python3 -m black --check .
+	ruff check --fix .
+
+release-tag:
+	git tag psd-v0.1 && git push origin psd-v0.1
 
 test:
 	$(PYTEST) -q
@@ -65,6 +66,12 @@ serve-api:
 # ------------------------------------------------------------------
 web-build:
 	cd apps/web && npm ci && npm run build
+
+web-test:
+	cd apps/web && corepack pnpm install && corepack pnpm test:unit -- --run
+
+web-e2e:
+	cd apps/web && corepack pnpm install && corepack pnpm exec playwright install --with-deps && corepack pnpm test:e2e -w
 
 psd-ci:
 	make sanity-fast && make web-build && pytest -q
@@ -148,6 +155,17 @@ msb-compute:
 .PHONY: msb-emit
 msb-emit:
 	python scripts/msb_emit.py
+
+.PHONY: msb-run-now
+msb-run-now:
+	python - <<'PY'
+	from psd.sentinel.msb_actions import evaluate_msb_triggers_and_update_livebar
+	from psd.web.app import create_app
+	from psd.web.config import Settings
+
+	app = create_app(Settings(disable_background=True))
+	evaluate_msb_triggers_and_update_livebar(app)
+	PY
 
 # ------------------------------------------------------------------
 # Sanity helpers

@@ -50,7 +50,8 @@ The menu auto-loads `.env` (or `PSD_ENV_FILE`) and fills safe defaults if keys a
 Set these before launching PSD locally or in production:
 - `PSD_SNAPSHOT_FN=portfolio_exporter.psd_adapter:snapshot_once`
 - `PSD_RULES_FN=portfolio_exporter.psd_rules:evaluate`
-- `IB_HOST=127.0.0.1` and `IB_PORT=7496` (use 7497 for paper; override if Gateway maps to 4001/4002)
+- `IB_HOST=127.0.0.1` (leave `IB_PORT` unset for Gateway->TWS auto-fallback)
+- For paper: set `IB_PORT=4002` (Gateway) or `IB_PORT=7497` (TWS)
 - `IB_CLIENT_ID=<unique>` per process/tool to avoid TWS collisions
 - Optional: `PSD_HEARTBEAT_S=2.0` to keep the ingestor loop cadence explicit
 - Leave `PSD_SSE_TEST_MODE` unset outside of tests; labs toggle it to fake SSE frames
@@ -77,3 +78,16 @@ SQLite runs PSD in write-ahead logging mode, so expect a companion `psd.db-wal` 
 
 - Local guard: `make sse-check URL=http://127.0.0.1:51127/stream THRESH=3` runs `tools/check_sse.sh` and passes when the median inter-arrival is below the threshold (seconds).
 - CI smoke: `.github/workflows/psd-smoke.yml` runs the same script against `${{ secrets.PSD_SSE_URL }}` via `workflow_dispatch` for staging checks.
+
+### PSD Quickstart (MSB)
+```bash
+make web-build
+make msb-compute           # uses vendor CSVs under data/vendor/
+python scripts/msb_emit.py # one-shot SSE broadcast for smoke
+make msb-run-now           # manual daily job (scheduler logic)
+```
+
+CI Gates (PSD).
+- Run: `make web-build && make web-test`.
+- Enforce memory digest <800 tokens; gitleaks/osv scanners 0 high/critical.
+- API tests use the app factory with `disable_background=True`; SSE tests use `?test_once=1`.

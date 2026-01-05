@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import os
 from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
 
 from psd.analytics.msb import compute_msb
+from psd.datasources import resolve_msb_source
+from psd.datasources.fred import refresh_hy_csv
 
 _JSON_SEPARATORS = (",", ":")
+logger = logging.getLogger("psd.scripts.msb_compute")
 
 
 def _ensure_parent(path: Path) -> None:
@@ -64,7 +69,9 @@ def _collect_anomalies(df: pd.DataFrame) -> list[dict[str, object]]:
             except TypeError:
                 continue
         if na_cols:
-            anomalies.append({"date": date_iso, "kind": "nan_detected", "columns": na_cols})
+            anomalies.append(
+                {"date": date_iso, "kind": "nan_detected", "columns": na_cols}
+            )
     return anomalies
 
 
@@ -81,8 +88,12 @@ def _append_anomalies(anomalies: Iterable[dict[str, object]], path: Path) -> Non
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Compute MSB readings.")
     parser.add_argument("--hy-csv", required=True, type=Path, help="HY OAS CSV path")
-    parser.add_argument("--vx1-csv", required=True, type=Path, help="VIX front CSV path")
-    parser.add_argument("--vx2-csv", required=True, type=Path, help="VIX second CSV path")
+    parser.add_argument(
+        "--vx1-csv", required=True, type=Path, help="VIX front CSV path"
+    )
+    parser.add_argument(
+        "--vx2-csv", required=True, type=Path, help="VIX second CSV path"
+    )
     parser.add_argument("--spx-csv", type=Path, help="Optional SPX return CSV path")
     parser.add_argument("--out", required=True, type=Path, help="Output CSV path")
     parser.add_argument(
@@ -104,6 +115,17 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+
+    env = os.environ
+    msb_source = resolve_msb_source(env)
+    if msb_source == "fred":
+        try:
+            refreshed = refresh_hy_csv(args.hy_csv, env=env)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("FRED refresh skipped: %s", exc)
+        else:
+            if refreshed:
+                logger.info("HY-OAS CSV refreshed from FRED: %s", args.hy_csv)
 
     hy_series = _load_series(args.hy_csv)
     vx1_series = _load_series(args.vx1_csv)

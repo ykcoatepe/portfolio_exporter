@@ -2,16 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   PSD Theme System
+   ============================================ */
+
 :root {
   color-scheme: dark;
+
+  /* ---- Background Hierarchy (solid for data) ---- */
+  --psd-bg-base: hsl(222 47% 11%);
+  --psd-bg-surface: hsl(217 33% 17%);
+  --psd-bg-elevated: hsl(215 28% 22%);
+  --psd-bg-data: hsl(222 47% 11%);
+
+  /* ---- Text Hierarchy ---- */
+  --psd-text-primary: hsl(210 40% 98%);
+  --psd-text-secondary: hsl(215 20% 65%);
+  --psd-text-muted: hsl(215 16% 47%);
+
+  /* ---- Semantic Colors ---- */
+  --psd-positive: hsl(142 76% 36%);
+  --psd-negative: hsl(0 84% 60%);
+  --psd-warning: hsl(45 93% 47%);
+  --psd-info: hsl(199 89% 48%);
+
+  /* ---- Accent ---- */
+  --psd-accent-primary: hsl(199 89% 48%);
+  --psd-accent-hover: hsl(199 89% 58%);
+
+  /* ---- Borders ---- */
+  --psd-border-default: hsl(217 33% 23%);
+  --psd-border-subtle: hsl(217 33% 17% / 0.6);
+
+  /* ---- Motion ---- */
+  --psd-motion-duration: 200ms;
+  --psd-motion-enabled: 1;
+
+  /* ---- Glass/Translucency (framing UI only) ---- */
+  --psd-glass-opacity: 0.6;
+  --psd-glass-blur: 12px;
 }
 
+/* ============================================
+   Accessibility: Reduced Motion
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --psd-motion-duration: 0ms;
+    --psd-motion-enabled: 0;
+  }
+
+  /* Disable smooth scroll */
+  .scroll-smooth {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* User-driven reduced motion override */
+:root[data-reduced-motion="true"] {
+  --psd-motion-duration: 0ms;
+  --psd-motion-enabled: 0;
+}
+
+:root[data-reduced-motion="true"] .scroll-smooth {
+  scroll-behavior: auto !important;
+}
+
+/* ============================================
+   Accessibility: Reduced Translucency
+   ============================================ */
+:root[data-reduced-translucency="true"] {
+  --psd-glass-opacity: 1;
+  --psd-glass-blur: 0px;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
 body {
   margin: 0;
   min-height: 100vh;
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background-color: #080b10;
-  color: #e4ecf8;
+  background-color: var(--psd-bg-base);
+  color: var(--psd-text-primary);
 }
 
 button,
@@ -22,6 +95,49 @@ select {
 }
 
 *:focus-visible {
-  outline: 2px solid theme("colors.sky.400");
+  outline: 2px solid var(--psd-accent-primary);
   outline-offset: 2px;
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+/* Glass effect (framing UI only, NOT data surfaces) */
+.psd-glass {
+  background: hsl(217 33% 17% / var(--psd-glass-opacity));
+  backdrop-filter: blur(var(--psd-glass-blur));
+  -webkit-backdrop-filter: blur(var(--psd-glass-blur));
+}
+
+/* Data surface (solid, high contrast) */
+.psd-data-surface {
+  background: var(--psd-bg-data);
+}
+
+/* Motion-safe transition helper */
+.psd-transition {
+  transition-duration: var(--psd-motion-duration);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Cell flash animation for data updates */
+@keyframes psd-cell-flash {
+  0% {
+    background-color: hsl(199 89% 48% / 0.3);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.psd-cell-updated {
+  animation: psd-cell-flash var(--psd-motion-duration) ease-out;
+}
+
+/* Monospace numbers (tabular) */
+.psd-mono {
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+  font-variant-numeric: tabular-nums;
 }

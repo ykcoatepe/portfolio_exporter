@@ -6,6 +6,11 @@
 - Query keys follow the `["psd", "..."]` convention so cache invalidation is predictable across panels and tests reusable in `src/hooks/*test.tsx`.
 - MSB widgets read from `/msb/current` and `/msb/history`, while `/sse` emits `msb.update` events with compact payloads for live dashboards.
 
+## MSB UI
+- Hooks: `useMsbCurrent` listens for `msb.update` SSE frames and keeps `useMsbHistory(days)` in sync without extra fetches.
+- A11y: the gauge reads aloud “Stress: N — Color” and the legend duplicates color bins as text.
+- Export: the panel’s download link targets `/msb/history.csv` for operators and journals.
+
 ## SPA Build
 - `npm run build` (surfaced via `make web-build`) emits the production bundle into `apps/web/dist`.
 - `apps/api/main.py` mounts the dist directory at `/psd`, and the fallback middleware serves `index.html` for unknown routes to support client-side routing.
@@ -16,3 +21,8 @@
 - The test guards against regressions where static mounting might shadow REST endpoints or ship stale assets—keeping it enabled requires building the SPA as part of CI.
 - Local runs can reproduce the same contract by executing `make web-build` before `pytest -q tests/test_spa_mount.py`.
 - Backend tests spin up the API with `create_app(Settings(test_mode=True, disable_background=True))` to skip background jobs and keep suites fast.
+
+## Live Status Bar
+- The scheduler writes hedge intents to `data/live_status_bar.csv` with columns `Hedge, Cost % NAV, Status, Expiry, Trigger, TriggerTimeTRT, Notes`.
+- Rule defaults map to `RULE_A_VIX_BACKWARDATION`, `RULE_B_HY_SHOCK`, and `RULE_C_MSB_60x3D`; rule C rows are marked `LIVE` and deduped by appending “already hedged; maintain size”.
+- UI consumers can tail the CSV for automation while `/metrics` surfaces `psd_livebar_rows_total` to monitor row churn.

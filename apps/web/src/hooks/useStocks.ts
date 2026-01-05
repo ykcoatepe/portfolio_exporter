@@ -1,6 +1,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { PSD_SNAPSHOT_QUERY_KEY, fetchPsdSnapshot } from "./usePsdSnapshot";
+import { resolveApiBaseUrl } from "../lib/http";
 import type {
   MarkSource,
   PSDSnapshot,
@@ -189,11 +190,8 @@ export function useStocks(): UseQueryResult<StockRow[], Error> {
 }
 
 async function fetchStocks(baseUrl = ""): Promise<StockRow[]> {
-  const origin =
-    baseUrl ||
-    (typeof window !== "undefined" ? window.location.origin : "http://localhost");
-  const sanitizedBase = origin.replace(/\/+$/, "");
-  const response = await fetch(`${sanitizedBase}/positions/stocks`, {
+  const origin = resolveApiBaseUrl(baseUrl);
+  const response = await fetch(`${origin}/positions/stocks`, {
     headers: { accept: "application/json" },
     credentials: "include",
   });

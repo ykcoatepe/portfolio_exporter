@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
 
 import type {
+  MsbReading,
   OptionsApiResponse,
   OptionComboGroupApi,
   OptionComboLegApi,
@@ -1074,6 +1075,48 @@ export const buildOptionsResponse = (
   };
 };
 
+export const buildMsbReading = (overrides: Partial<MsbReading> = {}): MsbReading => {
+  const base: MsbReading = {
+    date: new Date().toISOString().slice(0, 10),
+    hy: 3.45,
+    vx1: 16.2,
+    vx2: 17.5,
+    z_hy: 0.42,
+    term_ratio: 0.92,
+    cal_spread_pct: 0.038,
+    cal_spread_abs: 0.65,
+    saturated: false,
+    hy_score: 12,
+    vix_score: 14,
+    msb: 28,
+    color: "orange",
+    triggers: ["RULE_B_HY_SHOCK"],
+    winsor_clipped_n: 0,
+    cooldown_until: null,
+  };
+  return { ...base, ...overrides };
+};
+
+export const buildMsbHistory = (days = 30): MsbReading[] => {
+  const results: MsbReading[] = [];
+  const today = new Date();
+  for (let index = 0; index < days; index += 1) {
+    const ts = new Date(today.getTime() - index * 86_400_000);
+    const msbValue = 18 + index;
+    results.push(
+      buildMsbReading({
+        date: ts.toISOString().slice(0, 10),
+        hy: 3.1 + index * 0.05,
+        term_ratio: 0.9 + index * 0.003,
+        cal_spread_pct: 0.03 + index * 0.0005,
+        msb: msbValue,
+        color: msbValue >= 45 ? "red" : msbValue >= 32 ? "orange" : "yellow",
+        triggers: index % 6 === 0 ? ["RULE_A_VIX_BACKWARDATION"] : [],
+      }),
+    );
+  }
+  return results;
+};
 
 export const buildStatsResponse = (
   overrides: Partial<PortfolioStatsApiResponse> = {},
@@ -1094,13 +1137,26 @@ export const buildStatsResponse = (
     combos_matched: 12,
     stale_quotes_count: 1,
     data_source: "internal",
+    day_pnl: 355.0,
+    unrealized_pnl: 255.0,
+    sigma_total: 15.1,
+    sigma_per_day: -0.03,
     net_liq: 1_245_320.54,
-    var95_1d_pct: 58_320.12,
-    margin_used_pct: 0.37,
+    var_95: 58_320.12,
+    margin_pct: 0.37,
     updated_at: nowIso,
+    staleness_sec: 90,
+    served_at: nowIso,
     session: baseSession,
     session_info: baseSession,
     meta: { latest_ts: nowIso },
+    totals: {
+      pnl_day: 355.0,
+      unrealized: 255.0,
+      sum_delta: 15.1,
+      sum_theta: -0.03,
+      staleness_secs: 90,
+    },
   };
 
   const hasOwn = (key: keyof PortfolioStatsApiResponse) =>
@@ -1136,18 +1192,31 @@ export const buildStatsResponse = (
     option_legs_count: pickMany(["option_legs_count"], base.option_legs_count),
     combos_matched: pickMany(["combos_matched"], base.combos_matched),
     stale_quotes_count: pickMany(["stale_quotes_count"], base.stale_quotes_count),
+    day_pnl: pickMany(["day_pnl", "dayPnl"], base.day_pnl),
+    unrealized_pnl: pickMany([
+      "unrealized_pnl",
+      "unrealizedPnl",
+    ], base.unrealized_pnl),
+    sigma_total: pickMany(["sigma_total", "sigmaTotal"], base.sigma_total),
+    sigma_per_day: pickMany([
+      "sigma_per_day",
+      "sigmaPerDay",
+    ], base.sigma_per_day),
     net_liq: pickMany(["net_liq", "netLiq"], base.net_liq),
-    var95_1d_pct: pickMany(["var95_1d_pct", "var95", "var_95"], base.var95_1d_pct),
+    var_95: pickMany(["var_95", "var95", "var95_1d_pct"], base.var_95),
+    margin_pct: pickMany(["margin_pct", "marginPct"], base.margin_pct),
     margin_used_pct: pickMany([
       "margin_used_pct",
       "margin_pct",
       "marginPct",
-    ], base.margin_used_pct),
-    margin_pct: pickMany(["margin_pct", "marginPct"], base.margin_used_pct),
+    ], base.margin_pct),
     updated_at: pickMany(["updated_at", "updatedAt"], base.updated_at),
+    staleness_sec: pickMany(["staleness_sec", "stalenessSec"], base.staleness_sec),
+    served_at: pickMany(["served_at", "servedAt"], base.served_at),
     session: sessionValue,
     session_info: sessionInfoValue,
     meta: metaValue,
+    totals: pickMany(["totals"], base.totals ?? null),
     data_source: pickMany(["data_source", "dataSource"], base.data_source ?? null),
   };
 };
@@ -1473,6 +1542,8 @@ export const handlers = [
   http.get("*/positions/stocks", () => HttpResponse.json(buildStocksResponse())),
   http.get("*/positions/options", () => HttpResponse.json(buildOptionsResponse())),
   http.get("*/stats", () => HttpResponse.json(buildStatsResponse())),
+  http.get("*/msb/current", () => HttpResponse.json(buildMsbReading())),
+  http.get("*/msb/history", () => HttpResponse.json(buildMsbHistory())),
   http.get("*/rules/summary", () => HttpResponse.json(buildRulesSummaryResponse())),
   http.get("*/fundamentals.json", () => HttpResponse.json(fundamentalsFixture)),
 ];

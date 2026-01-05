@@ -13,6 +13,9 @@ import pandas as pd
 import yfinance as yf
 from ib_insync import IB, Contract, Future, Index, Option, Stock
 
+from portfolio_exporter.core.ib_config import HOST as IB_HOST
+from portfolio_exporter.core.ib_config import connect_ib
+
 try:
     from pandas_datareader import data as web
 
@@ -21,8 +24,6 @@ except ImportError:
     FRED_AVAILABLE = False
 
 # --- Configuration ---
-IB_HOST = "127.0.0.1"
-IB_PORT = 7496  # use 7497 for paper/sim
 # Use a dedicated client ID for this utility module
 CLIENT_ID = 20
 
@@ -41,7 +42,10 @@ class IBManager:
     """A context manager for handling IBKR connections."""
 
     def __init__(
-        self, host: str = IB_HOST, port: int = IB_PORT, client_id: int = CLIENT_ID
+        self,
+        host: str = IB_HOST,
+        port: int | None = None,
+        client_id: int = CLIENT_ID,
     ):
         self.ib = IB()
         self.host = host
@@ -50,11 +54,17 @@ class IBManager:
 
     def __enter__(self) -> IB:
         try:
-            self.ib.connect(self.host, self.port, clientId=self.client_id, timeout=10)
+            used_port = connect_ib(
+                self.ib,
+                host=self.host,
+                port=self.port,
+                client_id=self.client_id,
+                timeout=10,
+            )
             # Switch to delayed data if live is not available
             if not self.ib.reqMarketDataType(1):  # 1 for live
                 self.ib.reqMarketDataType(3)  # 3 for delayed
-            log.info(f"Connected to IBKR at {self.host}:{self.port}")
+            log.info("Connected to IBKR at %s:%s", self.host, used_port)
         except Exception as e:
             log.error(f"Failed to connect to IBKR: {e}")
             raise ConnectionError("Could not connect to IBKR Gateway/TWS.") from e

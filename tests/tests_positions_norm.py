@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from psd.ingestor.normalize import split_positions
 
 
@@ -109,3 +111,30 @@ def test_split_positions_groups_stock_combo_and_single_option():
     assert len(singles_opts) == 1
     assert singles_opts[0]["symbol"] == "MSFT"
     assert round(singles_opts[0]["pnl_intraday"], 2) == 60.0
+
+
+def test_split_positions_prefers_explicit_mark_without_tick():
+    raw_positions = [
+        {
+            "secType": "STK",
+            "symbol": "AAPL",
+            "conId": 987,
+            "qty": 5,
+            "avg_cost": 10.0,
+            "price": 12.0,
+            "mark_source": "manual",
+            "stale_seconds": 45,
+            "pnl_leg": 250.0,
+        }
+    ]
+
+    result = split_positions(raw_positions, "EXT")
+
+    assert len(result["single_stocks"]) == 1
+    stock = result["single_stocks"][0]
+
+    assert stock["mark"] == pytest.approx(12.0)
+    assert stock["price_source"] == "manual"
+    assert stock["stale_s"] == pytest.approx(45.0)
+    assert stock["pnl_intraday"] == pytest.approx(250.0)
+    assert stock["pnl_leg"] == pytest.approx(250.0)

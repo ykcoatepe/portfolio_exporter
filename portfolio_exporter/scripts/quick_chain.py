@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -31,6 +31,7 @@ from portfolio_exporter.core import cli as cli_helpers
 from portfolio_exporter.core import json as json_helpers
 from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import parse_month_day_no_year
 from portfolio_exporter.core.io import save as io_save
 from portfolio_exporter.core.runlog import RunLog
 
@@ -80,7 +81,18 @@ def run(
         )
     else:
         exp_raw = expiry
-    parsed_exp = dateparser.parse(exp_raw, settings={"PREFER_DATES_FROM": "future"})
+    no_year = parse_month_day_no_year(exp_raw)
+    if no_year is not None:
+        parsed_exp = datetime.combine(no_year, time())
+    else:
+        try:
+            parsed_exp = datetime.fromisoformat(exp_raw)
+        except ValueError:
+            parsed_exp = None
+        if parsed_exp is None:
+            parsed_exp = dateparser.parse(
+                exp_raw, settings={"PREFER_DATES_FROM": "future"}
+            )
     if not parsed_exp:
         console.print(f"[red]Could not parse expiry '{exp_raw}'.")
         return

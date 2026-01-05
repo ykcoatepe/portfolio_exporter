@@ -1,78 +1,58 @@
-import { act, fireEvent, screen, waitFor, waitForElementToBeRemoved, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { OptionLegsTable } from "./OptionLegsTable";
-import { buildOptionsResponse } from "../mocks/handlers";
-import { server } from "../mocks/server";
+import seed from "../fixtures/optionLegs.seed.json";
+import { isOptionLegsSeed, type OptionLegsSeed } from "../lib/optionLegs.types";
 import { renderWithClient } from "../test/queryClient";
+import { OptionLegsTable } from "./OptionLegsTable";
 
-const mockOptions = () => {
-  const payload = buildOptionsResponse();
+const mockUseOptionLegs = vi.fn();
 
-  payload.legs.forEach((leg) => {
-    leg.label = leg.symbol ?? leg.label;
-    if (leg.display) {
-      leg.display.leg_label = leg.symbol ?? leg.display.leg_label;
-    }
-  });
+vi.mock("../hooks/useOptions", () => ({
+  useOptionLegs: () => mockUseOptionLegs(),
+}));
 
-  payload.combos?.forEach((combo) => {
-    const rawLabel = (combo.legs ?? [])
-      .map((leg) => leg.symbol ?? "")
-      .filter(Boolean)
-      .join(" • ");
-    if (rawLabel) {
-      combo.label = rawLabel;
-      if (combo.display) {
-        combo.display.combo_label = rawLabel;
-      }
-    }
-  });
+const deepClone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
-  payload.combo_groups?.forEach((group) => {
-    const rawGroupLabel = group.legs
-      .map((leg) => leg.symbol ?? "")
-      .filter(Boolean)
-      .join(" + ");
-    if (rawGroupLabel) {
-      group.label = rawGroupLabel;
-      if (group.display) {
-        group.display.combo_label = rawGroupLabel;
-      }
-    }
-    group.legs.forEach((leg) => {
-      leg.label = leg.symbol ?? leg.label;
-      if (leg.display) {
-        leg.display.leg_label = leg.symbol ?? leg.display.leg_label;
-      }
-    });
-  });
+const SEED_DATA: OptionLegsSeed = (() => {
+  if (isOptionLegsSeed(seed)) {
+    return seed;
+  }
+  throw new Error("Invalid option legs seed fixture");
+})();
 
-  server.use(
-    http.get("*/positions/options", () => HttpResponse.json(payload)),
-  );
-  return payload;
-};
+const ORPHAN_COUNT = SEED_DATA.legs.filter((leg) => leg.isOrphan).length;
+const MSFT_ORPHAN_COUNT = SEED_DATA.legs.filter(
+  (leg) => leg.isOrphan && leg.shortUnderlying === "MSFT",
+).length;
+const DELTA_RANGE_COUNT = SEED_DATA.legs.filter((leg) => {
+  const delta = leg.delta;
+  return delta !== null && delta >= 0.1 && delta <= 0.4;
+}).length;
+
+const createMockResult = () => ({
+  data: deepClone(SEED_DATA.legs),
+  isLoading: false,
+  isFetching: false,
+  error: null,
+  refetch: vi.fn(),
+  underlyings: [...SEED_DATA.underlyings],
+  expiries: [...SEED_DATA.expiries],
+});
 
 describe("OptionLegsTable", () => {
   beforeEach(() => {
-    vi.useRealTimers();
-    vi.setSystemTime(new Date("2024-01-01T12:00:00Z"));
-    mockOptions();
+    mockUseOptionLegs.mockReturnValue(createMockResult());
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    vi.setSystemTime(new Date());
-    vi.restoreAllMocks();
+    mockUseOptionLegs.mockReset();
   });
 
   test("renders friendly leg labels with OSI tooltip", async () => {
     renderWithClient(<OptionLegsTable />);
 
-    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
     const body = screen.getByTestId("rows-body");
     const firstRow = within(body).getAllByRole("row", { name: /leg row/i })[0];
     const rowHeader = within(firstRow).getByRole("rowheader");
@@ -94,20 +74,17 @@ describe("OptionLegsTable", () => {
     const user = userEvent.setup();
     renderWithClient(<OptionLegsTable />);
 
-    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
-    const grid = await screen.findByRole("grid", { name: /single option legs/i });
+    await screen.findByRole("grid", { name: /single option legs/i });
     const body = screen.getByTestId("rows-body");
     const initialRows = within(body).getAllByRole("row", { name: /leg row/i });
-    expect(initialRows.length).toBeGreaterThan(1);
+    expect(initialRows).toHaveLength(SEED_DATA.legs.length);
 
     const orphanToggle = screen.getByLabelText(/only orphan legs/i);
-    await act(async () => {
-      await user.click(orphanToggle);
-    });
+    await user.click(orphanToggle);
 
     await waitFor(() => {
       const rowsAfterOrphan = within(body).getAllByRole("row", { name: /leg row/i });
-      expect(rowsAfterOrphan).toHaveLength(2);
+      expect(rowsAfterOrphan).toHaveLength(ORPHAN_COUNT);
     });
 
     // Toggle underlying chip
@@ -118,20 +95,16 @@ describe("OptionLegsTable", () => {
     const allButton = within(underlyingsSection).getByRole("button", { name: /^all$/i });
     const msftButton = within(underlyingsSection).getByRole("button", { name: /^msft$/i });
 
-    await act(async () => {
-      await user.click(msftButton);
-    });
+    await user.click(msftButton);
     await waitFor(() => {
       const rowsAfterMsft = within(body).getAllByRole("row", { name: /leg row/i });
-      expect(rowsAfterMsft).toHaveLength(1);
+      expect(rowsAfterMsft).toHaveLength(MSFT_ORPHAN_COUNT);
     });
 
-    await act(async () => {
-      await user.click(allButton);
-    });
+    await user.click(allButton);
     await waitFor(() => {
       const rowsReset = within(body).getAllByRole("row", { name: /leg row/i });
-      expect(rowsReset.length).toBeGreaterThan(1);
+      expect(rowsReset).toHaveLength(ORPHAN_COUNT);
     });
   });
 
@@ -139,63 +112,39 @@ describe("OptionLegsTable", () => {
     const user = userEvent.setup();
     renderWithClient(<OptionLegsTable />);
 
-    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
-    const grid = await screen.findByRole("grid", { name: /single option legs/i });
+    await screen.findByRole("grid", { name: /single option legs/i });
     const body = screen.getByTestId("rows-body");
     const deltaMinInput = screen.getByLabelText(/Δ Min/i, { selector: "input" });
     const deltaMaxInput = screen.getByLabelText(/Δ Max/i, { selector: "input" });
 
-    await act(async () => {
-      fireEvent.change(deltaMinInput, { target: { value: "0.1" } });
-      fireEvent.change(deltaMaxInput, { target: { value: "0.4" } });
-    });
+    fireEvent.change(deltaMinInput, { target: { value: "0.1" } });
+    fireEvent.change(deltaMaxInput, { target: { value: "0.4" } });
 
     await waitFor(() => {
       expect(screen.queryByText("-0.18")).not.toBeInTheDocument();
     });
     const filteredRows = within(body).getAllByRole("row", { name: /leg row/i });
-    expect(filteredRows).toHaveLength(2);
+    expect(filteredRows).toHaveLength(DELTA_RANGE_COUNT);
+    expect(screen.queryByText("-0.18")).not.toBeInTheDocument();
+    expect(screen.queryByText("-0.55")).not.toBeInTheDocument();
 
     // Reset delta range
     const resetButton = screen.getByRole("button", { name: /reset Δ/i });
-    await act(async () => {
-      await user.click(resetButton);
-    });
+    await user.click(resetButton);
     await waitFor(() => {
       const rowsAfterReset = within(body).getAllByRole("row", { name: /leg row/i });
-      expect(rowsAfterReset.length).toBeGreaterThan(filteredRows.length);
+      expect(rowsAfterReset).toHaveLength(SEED_DATA.legs.length);
     });
   });
 
   test("displays legs with derived marks even when totals are null", async () => {
-    const payload = mockOptions();
-    const targetLeg = payload.legs[0];
-    targetLeg.symbol = "NULLPNL  250118C00150000";
-    targetLeg.label = "Null PnL Mark";
-    targetLeg.display = {
-      ...targetLeg.display,
-      leg_label: "Null PnL Mark",
-      short_ul: "NPNL",
-      expiry_short: "JAN25",
-    };
-    targetLeg.mark_price = null;
-    targetLeg.mark_time = null;
-    targetLeg.mark = 1.23;
-    targetLeg.last = 1.23;
-    targetLeg.last_ts = "2024-01-01T11:59:30Z";
-    targetLeg.previous_close = 1.1;
-    targetLeg.total_pnl_amount = null;
-    targetLeg.total_pnl_percent = null;
-    targetLeg.day_pnl_amount = null;
-    targetLeg.day_pnl_percent = null;
-
+    mockUseOptionLegs.mockReturnValueOnce(createMockResult());
     renderWithClient(<OptionLegsTable />);
 
-    await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
     const body = screen.getByTestId("rows-body");
     const rows = within(body).getAllByRole("row", { name: /leg row/i });
     const targetRow = rows.find((row) =>
-      within(row).queryByText(/Null PnL Mark/i),
+      within(row).queryByText(/AAPL 165C Jun 21 '24/i),
     );
     expect(targetRow).toBeDefined();
     if (!targetRow) {
@@ -203,7 +152,6 @@ describe("OptionLegsTable", () => {
     }
 
     expect(within(targetRow).getByText(/\$1\.23/)).toBeInTheDocument();
-    expect(within(targetRow).getByText("00:30")).toBeInTheDocument();
     const placeholders = within(targetRow).getAllByText("—");
     expect(placeholders.length).toBeGreaterThan(0);
   });

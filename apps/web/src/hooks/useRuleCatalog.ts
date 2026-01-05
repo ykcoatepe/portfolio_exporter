@@ -8,6 +8,7 @@ import {
 
 import type { components } from "../lib/api";
 import type { RuleBreachSummary, RuleCounters, RuleSeverity } from "./useRules";
+import { resolveApiBaseUrl } from "../lib/http";
 
 const RULE_CATALOG_QUERY_KEY = ["rules", "catalog"] as const;
 
@@ -22,15 +23,7 @@ type RawTopEntry = RawValidationResponse["top"] extends Array<infer Item> ? Item
 
 type RawRuleRecord = RawCatalogResponse["rules"] extends Array<infer Item> ? Item : never;
 
-const resolveOrigin = (baseUrl = ""): string => {
-  if (baseUrl) {
-    return baseUrl.replace(/\/+$/, "");
-  }
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin;
-  }
-  return "http://localhost";
-};
+const resolveOrigin = (baseUrl = ""): string => resolveApiBaseUrl(baseUrl);
 
 const coerceInteger = (value: unknown, fallback = 0): number => {
   const next = Number(value);

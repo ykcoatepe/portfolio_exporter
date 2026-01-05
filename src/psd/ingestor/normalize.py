@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
+import time
 from collections import defaultdict
 from collections.abc import Iterable
 from typing import Any
@@ -8,6 +11,71 @@ from typing import Any
 from psd.core.mark_router import Session, choose_mark, pnl_option, pnl_stock
 
 _ALLOWED_SESSION: set[str] = {"RTH", "EXT", "CLOSED"}
+
+
+def _coerce_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _extract_price_source(raw: dict[str, Any]) -> str | None:
+    for key in ("price_source", "priceSource", "mark_source", "markSource"):
+        source_raw = raw.get(key)
+        if isinstance(source_raw, str):
+            stripped = source_raw.strip()
+            if stripped:
+                return stripped
+    return None
+
+
+def _extract_stale_hint(raw: dict[str, Any]) -> float | None:
+    for key in (
+        "stale_s",
+        "stale_seconds",
+        "staleSeconds",
+        "age_s",
+        "ageSeconds",
+        "mark_age_s",
+        "mark_age_seconds",
+    ):
+        stale_val = _coerce_float(raw.get(key))
+        if stale_val is not None:
+            return max(0.0, stale_val)
+    for key in (
+        "mark_ts",
+        "mark_timestamp",
+        "markTs",
+        "price_ts",
+        "priceTimestamp",
+    ):
+        ts_val = _coerce_float(raw.get(key))
+        if ts_val is None:
+            continue
+        return max(0.0, time.time() - ts_val)
+    return None
+
+
+def _extract_explicit_mark(raw: dict[str, Any]) -> tuple[float, str] | None:
+    for key, label in (
+        ("mark", "mark"),
+        ("price", "price"),
+        ("marketPrice", "marketPrice"),
+        ("market_price", "market_price"),
+        ("lastPrice", "lastPrice"),
+        ("market_price_last", "market_price_last"),
+        ("market_price_mid", "market_price_mid"),
+    ):
+        value = raw.get(key)
+        if isinstance(value, dict):
+            candidate = _coerce_float(value.get("price") or value.get("value"))
+        else:
+            candidate = _coerce_float(value)
+        if candidate is not None:
+            return candidate, label
+    return None
 
 
 def _normalize_session(session: str | Session) -> Session:
@@ -22,20 +90,64 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
     tick = raw.get("tick") if isinstance(raw.get("tick"), dict) else {}
 
     normalized_session = _normalize_session(session)
-    mark_raw, source, stale_s = choose_mark(tick, normalized_session)
 
-    qty = float(raw.get("qty", raw.get("position", 0.0)) or 0.0)
-    avg_cost = float(raw.get("avg_cost", raw.get("average_cost", 0.0)) or 0.0)
-    mark_value = mark_raw if math.isfinite(mark_raw) else avg_cost
+    explicit_mark = _extract_explicit_mark(raw)
+    price_source_hint = _extract_price_source(raw)
+    stale_hint = _extract_stale_hint(raw)
 
-    multiplier = 1.0
-    if sec in {"OPT", "FOP"}:
-        multiplier = float(raw.get("multiplier", 100.0) or 100.0)
+    mark_raw: float
+    fallback_source: str | None = None
+    fallback_stale: float | None = 0.0
+
+    if explicit_mark is not None:
+        mark_raw, fallback_source = explicit_mark
+    else:
+        mark_raw, fallback_source, fallback_stale = choose_mark(
+            tick, normalized_session
+        )
+
+    price_source_candidate = price_source_hint or (fallback_source or "unknown")
+    price_source = (
+        price_source_candidate.strip()
+        if isinstance(price_source_candidate, str)
+        else "unknown"
+    )
+    if not price_source:
+        price_source = "unknown"
+
+    stale_value = stale_hint if stale_hint is not None else fallback_stale
+    stale_s_coerced = _coerce_float(stale_value)
+    stale_s = max(0.0, stale_s_coerced) if stale_s_coerced is not None else 0.0
+
+    qty = _coerce_float(raw.get("qty"))
+    if qty is None:
+        qty = _coerce_float(raw.get("position"))
+    qty = qty if qty is not None else 0.0
+
+    avg_cost = _coerce_float(raw.get("avg_cost"))
+    if avg_cost is None:
+        avg_cost = _coerce_float(raw.get("average_cost"))
+    avg_cost = avg_cost if avg_cost is not None else 0.0
+
+    mark_coerced = _coerce_float(mark_raw)
+    mark_value = mark_coerced if mark_coerced is not None else avg_cost
+
+    multiplier = _coerce_float(raw.get("multiplier"))
+    if multiplier is None:
+        multiplier = 100.0 if sec in {"OPT", "FOP"} else 1.0
 
     pnl_value = (
         pnl_option(mark_value, avg_cost, qty, multiplier)
         if sec in {"OPT", "FOP"}
         else pnl_stock(mark_value, avg_cost, qty)
+    )
+
+    pnl_intraday_raw = _coerce_float(raw.get("pnl_intraday"))
+    pnl_leg_raw = _coerce_float(raw.get("pnl_leg"))
+    pnl_intraday = (
+        pnl_intraday_raw
+        if pnl_intraday_raw is not None
+        else (pnl_leg_raw if pnl_leg_raw is not None else pnl_value)
     )
 
     base: dict[str, Any] = {
@@ -46,11 +158,21 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         "avg_cost": avg_cost,
         "multiplier": multiplier,
         "mark": mark_value,
-        "price_source": source,
+        "price_source": price_source,
         "stale_s": stale_s,
-        "pnl_intraday": pnl_value,
+        "pnl_intraday": pnl_intraday,
         "greeks": raw.get("greeks") or {},
     }
+
+    if pnl_leg_raw is not None:
+        base["pnl_leg"] = pnl_leg_raw
+
+    pnl_intraday_value = _coerce_float(base.get("pnl_intraday"))
+    if pnl_intraday_value is not None:
+        base["pnl_day"] = float(pnl_intraday_value)
+
+    fallback_unrealized = (mark_value - avg_cost) * qty * multiplier
+    base.setdefault("__fallback_unrealized", fallback_unrealized)
 
     if sec in {"OPT", "FOP"}:
         base.update(
@@ -71,6 +193,12 @@ def _leg_key(entry: dict[str, Any]) -> tuple[Any, ...]:
         entry.get("right"),
         entry.get("strike"),
     )
+
+
+def _stable_combo_id(parts: object, prefix: str) -> str:
+    payload = json.dumps(parts, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}:{digest}"
 
 
 def _aggregate_greeks(legs: Iterable[dict[str, Any]]) -> dict[str, float]:
@@ -142,8 +270,9 @@ def split_positions(
             legs_of_combo.add(id(match))
         if not legs:
             continue
-        combo_id = str(
-            hash(tuple(sorted((leg.get("conId"), leg.get("qty")) for leg in legs)))
+        combo_id = _stable_combo_id(
+            sorted((leg.get("conId"), leg.get("qty")) for leg in legs),
+            "combo",
         )
         combos.append(
             {
@@ -184,7 +313,10 @@ def split_positions(
             legs_of_combo.add(id(short_leg))
             combo_name_parts = [str(val) for val in key if val]
             combo_name = " ".join(combo_name_parts) or "Vertical"
-            combo_id = f"vertical:{hash((long_leg.get('conId'), short_leg.get('conId'), qty_long))}"
+            combo_id = _stable_combo_id(
+                (long_leg.get("conId"), short_leg.get("conId"), qty_long),
+                "vertical",
+            )
             combo_legs = [long_leg, short_leg]
             combos.append(
                 {

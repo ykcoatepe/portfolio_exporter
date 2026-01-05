@@ -5,7 +5,6 @@ import json
 import os
 from collections.abc import Iterable
 from contextlib import contextmanager
-from datetime import datetime
 from pathlib import Path
 from time import perf_counter
 
@@ -38,7 +37,9 @@ class RunLog:
 
     def __enter__(self) -> RunLog:
         self._start = perf_counter()
-        self.start_ts = datetime.utcnow().isoformat()
+        from .date_utils import utcnow
+
+        self.start_ts = utcnow().isoformat()
         return self
 
     def __exit__(
@@ -65,7 +66,9 @@ class RunLog:
             self.timings.append({"stage": stage, "ms": int((end - start) * 1000)})
 
     def finalize(self, *, write: bool) -> Path | None:
-        end_ts = datetime.utcnow().isoformat()
+        from .date_utils import utcnow
+
+        end_ts = utcnow().isoformat()
         duration_ms = int((perf_counter() - self._start) * 1000)
 
         def _json_sanitize(obj):

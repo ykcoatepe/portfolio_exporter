@@ -27,14 +27,28 @@ from portfolio_exporter.core.config import settings
 
 try:  # optional IBKR config
     from portfolio_exporter.core.ib_config import HOST as IB_HOST
-    from portfolio_exporter.core.ib_config import PORT as IB_PORT
     from portfolio_exporter.core.ib_config import client_id as _cid
+    from portfolio_exporter.core.ib_config import connect_ib
 except Exception:  # pragma: no cover - fallback defaults
     IB_HOST = "127.0.0.1"  # type: ignore
-    IB_PORT = 7496  # type: ignore  # set 7497 for paper/sim
+    IB_PORT = 4001  # type: ignore  # Gateway live; set 4002/7497 for paper
 
     def _cid(name: str, default: int = 0) -> int:  # type: ignore
         return default
+
+    def connect_ib(  # type: ignore
+        ib,
+        *,
+        host: str | None = None,
+        port: int | None = None,
+        client_id: int = 0,
+        timeout: int = 10,
+        silent_first: bool = True,
+    ) -> int:
+        target_host = host if host is not None else IB_HOST
+        target_port = port if port is not None else IB_PORT
+        ib.connect(target_host, target_port, clientId=client_id, timeout=timeout)
+        return target_port
 
 
 import logging
@@ -49,6 +63,7 @@ from portfolio_exporter.core import combo as combo_core
 from portfolio_exporter.core import config as config_core
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import json as json_helpers
+from portfolio_exporter.core.date_utils import parse_month_day_no_year
 from portfolio_exporter.core.runlog import RunLog
 
 # Reuse enrichment from portfolio_greeks to keep behavior identical
@@ -386,12 +401,11 @@ def _load_open_orders() -> pd.DataFrame:
         return pd.DataFrame()
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_OPEN_CID, timeout=5)
+        connect_ib(ib, host=IB_HOST, client_id=IB_OPEN_CID, timeout=5)
     except Exception as exc:  # pragma: no cover - connection optional
         logger.warning(
-            "IBKR connection failed for open orders: host=%s port=%s cid=%s err=%s",
+            "IBKR connection failed for open orders: host=%s cid=%s err=%s",
             IB_HOST,
-            IB_PORT,
             IB_OPEN_CID,
             exc,
         )
@@ -936,13 +950,12 @@ def fetch_trades_ib(start: date, end: date) -> tuple[list[Trade], list[OpenOrder
     ib = IB()
 
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=10)
+        connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=10)
     except Exception as exc:
         # Align with other scripts: downgrade to a warning and continue offline
         logger.warning(
-            "IBKR connection failed for executions: host=%s port=%s cid=%s err=%s",
+            "IBKR connection failed for executions: host=%s cid=%s err=%s",
             IB_HOST,
-            IB_PORT,
             IB_CID,
             exc,
         )
@@ -1554,7 +1567,9 @@ def _build_positions_like_df(
     side = (
         df["Side"]
         if "Side" in df.columns
-        else df["side"] if "side" in df.columns else pd.Series([""] * len(df))
+        else df["side"]
+        if "side" in df.columns
+        else pd.Series([""] * len(df))
     )
     # signed qty: BUY +, SELL -
     sign = side.apply(
@@ -1900,9 +1915,7 @@ def _cluster_executions(
                 clusters.get("pnl"), errors="coerce"
             ).fillna(0.0) - pd.to_numeric(
                 clusters.get("commission"), errors="coerce"
-            ).fillna(
-                0.0
-            )
+            ).fillna(0.0)
     except Exception:
         pass
 
@@ -3239,6 +3252,9 @@ def _parse_when(s: str | None) -> datetime | None:
     s = s.strip()
     if not s:
         return None
+    no_year = parse_month_day_no_year(s)
+    if no_year is not None:
+        return datetime(no_year.year, no_year.month, no_year.day)
     # Try dateparser for flexibility if available
     try:
         import dateparser  # type: ignore

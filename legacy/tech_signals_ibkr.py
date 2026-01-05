@@ -13,7 +13,7 @@ import os, sys, time, logging
 import csv
 import argparse
 from math import log, sqrt, erf
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 TR_TZ = ZoneInfo("Europe/Istanbul")
@@ -194,7 +194,7 @@ def front_future(root: str, exch: str) -> Future:
         details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)
     ):
         dt = _parse_ib_month(det.contract.lastTradeDateOrContractMonth)
-        if dt > datetime.utcnow():
+        if dt > datetime.now(timezone.utc).replace(tzinfo=None):
             return det.contract
     # fallback to first detail if all expired
     return details[0].contract
@@ -456,7 +456,13 @@ for tk in iterable:
             iv_now = np.nan
             min_diff = 1e9
             T = (
-                max((datetime.strptime(expiry, "%Y%m%d") - datetime.utcnow()).days, 1)
+                max(
+                    (
+                        datetime.strptime(expiry, "%Y%m%d")
+                        - datetime.now(timezone.utc).replace(tzinfo=None)
+                    ).days,
+                    1,
+                )
                 / 365
             )
             oi_sum = 0
@@ -525,7 +531,7 @@ for tk in iterable:
     # IV rank
     fn = os.path.join(DATA_DIR, f"{tk}.csv")
     if not np.isnan(iv_now):
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")
         pd.DataFrame([[today, iv_now]], columns=["date", "iv"]).to_csv(
             fn, mode="a", header=not os.path.exists(fn), index=False
         )

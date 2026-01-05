@@ -27,6 +27,7 @@ import pandas as pd
 
 from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import utcnow
 
 run_with_spinner = core_ui.run_with_spinner
 import math
@@ -294,8 +295,8 @@ def _resolve_output_dir() -> str:
 
 
 from portfolio_exporter.core.ib_config import HOST as IB_HOST
-from portfolio_exporter.core.ib_config import PORT as IB_PORT
 from portfolio_exporter.core.ib_config import client_id as _cid
+from portfolio_exporter.core.ib_config import connect_ib
 
 _EVENT_LOOP: asyncio.AbstractEventLoop | None = None
 
@@ -438,7 +439,7 @@ def fetch_ib_quotes(tickers: list[str], opt_cons: list[Option]) -> pd.DataFrame:
     _ensure_event_loop()
     ib = IB()
     try:
-        ib.connect(IB_HOST, IB_PORT, clientId=IB_CID, timeout=3)
+        connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=3)
     except Exception:
         logging.warning("IBKR Gateway not reachable — skipping IB pull.")
         return pd.DataFrame()
@@ -597,7 +598,7 @@ def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
     if not FRED_AVAILABLE:
         return pd.DataFrame()
     rows = []
-    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    ts = utcnow().isoformat(timespec="seconds") + "Z"
     iterable = iter_progress(tickers, "FRED") if PROGRESS else tickers
     for t in iterable:
         series = YIELD_MAP.get(t)
@@ -842,7 +843,7 @@ def run(
         _ensure_event_loop()
         ib_tmp = IB()
         try:
-            ib_tmp.connect(IB_HOST, IB_PORT, clientId=99, timeout=3)
+            connect_ib(ib_tmp, host=IB_HOST, client_id=99, timeout=3)
             opt_list, opt_under = fetch_ib_positions(ib_tmp)
             ib_tmp.disconnect()
         except Exception:
@@ -891,7 +892,7 @@ def run(
         _ensure_event_loop()
         ib_live = IB()
         try:
-            ib_live.connect(IB_HOST, IB_PORT, clientId=98, timeout=3)
+            connect_ib(ib_live, host=IB_HOST, client_id=98, timeout=3)
             df_pos = fetch_live_positions(ib_live)
             ib_live.disconnect()
             if not df_pos.empty:

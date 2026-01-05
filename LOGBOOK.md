@@ -4,6 +4,14 @@ Scope: scan_once, memos JSONL, CLI table, rules & tests
 Key files: src/psd/**, config/rules.yaml, scripts/run_sentinel.py, tests/test_*
 Status: merged @ v0.1 scaffold → implementation
 
+# 2025-10-23 • Task: MSB sentinel scheduler & live bar • Branch: feature/msb-api-sse-v1
+Owner: codex (session/ai)
+Scope: TRT 17:30 scheduler, Rule A/B/C evaluation w/ cooldown, SSE alerts, live hedge CSV, Prometheus metrics, docs/tests
+Key files: src/psd/sentinel/sched.py, src/psd/sentinel/msb_actions.py, src/psd/ui/livebar.py, tests/test_msb_*.py
+Status: open → PR #173
+Next: monitor metrics rollout, consider UI surfacing of live bar
+Risks/Notes: Vendor CSV freshness gates scheduler; live bar CSV ignored by git, ensure ops collects artifacts
+
 # 2025-09-14 • Task: Scaffold PSD (v0.1) • Branch: feature/psd-sentinel-v0
 Owner: codex (session/codex)
 Scope: Create structure and placeholders for PSD; no logic yet
@@ -72,3 +80,22 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Next:** MSB feature
 
 **Notes:** CI gate now builds SPA  |  Ref: <PR link>
+
+### 2025-10-24 • Task: MSB docs & ops polish • Branch: docs/msb-playbook-v1
+**Owner:** session/ai  |  **Scope:** manual.md rule block, agent.md quickstart, README endpoint notes, CI web-test
+
+**Interfaces:** /msb/*, /sse, Make targets
+
+**Status:** open → merged @ <sha>  |  **Next:** tag psd-v0.1
+
+**Risks/Notes:** vendor CSV freshness; cooldown governance
+
+### 2025-10-24 • Task: v0.1 Release Cut • Branch: release/psd-v0.1
+**Owner:** session/ai | **Scope:** versions, changelog, gitleaks/osv gates, artifacts, tag
+**Interfaces:** /msb/*, /sse
+**Status:** open → tagged @ <sha> | **Next:** v0.1.1 deps bump (pypdf/vite/fast-redact)
+
+### 2025-10-24 • Task: v0.1.1 Deps + FRED Parquet • Branch: release/v0.1.1-msb-fred-parquet-deps
+**Owner:** session/ai | **Scope:** pypdf/vite bumps, FRED HY toggle, Parquet export
+**Interfaces:** /msb/history(.csv|.parquet)
+**Status:** open → merged @ <sha> | **Next:** monitor FRED rate limits & front-end parquet UX

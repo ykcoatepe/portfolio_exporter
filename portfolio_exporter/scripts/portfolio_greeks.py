@@ -256,12 +256,27 @@ try:
     from portfolio_exporter.core.ib_config import HOST as IB_HOST
     from portfolio_exporter.core.ib_config import PORT as IB_PORT
     from portfolio_exporter.core.ib_config import client_id as _cid
+    from portfolio_exporter.core.ib_config import connect_ib
 except Exception:  # pragma: no cover - optional fallback
     IB_HOST = "127.0.0.1"  # type: ignore
-    IB_PORT = 7497  # type: ignore
+    IB_PORT = 4001  # type: ignore  # Gateway live; set 4002/7497 for paper
 
     def _cid(name: str, default: int = 0) -> int:  # type: ignore
         return default
+
+    def connect_ib(  # type: ignore
+        ib,
+        *,
+        host: str | None = None,
+        port: int | None = None,
+        client_id: int = 0,
+        timeout: int = 10,
+        silent_first: bool = True,
+    ) -> int:
+        target_host = host if host is not None else IB_HOST
+        target_port = port if port is not None else IB_PORT
+        ib.connect(target_host, target_port, clientId=client_id, timeout=timeout)
+        return target_port
 
 
 IB_CID = _cid("portfolio_greeks", default=11)  # separate clientId from snapshots
@@ -795,8 +810,9 @@ def main_cli() -> None:
 
     ib = IB()
     try:
-        logger.info(f"Connecting to IBKR on {IB_HOST}:{IB_PORT} with CID {IB_CID} …")
-        ib.connect(IB_HOST, IB_PORT, IB_CID, timeout=10)
+        logger.info("Connecting to IBKR on %s with CID %s …", IB_HOST, IB_CID)
+        used_port = connect_ib(ib, host=IB_HOST, client_id=IB_CID, timeout=10)
+        logger.info("Connected to IBKR on port %d", used_port)
     except Exception as exc:
         logger.error(f"IBKR connection failed: {exc}", exc_info=True)
         sys.exit(1)
@@ -1283,6 +1299,29 @@ async def _load_positions() -> pd.DataFrame:  # pragma: no cover - replaced in t
 
 def load_positions_sync() -> pd.DataFrame:
     """Synchronous wrapper around :func:`_load_positions`."""
+
+    if os.getenv("PE_TEST_MODE") == "1":
+        args_obj = globals().get("args")
+        positions_csv = (
+            getattr(args_obj, "positions_csv", None) if args_obj is not None else None
+        )
+        if positions_csv:
+            try:
+                df = pd.read_csv(os.path.expanduser(positions_csv)).copy()
+                if "secType" not in df.columns:
+                    df["secType"] = "OPT"
+                if "multiplier" not in df.columns:
+                    df["multiplier"] = 100
+                for greek in ["delta", "gamma", "vega", "theta"]:
+                    if greek not in df.columns:
+                        df[greek] = 0.0
+                if "qty" not in df.columns:
+                    df["qty"] = 0.0
+                if "underlying" not in df.columns and "symbol" in df.columns:
+                    df["underlying"] = df["symbol"]
+                return df
+            except Exception:
+                pass
 
     try:
         asyncio.get_running_loop()

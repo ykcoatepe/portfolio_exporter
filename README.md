@@ -120,6 +120,10 @@ Quick start (recommended flow)
 - Quiet CI runs: export `PE_QUIET=1` to suppress Rich output
 
 Environment and configuration
+> **IB Gateway is now the preferred connection method.** When `IB_PORT` is unset,
+> scripts automatically try Gateway (4001) with fallback to TWS (7496).
+> See [IB Gateway Setup Guide](docs/IB_GATEWAY_SETUP.md) for installation.
+
 - `OUTPUT_DIR`: default directory for generated files (honored via settings)
 - `PE_OUTPUT_DIR`: legacy override used by some scripts (e.g., Net‑Liq CLI)
 - `PE_QUIET`: when set and non‑zero, suppresses pretty console output

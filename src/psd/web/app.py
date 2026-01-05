@@ -5,6 +5,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
@@ -18,10 +19,13 @@ from psd.core.store import (
     init,
     latest_snapshot,
     max_event_id,
+    read_last_stats,
     read_msb_current,
     read_msb_history,
     tail_events,
 )
+from psd.sentinel.sched import start_msb_scheduler, stop_msb_scheduler
+from psd.ui.exporters import export_snapshot
 from psd.web.config import Settings, get_settings
 from psd.web.ready import router as ready_router
 from psd.web.sse import SseManager, sse_endpoint
@@ -39,6 +43,15 @@ _DEFAULT_STATS_EMPTY = compute_stats(None)
 
 STREAM_CLIENTS = Gauge("psd_stream_clients", "Connected SSE clients")
 STREAM_EVENTS = Counter("psd_stream_events_total", "SSE events sent", ["kind"])
+STATS_STARTUP_BROADCASTS = Counter(
+    "psd_stats_startup_broadcasts_total",
+    "Initial stats broadcasts emitted during application startup",
+)
+STATS_BROADCASTS = Counter(
+    "psd_stats_broadcasts_total",
+    "Portfolio stats SSE broadcasts emitted",
+    ["trigger"],
+)
 
 router = APIRouter()
 
@@ -73,7 +86,16 @@ def _create_lifespan(settings: Settings) -> Any:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         init()
-        yield
+        start_msb_scheduler(_app)
+        try:
+            if broadcast_latest_stats(_app, trigger="startup"):
+                STATS_STARTUP_BROADCASTS.inc()
+        except Exception:
+            log.debug("initial stats broadcast failed", exc_info=True)
+        try:
+            yield
+        finally:
+            stop_msb_scheduler()
 
     return lifespan
 
@@ -118,9 +140,72 @@ def stats() -> JSONResponse:
     return JSONResponse(payload)
 
 
+def _parse_updated_at(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(value), tz=UTC)
+        except (OverflowError, ValueError):
+            return None
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if text.endswith("Z"):
+            text = text.rstrip("Z") + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    return None
+
+
+def _build_stats_payload(now: datetime | None = None) -> dict[str, Any] | None:
+    stats = read_last_stats()
+    if not stats:
+        return None
+    payload = dict(stats)
+    reference = now or datetime.now(tz=UTC)
+    updated_at = _parse_updated_at(payload.get("updated_at"))
+    staleness = None
+    if updated_at is not None:
+        staleness = max(0.0, (reference - updated_at).total_seconds())
+    payload["staleness_sec"] = staleness
+    payload["served_at"] = reference.isoformat()
+    return payload
+
+
+@router.get("/stats/current")
+def stats_current(fresh_within_sec: float | None = None) -> Response:
+    payload = _build_stats_payload()
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Stats unavailable")
+    staleness = payload.get("staleness_sec")
+    if staleness is not None and fresh_within_sec is not None:
+        try:
+            threshold = float(fresh_within_sec)
+        except (TypeError, ValueError):
+            threshold = None
+        else:
+            if threshold < 0:
+                threshold = 0.0
+        if threshold is not None and staleness > threshold:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return JSONResponse(payload)
+
+
 @router.get("/stream")
 async def stream(
-    request: Request, settings: Settings = Depends(get_settings)  # noqa: B008
+    request: Request,
+    settings: Settings = Depends(get_settings),  # noqa: B008
 ):
     last_event_id_header = request.headers.get("last-event-id", "").strip()
     last_event_id: int | None
@@ -189,9 +274,12 @@ async def stream(
             snap = latest_snapshot()
             if snap:
                 STREAM_EVENTS.labels("snapshot").inc()
-                yield "event: snapshot\n" + "data: " + json.dumps(
-                    snap, separators=(",", ":")
-                ) + "\n\n"
+                yield (
+                    "event: snapshot\n"
+                    + "data: "
+                    + json.dumps(snap, separators=(",", ":"))
+                    + "\n\n"
+                )
                 frames_sent += 1
                 t_last = time.monotonic()
                 if _maybe_quit():
@@ -261,6 +349,22 @@ def msb_history(days: int = 365) -> list[MsbDTO]:
     return [MsbDTO.model_validate(entry) for entry in history]
 
 
+@router.get("/msb/history.csv")
+def msb_history_csv(days: int = 365) -> Response:
+    history = read_msb_history(days)
+    content, media_type, filename = export_snapshot(history, fmt="csv")
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    return Response(content=content, media_type=media_type, headers=headers)
+
+
+@router.get("/msb/history.parquet")
+def msb_history_parquet(days: int = 365) -> Response:
+    history = read_msb_history(days)
+    content, media_type, filename = export_snapshot(history, fmt="parquet")
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    return Response(content=content, media_type=media_type, headers=headers)
+
+
 @router.post("/msb/broadcast", status_code=status.HTTP_200_OK)
 async def msb_broadcast(request: Request) -> JSONResponse:
     success = broadcast_latest_msb(request.app)
@@ -278,6 +382,26 @@ def broadcast_latest_msb(app: FastAPI) -> bool:
         return False
     dto = MsbDTO.model_validate(record).model_dump(mode="json")
     manager.broadcast("msb.update", dto)
+    try:
+        broadcast_latest_stats(app, trigger="msb")
+    except Exception:  # pragma: no cover - defensive logging path
+        log.debug("stats broadcast after msb update failed", exc_info=True)
+    return True
+
+
+def broadcast_latest_stats(app: FastAPI, *, trigger: str = "manual") -> bool:
+    manager = getattr(app.state, "sse", None)
+    if not isinstance(manager, SseManager):
+        raise RuntimeError("SSE manager not attached to FastAPI application")
+    payload = _build_stats_payload()
+    if payload is None:
+        return False
+    manager.broadcast("psd.stats.update", payload)
+    try:
+        label = str(trigger or "manual")
+    except Exception:  # pragma: no cover - extremely defensive
+        label = "manual"
+    STATS_BROADCASTS.labels(trigger=label).inc()
     return True
 
 
@@ -304,12 +428,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/sse")
     async def _sse_route(
-        request: Request, current: Settings = Depends(get_settings)  # noqa: B008
+        request: Request,
+        current: Settings = Depends(get_settings),  # noqa: B008
     ):
         manager_in_state = getattr(app.state, "sse", None)
         if not isinstance(manager_in_state, SseManager):
             raise HTTPException(status_code=503, detail="SSE manager unavailable")
-        if manager_in_state.heartbeat_interval != max(1, int(current.sse_heartbeat_sec)):
+        if manager_in_state.heartbeat_interval != max(
+            1, int(current.sse_heartbeat_sec)
+        ):
             app.state.sse = SseManager(heartbeat_interval=current.sse_heartbeat_sec)
             manager_in_state = app.state.sse
         return await sse_endpoint(request, manager_in_state)

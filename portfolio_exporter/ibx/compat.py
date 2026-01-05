@@ -9,6 +9,8 @@ from typing import Any
 
 from ib_insync import IB
 
+from portfolio_exporter.core.ib_config import connect_ports, is_port_explicit
+
 log = logging.getLogger(__name__)
 
 _ASYNC_SUPPORT: dict[str, bool] = {}
@@ -65,6 +67,11 @@ async def connect(
         default_timeout = 7.0
     timeout_value = timeout if timeout is not None else default_timeout
 
+    if is_port_explicit() or port not in (4001, 7496):
+        ports_to_try = (port,)
+    else:
+        ports_to_try = connect_ports()
+
     async with _connect_lock:
         if _ib_singleton and _ib_singleton.isConnected():
             return _ib_singleton
@@ -77,29 +84,41 @@ async def connect(
             ib = IB()
 
             async def _do_connect() -> IB:
-                try:
+                last_exc: Exception | None = None
+                for idx, try_port in enumerate(ports_to_try):
                     try:
-                        await ib.connectAsync(
-                            host, port, clientId=client_id, timeout=timeout_value
-                        )
-                    except (RuntimeError, NotImplementedError) as exc:
-                        log.debug(
-                            "connectAsync not available here (%s), falling back to sync connect",
-                            exc,
-                        )
-                        _mark_sync("connect")
-                        await _to_thread(
-                            ib.connect,
-                            host,
-                            port,
-                            clientId=client_id,
-                            timeout=timeout_value,
-                        )
-                    return ib
-                except Exception:
-                    with contextlib.suppress(Exception):
-                        ib.disconnect()
-                    raise
+                        try:
+                            await ib.connectAsync(
+                                host,
+                                try_port,
+                                clientId=client_id,
+                                timeout=timeout_value,
+                            )
+                        except (RuntimeError, NotImplementedError) as exc:
+                            log.debug(
+                                "connectAsync not available here (%s), falling back to sync connect",
+                                exc,
+                            )
+                            _mark_sync("connect")
+                            await _to_thread(
+                                ib.connect,
+                                host,
+                                try_port,
+                                clientId=client_id,
+                                timeout=timeout_value,
+                            )
+                        if idx > 0:
+                            log.info("Connected on fallback port %d", try_port)
+                        return ib
+                    except Exception as exc:
+                        last_exc = exc
+                        if idx == 0 and len(ports_to_try) > 1:
+                            log.debug(
+                                "Port %d unreachable, trying fallback...", try_port
+                            )
+                        with contextlib.suppress(Exception):
+                            ib.disconnect()
+                raise ConnectionError(f"All ports failed: {ports_to_try}") from last_exc
 
             task = asyncio.create_task(_do_connect())
             _connecting = task

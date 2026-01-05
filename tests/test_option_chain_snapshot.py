@@ -2,7 +2,7 @@ import sys
 import types
 import unittest
 from unittest.mock import patch
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import tempfile
 import zipfile
@@ -38,14 +38,14 @@ oc = importlib.import_module("legacy.option_chain_snapshot")
 
 class ChooseExpiryTests(unittest.TestCase):
     def test_weekly_within_seven_days(self):
-        today = datetime.utcnow().date()
+        today = datetime.now(tz=timezone.utc).date()
         exp_close = (today + timedelta(days=3)).strftime("%Y%m%d")
         exp_later = (today + timedelta(days=10)).strftime("%Y%m%d")
         result = oc.choose_expiry([exp_close, exp_later])
         self.assertEqual(result, exp_close)
 
     def test_first_friday(self):
-        today = datetime.utcnow().date()
+        today = datetime.now(tz=timezone.utc).date()
         # choose a date more than 7 days ahead that is a Friday
         days = 8
         while (today + timedelta(days=days)).weekday() != 4:

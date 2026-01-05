@@ -24,7 +24,9 @@ from positions_engine.service.state import (
 )
 
 
-def test_refresh_live_snapshot_preserves_existing_avg_cost(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_refresh_live_snapshot_preserves_existing_avg_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Incoming snapshots without avg_cost should keep the previous basis."""
 
     state = PositionsState()
@@ -34,8 +36,14 @@ def test_refresh_live_snapshot_preserves_existing_avg_cost(monkeypatch: pytest.M
         quantity=Decimal("10"),
         avg_cost=Decimal("123.45"),
     )
-    initial_quote = Quote(symbol="AAPL", last=Decimal("150"), session=TradingSession.RTH)
-    state.refresh(positions=[initial_position], quotes=[initial_quote], snapshot_at=datetime.now(tz=UTC))
+    initial_quote = Quote(
+        symbol="AAPL", last=Decimal("150"), session=TradingSession.RTH
+    )
+    state.refresh(
+        positions=[initial_position],
+        quotes=[initial_quote],
+        snapshot_at=datetime.now(tz=UTC),
+    )
 
     now = datetime.now(tz=UTC)
     positions_records = [
@@ -110,7 +118,9 @@ def test_option_leg_rebuilds_mark_from_last_and_previous_close() -> None:
         "last": 1.23,
         "previous_close": 1.10,
     }
-    record_last, quote_last = provider._option_leg_record(leg_with_last, fallback_underlying="AAPL")
+    record_last, quote_last = provider._option_leg_record(
+        leg_with_last, fallback_underlying="AAPL"
+    )
     assert record_last is not None
     assert quote_last is not None
     assert quote_last["last"] == pytest.approx(1.23)
@@ -124,7 +134,9 @@ def test_option_leg_rebuilds_mark_from_last_and_previous_close() -> None:
         "expiry": "2025-01-18",
         "previous_close": 0.95,
     }
-    record_prev, quote_prev = provider._option_leg_record(leg_with_prev, fallback_underlying="AAPL")
+    record_prev, quote_prev = provider._option_leg_record(
+        leg_with_prev, fallback_underlying="AAPL"
+    )
     assert record_prev is not None
     assert quote_prev is not None
     assert quote_prev["last"] == pytest.approx(0.95)

@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -20,9 +20,13 @@ describe("PSD page", () => {
   });
 
   test("renders positions view sections and ribbon metrics", async () => {
+    const nowMs = Date.parse("2024-01-01T12:00:00Z");
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(nowMs);
+
     const statsFixture = buildStatsResponse({
       net_liq: 1_245_320.54,
-      var95_1d_pct: 58_320.12,
+      var_95: 58_320.12,
+      margin_pct: 0.45,
       margin_used_pct: 0.45,
       updated_at: "2024-01-01T12:00:00Z",
     });
@@ -110,13 +114,12 @@ describe("PSD page", () => {
     });
 
     server.use(
+      http.get("*/stats/current", () => HttpResponse.json(statsFixture)),
       http.get("*/stats", () => HttpResponse.json(statsFixture)),
       http.get("*/state", () => HttpResponse.json(snapshotFixture)),
     );
 
-    await act(async () => {
-      renderWithClient(<PSDPage />);
-    });
+    renderWithClient(<PSDPage />);
 
     const statsRegion = await screen.findByRole("region", { name: /portfolio stats/i });
 
@@ -129,29 +132,50 @@ describe("PSD page", () => {
       return definition!.textContent?.trim();
     };
 
-    expect(valueFor("Day P&L")).toBe("$355.00");
-    expect(valueFor("Unrealized P&L")).toBe("$255.00");
-    expect(valueFor("ΣΔ")).toBe("+15.10");
-    expect(valueFor("ΣΘ / day")).toBe("-0.03");
-    expect(valueFor("Net Liq")).toBe("$1,245,320.54");
-    const varValue = valueFor("VaR 95%");
-    expect(varValue).toBe("$58,320.12");
-    expect(valueFor("Margin %")).toBe("45.00%");
-    expect(valueFor("Updated")).toBe("now");
+    await waitFor(() => {
+      expect(valueFor("Day P&L")).toBe("$355.00");
+      expect(valueFor("Unrealized P&L")).toBe("$255.00");
+      expect(valueFor("ΣΔ")).toBe("+15.10");
+      expect(valueFor("ΣΘ / day")).toBe("-0.03");
+      expect(valueFor("Net Liq")).toBe("$1,245,320.54");
+      const varValue = valueFor("VaR 95%");
+      expect(varValue).toBe("$58,320.12");
+      expect(valueFor("Margin %")).toBe("45.00%");
+      expect(valueFor("Updated")).toBe("now");
+    });
+
+    dateNowSpy.mockRestore();
+
+    const expectAlignClass = (element: HTMLElement | null, align: "left" | "right") => {
+      expect(element).not.toBeNull();
+      const className = align === "right" ? "text-right" : "text-left";
+      expect(element as HTMLElement).toHaveClass(className);
+    };
 
     const stocksSection = await screen.findByRole("region", { name: /Single Stocks/i });
-    expect(within(stocksSection).getByRole("grid", { name: /Single Stocks/i })).toBeInTheDocument();
+    const stocksGrid = within(stocksSection).getByRole("grid", { name: /Single Stocks/i });
+    expect(stocksGrid).toBeInTheDocument();
     expect(within(stocksSection).getByText("TSLA")).toBeInTheDocument();
     expect(within(stocksSection).getByText("$75.00")).toBeInTheDocument();
+
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Symbol" }), "left");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Qty" }), "right");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Mark" }), "right");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Source" }), "left");
+
+    const stockRowHeader = within(stocksGrid).getByRole("rowheader", { name: /TSLA/i });
+    expectAlignClass(stockRowHeader, "left");
+    expectAlignClass(within(stocksGrid).getByText("+15").closest("td"), "right");
+    expectAlignClass(within(stocksGrid).getByText("$215.00").closest("td"), "right");
+    expectAlignClass(within(stocksGrid).getByText("LAST").closest("td"), "left");
+    expectAlignClass(within(stocksGrid).getByText("00:12").closest("td"), "right");
 
     const combosSection = await screen.findByRole("region", { name: /Options — Combos/i });
     const comboToggle = within(combosSection).getByRole("button", { name: /TSLA CALL SPREAD/i });
     expect(comboToggle).toBeInTheDocument();
 
     const user = userEvent.setup();
-    await act(async () => {
-      await user.click(comboToggle);
-    });
+    await user.click(comboToggle);
 
     const osiPattern = /\d{6,8}[CP]\d{8}/;
     const legsGrid = await within(combosSection).findByRole("grid", { name: /TSLA CALL SPREAD legs/i });
@@ -163,6 +187,14 @@ describe("PSD page", () => {
     expect(comboRowHeader.textContent).not.toMatch(osiPattern);
     expect(comboLabelSpan?.getAttribute("title")).toMatch(osiPattern);
 
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Symbol" }), "left");
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Qty" }), "right");
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Source" }), "left");
+
+    expectAlignClass(comboRowHeader, "left");
+    expectAlignClass(within(legsGrid).getByText("+1").closest("td"), "right");
+    expectAlignClass(within(legsGrid).getAllByText("MID")[0].closest("td"), "left");
+
     const singlesSection = await screen.findByRole("region", { name: /Options — Singles/i });
     const singlesGrid = within(singlesSection).getByRole("grid", { name: /Options — Singles/i });
     const singleRowHeader = within(singlesGrid).getAllByRole("rowheader")[0];
@@ -171,6 +203,14 @@ describe("PSD page", () => {
     expect(singleRowHeader.textContent).toMatch(/MSFT 290P/i);
     expect(singleRowHeader.textContent).not.toMatch(osiPattern);
     expect(singleLabelSpan?.getAttribute("title")).toMatch(osiPattern);
+
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Symbol" }), "left");
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Qty" }), "right");
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Source" }), "left");
+
+    expectAlignClass(singleRowHeader, "left");
+    expectAlignClass(within(singlesGrid).getByText("-1").closest("td"), "right");
+    expectAlignClass(within(singlesGrid).getByText("MID").closest("td"), "left");
   });
 
   test("tabs through ribbon into fallback stocks table", async () => {
@@ -180,35 +220,50 @@ describe("PSD page", () => {
     delete (fallbackSnapshot as Record<string, unknown>).positions_view;
 
     server.use(
+      http.get("*/stats/current", () => HttpResponse.json(statsFixture)),
       http.get("*/stats", () => HttpResponse.json(statsFixture)),
       http.get("*/state", () => HttpResponse.json(fallbackSnapshot)),
     );
 
     const user = userEvent.setup();
 
-    await act(async () => {
-      renderWithClient(<PSDPage />);
-    });
+    renderWithClient(<PSDPage />);
 
     const statsRegion = await screen.findByRole("region", { name: /portfolio stats/i });
+    await screen.findByRole("region", { name: /MSB hedge actions/i });
+    const exportCsvLink = await screen.findByText(/export msb \(csv\)/i, {
+      selector: "a",
+    });
+    const exportParquetLink = await screen.findByText(/export msb \(parquet\)/i, {
+      selector: "a",
+    });
+
     statsRegion.focus();
     expect(statsRegion).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
+    const msb7dToggle = await screen.findByRole("button", { name: "7D" });
+    expect(msb7dToggle).toHaveFocus();
+
+    await user.tab();
+    const msb1yToggle = await screen.findByRole("button", { name: "1Y" });
+    expect(msb1yToggle).toHaveFocus();
+
+    await user.tab();
+    expect(exportCsvLink).toHaveFocus();
+
+    await user.tab();
+    expect(exportParquetLink).toHaveFocus();
+
+    await user.tab();
     const filter = await screen.findByRole("searchbox", { name: /filter symbols/i });
     expect(filter).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     const sortButton = await screen.findByRole("button", { name: /day p&l/i });
     expect(sortButton).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     const stocksGrid = await screen.findByRole("grid", { name: /single stocks positions/i });
     const rows = within(stocksGrid).getAllByRole("row");
     expect(rows.length).toBeGreaterThan(1);
@@ -269,17 +324,13 @@ describe("PSD page", () => {
 
     server.use(http.get("*/state", () => HttpResponse.json(snapshotFixture)));
 
-    await act(async () => {
-      renderWithClient(<PSDPage />);
-    });
+    renderWithClient(<PSDPage />);
 
     const comboToggle = await screen.findByRole("button", { name: /TSLA CALL SPREAD/i });
     const user = userEvent.setup();
 
     comboToggle.focus();
-    await act(async () => {
-      await user.keyboard("{Enter}");
-    });
+    await user.keyboard("{Enter}");
 
     expect(await screen.findByRole("grid", { name: /TSLA CALL SPREAD legs/i })).toBeInTheDocument();
   });

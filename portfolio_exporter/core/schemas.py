@@ -5,9 +5,9 @@ from __future__ import annotations
 import pandas as pd
 
 try:  # optional pandera dependency
-    import pandera as pa
+    import pandera.pandas as pa
 except Exception:  # pragma: no cover - optional
-    pa = None  # type: ignore
+    pa = None
 
 
 if pa:  # pragma: no branch
@@ -53,5 +53,5 @@ if pa:  # pragma: no branch
 
 else:  # pandera not installed
 
-    def check_headers(name: str, df: pd.DataFrame) -> list[str]:  # type: ignore[override]
+    def check_headers(name: str, df: pd.DataFrame) -> list[str]:
         return ["pandera not installed"]

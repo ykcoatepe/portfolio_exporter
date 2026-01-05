@@ -8,13 +8,15 @@ import dataclasses
 import logging
 import os
 import sys
+import threading
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import FileResponse, PlainTextResponse
 from starlette.staticfiles import StaticFiles
 
@@ -47,7 +49,6 @@ from positions_engine.service import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Positions Engine API", version="0.1.0")
 _state = PositionsState()
 _rules_state = RulesState(_state)
 _catalog_state = RulesCatalogState(_state, _rules_state)
@@ -66,6 +67,23 @@ _AUTO_REFRESH = os.getenv("POSITIONS_ENGINE_AUTO_REFRESH", "0") == "1"
 WEB_DIST = (REPO_ROOT / "apps" / "web" / "dist").resolve()
 INDEX_HTML = WEB_DIST / "index.html"
 _DEMO_OVERRIDE: bool | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _kickoff_startup_refresh()
+    refresh_loop.start()
+    if _greeks_refresh_loop is not None:
+        _greeks_refresh_loop.start()
+    try:
+        yield
+    finally:
+        refresh_loop.stop()
+        if _greeks_refresh_loop is not None:
+            _greeks_refresh_loop.stop()
+
+
+app = FastAPI(title="Positions Engine API", version="0.1.0", lifespan=lifespan)
 
 
 def _resolve_data_root() -> Path:
@@ -242,23 +260,7 @@ class StatsResponse(BaseModel):
     data_source: str | None = None
     session: SessionResponseModel | None = None
 
-    class Config:
-        extra = "allow"
-
-
-@app.on_event("startup")
-async def _on_startup() -> None:  # pragma: no cover - exercised by integration tests
-    _refresh_from_providers()
-    refresh_loop.start()
-    if _greeks_refresh_loop is not None:
-        _greeks_refresh_loop.start()
-
-
-@app.on_event("shutdown")
-async def _on_shutdown() -> None:  # pragma: no cover - exercised by integration tests
-    refresh_loop.stop()
-    if _greeks_refresh_loop is not None:
-        _greeks_refresh_loop.stop()
+    model_config = ConfigDict(extra="allow")
 
 
 @app.get("/healthz", tags=["meta"])
@@ -450,6 +452,19 @@ def _refresh_from_providers() -> None:
 
 def _refresh_from_disk() -> None:
     _refresh_from_providers()
+
+
+def _kickoff_startup_refresh() -> None:
+    """Run the initial provider refresh without blocking API startup."""
+
+    def _runner() -> None:
+        try:
+            _refresh_from_providers()
+        except Exception:  # pragma: no cover - defensive
+            logger.info("[startup] provider refresh failed", exc_info=True)
+
+    thread = threading.Thread(target=_runner, name="psd-startup-refresh", daemon=True)
+    thread.start()
 
 
 def _guard_quotes(quotes: list[Quote]) -> list[Quote]:

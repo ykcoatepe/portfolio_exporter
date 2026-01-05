@@ -1,17 +1,15 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 
+import { resolveApiBaseUrl } from "../lib/http";
 import type { MarketSession } from "../lib/types";
 import { normalizeSession } from "../lib/session";
 
 const SESSION_QUERY_KEY = ["portfolio", "session"] as const;
 
 async function fetchSession(baseUrl = ""): Promise<MarketSession> {
-  const origin =
-    baseUrl ||
-    (typeof window !== "undefined" ? window.location.origin : "http://localhost");
-  const sanitizedBase = origin.replace(/\/+$/, "");
-  const endpoint = `${sanitizedBase}/session`;
+  const origin = resolveApiBaseUrl(baseUrl);
+  const endpoint = `${origin}/session`;
   const response = await fetch(endpoint, {
     headers: { Accept: "application/json" },
     credentials: "include",

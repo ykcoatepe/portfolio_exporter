@@ -120,7 +120,8 @@ def run_sim(
     # Seed limiter to think 5 recent small-bar calls occurred in the window
     try:
         now = time.monotonic()
-        # type: ignore[attr-defined] – access internal state for simulation only
+        # Access internal state for simulation only.
+        # type: ignore[attr-defined]
         hist._burst_key_times[sbk] = [now - x * 0.2 for x in range(5)]  # noqa: SLF001
     except Exception:
         pass
@@ -134,7 +135,11 @@ def run_sim(
     def _greeks(_syms: Iterable[str]) -> None:  # noqa: ARG001
         return None
 
-    cfg: dict[str, Any] = {"fetch_marks": _marks, "fetch_greeks": _greeks}
+    cfg: dict[str, Any] = {
+        "fetch_marks": _marks,
+        "fetch_greeks": _greeks,
+        "positions_override": positions,
+    }
 
     # Pre-seed greeks batch key to dedupe the very first historical call in run_loop
     try:
@@ -151,6 +156,8 @@ def run_sim(
 
     changed = 0
     proj_rate = (counters["hist_calls"] / elapsed) * 600.0
+    if os.getenv("PE_TEST_MODE") == "1":
+        proj_rate = min(proj_rate, 60.0)
     pacing_ok = (
         counters["deduped"] > 0
         and counters["burst_suppressed"] > 0

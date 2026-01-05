@@ -2,6 +2,7 @@
 historic_prices.csv
 portfolio_*.csv
 data/vendor/
+data/live_status_bar.csv
 logs/
 
 # Ignore Python cache files
@@ -16,6 +17,10 @@ combos_preview.txt
 # ignore outputs
 out/
 
+# Debug artifacts
+debug/*.log
+debug/*_logs.txt
+
 # PSD
 var/memos/
 .pytest_cache/
@@ -27,3 +32,9 @@ apps/web/node_modules
 apps/web/dep-tree.before.txt
 apps/web/dep-tree.after.txt
 apps/web/audit.json
+
+# Local scratch at repo root
+node_modules/
+package.json
+package-lock.json
+tmp_test_run/
