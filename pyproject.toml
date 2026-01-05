@@ -34,7 +34,8 @@ psd = [
   "uvicorn>=0.22",
   "pydantic>=2.7",
   "websockets>=12.0",
-  "wsproto>=1.2"
+  "wsproto>=1.2",
+  "prometheus-client>=0.20"
 ]
 
 [project.scripts]

@@ -193,6 +193,14 @@
     {
       "event": "session_start",
       "timestamp": "2026-01-05T07:00:44Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-05T07:07:27Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-05T07:13:31Z"
     }
   ],
   "decisions": [
