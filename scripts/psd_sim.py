@@ -120,7 +120,8 @@ def run_sim(
     # Seed limiter to think 5 recent small-bar calls occurred in the window
     try:
         now = time.monotonic()
-        # type: ignore[attr-defined] – access internal state for simulation only
+        # Access internal state for simulation only.
+        # type: ignore[attr-defined]
         hist._burst_key_times[sbk] = [now - x * 0.2 for x in range(5)]  # noqa: SLF001
     except Exception:
         pass

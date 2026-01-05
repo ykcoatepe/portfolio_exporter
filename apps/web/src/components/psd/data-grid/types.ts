@@ -4,7 +4,23 @@
  * Type definitions for the virtualized data grid components.
  */
 
-import type { RowData, Row, ColumnDef, Table } from "@tanstack/react-table";
+import type {
+    RowData,
+    Row,
+    ColumnDef,
+    Table,
+    ColumnFiltersState,
+    OnChangeFn,
+    FilterFn,
+} from "@tanstack/react-table";
+
+// Register custom filter functions with TanStack Table's type system
+declare module "@tanstack/react-table" {
+    interface FilterFns {
+        psdString: FilterFn<unknown>;
+        psdNumber: FilterFn<unknown>;
+    }
+}
 
 /**
  * Extend TanStack Table's ColumnMeta with grid-specific properties
@@ -116,6 +132,18 @@ export interface PsdDataGridProps<TData extends RowData> {
         left?: string[];
         right?: string[];
     };
+    /** Selected row IDs (controlled) */
+    selectedRowIds?: Set<string>;
+    /** Callback when selection changes */
+    onSelectedRowIdsChange?: (ids: Set<string>) => void;
+    /** Enable row selection */
+    enableSelection?: boolean;
+    /** Controlled column filters */
+    columnFilters?: ColumnFiltersState;
+    /** Column filter change handler */
+    onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
+    /** Indicates data is stable (no transient refetch empty states) */
+    isDataStable?: boolean;
 }
 
 /**

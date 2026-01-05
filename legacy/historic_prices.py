@@ -25,6 +25,8 @@ except Exception:  # pragma: no cover - optional
     PROGRESS = False
 from datetime import datetime
 
+from portfolio_exporter.core.date_utils import utcnow
+
 # ---------- IBKR optional integration ----------
 try:
     from ib_insync import IB, Stock
@@ -62,8 +64,8 @@ def _tickers_from_ib() -> list[str]:
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]  # first existing file wins
 
 # Timestamped output (UTC). Includes time so repeated runs don't overwrite.
-DATE_TAG = datetime.utcnow().strftime("%Y%m%d")
-TIME_TAG = datetime.utcnow().strftime("%H%M")
+DATE_TAG = utcnow().strftime("%Y%m%d")
+TIME_TAG = utcnow().strftime("%H%M")
 # Save to iCloud Drive ▸ Downloads (override with OUTPUT_DIR env var)
 OUTPUT_DIR = os.environ.get(
     "OUTPUT_DIR",

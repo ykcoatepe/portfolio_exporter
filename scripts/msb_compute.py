@@ -69,7 +69,9 @@ def _collect_anomalies(df: pd.DataFrame) -> list[dict[str, object]]:
             except TypeError:
                 continue
         if na_cols:
-            anomalies.append({"date": date_iso, "kind": "nan_detected", "columns": na_cols})
+            anomalies.append(
+                {"date": date_iso, "kind": "nan_detected", "columns": na_cols}
+            )
     return anomalies
 
 
@@ -86,8 +88,12 @@ def _append_anomalies(anomalies: Iterable[dict[str, object]], path: Path) -> Non
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Compute MSB readings.")
     parser.add_argument("--hy-csv", required=True, type=Path, help="HY OAS CSV path")
-    parser.add_argument("--vx1-csv", required=True, type=Path, help="VIX front CSV path")
-    parser.add_argument("--vx2-csv", required=True, type=Path, help="VIX second CSV path")
+    parser.add_argument(
+        "--vx1-csv", required=True, type=Path, help="VIX front CSV path"
+    )
+    parser.add_argument(
+        "--vx2-csv", required=True, type=Path, help="VIX second CSV path"
+    )
     parser.add_argument("--spx-csv", type=Path, help="Optional SPX return CSV path")
     parser.add_argument("--out", required=True, type=Path, help="Output CSV path")
     parser.add_argument(

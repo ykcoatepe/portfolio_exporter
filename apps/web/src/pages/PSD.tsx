@@ -7,14 +7,23 @@ import MSBCard from "../components/MSBCard";
 import MSBMiniCharts from "../components/MSBMiniCharts";
 import OptionLegsTable from "../components/OptionLegsTable";
 import { PsdShell } from "../components/psd/PsdShell";
+import {
+  PsdStocksGrid,
+  mapLegsToStockRows,
+  GridParityHarness,
+  PsdStocksFilterBar,
+} from "../components/psd/data-grid";
 import RulesPanel from "../components/RulesPanel";
 import StatsRibbon from "../components/StatsRibbon";
 import StocksTable from "../components/StocksTable";
+import { getPsdGridMode } from "../hooks/getPsdGridMode";
 import { usePsdSnapshot } from "../hooks/usePsdSnapshot";
 import { formatDuration, formatMoney } from "../lib/format";
 import { buildFriendlyLegDisplay } from "../lib/labels";
 import type { PSDLeg, PSDPositionsView } from "../lib/types";
 import { formatSigned, valueTone } from "../components/tableUtils";
+import { usePsdStocksFilterStore } from "../state/psdStocksFilters";
+import { matchesNumberFilter, matchesStringFilter, type PsdNumberFilterValue } from "../components/psd/data-grid/filters";
 
 const columns = [
   { key: "symbol", label: "Symbol", align: "left" },
@@ -221,6 +230,130 @@ function CombosSection({ view }: { view: PSDPositionsView }) {
   );
 }
 
+/**
+ * Stocks section with feature-flagged grid rendering.
+ * Supports: old (LegsTable), new (PsdStocksGrid), parity (side-by-side comparison)
+ */
+function StocksSectionWithGrid({
+  positionsView,
+  isDataStable,
+}: {
+  positionsView: PSDPositionsView | undefined;
+  isDataStable: boolean;
+}) {
+  const gridMode = getPsdGridMode();
+  const legs = positionsView?.single_stocks ?? [];
+  const stockRows = useMemo(() => mapLegsToStockRows(legs), [legs]);
+  const columnFilters = usePsdStocksFilterStore((state) => state.columnFilters);
+  const setColumnFilters = usePsdStocksFilterStore((state) => state.setColumnFilters);
+  const resetFilters = usePsdStocksFilterStore((state) => state.resetFilters);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("filters") !== "reset") {
+      return;
+    }
+    resetFilters();
+    params.delete("filters");
+    const next = params.toString();
+    const nextUrl = `${window.location.pathname}${next ? `?${next}` : ""}${window.location.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [resetFilters]);
+
+  const filteredStockRows = useMemo(() => {
+    if (columnFilters.length === 0) {
+      return stockRows;
+    }
+    return stockRows.filter((row) =>
+      columnFilters.every((filter) => {
+        if (filter.id === "symbol") {
+          return matchesStringFilter(row.symbol, filter.value as string | null | undefined);
+        }
+        if (filter.id === "quantity") {
+          return matchesNumberFilter(
+            row.quantity,
+            filter.value as PsdNumberFilterValue | null | undefined,
+          );
+        }
+        if (filter.id === "markPrice") {
+          return matchesNumberFilter(
+            row.markPrice,
+            filter.value as PsdNumberFilterValue | null | undefined,
+          );
+        }
+        if (filter.id === "dayPnlAmount") {
+          return matchesNumberFilter(
+            row.dayPnlAmount,
+            filter.value as PsdNumberFilterValue | null | undefined,
+          );
+        }
+        if (filter.id === "delta") {
+          return matchesNumberFilter(
+            row.delta,
+            filter.value as PsdNumberFilterValue | null | undefined,
+          );
+        }
+        return true;
+      }),
+    );
+  }, [stockRows, columnFilters]);
+
+  const filteredLegs = useMemo(() => {
+    if (columnFilters.length === 0) {
+      return legs;
+    }
+    const allowedIds = new Set(filteredStockRows.map((row) => row.id));
+    return legs.filter((leg) => allowedIds.has(`stock:${leg.conId ?? leg.symbol}`));
+  }, [legs, filteredStockRows, columnFilters]);
+
+  const renderOldGrid = () => (
+    <LegsTable label="Single Stocks (Old)" legs={filteredLegs} />
+  );
+
+  const renderNewGrid = () => (
+    <PsdStocksGrid
+      data={stockRows}
+      height="350px"
+      columnFilters={columnFilters}
+      onColumnFiltersChange={setColumnFilters}
+      isDataStable={isDataStable}
+    />
+  );
+
+  return (
+    <section
+      aria-label="Single Stocks"
+      className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5"
+    >
+      <h2 className="text-xl font-semibold text-slate-100">Single Stocks</h2>
+      <div className="mt-3">
+        <PsdStocksFilterBar
+          columnFilters={columnFilters}
+          onColumnFiltersChange={setColumnFilters}
+          onReset={resetFilters}
+        />
+      </div>
+      <div className="mt-4">
+        {gridMode === "parity" ? (
+          <GridParityHarness
+            legs={filteredLegs}
+            stockRows={filteredStockRows}
+            renderOld={() => renderOldGrid()}
+            renderNew={() => renderNewGrid()}
+          />
+        ) : gridMode === "new" ? (
+          renderNewGrid()
+        ) : (
+          <LegsTable label="Single Stocks" legs={filteredLegs} />
+        )}
+      </div>
+    </section>
+  );
+}
+
 function LegsTable({ label, legs }: { label: string; legs: PSDLeg[] }) {
   if (legs.length === 0) {
     return <p className="mt-3 text-sm text-slate-400">No positions available.</p>;
@@ -252,7 +385,7 @@ function LegsTable({ label, legs }: { label: string; legs: PSDLeg[] }) {
 }
 
 const PSDPage = () => {
-  const { data: snapshot } = usePsdSnapshot();
+  const { data: snapshot, isFetching } = usePsdSnapshot();
   const positionsView = snapshot?.positions_view;
   const hasView = useMemo(() => {
     if (!positionsView) {
@@ -282,10 +415,10 @@ const PSDPage = () => {
 
         {hasView ? (
           <>
-            <section aria-label="Single Stocks" className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
-              <h2 className="text-xl font-semibold text-slate-100">Single Stocks</h2>
-              <LegsTable label="Single Stocks" legs={positionsView?.single_stocks ?? []} />
-            </section>
+            <StocksSectionWithGrid
+              positionsView={positionsView}
+              isDataStable={!isFetching}
+            />
 
             <section aria-label="Options — Combos" className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
               <h2 className="text-xl font-semibold text-slate-100">Options — Combos</h2>

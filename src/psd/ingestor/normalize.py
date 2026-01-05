@@ -3,9 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import time
 from collections import defaultdict
 from collections.abc import Iterable
-import time
 from typing import Any
 
 from psd.core.mark_router import Session, choose_mark, pnl_option, pnl_stock
@@ -102,10 +102,16 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
     if explicit_mark is not None:
         mark_raw, fallback_source = explicit_mark
     else:
-        mark_raw, fallback_source, fallback_stale = choose_mark(tick, normalized_session)
+        mark_raw, fallback_source, fallback_stale = choose_mark(
+            tick, normalized_session
+        )
 
     price_source_candidate = price_source_hint or (fallback_source or "unknown")
-    price_source = price_source_candidate.strip() if isinstance(price_source_candidate, str) else "unknown"
+    price_source = (
+        price_source_candidate.strip()
+        if isinstance(price_source_candidate, str)
+        else "unknown"
+    )
     if not price_source:
         price_source = "unknown"
 

@@ -183,7 +183,9 @@ export function useStats(
         const raw = (data && typeof data === "object" ? data : null) as
           | Record<string, unknown>
           | null;
-        queryClient.setQueryData(PSD_STATS_QUERY_KEY, (current) => {
+        queryClient.setQueryData<PortfolioStats | null>(
+          PSD_STATS_QUERY_KEY,
+          (current) => {
           if (!current) {
             return parsed;
           }
@@ -221,13 +223,14 @@ export function useStats(
             ? parsed.totals
             : current.totals ?? parsed.totals;
 
-          return {
-            ...current,
-            ...parsed,
-            counts: mergedCounts,
-            totals: nextTotals,
-          };
-        });
+            return {
+              ...current,
+              ...parsed,
+              counts: mergedCounts,
+              totals: nextTotals,
+            };
+          },
+        );
       } catch (error) {
         if (import.meta.env?.DEV) {
           // eslint-disable-next-line no-console -- useful for diagnosing malformed payloads.

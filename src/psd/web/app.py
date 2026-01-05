@@ -204,7 +204,8 @@ def stats_current(fresh_within_sec: float | None = None) -> Response:
 
 @router.get("/stream")
 async def stream(
-    request: Request, settings: Settings = Depends(get_settings)  # noqa: B008
+    request: Request,
+    settings: Settings = Depends(get_settings),  # noqa: B008
 ):
     last_event_id_header = request.headers.get("last-event-id", "").strip()
     last_event_id: int | None
@@ -273,9 +274,12 @@ async def stream(
             snap = latest_snapshot()
             if snap:
                 STREAM_EVENTS.labels("snapshot").inc()
-                yield "event: snapshot\n" + "data: " + json.dumps(
-                    snap, separators=(",", ":")
-                ) + "\n\n"
+                yield (
+                    "event: snapshot\n"
+                    + "data: "
+                    + json.dumps(snap, separators=(",", ":"))
+                    + "\n\n"
+                )
                 frames_sent += 1
                 t_last = time.monotonic()
                 if _maybe_quit():
@@ -424,12 +428,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/sse")
     async def _sse_route(
-        request: Request, current: Settings = Depends(get_settings)  # noqa: B008
+        request: Request,
+        current: Settings = Depends(get_settings),  # noqa: B008
     ):
         manager_in_state = getattr(app.state, "sse", None)
         if not isinstance(manager_in_state, SseManager):
             raise HTTPException(status_code=503, detail="SSE manager unavailable")
-        if manager_in_state.heartbeat_interval != max(1, int(current.sse_heartbeat_sec)):
+        if manager_in_state.heartbeat_interval != max(
+            1, int(current.sse_heartbeat_sec)
+        ):
             app.state.sse = SseManager(heartbeat_interval=current.sse_heartbeat_sec)
             manager_in_state = app.state.sse
         return await sse_endpoint(request, manager_in_state)

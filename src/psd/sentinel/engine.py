@@ -119,7 +119,9 @@ def evaluate_msb_triggers(
             payload["cooldown_until"] = cooldown_until.isoformat()
         uid = f"msb:{date_str}:{rule.lower()}"
         severity = "action" if rule == "C" else "warn"
-        return Alert(uid=uid, rule=rule, severity=severity, message=message, data=payload)
+        return Alert(
+            uid=uid, rule=rule, severity=severity, message=message, data=payload
+        )
 
     spx_check = (
         isinstance(spx_ret, (int, float))
@@ -143,7 +145,9 @@ def evaluate_msb_triggers(
 
     d1_check = isinstance(hy_d1_bps, (int, float)) and math.isfinite(float(hy_d1_bps))
     d5_check = isinstance(hy_d5_bps, (int, float)) and math.isfinite(float(hy_d5_bps))
-    if (d1_check and float(hy_d1_bps) >= 25.0) or (d5_check and float(hy_d5_bps) >= 60.0):
+    if (d1_check and float(hy_d1_bps) >= 25.0) or (
+        d5_check and float(hy_d5_bps) >= 60.0
+    ):
         why = {
             "hy_d1_bps": float(hy_d1_bps) if d1_check else None,
             "hy_d5_bps": float(hy_d5_bps) if d5_check else None,

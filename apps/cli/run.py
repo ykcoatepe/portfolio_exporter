@@ -82,7 +82,9 @@ def _parse_symbols(raw: Iterable[str] | None) -> tuple[str, ...]:
         return ()
     seen: list[str] = []
     for chunk in raw:
-        pieces = str(chunk).replace(" ", "").split(",") if "," in str(chunk) else [chunk]
+        pieces = (
+            str(chunk).replace(" ", "").split(",") if "," in str(chunk) else [chunk]
+        )
         for part in pieces:
             symbol = str(part).strip().upper()
             if not symbol or symbol in seen:
@@ -127,9 +129,14 @@ def _signal_to_dict(signal: Signal) -> dict[str, Any]:
 
 
 def _result_to_payload(
-    analyzer_name: str, result: AnalyzerResult | None, json_only: bool, full_artifacts: bool
+    analyzer_name: str,
+    result: AnalyzerResult | None,
+    json_only: bool,
+    full_artifacts: bool,
 ) -> dict[str, Any]:
-    mode = "full-artifacts" if full_artifacts else "json-only" if json_only else "hybrid"
+    mode = (
+        "full-artifacts" if full_artifacts else "json-only" if json_only else "hybrid"
+    )
     if result is None:
         return {
             "analyzer": analyzer_name,

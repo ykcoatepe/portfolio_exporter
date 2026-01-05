@@ -11,11 +11,12 @@
  */
 
 import type { ReactNode, KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RowData, Row, ColumnDef, ExpandedState } from "@tanstack/react-table";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RowData, Row, ExpandedState } from "@tanstack/react-table";
 import {
     useReactTable,
     getCoreRowModel,
+    getFilteredRowModel,
     getExpandedRowModel,
     getSortedRowModel,
     flexRender,
@@ -26,6 +27,10 @@ import clsx from "clsx";
 import type { PsdDataGridProps, VirtualConfig, RowIdFn } from "./types";
 import { mergeVirtualConfig, shouldVirtualize } from "./virtualConfig";
 import { handleRowKeyDown } from "./keyboard";
+import { useGridSelection } from "./useGridSelection";
+import { useContextMenu } from "./useContextMenu";
+import { GridContextMenu } from "./GridContextMenu";
+import { psdFilterFns } from "./filters";
 
 /**
  * Default row ID generator using index
@@ -111,6 +116,12 @@ export function PsdDataGrid<TData extends RowData>({
     renderExpandedRow,
     enableExpansion = false,
     pinnedColumns,
+    selectedRowIds,
+    onSelectedRowIdsChange,
+    enableSelection = false,
+    columnFilters = [],
+    onColumnFiltersChange,
+    isDataStable = true,
 }: PsdDataGridProps<TData>): JSX.Element {
     // Refs
     const containerRef = useRef<HTMLDivElement>(null);
@@ -118,6 +129,7 @@ export function PsdDataGrid<TData extends RowData>({
 
     // Keyboard nav state
     const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
+    const focusedRowIdRef = useRef<string | null>(null);
 
     // Expansion state (controlled or uncontrolled)
     const [internalExpanded, setInternalExpanded] = useState<ExpandedState>({});
@@ -156,18 +168,121 @@ export function PsdDataGrid<TData extends RowData>({
         data,
         columns,
         getRowId: (row, index) => getRowId(row, index),
+        filterFns: psdFilterFns,
         getCoreRowModel: getCoreRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getExpandedRowModel: enableExpansion ? getExpandedRowModel() : undefined,
         state: {
             expanded: enableExpansion ? expanded : undefined,
+            columnFilters,
         },
         onExpandedChange: enableExpansion ? handleExpandedChange : undefined,
+        onColumnFiltersChange,
     });
 
     const { rows } = table.getRowModel();
     const headerGroups = table.getHeaderGroups();
     const useVirtual = shouldVirtualize(rows.length, virtualConfig);
+
+    // Ordered row IDs for range selection
+    const orderedRowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+    const visibleRowIds = useMemo(() => new Set(rows.map((r) => r.id)), [rows]);
+    const filtersKey = useMemo(() => {
+        if (!columnFilters || columnFilters.length === 0) {
+            return "";
+        }
+        const normalized = columnFilters
+            .map((filter) => ({ id: filter.id, value: filter.value }))
+            .sort((a, b) => a.id.localeCompare(b.id));
+        return JSON.stringify(normalized);
+    }, [columnFilters]);
+    const prevFiltersKeyRef = useRef(filtersKey);
+
+    // Selection hook
+    const selection = useGridSelection({
+        selectedRowIds,
+        onSelectedRowIdsChange,
+        orderedRowIds,
+    });
+
+    // Focus row by index
+    const focusRowByIndex = useCallback(
+        (index: number) => {
+            setFocusedRowIndex(index);
+            const row = rows[index];
+            if (row) {
+                focusedRowIdRef.current = row.id;
+            }
+            const rowEl = rowRefs.current.get(index);
+            if (rowEl) {
+                rowEl.focus({ preventScroll: true });
+                rowEl.scrollIntoView({ block: "nearest", behavior: "auto" });
+            }
+        },
+        [rows]
+    );
+
+    // Prune selection/focus when filters change (only when data is stable)
+    useEffect(() => {
+        const previousFiltersKey = prevFiltersKeyRef.current;
+        const filtersChanged = previousFiltersKey !== filtersKey;
+        if (filtersChanged) {
+            prevFiltersKeyRef.current = filtersKey;
+        }
+
+        if (!filtersChanged && !isDataStable) {
+            return;
+        }
+
+        if (enableSelection) {
+            selection.pruneSelection(visibleRowIds);
+            const nextActiveId = rows.length > 0 ? rows[0].id : null;
+            selection.pruneAnchor(visibleRowIds, focusedRowIdRef.current ?? nextActiveId);
+        }
+
+        if (rows.length === 0) {
+            if (focusedRowIndex !== null) {
+                setFocusedRowIndex(null);
+            }
+            focusedRowIdRef.current = null;
+            return;
+        }
+
+        const focusedId = focusedRowIdRef.current;
+        if (!focusedId || !visibleRowIds.has(focusedId)) {
+            focusRowByIndex(0);
+            return;
+        }
+
+        const nextIndex = rows.findIndex((row) => row.id === focusedId);
+        if (nextIndex !== -1 && nextIndex !== focusedRowIndex) {
+            setFocusedRowIndex(nextIndex);
+        }
+    }, [
+        enableSelection,
+        isDataStable,
+        selection,
+        visibleRowIds,
+        rows,
+        focusedRowIndex,
+        focusRowByIndex,
+        filtersKey,
+    ]);
+
+    // Context menu hook
+    const contextMenu = useContextMenu();
+
+    // Row ID → symbol map for context menu actions
+    const rowSymbolMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const row of rows) {
+            const data = row.original as Record<string, unknown>;
+            const symbol = typeof data.symbol === "string" ? data.symbol : row.id;
+            map.set(row.id, symbol);
+        }
+        return map;
+    }, [rows]);
 
     // Virtualizer
     const virtualizer = useVirtualizer({
@@ -180,16 +295,6 @@ export function PsdDataGrid<TData extends RowData>({
 
     const virtualRows = useVirtual ? virtualizer.getVirtualItems() : null;
     const totalSize = useVirtual ? virtualizer.getTotalSize() : 0;
-
-    // Focus row by index
-    const focusRowByIndex = useCallback((index: number) => {
-        setFocusedRowIndex(index);
-        const rowEl = rowRefs.current.get(index);
-        if (rowEl) {
-            rowEl.focus({ preventScroll: true });
-            rowEl.scrollIntoView({ block: "nearest", behavior: "auto" });
-        }
-    }, []);
 
     // Handle row toggle expand
     const handleToggleExpand = useCallback(
@@ -210,6 +315,9 @@ export function PsdDataGrid<TData extends RowData>({
             const rowClassName = rowStyle?.getRowClassName?.(row) ?? "";
             const rowStyleObj = rowStyle?.getRowStyle?.(row) ?? {};
 
+            // Selection state
+            const isSelected = enableSelection && selection.isSelected(row.id);
+
             return (
                 <tr
                     key={row.id}
@@ -218,20 +326,31 @@ export function PsdDataGrid<TData extends RowData>({
                     }}
                     tabIndex={isFocused ? 0 : -1}
                     role="row"
-                    aria-rowindex={rowIndex + 2} // +2 for header row
-                    aria-selected={isFocused}
+                    aria-rowindex={rowIndex + 2}
+                    aria-selected={enableSelection ? isSelected : isFocused}
                     aria-expanded={enableExpansion ? isExpanded : undefined}
+                    data-rowid={row.id}
                     className={clsx(
-                        "border-b border-slate-800/60 psd-transition",
+                        "border-b border-slate-800/60 psd-transition psd-grid-row",
                         "hover:bg-slate-800/40",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500/60",
                         isFocused && "bg-slate-800/60",
+                        isSelected && "psd-grid-row--selected",
                         rowClassName,
                     )}
                     style={rowStyleObj}
-                    onClick={() => onRowClick?.(row)}
+                    onClick={(e) => {
+                        if (enableSelection) {
+                            selection.handleRowClick(row.id, e);
+                        }
+                        focusRowByIndex(rowIndex);
+                        onRowClick?.(row);
+                    }}
                     onDoubleClick={() => onRowDoubleClick?.(row)}
-                    onKeyDown={(e) =>
+                    onKeyDown={(e) => {
+                        if (enableSelection) {
+                            selection.handleKeyboardSelect(row.id, e);
+                        }
                         handleRowKeyDown(e, {
                             row,
                             rowIndex,
@@ -240,13 +359,24 @@ export function PsdDataGrid<TData extends RowData>({
                             onActivate: onRowActivate,
                             onToggleExpand: handleToggleExpand,
                             enableExpansion,
-                        })
-                    }
+                        });
+                    }}
+                    onContextMenu={(e) => {
+                        e.preventDefault();
+                        const { clientX, clientY } = e;
+                        // Selection-aware targeting
+                        const targetIds = enableSelection && selection.isSelected(row.id)
+                            ? Array.from(selection.selectedIds)
+                            : [row.id];
+                        contextMenu.open(targetIds, { x: clientX, y: clientY });
+                    }}
                 >
                     {row.getVisibleCells().map((cell) => (
                         <td
                             key={cell.id}
-                            className="text-sm"
+                            className="text-sm psd-grid-cell"
+                            data-rowid={row.id}
+                            data-colid={cell.column.id}
                             style={{
                                 width: cell.column.getSize(),
                             }}
@@ -260,6 +390,8 @@ export function PsdDataGrid<TData extends RowData>({
         [
             focusedRowIndex,
             enableExpansion,
+            enableSelection,
+            selection,
             rowStyle,
             onRowClick,
             onRowDoubleClick,
@@ -335,121 +467,137 @@ export function PsdDataGrid<TData extends RowData>({
     }
 
     return (
-        <div
-            ref={containerRef}
-            className={clsx(
-                "overflow-auto rounded-lg border border-slate-800/60 bg-slate-900 psd-data-surface",
-                className,
-            )}
-            style={{ height }}
-            role="grid"
-            aria-label={ariaLabel}
-            aria-rowcount={rows.length + 1}
-            aria-colcount={columns.length}
-        >
-            <table className="w-full border-collapse">
-                {/* Header */}
-                <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm">
-                    {headerGroups.map((headerGroup) => (
-                        <tr key={headerGroup.id} role="row" aria-rowindex={1}>
-                            {headerGroup.headers.map((header) => {
-                                const meta = header.column.columnDef.meta;
-                                return (
-                                    <th
-                                        key={header.id}
-                                        className={clsx(
-                                            "border-b border-slate-700 px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500",
-                                            meta?.align === "right" && "text-right",
-                                            meta?.align === "center" && "text-center",
-                                            meta?.sortable && "cursor-pointer select-none hover:text-slate-300",
-                                        )}
-                                        style={{
-                                            width: header.getSize(),
-                                            minWidth: meta?.minWidth,
-                                            maxWidth: meta?.maxWidth,
-                                        }}
-                                        title={meta?.headerTooltip}
-                                        onClick={
-                                            meta?.sortable
-                                                ? header.column.getToggleSortingHandler()
-                                                : undefined
-                                        }
-                                        role="columnheader"
-                                        aria-sort={
-                                            header.column.getIsSorted()
-                                                ? header.column.getIsSorted() === "asc"
-                                                    ? "ascending"
-                                                    : "descending"
-                                                : undefined
-                                        }
-                                    >
-                                        {flexRender(
-                                            header.column.columnDef.header,
-                                            header.getContext(),
-                                        )}
-                                        {header.column.getIsSorted() && (
-                                            <span className="ml-1">
-                                                {header.column.getIsSorted() === "asc" ? "↑" : "↓"}
-                                            </span>
-                                        )}
-                                    </th>
-                                );
-                            })}
-                        </tr>
-                    ))}
-                </thead>
+        <>
+            <div
+                ref={containerRef}
+                className={clsx(
+                    "overflow-auto rounded-lg border border-slate-800/60 bg-slate-900 psd-data-surface",
+                    className,
+                )}
+                style={{ height }}
+                role="grid"
+                aria-label={ariaLabel}
+                aria-rowcount={rows.length + 1}
+                aria-colcount={columns.length}
+            >
+                <table className="w-full border-collapse">
+                    {/* Header */}
+                    <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm">
+                        {headerGroups.map((headerGroup) => (
+                            <tr key={headerGroup.id} role="row" aria-rowindex={1}>
+                                {headerGroup.headers.map((header) => {
+                                    const meta = header.column.columnDef.meta;
+                                    return (
+                                        <th
+                                            key={header.id}
+                                            className={clsx(
+                                                "border-b border-slate-700 px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500",
+                                                meta?.align === "right" && "text-right",
+                                                meta?.align === "center" && "text-center",
+                                                meta?.sortable && "cursor-pointer select-none hover:text-slate-300",
+                                            )}
+                                            style={{
+                                                width: header.getSize(),
+                                                minWidth: meta?.minWidth,
+                                                maxWidth: meta?.maxWidth,
+                                            }}
+                                            title={meta?.headerTooltip}
+                                            onClick={
+                                                meta?.sortable
+                                                    ? header.column.getToggleSortingHandler()
+                                                    : undefined
+                                            }
+                                            role="columnheader"
+                                            aria-sort={
+                                                header.column.getIsSorted()
+                                                    ? header.column.getIsSorted() === "asc"
+                                                        ? "ascending"
+                                                        : "descending"
+                                                    : undefined
+                                            }
+                                        >
+                                            {flexRender(
+                                                header.column.columnDef.header,
+                                                header.getContext(),
+                                            )}
+                                            {header.column.getIsSorted() && (
+                                                <span className="ml-1">
+                                                    {header.column.getIsSorted() === "asc" ? "↑" : "↓"}
+                                                </span>
+                                            )}
+                                        </th>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </thead>
 
-                {/* Body */}
-                <tbody>
-                    {useVirtual && virtualRows ? (
-                        <>
-                            {/* Virtual spacer top */}
-                            {virtualRows.length > 0 && virtualRows[0].start > 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={columns.length}
-                                        style={{ height: virtualRows[0].start }}
-                                    />
-                                </tr>
-                            )}
-
-                            {/* Virtual rows */}
-                            {virtualRows.map((virtualRow) => {
-                                const row = rows[virtualRow.index];
-                                return (
-                                    <>
-                                        {renderRow(row, virtualRow.index, true)}
-                                        {renderExpandedContent(row)}
-                                    </>
-                                );
-                            })}
-
-                            {/* Virtual spacer bottom */}
-                            {virtualRows.length > 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={columns.length}
-                                        style={{
-                                            height:
-                                                totalSize -
-                                                virtualRows[virtualRows.length - 1].end,
-                                        }}
-                                    />
-                                </tr>
-                            )}
-                        </>
-                    ) : (
-                        // Non-virtual rows
-                        rows.map((row, index) => (
+                    {/* Body */}
+                    <tbody>
+                        {useVirtual && virtualRows ? (
                             <>
-                                {renderRow(row, index, false)}
-                                {renderExpandedContent(row)}
+                                {/* Virtual spacer top */}
+                                {virtualRows.length > 0 && virtualRows[0].start > 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={columns.length}
+                                            style={{ height: virtualRows[0].start }}
+                                        />
+                                    </tr>
+                                )}
+
+                                {/* Virtual rows */}
+                                {virtualRows.map((virtualRow) => {
+                                    const row = rows[virtualRow.index];
+                                    return (
+                                        <Fragment key={row.id}>
+                                            {renderRow(row, virtualRow.index, true)}
+                                            {renderExpandedContent(row)}
+                                        </Fragment>
+                                    );
+                                })}
+
+                                {/* Virtual spacer bottom */}
+                                {virtualRows.length > 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={columns.length}
+                                            style={{
+                                                height:
+                                                    totalSize -
+                                                    virtualRows[virtualRows.length - 1].end,
+                                            }}
+                                        />
+                                    </tr>
+                                )}
                             </>
-                        ))
-                    )}
-                </tbody>
-            </table>
-        </div>
+                        ) : (
+                            // Non-virtual rows
+                            rows.map((row, index) => (
+                                <Fragment key={row.id}>
+                                    {renderRow(row, index, false)}
+                                    {renderExpandedContent(row)}
+                                </Fragment>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Context Menu */}
+            <GridContextMenu
+                isOpen={contextMenu.state.isOpen}
+                position={contextMenu.state.position}
+                targetRowIds={contextMenu.state.targetRowIds}
+                rowSymbolMap={rowSymbolMap}
+                onClose={contextMenu.close}
+                onCopySymbols={(symbols) => {
+                    // Copy newline-separated symbols to clipboard
+                    const text = symbols.join("\n");
+                    navigator.clipboard?.writeText(text);
+                }}
+            />
+        </>
     );
 }
 

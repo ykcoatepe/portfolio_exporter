@@ -187,7 +187,9 @@ def _load_series(csv_path: Path) -> pd.Series:
     return series
 
 
-def _load_vendor(root: Path) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series | None]:
+def _load_vendor(
+    root: Path,
+) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series | None]:
     hy = _load_series(root / "hy.csv")
     vx1 = _load_series(root / "vx1.csv")
     vx2 = _load_series(root / "vx2.csv")
@@ -250,9 +252,15 @@ def _prepare_context(
         "vx1": float(tail["vx1"]),
         "vx2": float(tail["vx2"]),
         "z_hy": float(tail["z_hy"]) if not pd.isna(tail["z_hy"]) else None,
-        "term_ratio": float(tail["term_ratio"]) if not pd.isna(tail["term_ratio"]) else None,
-        "cal_spread_pct": float(tail["cal_spread_pct"]) if not pd.isna(tail["cal_spread_pct"]) else None,
-        "cal_spread_abs": float(tail["cal_spread_abs"]) if not pd.isna(tail["cal_spread_abs"]) else None,
+        "term_ratio": float(tail["term_ratio"])
+        if not pd.isna(tail["term_ratio"])
+        else None,
+        "cal_spread_pct": float(tail["cal_spread_pct"])
+        if not pd.isna(tail["cal_spread_pct"])
+        else None,
+        "cal_spread_abs": float(tail["cal_spread_abs"])
+        if not pd.isna(tail["cal_spread_abs"])
+        else None,
         "saturated": bool(tail["saturated"]),
         "hy_score": int(tail["hy_score"]),
         "vix_score": int(tail["vix_score"]),
@@ -310,7 +318,9 @@ def _append_trigger_csv(alerts: Iterable[Any], context: dict[str, Any]) -> None:
     hy_d1 = context.get("hy_d1_bps")
     hy_d5 = context.get("hy_d5_bps")
     cooldown_until = context.get("cooldown_until")
-    cooldown_iso = cooldown_until.isoformat() if isinstance(cooldown_until, date) else None
+    cooldown_iso = (
+        cooldown_until.isoformat() if isinstance(cooldown_until, date) else None
+    )
 
     path = Path("debug") / "msb_triggers.csv"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -349,7 +359,9 @@ def _append_trigger_csv(alerts: Iterable[Any], context: dict[str, Any]) -> None:
                     "hy_d1_bps": hy_d1,
                     "hy_d5_bps": hy_d5,
                     "cooldown_until": cooldown_iso,
-                    "actions_json": json.dumps(actions, separators=(",", ":"), ensure_ascii=False),
+                    "actions_json": json.dumps(
+                        actions, separators=(",", ":"), ensure_ascii=False
+                    ),
                 }
             )
 
@@ -380,10 +392,14 @@ def run_msb_scheduler_once(
             refreshed = refresh_hy_csv(hy_path, env=os.environ)
         except Exception as exc:  # pragma: no cover - depends on network/env
             _SCHED_LOG.warning("FRED HY refresh failed: %s", exc)
-            _log_scheduler("warn", date=today_iso, reason="fred_refresh_failed", error=str(exc))
+            _log_scheduler(
+                "warn", date=today_iso, reason="fred_refresh_failed", error=str(exc)
+            )
         else:
             if refreshed:
-                _log_scheduler("refresh", date=today_iso, source="fred", path=str(hy_path))
+                _log_scheduler(
+                    "refresh", date=today_iso, source="fred", path=str(hy_path)
+                )
 
     attempt = 0
     backoff = 5.0
@@ -418,7 +434,9 @@ def run_msb_scheduler_once(
             try:
                 broadcast_ok = broadcast_latest_msb(app)
             except Exception as exc:  # pragma: no cover - defensive
-                _log_scheduler("warn", reason="broadcast_failed", date=today_iso, error=str(exc))
+                _log_scheduler(
+                    "warn", reason="broadcast_failed", date=today_iso, error=str(exc)
+                )
 
             alerts = evaluate_msb_triggers_and_update_livebar(app, context=context)
             _append_trigger_csv(alerts, context)
@@ -448,7 +466,9 @@ def run_msb_scheduler_once(
     return False
 
 
-def _scheduler_loop(app: FastAPI, stop_event: threading.Event, vendor_root: Path) -> None:
+def _scheduler_loop(
+    app: FastAPI, stop_event: threading.Event, vendor_root: Path
+) -> None:
     while not stop_event.is_set():
         now = datetime.now(tz=_TRT)
         run_at = _next_business_run(now)
@@ -461,7 +481,9 @@ def _scheduler_loop(app: FastAPI, stop_event: threading.Event, vendor_root: Path
             run_msb_scheduler_once(app, vendor_dir=vendor_root, now=run_at)
         except Exception as exc:  # pragma: no cover - background loop
             _SCHED_LOG.exception("MSB scheduler run failed: %s", exc)
-            _log_scheduler("error", reason="background_failure", date=run_at.date().isoformat())
+            _log_scheduler(
+                "error", reason="background_failure", date=run_at.date().isoformat()
+            )
 
 
 def start_msb_scheduler(app: FastAPI, *, vendor_dir: Path | str | None = None) -> None:
@@ -592,11 +614,7 @@ def run_loop(
         # Optionally fetch or wrap positions to control pacing.
         # If IB datasource is available, wrap via io_request; otherwise rely on engine.
         positions: Iterable[dict[str, Any]] | None = None
-        if (
-            not test_mode
-            and ib_src is not None
-            and hasattr(ib_src, "get_positions")
-        ):
+        if not test_mode and ib_src is not None and hasattr(ib_src, "get_positions"):
 
             def _get_pos() -> Any:
                 return ib_src.get_positions(cfg)
@@ -660,7 +678,9 @@ def run_loop(
             # Optional extra IO for greeks/marks only for changed underlyings
             # Users/tests can plug real callables via cfg keys
             fetch_marks: Callable[[Iterable[str]], Any] | None = cfg.get("fetch_marks")  # type: ignore
-            fetch_greeks: Callable[[Iterable[str]], Any] | None = cfg.get("fetch_greeks")  # type: ignore
+            fetch_greeks: Callable[[Iterable[str]], Any] | None = cfg.get(
+                "fetch_greeks"
+            )  # type: ignore
             key_base = hash(tuple(sorted(changed_syms)))
 
             if fetch_marks is not None:

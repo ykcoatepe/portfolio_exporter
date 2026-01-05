@@ -31,6 +31,7 @@ import io
 
 import pandas as pd  #  pandas ≥1.2
 import requests  #  pip install requests
+from portfolio_exporter.core.date_utils import utcnow
 
 try:  # optional dependencies
     import xlsxwriter  # type: ignore
@@ -49,7 +50,7 @@ OUTPUT_DIR = Path(
     "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
 )
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-TIME_TAG = datetime.utcnow().strftime("%H%M")
+TIME_TAG = utcnow().strftime("%H%M")
 
 # ---  1️⃣  where TWS writes dailyNetLiq.csv -----------------
 # If you changed the “Export Directory” in TWS, edit here OR

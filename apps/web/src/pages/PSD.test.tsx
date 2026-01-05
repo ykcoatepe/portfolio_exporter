@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -119,9 +119,7 @@ describe("PSD page", () => {
       http.get("*/state", () => HttpResponse.json(snapshotFixture)),
     );
 
-    await act(async () => {
-      renderWithClient(<PSDPage />);
-    });
+    renderWithClient(<PSDPage />);
 
     const statsRegion = await screen.findByRole("region", { name: /portfolio stats/i });
 
@@ -134,15 +132,17 @@ describe("PSD page", () => {
       return definition!.textContent?.trim();
     };
 
-    expect(valueFor("Day P&L")).toBe("$355.00");
-    expect(valueFor("Unrealized P&L")).toBe("$255.00");
-    expect(valueFor("ΣΔ")).toBe("+15.10");
-    expect(valueFor("ΣΘ / day")).toBe("-0.03");
-    expect(valueFor("Net Liq")).toBe("$1,245,320.54");
-    const varValue = valueFor("VaR 95%");
-    expect(varValue).toBe("$58,320.12");
-    expect(valueFor("Margin %")).toBe("45.00%");
-    expect(valueFor("Updated")).toBe("now");
+    await waitFor(() => {
+      expect(valueFor("Day P&L")).toBe("$355.00");
+      expect(valueFor("Unrealized P&L")).toBe("$255.00");
+      expect(valueFor("ΣΔ")).toBe("+15.10");
+      expect(valueFor("ΣΘ / day")).toBe("-0.03");
+      expect(valueFor("Net Liq")).toBe("$1,245,320.54");
+      const varValue = valueFor("VaR 95%");
+      expect(varValue).toBe("$58,320.12");
+      expect(valueFor("Margin %")).toBe("45.00%");
+      expect(valueFor("Updated")).toBe("now");
+    });
 
     dateNowSpy.mockRestore();
 
@@ -175,9 +175,7 @@ describe("PSD page", () => {
     expect(comboToggle).toBeInTheDocument();
 
     const user = userEvent.setup();
-    await act(async () => {
-      await user.click(comboToggle);
-    });
+    await user.click(comboToggle);
 
     const osiPattern = /\d{6,8}[CP]\d{8}/;
     const legsGrid = await within(combosSection).findByRole("grid", { name: /TSLA CALL SPREAD legs/i });
@@ -229,9 +227,7 @@ describe("PSD page", () => {
 
     const user = userEvent.setup();
 
-    await act(async () => {
-      renderWithClient(<PSDPage />);
-    });
+    renderWithClient(<PSDPage />);
 
     const statsRegion = await screen.findByRole("region", { name: /portfolio stats/i });
     await screen.findByRole("region", { name: /MSB hedge actions/i });
@@ -245,43 +241,29 @@ describe("PSD page", () => {
     statsRegion.focus();
     expect(statsRegion).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     const msb7dToggle = await screen.findByRole("button", { name: "7D" });
     expect(msb7dToggle).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     const msb1yToggle = await screen.findByRole("button", { name: "1Y" });
     expect(msb1yToggle).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     expect(exportCsvLink).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     expect(exportParquetLink).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     const filter = await screen.findByRole("searchbox", { name: /filter symbols/i });
     expect(filter).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     const sortButton = await screen.findByRole("button", { name: /day p&l/i });
     expect(sortButton).toHaveFocus();
 
-    await act(async () => {
-      await user.tab();
-    });
+    await user.tab();
     const stocksGrid = await screen.findByRole("grid", { name: /single stocks positions/i });
     const rows = within(stocksGrid).getAllByRole("row");
     expect(rows.length).toBeGreaterThan(1);
@@ -342,17 +324,13 @@ describe("PSD page", () => {
 
     server.use(http.get("*/state", () => HttpResponse.json(snapshotFixture)));
 
-    await act(async () => {
-      renderWithClient(<PSDPage />);
-    });
+    renderWithClient(<PSDPage />);
 
     const comboToggle = await screen.findByRole("button", { name: /TSLA CALL SPREAD/i });
     const user = userEvent.setup();
 
     comboToggle.focus();
-    await act(async () => {
-      await user.keyboard("{Enter}");
-    });
+    await user.keyboard("{Enter}");
 
     expect(await screen.findByRole("grid", { name: /TSLA CALL SPREAD legs/i })).toBeInTheDocument();
   });

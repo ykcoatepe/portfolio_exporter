@@ -21,6 +21,7 @@ default value that avoids collisions across concurrently running tools.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import TYPE_CHECKING
@@ -33,6 +34,20 @@ log = logging.getLogger(__name__)
 # Port constants
 _GATEWAY_LIVE = 4001
 _TWS_LIVE = 7496
+
+
+def _ensure_loop() -> None:
+    """Ensure an asyncio event loop exists for ib_insync sync helpers."""
+
+    try:
+        asyncio.get_running_loop()
+        return
+    except RuntimeError:
+        pass
+    try:
+        asyncio.set_event_loop(asyncio.new_event_loop())
+    except Exception:
+        return
 
 
 def _safe_parse_port(default: int = _GATEWAY_LIVE) -> int:
@@ -78,7 +93,7 @@ _last_good_port: int | None = None
 
 
 def connect_ib(
-    ib: "IB",
+    ib: IB,
     *,
     host: str | None = None,
     port: int | None = None,
@@ -104,18 +119,16 @@ def connect_ib(
     """
 
     global _last_good_port
+    _ensure_loop()
 
     target_host = host if host is not None else HOST
 
+    ports: tuple[int, ...]
     if port is not None:
         ports = (port,)
     else:
         ports = connect_ports()
-        if (
-            _last_good_port
-            and _last_good_port in ports
-            and _last_good_port != ports[0]
-        ):
+        if _last_good_port and _last_good_port in ports and _last_good_port != ports[0]:
             ports = (_last_good_port,) + tuple(p for p in ports if p != _last_good_port)
 
     last_exc: Exception | None = None

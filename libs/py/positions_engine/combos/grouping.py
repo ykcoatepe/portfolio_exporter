@@ -83,7 +83,9 @@ class _LegAccumulator:
             self.mark_weight += weight
             source_key = _canonical_mark_source(leg.mark_source)
             if source_key is not None:
-                sum_value, weight_value = self.mark_components.get(source_key, (ZERO, ZERO))
+                sum_value, weight_value = self.mark_components.get(
+                    source_key, (ZERO, ZERO)
+                )
                 self.mark_components[source_key] = (
                     sum_value + leg.mark * weight,
                     weight_value + weight,
@@ -150,9 +152,7 @@ class ComboGroup:
 
     def to_payload(self) -> dict[str, Any]:
         net_price: Decimal | None = (
-            self.net_price_weighted / self.weight_total
-            if self.weight_total
-            else None
+            self.net_price_weighted / self.weight_total if self.weight_total else None
         )
         label_legs = [
             _LabelLeg(right=acc.right, strike=acc.strike, expiry=acc.expiry)
@@ -204,7 +204,10 @@ class ComboGroup:
                     if pnl_unrealized is None
                     else pnl_unrealized + accumulator.total_pnl
                 )
-            for source_key, (sum_value, weight_value) in accumulator.mark_components.items():
+            for source_key, (
+                sum_value,
+                weight_value,
+            ) in accumulator.mark_components.items():
                 if weight_value <= ZERO:
                     continue
                 mark_value = sum_value / weight_value

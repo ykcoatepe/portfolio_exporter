@@ -108,7 +108,9 @@ def update_live_status_bar(
 
     if live_duplicate is not None:
         duplicate_note = "already hedged; maintain size"
-        live_duplicate["Notes"] = _append_note(live_duplicate.get("Notes", ""), duplicate_note)
+        live_duplicate["Notes"] = _append_note(
+            live_duplicate.get("Notes", ""), duplicate_note
+        )
         if extra_note:
             live_duplicate["Notes"] = _append_note(live_duplicate["Notes"], extra_note)
     else:
@@ -138,4 +140,3 @@ def update_live_status_bar(
 
 
 __all__ = ["update_live_status_bar"]
-

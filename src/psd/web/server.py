@@ -619,7 +619,9 @@ _broadcast_loop: asyncio.AbstractEventLoop | None = None
 _logger = logging.getLogger("psd.web.server")
 
 
-def _register_broadcast_loop(loop: asyncio.AbstractEventLoop | None, *, force: bool = False) -> None:
+def _register_broadcast_loop(
+    loop: asyncio.AbstractEventLoop | None, *, force: bool = False
+) -> None:
     global _broadcast_loop
     if loop is None:
         _broadcast_loop = None

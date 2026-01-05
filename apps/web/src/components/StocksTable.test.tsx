@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
@@ -294,15 +294,9 @@ describe("StocksTable", () => {
 
     await screen.findByText("NVDA");
 
-    await act(async () => {
-      await user.tab(); // focus filter
-    });
-    await act(async () => {
-      await user.tab(); // focus sort toggle
-    });
-    await act(async () => {
-      await user.tab(); // focus first row
-    });
+    await user.tab(); // focus filter
+    await user.tab(); // focus sort toggle
+    await user.tab(); // focus first row
 
     const dataRows = within(screen.getByRole("grid", { name: /single stocks positions/i }))
       .getAllByRole("row")
@@ -316,38 +310,28 @@ describe("StocksTable", () => {
     expect(within(firstRow).getAllByRole("gridcell")).toHaveLength(6);
     expect(secondRow).toHaveAttribute("tabindex", "-1");
 
-    await act(async () => {
-      await user.keyboard("{ArrowDown}");
-    });
+    await user.keyboard("{ArrowDown}");
     await waitFor(() => expect(document.activeElement).toBe(secondRow));
     await waitFor(() => expect(secondRow).toHaveAttribute("aria-selected", "true"));
     expect(firstRow).toHaveAttribute("aria-selected", "false");
     expect(firstRow).toHaveAttribute("tabindex", "-1");
 
-    await act(async () => {
-      await user.keyboard("{Enter}");
-    });
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(secondRow).toHaveAttribute("aria-expanded", "true"));
     await screen.findByRole("heading", { level: 4, name: "Fundamentals" });
 
-    await act(async () => {
-      await user.keyboard("{Space}");
-    });
+    await user.keyboard("{Space}");
     await waitFor(() => expect(secondRow).toHaveAttribute("aria-expanded", "false"));
     await waitFor(() =>
       expect(screen.queryByRole("heading", { level: 4, name: "Fundamentals" })).toBeNull(),
     );
 
-    await act(async () => {
-      await user.keyboard("{Home}");
-    });
+    await user.keyboard("{Home}");
     await waitFor(() => expect(document.activeElement).toBe(firstRow));
     expect(firstRow).toHaveAttribute("aria-selected", "true");
     expect(secondRow).toHaveAttribute("aria-selected", "false");
 
-    await act(async () => {
-      await user.keyboard("{End}");
-    });
+    await user.keyboard("{End}");
     await waitFor(() => expect(document.activeElement).toBe(secondRow));
     expect(secondRow).toHaveAttribute("aria-selected", "true");
 
@@ -388,9 +372,7 @@ describe("StocksTable", () => {
     expect(header).toHaveAttribute("aria-sort", "descending");
 
     let toggleButton = within(header).getByRole("button", { name: /day p&l/i });
-    await act(async () => {
-      await user.click(toggleButton);
-    });
+    await user.click(toggleButton);
 
     await waitFor(() => expect(header).toHaveAttribute("aria-sort", "ascending"));
     let dataRows = within(screen.getByRole("grid", { name: /single stocks positions/i })).getAllByRole("row").slice(1, 3);
@@ -398,9 +380,7 @@ describe("StocksTable", () => {
 
     toggleButton = within(header).getByRole("button", { name: /day p&l/i });
     expect(toggleButton).toBe(document.activeElement);
-    await act(async () => {
-      await user.keyboard("{Enter}"); // trigger via keyboard while button focused
-    });
+    await user.keyboard("{Enter}"); // trigger via keyboard while button focused
     await waitFor(() => expect(header).toHaveAttribute("aria-sort", "descending"));
     dataRows = within(screen.getByRole("grid", { name: /single stocks positions/i })).getAllByRole("row").slice(1, 3);
     expect(dataRows[0]).toHaveTextContent("NVDA");
@@ -429,9 +409,7 @@ describe("StocksTable", () => {
     await screen.findByText("AMD");
     expect(screen.getByLabelText("Filter symbols")).not.toBe(document.activeElement);
 
-    await act(async () => {
-      await user.keyboard("/");
-    });
+    await user.keyboard("/");
     await waitFor(() => expect(screen.getByLabelText("Filter symbols")).toBe(document.activeElement));
 
   });

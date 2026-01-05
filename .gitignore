@@ -32,3 +32,9 @@ apps/web/node_modules
 apps/web/dep-tree.before.txt
 apps/web/dep-tree.after.txt
 apps/web/audit.json
+
+# Local scratch at repo root
+node_modules/
+package.json
+package-lock.json
+tmp_test_run/

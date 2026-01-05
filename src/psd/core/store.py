@@ -499,9 +499,9 @@ def read_last_stats() -> dict[str, Any] | None:
             return True
         view_total = view_totals[key]
         fallback_total = fallback_totals[key]
-        if _is_effectively_zero(view_total, abs_tol=abs_tol) and not _is_effectively_zero(
-            fallback_total, abs_tol=abs_tol
-        ):
+        if _is_effectively_zero(
+            view_total, abs_tol=abs_tol
+        ) and not _is_effectively_zero(fallback_total, abs_tol=abs_tol):
             return True
         return False
 

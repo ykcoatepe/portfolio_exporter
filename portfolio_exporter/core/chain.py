@@ -250,7 +250,9 @@ def _infer_credit_debit(legs: list[dict]) -> str | None:
                 qty = (
                     1.0
                     if side in {"SELL", "SHORT"}
-                    else -1.0 if side in {"BUY", "LONG"} else 0.0
+                    else -1.0
+                    if side in {"BUY", "LONG"}
+                    else 0.0
                 )
             total += val * qty
         except Exception:

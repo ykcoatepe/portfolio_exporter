@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import utcnow
 
 run_with_spinner = core_ui.run_with_spinner
 
@@ -190,7 +191,7 @@ def front_future(root: str, exch: str) -> Future:
         details, key=lambda d: _parse_ib_month(d.contract.lastTradeDateOrContractMonth)
     ):
         dt = _parse_ib_month(det.contract.lastTradeDateOrContractMonth)
-        if dt > datetime.utcnow():
+        if dt > utcnow():
             return det.contract
     # fallback to first detail if all expired
     return details[0].contract
@@ -499,7 +500,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
                 min_diff = 1e9
                 T = (
                     max(
-                        (datetime.strptime(expiry, "%Y%m%d") - datetime.utcnow()).days,
+                        (datetime.strptime(expiry, "%Y%m%d") - utcnow()).days,
                         1,
                     )
                     / 365
@@ -577,7 +578,7 @@ def run(tickers: list[str] | None = None, fmt: str = "csv", return_df: bool = Fa
         os.makedirs(DATA_DIR, exist_ok=True)
         fn = os.path.join(DATA_DIR, f"{tk}.csv")
         if not np.isnan(iv_now):
-            today = datetime.utcnow().strftime("%Y-%m-%d")
+            today = utcnow().strftime("%Y-%m-%d")
             pd.DataFrame([[today, iv_now]], columns=["date", "iv"]).to_csv(
                 fn, mode="a", header=not os.path.exists(fn), index=False
             )

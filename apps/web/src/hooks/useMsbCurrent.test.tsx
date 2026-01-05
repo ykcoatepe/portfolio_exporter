@@ -1,4 +1,4 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { beforeAll, afterAll, afterEach, describe, expect, test, vi } from "vitest";
 import { http, HttpResponse } from "msw";
@@ -113,9 +113,7 @@ describe("useMsbCurrent", () => {
     expect(source).toBeDefined();
     expect(source?.withCredentials).toBe(true);
 
-    act(() => {
-      source?.emit("msb.update", updated);
-    });
+    source?.emit("msb.update", updated);
 
     await waitFor(() => {
       const next = client.getQueryData<MsbReading>(["msb.current"]);

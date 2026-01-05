@@ -8,10 +8,11 @@ from typing import Any
 
 from portfolio_exporter.core.config import settings
 from portfolio_exporter.core.ib_config import HOST as _IB_HOST
-from portfolio_exporter.core.ib_config import connect_ports
 from portfolio_exporter.core.ib_config import client_id as _client_id
+from portfolio_exporter.core.ib_config import connect_ports
 
 _IB_CID = _client_id("core", default=29)
+_IB_PORT: int | None = None
 
 _ib_singleton = None  # type: ignore
 
@@ -42,6 +43,7 @@ def _ib():
         return _ib_singleton
     if IB is None:
         return None
+    loop = _ensure_loop()
     _ib_singleton = IB()
 
     async def _try_connect():
@@ -55,7 +57,6 @@ def _ib():
             except Exception:
                 continue
 
-    loop = _ensure_loop()
     if loop.is_running():
         asyncio.run_coroutine_threadsafe(_try_connect(), loop)
     else:

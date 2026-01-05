@@ -18,7 +18,9 @@ from . import is_offline
 logger = logging.getLogger("psd.datasource.fred")
 
 _BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
-DEFAULT_SERIES_ID = "BAMLH0A0HYM2"  # ICE BofA US High Yield Index Option-Adjusted Spread
+DEFAULT_SERIES_ID = (
+    "BAMLH0A0HYM2"  # ICE BofA US High Yield Index Option-Adjusted Spread
+)
 _DEFAULT_START = "2000-01-01"
 
 

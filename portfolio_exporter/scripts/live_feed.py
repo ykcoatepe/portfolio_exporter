@@ -27,6 +27,7 @@ import pandas as pd
 
 from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import utcnow
 
 run_with_spinner = core_ui.run_with_spinner
 import math
@@ -597,7 +598,7 @@ def fetch_fred_yields(tickers: list[str]) -> pd.DataFrame:
     if not FRED_AVAILABLE:
         return pd.DataFrame()
     rows = []
-    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    ts = utcnow().isoformat(timespec="seconds") + "Z"
     iterable = iter_progress(tickers, "FRED") if PROGRESS else tickers
     for t in iterable:
         series = YIELD_MAP.get(t)

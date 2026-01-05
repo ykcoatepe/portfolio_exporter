@@ -1,26 +1,17 @@
 /**
- * PSD Data Grid - Barrel Export
+ * PSD Data Grid Components
+ *
+ * Main exports for the virtualized data grid system.
  */
 
 export { PsdDataGrid } from "./PsdDataGrid";
-export type { PsdDataGridProps, PsdColumnMeta, VirtualConfig, RowIdFn, RowStyleConfig, KeyboardNavState } from "./types";
-export { DEFAULT_VIRTUAL_CONFIG, COMPACT_VIRTUAL_CONFIG, LARGE_VIRTUAL_CONFIG, mergeVirtualConfig, shouldVirtualize } from "./virtualConfig";
-export { handleGridKeyDown, handleRowKeyDown } from "./keyboard";
-export {
-    formatNumber,
-    formatCurrency,
-    formatPercent,
-    formatGreek,
-    valueTone,
-    stalenessTone,
-    CellWrapper,
-    NumericCell,
-    CurrencyCell,
-    PercentCell,
-    GreekCell,
-    SymbolCell,
-    TextCell,
-    BadgeCell,
-    ProgressCell,
-    ExpandCell,
-} from "./cells";
+export { PsdStocksGrid } from "./PsdStocksGrid";
+export { GridParityHarness } from "./GridParityHarness";
+export { useGridSelection } from "./useGridSelection";
+export { useContextMenu } from "./useContextMenu";
+export { GridContextMenu } from "./GridContextMenu";
+export { PsdStocksFilterBar } from "./PsdStocksFilterBar";
+export * from "./mappers";
+export * from "./types";
+export * from "./cells";
+export * from "./virtualConfig";

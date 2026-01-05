@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 
 """Regression to ensure avg_cost remains stable across snapshot gaps."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -15,7 +16,9 @@ from positions_engine.service.normalize import (
 from positions_engine.service.state import PositionsState
 
 
-def test_live_refresh_preserves_avg_cost_when_snapshot_omits_basis(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_live_refresh_preserves_avg_cost_when_snapshot_omits_basis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     provider = InternalScriptsProvider()
 
     snapshot_with_basis = {
@@ -64,7 +67,9 @@ def test_live_refresh_preserves_avg_cost_when_snapshot_omits_basis(monkeypatch: 
         "positions": [],
         "quotes": [],
     }
-    missing_records, missing_quotes = provider._normalize_snapshot(snapshot_missing_basis)
+    missing_records, missing_quotes = provider._normalize_snapshot(
+        snapshot_missing_basis
+    )
     assert missing_records and missing_records[0]["avg_cost"] is None
 
     monkeypatch.setattr(

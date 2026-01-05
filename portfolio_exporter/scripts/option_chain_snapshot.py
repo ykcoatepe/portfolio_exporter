@@ -28,6 +28,7 @@ import time
 from portfolio_exporter.core import io
 from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import utcnow
 
 run_with_spinner = core_ui.run_with_spinner
 import zipfile
@@ -195,7 +196,7 @@ def get_portfolio_tickers(ib: IB) -> list[str]:
 # ────────────── expiry helpers ──────────────
 def choose_expiry(expirations: Sequence[str]) -> str:
     """Pick weekly ≤ 7 days, else first Friday, else earliest."""
-    today = datetime.utcnow().date()
+    today = utcnow().date()
     # within a week
     for e in expirations:
         if (datetime.strptime(e, "%Y%m%d").date() - today).days <= 7:
