@@ -84,6 +84,7 @@ export default function PowerlawPanel({ powerlaw, onRefresh }: PowerlawPanelProp
   const [refreshing, setRefreshing] = useState(false);
   const stale = powerlaw.stale === true;
   const refreshStatus = powerlaw.refresh?.status ?? "idle";
+  const refreshError = powerlaw.refresh?.last_error ?? null;
   const asOfLabel = formatDate(powerlaw.as_of ?? undefined);
   const dataQuality = powerlaw.data_quality ?? "N/A";
   const vixLabel = formatNumber(powerlaw.vix_spot);
@@ -100,9 +101,9 @@ export default function PowerlawPanel({ powerlaw, onRefresh }: PowerlawPanelProp
     ? refreshStatus === "running"
       ? "Refreshing Powerlaw data now..."
       : refreshStatus === "timeout"
-        ? "Refresh timed out - showing last snapshot."
+        ? `Refresh timed out${refreshError ? ` (${refreshError})` : ""} - showing last snapshot.`
         : refreshStatus === "failed"
-          ? "Refresh failed - showing last snapshot."
+          ? `Refresh failed${refreshError ? ` (${refreshError})` : ""} - showing last snapshot.`
           : staleReason === "missing_snapshot"
             ? "No Powerlaw snapshot found yet."
             : staleReason === "config_missing"
@@ -159,22 +160,29 @@ export default function PowerlawPanel({ powerlaw, onRefresh }: PowerlawPanelProp
       </div>
 
       {staleMessage ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
-          <span>{staleMessage}</span>
-          {canRefresh ? (
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={refreshDisabled}
-              className={clsx(
-                "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide",
-                refreshDisabled
-                  ? "border-slate-700 text-slate-500"
-                  : "border-amber-400/50 text-amber-100 hover:border-amber-300 hover:text-amber-50",
-              )}
-            >
-              {refreshDisabled ? "Refreshing..." : "Refresh Powerlaw"}
-            </button>
+        <div className="mt-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{staleMessage}</span>
+            {canRefresh ? (
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={refreshDisabled}
+                className={clsx(
+                  "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide",
+                  refreshDisabled
+                    ? "border-slate-700 text-slate-500"
+                    : "border-amber-400/50 text-amber-100 hover:border-amber-300 hover:text-amber-50",
+                )}
+              >
+                {refreshDisabled ? "Refreshing..." : "Refresh Powerlaw"}
+              </button>
+            ) : null}
+          </div>
+          {refreshStatus === "running" ? (
+            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-900/60">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-amber-300/70" />
+            </div>
           ) : null}
         </div>
       ) : null}

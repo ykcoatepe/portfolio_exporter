@@ -14,7 +14,10 @@ from prometheus_client import Counter, Gauge
 from pydantic import BaseModel, ConfigDict
 from starlette.middleware.cors import CORSMiddleware
 
-from portfolio_exporter.psd_powerlaw import request_powerlaw_refresh
+from portfolio_exporter.psd_powerlaw import (
+    load_powerlaw_snapshot,
+    request_powerlaw_refresh,
+)
 from psd.analytics.stats import compute_stats
 from psd.core.store import (
     init,
@@ -109,17 +112,23 @@ def _create_lifespan(settings: Settings) -> Any:
 @router.get("/state")
 def state() -> JSONResponse:
     snap = latest_snapshot()
+    powerlaw = None
+    try:
+        powerlaw = load_powerlaw_snapshot()
+    except Exception as exc:
+        log.warning("powerlaw snapshot load failed: %s", exc)
     if not snap:
-        return JSONResponse(
-            {
-                "ts": None,
-                "positions": [],
-                "positions_view": _empty_positions_view(),
-                "quotes": {},
-                "risk": {},
-                "empty": True,
-            }
-        )
+        payload = {
+            "ts": None,
+            "positions": [],
+            "positions_view": _empty_positions_view(),
+            "quotes": {},
+            "risk": {},
+            "empty": True,
+        }
+        if powerlaw is not None:
+            payload["powerlaw"] = powerlaw
+        return JSONResponse(payload)
     view = snap.get("positions_view")
     if not isinstance(view, dict):
         positions = snap.get("positions")
@@ -135,6 +144,8 @@ def state() -> JSONResponse:
         else:
             view = _empty_positions_view()
         snap = {**snap, "positions_view": view}
+    if powerlaw is not None:
+        snap = {**snap, "powerlaw": powerlaw}
     return JSONResponse(snap)
 
 
