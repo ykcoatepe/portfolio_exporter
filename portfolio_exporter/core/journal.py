@@ -68,7 +68,7 @@ def update_journal(path: str, updates: dict[str, dict[str, Any]]) -> None:
         return
     import pandas as pd
 
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
     for sym, vals in updates.items():
         idx = df.index[df["symbol"] == sym]
         for k, v in vals.items():

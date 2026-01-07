@@ -156,4 +156,3 @@ def evaluate_msb_triggers_and_update_livebar(
 
 
 __all__ = ["evaluate_msb_triggers_and_update_livebar"]
-

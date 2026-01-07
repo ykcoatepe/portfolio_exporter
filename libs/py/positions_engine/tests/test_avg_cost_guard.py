@@ -18,4 +18,6 @@ def test_no_avg_cost_zero_assignments() -> None:
             continue
         if _ZERO_ASSIGN_PATTERN.search(text):
             offending.append(path.relative_to(project_root))
-    assert not offending, f"Found avg_cost zero assignments in: {', '.join(str(p) for p in offending)}"
+    assert not offending, (
+        f"Found avg_cost zero assignments in: {', '.join(str(p) for p in offending)}"
+    )

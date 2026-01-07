@@ -18,8 +18,12 @@ def snapshot(tickers: Sequence[str]) -> dict[str, float]:
     """
     # Backward-compatible test hook: if local helpers are monkeypatched,
     # honor the old IBKR→YF fallback path used in tests.
-    ib_fn: Callable[[Sequence[str]], dict[str, float]] | None = globals().get("_ibkr_quotes")  # type: ignore[assignment]
-    yf_fn: Callable[[Sequence[str]], dict[str, float]] | None = globals().get("_yf_quotes")  # type: ignore[assignment]
+    ib_fn: Callable[[Sequence[str]], dict[str, float]] | None = globals().get(
+        "_ibkr_quotes"
+    )  # type: ignore[assignment]
+    yf_fn: Callable[[Sequence[str]], dict[str, float]] | None = globals().get(
+        "_yf_quotes"
+    )  # type: ignore[assignment]
     if callable(ib_fn) and callable(yf_fn):
         try:
             return ib_fn(tickers)

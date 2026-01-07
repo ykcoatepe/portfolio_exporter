@@ -69,12 +69,12 @@ rules:
     preview = client.post("/rules/preview", json={"catalog_text": yaml_text})
     assert preview.status_code == 200
     preview_payload = preview.json()
-    assert preview_payload["diff"][
-        "added"
-    ], "expected proposed catalog to add new rules"
-    assert preview_payload["diff"][
-        "removed"
-    ], "expected preview diff to include removed defaults"
+    assert preview_payload["diff"]["added"], (
+        "expected proposed catalog to add new rules"
+    )
+    assert preview_payload["diff"]["removed"], (
+        "expected preview diff to include removed defaults"
+    )
 
 
 def test_validate_catalog_forbidden_ast(
@@ -205,6 +205,6 @@ rules:
     assert errors == []
     assert initial_text in seen
     assert updated_text in seen
-    assert (
-        len(seen - {initial_text, updated_text}) == 0
-    ), "Unexpected intermediate catalog content observed"
+    assert len(seen - {initial_text, updated_text}) == 0, (
+        "Unexpected intermediate catalog content observed"
+    )

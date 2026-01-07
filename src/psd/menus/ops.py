@@ -290,9 +290,16 @@ def show_logs(console: Console, lines: int = LOG_TAIL_LINES) -> None:
 
 
 def open_dashboard(console: Console) -> None:
-    data = _load_pid_file()
-    port = data.get("port", _port_from_env())
-    url = f"http://127.0.0.1:{port}"
+    # Check if dev mode is enabled (use Vite dev server instead of FastAPI)
+    dev_mode = os.getenv("PSD_DEV_MODE", "").lower() in ("1", "true", "yes")
+    if dev_mode:
+        dev_port = int(os.getenv("PSD_DEV_PORT", "5173"))
+        url = f"http://localhost:{dev_port}/psd"
+        console.print("[cyan]Opening Vite dev server (PSD_DEV_MODE=1)[/cyan]")
+    else:
+        data = _load_pid_file()
+        port = data.get("port", _port_from_env())
+        url = f"http://127.0.0.1:{port}"
     success = webbrowser.open(url)
     if success:
         console.print(f"[green]Opened dashboard:[/green] {url}")
@@ -310,7 +317,7 @@ def start_psd(console: Console) -> None:
         "[dim]Using {snapshot} | IB {host}:{port} clientId={client_id}[/]".format(
             snapshot=child_env["PSD_SNAPSHOT_FN"],
             host=child_env["IB_HOST"],
-            port=child_env["IB_PORT"],
+            port=child_env.get("IB_PORT", "auto"),
             client_id=child_env["IB_CLIENT_ID"],
         )
     )

@@ -135,12 +135,16 @@ def _expiry_radar(
     delta_col = (
         "delta_exposure"
         if "delta_exposure" in df.columns
-        else "delta" if "delta" in df.columns else None
+        else "delta"
+        if "delta" in df.columns
+        else None
     )
     theta_col = (
         "theta_exposure"
         if "theta_exposure" in df.columns
-        else "theta" if "theta" in df.columns else None
+        else "theta"
+        if "theta" in df.columns
+        else None
     )
     rows: list[dict[str, Any]] = []
     for date, grp in df.groupby(df["expiry_dt"].dt.date):
@@ -185,7 +189,9 @@ def _theta_decay_5d(df: pd.DataFrame) -> float:
     theta_col = (
         "theta_exposure"
         if "theta_exposure" in df.columns
-        else "theta" if "theta" in df.columns else None
+        else "theta"
+        if "theta" in df.columns
+        else None
     )
     if theta_col is None:
         return 0.0

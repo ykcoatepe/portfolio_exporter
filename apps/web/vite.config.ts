@@ -9,6 +9,17 @@ export default defineConfig({
     },
   },
   plugins: [react()],
+  server: {
+    proxy: {
+      "/state": "http://127.0.0.1:51127",
+      "/stats": "http://127.0.0.1:51127",
+      "/positions": "http://127.0.0.1:51127",
+      "/msb": "http://127.0.0.1:51127",
+      "/rules": "http://127.0.0.1:51127",
+      "/sse": "http://127.0.0.1:51127",
+      "/session": "http://127.0.0.1:51127",
+    },
+  },
   test: {
     globals: true,
     css: true,

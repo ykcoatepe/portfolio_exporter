@@ -23,6 +23,7 @@ except Exception:  # pragma: no cover - optional dependency
     Ticker = None  # type: ignore
 
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import utcnow
 
 try:
     from portfolio_exporter.core.input import parse_order_line
@@ -150,6 +151,11 @@ def _parse_date_like(text: str) -> _dt.date | None:
         return _dt.date.fromisoformat(text)
     except Exception:
         pass
+    from portfolio_exporter.core.date_utils import parse_month_day_no_year
+
+    no_year = parse_month_day_no_year(text)
+    if no_year is not None:
+        return no_year
     try:  # optional dependency route
         import dateparser  # type: ignore
 
@@ -368,7 +374,7 @@ def _base_ticket(
     account: str | None = None,
 ):
     return {
-        "timestamp": dt.datetime.utcnow().isoformat(),
+        "timestamp": utcnow().isoformat(),
         "strategy": strategy,
         "underlying": symbol,
         "expiry": expiry,
@@ -1716,7 +1722,7 @@ def run() -> bool:
     )
 
     ticket = {
-        "timestamp": dt.datetime.utcnow().isoformat(),
+        "timestamp": utcnow().isoformat(),
         "strategy": strat,
         "underlying": underlying,
         "expiry": expiry,

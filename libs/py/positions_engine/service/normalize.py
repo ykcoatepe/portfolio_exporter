@@ -88,6 +88,7 @@ def quotes_from_records(records: Iterable[dict[str, Any]]) -> list[Quote]:
         )
     return out
 
+
 _TIMESTAMP_CONTAINER_KEYS: tuple[str, ...] = ("tick", "quote", "mark")
 
 
@@ -205,7 +206,6 @@ def _extract_last_timestamp(row: dict[str, Any]) -> datetime | None:
             "trade_ts",
         ),
     )
-
 
 
 def _resolve_symbol(row: dict[str, Any]) -> str | None:
@@ -342,11 +342,7 @@ def compute_equity_pnl_fields(
 
     day_pnl_float: float | None = None
     day_percent_float: float | None = None
-    if (
-        mark is not None
-        and previous_close is not None
-        and quantity is not None
-    ):
+    if mark is not None and previous_close is not None and quantity is not None:
         day_basis = previous_close * quantity * multiplier
         day_pnl = (mark - previous_close) * quantity * multiplier
         day_pnl_float = float(day_pnl)
@@ -356,11 +352,7 @@ def compute_equity_pnl_fields(
     total_pnl_float: float | None = None
     total_percent_float: float | None = None
     avg_cost = position.avg_cost
-    if (
-        mark is not None
-        and quantity is not None
-        and avg_cost not in (None, 0)
-    ):
+    if mark is not None and quantity is not None and avg_cost not in (None, 0):
         total_basis = avg_cost * quantity * multiplier
         total_pnl = (mark - avg_cost) * quantity * multiplier
         total_pnl_float = float(total_pnl)

@@ -74,7 +74,9 @@ def export_snapshot(
         writer.writeheader()
         for entry in rows:
             row = {key: entry.get(key) for key in FIELDNAMES}
-            row["triggers"] = _normalize_triggers(row.get("triggers"), for_parquet=False)
+            row["triggers"] = _normalize_triggers(
+                row.get("triggers"), for_parquet=False
+            )
             writer.writerow({key: _csv_value(value) for key, value in row.items()})
         content = buffer.getvalue().encode("utf-8")
         return content, "text/csv; charset=utf-8", f"{filename}.csv"

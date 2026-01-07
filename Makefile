@@ -65,13 +65,13 @@ serve-api:
 # Web build & CI helpers
 # ------------------------------------------------------------------
 web-build:
-	cd apps/web && npm ci && npm run build
+	cd apps/web && bun install && bun run build
 
 web-test:
-	cd apps/web && corepack pnpm install && corepack pnpm test:unit -- --run
+	cd apps/web && bun install && bun run test:unit
 
 web-e2e:
-	cd apps/web && corepack pnpm install && corepack pnpm exec playwright install --with-deps && corepack pnpm test:e2e -w
+	cd apps/web && bun install && bunx playwright install --with-deps && bun run test:e2e
 
 psd-ci:
 	make sanity-fast && make web-build && pytest -q
@@ -82,19 +82,19 @@ psd-ci:
 .PHONY: contract-sync typegen-local ui-test ui-test-contracts ui-dev api-test api-serve perf-check
 
 contract-sync:
-	cd apps/web && npx openapi-typescript http://127.0.0.1:8000/openapi.json -o src/lib/api.d.ts
+	cd apps/web && bunx openapi-typescript http://127.0.0.1:8000/openapi.json -o src/lib/api.d.ts
 
 typegen-local:
 	python -c 'from apps.api.main import app; import json, sys; sys.stdout.write(json.dumps(app.openapi()))' > apps/web/openapi.json
-	cd apps/web && npx --yes openapi-typescript ./openapi.json -o src/lib/api.d.ts
+	cd apps/web && bunx --yes openapi-typescript ./openapi.json -o src/lib/api.d.ts
 
 ui-test:
-	cd apps/web && npm run test:unit
+	cd apps/web && bun run test:unit
 
 ui-test-contracts:
-	cd apps/web && npm run test:contracts
+	cd apps/web && bun run test:contracts
 
-ui-dev: ; cd apps/web && npm run dev
+ui-dev: ; cd apps/web && bun run dev
 api-test: ; pytest -q libs/py/positions_engine/tests
 api-serve: ; uvicorn apps.api.main:app --reload
 perf-check: ; python -m scripts.perf_fixture_run

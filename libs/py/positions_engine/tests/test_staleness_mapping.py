@@ -27,7 +27,10 @@ def test_staleness_mid_uses_bid_timestamp_fallback() -> None:
 
 def test_staleness_last_uses_quote_timestamp_fallback() -> None:
     now = datetime.now(tz=UTC)
-    entry = {"kind": "LAST", "quote_timestamp": (now - timedelta(seconds=75)).isoformat()}
+    entry = {
+        "kind": "LAST",
+        "quote_timestamp": (now - timedelta(seconds=75)).isoformat(),
+    }
 
     staleness = _resolve_option_stale_seconds_entry(entry, "LAST", now)
     assert staleness is not None

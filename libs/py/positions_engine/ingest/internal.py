@@ -204,11 +204,9 @@ def _decimal_from_any(value: Any) -> Decimal | None:
 
 
 def _synthesize_leg_mark_and_ts(
-    leg: dict[str, Any]
+    leg: dict[str, Any],
 ) -> tuple[Decimal | None, str | None, datetime | None]:
-    explicit_source = _normalize_mark_source(
-        leg.get("mark_source") or leg.get("kind")
-    )
+    explicit_source = _normalize_mark_source(leg.get("mark_source") or leg.get("kind"))
     mark_value = _decimal_from_any(leg.get("mark"))
     if mark_value is not None:
         ts = _first_parsed_ts(
@@ -485,7 +483,10 @@ class InternalScriptsProvider:
 
         _ensure_repo_root()
         for module_name, attr_candidates in (
-            ("portfolio_exporter.psd_adapter", ("greeks_snapshot_once", "greeks_snapshot")),
+            (
+                "portfolio_exporter.psd_adapter",
+                ("greeks_snapshot_once", "greeks_snapshot"),
+            ),
             ("src.psd.ingestor.normalize", ("greeks_snapshot_once",)),
         ):
             module = self._import_optional(module_name)
@@ -498,12 +499,19 @@ class InternalScriptsProvider:
                 try:
                     result = self._invoke_callable(fn)
                 except Exception:  # pragma: no cover - defensive logging
-                    logger.debug("[internal] greeks snapshot via %s.%s failed", module_name, attr_name, exc_info=True)
+                    logger.debug(
+                        "[internal] greeks snapshot via %s.%s failed",
+                        module_name,
+                        attr_name,
+                        exc_info=True,
+                    )
                     continue
                 if isinstance(result, dict) and result:
                     return result
                 if isinstance(result, list) and result:
-                    return {"rows": [entry for entry in result if isinstance(entry, dict)]}
+                    return {
+                        "rows": [entry for entry in result if isinstance(entry, dict)]
+                    }
         return None
 
     def _load_snapshot(self) -> dict[str, Any] | None:
@@ -1006,8 +1014,8 @@ class InternalScriptsProvider:
         previous_close_value = _to_float_or_none(leg.get("previous_close"))
 
         explicit_mark = _decimal_from_any(leg.get("mark"))
-        synthesized_mark, synthesized_source, mark_timestamp_obj = _synthesize_leg_mark_and_ts(
-            leg
+        synthesized_mark, synthesized_source, mark_timestamp_obj = (
+            _synthesize_leg_mark_and_ts(leg)
         )
         mark_value = float(synthesized_mark) if synthesized_mark is not None else None
         mark_source = (
@@ -1016,13 +1024,17 @@ class InternalScriptsProvider:
             or _normalize_mark_source(leg.get("kind"))
         )
         mark_timestamp = (
-            mark_timestamp_obj.isoformat()
-            if mark_timestamp_obj is not None
-            else None
+            mark_timestamp_obj.isoformat() if mark_timestamp_obj is not None else None
         )
 
-        if mark_value is not None and explicit_mark is None and mark_counter is not None:
-            counter_key = mark_source or _normalize_mark_source(synthesized_source) or "MISSING"
+        if (
+            mark_value is not None
+            and explicit_mark is None
+            and mark_counter is not None
+        ):
+            counter_key = (
+                mark_source or _normalize_mark_source(synthesized_source) or "MISSING"
+            )
             mark_counter[counter_key] += 1
 
         if mark_value is not None:

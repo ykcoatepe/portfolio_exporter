@@ -746,7 +746,12 @@ def test_group_sum_greeks_and_pnl_skip_missing_values() -> None:
     payload = grouping.groups[0].to_payload()
 
     assert payload["group_pnl_unrealized"] is None
-    assert payload["sum_greeks"] == {"delta": None, "gamma": None, "theta": None, "vega": None}
+    assert payload["sum_greeks"] == {
+        "delta": None,
+        "gamma": None,
+        "theta": None,
+        "vega": None,
+    }
 
 
 def test_group_pnl_unrealized_none_when_legs_missing_pnl() -> None:

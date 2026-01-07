@@ -1,4 +1,4 @@
-import { act, screen, waitFor, waitForElementToBeRemoved, within } from "@testing-library/react";
+import { screen, waitFor, waitForElementToBeRemoved, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -216,9 +216,7 @@ describe("CombosTable", () => {
     const firstRow = screen.getAllByRole("row", { name: /combo row/i })[0];
     const expandButton = within(firstRow).getByRole("button", { name: /expand group/i });
 
-    await act(async () => {
-      await user.click(expandButton);
-    });
+    await user.click(expandButton);
 
     const detailRow = await screen.findByRole("row", { name: /combo detail row/i });
     const detailCell = within(detailRow).getByRole("gridcell");
@@ -241,9 +239,7 @@ describe("CombosTable", () => {
       name: /expand group/i,
     });
 
-    await act(async () => {
-      await user.click(expandButton);
-    });
+    await user.click(expandButton);
 
     const detailRow = await screen.findByRole("row", { name: /combo detail row/i });
     const combosSection = within(detailRow).getByText(/^Combos$/i);
@@ -262,9 +258,7 @@ describe("CombosTable", () => {
     await waitForElementToBeRemoved(() => screen.queryAllByTestId("skeleton-row"));
 
     const toggle = screen.getByRole("checkbox", { name: /show raw combos/i });
-    await act(async () => {
-      await user.click(toggle);
-    });
+    await user.click(toggle);
 
     const rawRowHeader = await screen.findByRole("rowheader", {
       name: /AAPL 195C CAL • Sep→Nov • Debit 4\.40/i,
@@ -275,9 +269,7 @@ describe("CombosTable", () => {
       name: /expand combo/i,
     });
 
-    await act(async () => {
-      await user.click(expandButton);
-    });
+    await user.click(expandButton);
 
     expect(await screen.findByText(/AAPL 195C • Nov 15 '24/)).toBeInTheDocument();
   });
@@ -291,20 +283,14 @@ describe("CombosTable", () => {
     const body = screen.getByTestId("rows-body");
     const dataRows = within(body).getAllByRole("row", { name: /combo row/i });
 
-    await act(async () => {
-      await user.click(dataRows[0]);
-    });
+    await user.click(dataRows[0]);
 
     await waitFor(() => expect(document.activeElement).toHaveAttribute("data-row-index", "0"));
 
-    await act(async () => {
-      await user.keyboard("{ArrowDown}");
-    });
+    await user.keyboard("{ArrowDown}");
     await waitFor(() => expect(document.activeElement).toHaveAttribute("data-row-index", "1"));
 
-    await act(async () => {
-      await user.keyboard("{Home}");
-    });
+    await user.keyboard("{Home}");
     await waitFor(() => expect(document.activeElement).toHaveAttribute("data-row-index", "0"));
   });
 

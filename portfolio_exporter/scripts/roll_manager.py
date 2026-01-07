@@ -27,6 +27,7 @@ from portfolio_exporter.core import ui as core_ui
 from portfolio_exporter.core.chain import fetch_chain
 from portfolio_exporter.core.combo import detect_combos
 from portfolio_exporter.core.config import settings
+from portfolio_exporter.core.date_utils import utcnow
 from portfolio_exporter.core.runlog import RunLog
 
 # Back-compat: expose run_with_spinner alias for tests to monkeypatch
@@ -99,7 +100,7 @@ def _write_files(
             }
         )
 
-    ticket = {"timestamp": dt.datetime.utcnow().isoformat(), "combos": combos_out}
+    ticket = {"timestamp": utcnow().isoformat(), "combos": combos_out}
     ticket_path = io.save(ticket, f"roll_ticket_{ts}", "json", outdir)
 
     csv_df = pd.DataFrame(

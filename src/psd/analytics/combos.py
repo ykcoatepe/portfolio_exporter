@@ -9,10 +9,10 @@ Rules:
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-import math
 
 from ..models import OptionLeg, Position
 

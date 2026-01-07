@@ -13,16 +13,34 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
-API_HOST, API_PORT = "127.0.0.1", 8000
+# Primary: Vite dev server (modern dashboard)
+DEV_HOST, DEV_PORT = "localhost", 5173
+# Fallback: PSD backend (FastAPI)
+API_HOST, API_PORT = "127.0.0.1", 51127
 MODULE_PATH = Path(__file__).resolve()
 REPO_ROOT = MODULE_PATH.parents[2]
 WEB_ROOT = REPO_ROOT / "apps" / "web"
 DIST_INDEX = WEB_ROOT / "dist" / "index.html"
 PSD_ENV_PATH = REPO_ROOT / ".psd.env"
 _DASH_URL = f"http://{API_HOST}:{API_PORT}/psd"
+_DEV_DASH_URL = f"http://{DEV_HOST}:{DEV_PORT}/psd"
 
 _AUTO_STARTED = False
 _DEFAULT_STARTUP_TIMEOUT_S = 20.0
+
+
+def _is_dev_mode() -> bool:
+    """Auto-detect if Vite dev server is running on port 5173."""
+    # If explicitly set, respect it
+    env_val = os.getenv("PSD_DEV_MODE", "").lower()
+    if env_val in ("1", "true", "yes"):
+        return True
+    if env_val in ("0", "false", "no"):
+        return False
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    # Auto-detect: check if Vite is running
+    return _port_open(DEV_HOST, DEV_PORT)
 
 
 def _build_uvicorn_command() -> list[str]:
@@ -30,7 +48,8 @@ def _build_uvicorn_command() -> list[str]:
         sys.executable,
         "-m",
         "uvicorn",
-        "apps.api.main:app",
+        "--factory",
+        "psd.web.server:make_app",
         "--host",
         API_HOST,
         "--port",
@@ -74,14 +93,23 @@ def _notify_psd_error(status: Any, message: str) -> None:
     print(message)
 
 
-def _port_open(host: str, port: int, timeout: float = 0.2) -> bool:
-    with socket.socket() as sock:
-        sock.settimeout(timeout)
+def _port_open(host: str, port: int, timeout: float = 0.5) -> bool:
+    """Check if a port is open, trying both IPv4 and IPv6."""
+    for family in (socket.AF_INET, socket.AF_INET6):
         try:
-            sock.connect((host, port))
-            return True
+            with socket.socket(family, socket.SOCK_STREAM) as sock:
+                sock.settimeout(timeout)
+                # For IPv6 localhost, use ::1
+                addr = (
+                    "::1"
+                    if family == socket.AF_INET6 and host in ("localhost", "127.0.0.1")
+                    else host
+                )
+                sock.connect((addr, port))
+                return True
         except OSError:
-            return False
+            continue
+    return False
 
 
 def _ensure_uvicorn_runtime() -> None:
@@ -178,7 +206,8 @@ def start_psd_dashboard() -> None:
 
 
 def _open_dash_tab() -> None:
-    webbrowser.open_new_tab(_DASH_URL)
+    url = _DEV_DASH_URL if _is_dev_mode() else _DASH_URL
+    webbrowser.open_new_tab(url)
 
 
 def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for future
@@ -193,7 +222,10 @@ def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for fu
             pass
 
     try:
-        if not _AUTO_STARTED or not _port_open(API_HOST, API_PORT):
+        if _is_dev_mode():
+            # In dev mode, just open the Vite dev server directly
+            _open_dash_tab()
+        elif not _AUTO_STARTED or not _port_open(API_HOST, API_PORT):
             _AUTO_STARTED = True
             start_psd_dashboard()
         else:

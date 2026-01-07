@@ -11,6 +11,10 @@ import type { RuleBreachSummary, RuleCounters, RuleSeverity } from "./useRules";
 import { resolveApiBaseUrl } from "../lib/http";
 
 const RULE_CATALOG_QUERY_KEY = ["rules", "catalog"] as const;
+export const RULES_CATALOG_ENABLED =
+  typeof import.meta !== "undefined" &&
+  (import.meta.env?.VITE_RULES_CATALOG === "true" ||
+    import.meta.env?.MODE === "test");
 
 type RawCatalogResponse = components["schemas"]["RulesCatalogResponseModel"];
 type RawValidationResponse = components["schemas"]["RulesCatalogValidationResponseModel"];
@@ -201,7 +205,18 @@ const normalizePublishResponse = (raw: RawPublishResponse): RuleCatalogPublishRe
   updatedBy: coerceNullableString(raw?.updated_by),
 });
 
+const EMPTY_CATALOG: RuleCatalogInfo = {
+  version: 0,
+  updatedAt: null,
+  updatedBy: null,
+  rules: [],
+  rulesCount: 0,
+};
+
 async function fetchRuleCatalog(baseUrl = ""): Promise<RuleCatalogInfo> {
+  if (!RULES_CATALOG_ENABLED) {
+    return EMPTY_CATALOG;
+  }
   const origin = resolveOrigin(baseUrl);
   const response = await fetch(`${origin}/rules/catalog`, {
     headers: { Accept: "application/json" },
@@ -223,6 +238,9 @@ async function postValidateRules(
   variables: ValidateVariables,
   baseUrl = "",
 ): Promise<RuleCatalogValidationResult> {
+  if (!RULES_CATALOG_ENABLED) {
+    throw new Error("Rules catalog actions are disabled in PSD lite mode.");
+  }
   const origin = resolveOrigin(baseUrl);
   const endpoint = variables.preview ? "/rules/preview" : "/rules/validate";
   const response = await fetch(`${origin}${endpoint}`, {
@@ -254,6 +272,9 @@ async function postPublishRules(
   variables: PublishVariables,
   baseUrl = "",
 ): Promise<RuleCatalogPublishResult> {
+  if (!RULES_CATALOG_ENABLED) {
+    throw new Error("Rules catalog actions are disabled in PSD lite mode.");
+  }
   const origin = resolveOrigin(baseUrl);
   const response = await fetch(`${origin}/rules/publish`, {
     method: "POST",
@@ -277,6 +298,9 @@ async function postPublishRules(
 }
 
 async function postReloadRules(baseUrl = ""): Promise<RuleCatalogInfo> {
+  if (!RULES_CATALOG_ENABLED) {
+    throw new Error("Rules catalog actions are disabled in PSD lite mode.");
+  }
   const origin = resolveOrigin(baseUrl);
   const response = await fetch(`${origin}/rules/reload`, {
     method: "POST",
@@ -296,6 +320,8 @@ export function useRuleCatalog(): UseQueryResult<RuleCatalogInfo, Error> {
     queryFn: () => fetchRuleCatalog(),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
+    enabled: RULES_CATALOG_ENABLED,
+    initialData: RULES_CATALOG_ENABLED ? undefined : EMPTY_CATALOG,
   });
 }
 
@@ -333,4 +359,3 @@ export function usePublishRules(): UseMutationResult<RuleCatalogPublishResult, E
     },
   });
 }
-

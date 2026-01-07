@@ -77,15 +77,13 @@ def _rolling_winsorize(
     clipped = series
     mask = low.notna() & high.notna()
     clipped = clipped.where(~mask, series.clip(lower=low, upper=high))
-    clipped_diff = (
-        (series - clipped).abs() > np.finfo(float).eps
-    ).astype(int) * mask.astype(int)
+    clipped_diff = ((series - clipped).abs() > np.finfo(float).eps).astype(
+        int
+    ) * mask.astype(int)
     return clipped, clipped_diff
 
 
-def _z_score(
-    series: pd.Series, window: int, fallback: int
-) -> pd.Series:
+def _z_score(series: pd.Series, window: int, fallback: int) -> pd.Series:
     min_periods = max(2, min(window, fallback))
     rolling_mean = (
         series.rolling(window=window, min_periods=min_periods).mean().astype(float)
@@ -284,7 +282,9 @@ def compute_msb(
             cooldown_until.append(cooldown_active_until)
         else:
             cooldown_until.append(
-                cooldown_active_until if cooldown_active_until and idx <= cooldown_active_until else pd.NaT
+                cooldown_active_until
+                if cooldown_active_until and idx <= cooldown_active_until
+                else pd.NaT
             )
 
         triggers.append(trigger_flags)

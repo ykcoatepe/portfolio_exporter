@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -80,9 +80,7 @@ describe("OptionLegsTable", () => {
     expect(initialRows).toHaveLength(SEED_DATA.legs.length);
 
     const orphanToggle = screen.getByLabelText(/only orphan legs/i);
-    await act(async () => {
-      await user.click(orphanToggle);
-    });
+    await user.click(orphanToggle);
 
     await waitFor(() => {
       const rowsAfterOrphan = within(body).getAllByRole("row", { name: /leg row/i });
@@ -97,17 +95,13 @@ describe("OptionLegsTable", () => {
     const allButton = within(underlyingsSection).getByRole("button", { name: /^all$/i });
     const msftButton = within(underlyingsSection).getByRole("button", { name: /^msft$/i });
 
-    await act(async () => {
-      await user.click(msftButton);
-    });
+    await user.click(msftButton);
     await waitFor(() => {
       const rowsAfterMsft = within(body).getAllByRole("row", { name: /leg row/i });
       expect(rowsAfterMsft).toHaveLength(MSFT_ORPHAN_COUNT);
     });
 
-    await act(async () => {
-      await user.click(allButton);
-    });
+    await user.click(allButton);
     await waitFor(() => {
       const rowsReset = within(body).getAllByRole("row", { name: /leg row/i });
       expect(rowsReset).toHaveLength(ORPHAN_COUNT);
@@ -123,10 +117,8 @@ describe("OptionLegsTable", () => {
     const deltaMinInput = screen.getByLabelText(/Δ Min/i, { selector: "input" });
     const deltaMaxInput = screen.getByLabelText(/Δ Max/i, { selector: "input" });
 
-    await act(async () => {
-      fireEvent.change(deltaMinInput, { target: { value: "0.1" } });
-      fireEvent.change(deltaMaxInput, { target: { value: "0.4" } });
-    });
+    fireEvent.change(deltaMinInput, { target: { value: "0.1" } });
+    fireEvent.change(deltaMaxInput, { target: { value: "0.4" } });
 
     await waitFor(() => {
       expect(screen.queryByText("-0.18")).not.toBeInTheDocument();
@@ -138,9 +130,7 @@ describe("OptionLegsTable", () => {
 
     // Reset delta range
     const resetButton = screen.getByRole("button", { name: /reset Δ/i });
-    await act(async () => {
-      await user.click(resetButton);
-    });
+    await user.click(resetButton);
     await waitFor(() => {
       const rowsAfterReset = within(body).getAllByRole("row", { name: /leg row/i });
       expect(rowsAfterReset).toHaveLength(SEED_DATA.legs.length);

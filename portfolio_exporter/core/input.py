@@ -6,6 +6,8 @@ from typing import NamedTuple
 
 import dateparser
 
+from portfolio_exporter.core.date_utils import parse_month_day_no_year
+
 
 class Leg(NamedTuple):
     right: str  # "C" or "P"
@@ -61,10 +63,31 @@ def parse_order_line(text: str) -> ParsedOrder | None:
     if k2:
         strikes.append(float(k2))
     expiry_txt = " ".join(toks[2:]) if len(toks) > 2 else "+30d"
-    exp_dt = dateparser.parse(expiry_txt, settings={"PREFER_DATES_FROM": "future"})
+    exp_dt = parse_month_day_no_year(expiry_txt)
+    if exp_dt is None:
+        for fmt in (
+            "%Y-%m-%d",
+            "%Y%m%d",
+            "%d-%b-%Y",
+            "%d-%b-%y",
+            "%d %b %Y",
+            "%d %b %y",
+            "%d-%B-%Y",
+            "%d-%B-%y",
+            "%d %B %Y",
+            "%d %B %y",
+        ):
+            try:
+                exp_dt = _dt.datetime.strptime(expiry_txt, fmt).date()
+                break
+            except ValueError:
+                continue
+    if exp_dt is None:
+        exp_dt = dateparser.parse(expiry_txt, settings={"PREFER_DATES_FROM": "future"})
     if not exp_dt:
         return None
-    exp_dt = exp_dt.date()
+    if isinstance(exp_dt, _dt.datetime):
+        exp_dt = exp_dt.date()
     legs = [Leg(right=right, strike=s, expiry=exp_dt) for s in strikes]
     parsed = ParsedOrder(underlying=sym, legs=legs, qty=qty)
     global LAST_PARSED

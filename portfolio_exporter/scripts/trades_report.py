@@ -63,6 +63,7 @@ from portfolio_exporter.core import combo as combo_core
 from portfolio_exporter.core import config as config_core
 from portfolio_exporter.core import io as core_io
 from portfolio_exporter.core import json as json_helpers
+from portfolio_exporter.core.date_utils import parse_month_day_no_year
 from portfolio_exporter.core.runlog import RunLog
 
 # Reuse enrichment from portfolio_greeks to keep behavior identical
@@ -1566,7 +1567,9 @@ def _build_positions_like_df(
     side = (
         df["Side"]
         if "Side" in df.columns
-        else df["side"] if "side" in df.columns else pd.Series([""] * len(df))
+        else df["side"]
+        if "side" in df.columns
+        else pd.Series([""] * len(df))
     )
     # signed qty: BUY +, SELL -
     sign = side.apply(
@@ -1912,9 +1915,7 @@ def _cluster_executions(
                 clusters.get("pnl"), errors="coerce"
             ).fillna(0.0) - pd.to_numeric(
                 clusters.get("commission"), errors="coerce"
-            ).fillna(
-                0.0
-            )
+            ).fillna(0.0)
     except Exception:
         pass
 
@@ -3251,6 +3252,9 @@ def _parse_when(s: str | None) -> datetime | None:
     s = s.strip()
     if not s:
         return None
+    no_year = parse_month_day_no_year(s)
+    if no_year is not None:
+        return datetime(no_year.year, no_year.month, no_year.day)
     # Try dateparser for flexibility if available
     try:
         import dateparser  # type: ignore

@@ -6,7 +6,6 @@ import {
   buildFriendlyLegDisplay,
   deriveGroupKey,
   formatComboLabel,
-  formatExpiryShort,
   normalizeRightCode,
   parseOsi,
   sanitizeLabel,
@@ -23,11 +22,18 @@ import type {
   OptionsApiResponse,
   PlaybookMeta,
   MarkSource,
+  PSDCombo,
+  PSDLeg,
+  PSDGreeks,
+  PSDSnapshot,
 } from "../lib/types";
 import { resolveApiBaseUrl } from "../lib/http";
+import { fetchPsdSnapshot } from "./usePsdSnapshot";
 
 const OPTIONS_QUERY_KEY = ["positions", "options"] as const;
 const MARK_SOURCE_PRIORITY: Record<string, number> = { MID: 0, LAST: 1, PREV: 2, MISSING: 3 };
+const isTestEnvironment =
+  typeof import.meta !== "undefined" && import.meta.env?.MODE === "test";
 
 export type ComboFilterKey =
   | "tpHit"
@@ -216,6 +222,234 @@ const toNumber = (value: unknown, fallback: number | null = null): number | null
 const toInteger = (value: unknown, fallback: number): number => {
   const next = Number(value);
   return Number.isFinite(next) ? Math.trunc(next) : fallback;
+};
+
+const toGreekSummary = (
+  value: PSDGreeks | null | undefined,
+): OptionGreekSummary | undefined => {
+  if (!value) {
+    return undefined;
+  }
+  const record = value as Partial<OptionGreekSummary>;
+  return {
+    delta: toNumber(record.delta),
+    gamma: toNumber(record.gamma),
+    theta: toNumber(record.theta),
+    vega: toNumber(record.vega),
+  };
+};
+
+const toIsoDate = (value: string | null | undefined): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^\d{8}$/.test(trimmed)) {
+    const year = trimmed.slice(0, 4);
+    const month = trimmed.slice(4, 6);
+    const day = trimmed.slice(6, 8);
+    return `${year}-${month}-${day}`;
+  }
+  if (/^\d{6}$/.test(trimmed)) {
+    const yy = Number(trimmed.slice(0, 2));
+    const year = yy >= 70 ? 1900 + yy : 2000 + yy;
+    const month = trimmed.slice(2, 4);
+    const day = trimmed.slice(4, 6);
+    return `${year.toString().padStart(4, "0")}-${month}-${day}`;
+  }
+  return null;
+};
+
+const toMarkSource = (value: string | null | undefined): MarkSource => {
+  const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
+  if (normalized === "MID" || normalized === "LAST" || normalized === "PREV") {
+    return normalized as MarkSource;
+  }
+  return "MISSING";
+};
+
+const resolveLegExpiry = (leg: PSDLeg, parsed: ReturnType<typeof parseOsi>): string => {
+  return (
+    toIsoDate(leg.expiry ?? null) ??
+    parsed?.expiryISO ??
+    ""
+  );
+};
+
+const resolveLegStrike = (leg: PSDLeg, parsed: ReturnType<typeof parseOsi>): number => {
+  const fromLeg = toNumber(leg.strike);
+  if (fromLeg !== null) {
+    return fromLeg;
+  }
+  return parsed?.strike ?? 0;
+};
+
+const resolveLegUnderlying = (leg: PSDLeg, parsed: ReturnType<typeof parseOsi>): string => {
+  if (parsed?.ul) {
+    return parsed.ul;
+  }
+  return leg.symbol;
+};
+
+const buildOptionLegApi = (leg: PSDLeg, comboId: string | null): OptionComboLegApi => {
+  const parsed = parseOsi(leg.symbol);
+  const expiry = resolveLegExpiry(leg, parsed);
+  const strike = resolveLegStrike(leg, parsed);
+  const right = normalizeRightCode(leg.right ?? parsed?.side ?? null);
+  const markSource = toMarkSource(leg.price_source ?? leg.mark_source ?? null);
+  const greeks = toGreekSummary(leg.greeks);
+  const quantityRaw =
+    leg.qty ??
+    (leg as Partial<{ quantity: number }>).quantity ??
+    0;
+
+  return {
+    combo_id: comboId,
+    combo_group_id: null,
+    symbol: leg.symbol,
+    underlying: resolveLegUnderlying(leg, parsed),
+    expiry,
+    strike,
+    right,
+    quantity: toNumber(quantityRaw, 0) ?? 0,
+    mark_price: toNumber(leg.mark),
+    mark: toNumber(leg.mark),
+    mark_source: markSource,
+    mark_time: leg.mark_time ?? leg.updated_at ?? null,
+    delta: greeks?.delta ?? null,
+    gamma: greeks?.gamma ?? null,
+    theta: greeks?.theta ?? null,
+    vega: greeks?.vega ?? null,
+    day_pnl_amount: toNumber(leg.pnl_intraday),
+    day_pnl_percent: toNumber(leg.day_pnl_percent ?? leg.day_pnl_pct),
+    total_pnl_amount: toNumber(leg.pnl_unrealized ?? leg.total_pnl),
+    total_pnl_percent: toNumber(
+      leg.pnl_unrealized_percent ??
+        leg.pnl_unrealized_pct ??
+        leg.total_pnl_percent,
+    ),
+    previous_close: toNumber(leg.previous_close),
+    updated_at: leg.updated_at ?? null,
+  };
+};
+
+const resolveComboExpiry = (legs: OptionComboLegApi[]): string => {
+  const candidates = legs
+    .map((leg) => leg.expiry)
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+  if (!candidates.length) {
+    return "";
+  }
+  const sorted = candidates
+    .map((value) => ({ value, ts: Date.parse(value) }))
+    .filter((entry) => Number.isFinite(entry.ts))
+    .sort((a, b) => a.ts - b.ts);
+  return sorted.length ? sorted[0].value : candidates[0];
+};
+
+const buildComboApi = (
+  combo: PSDCombo,
+  asOf: string | null,
+  index: number,
+): { comboApi: OptionComboApi; legs: OptionComboLegApi[] } => {
+  const comboRecord = combo as Partial<{
+    name: string;
+    strategy: string;
+    underlier: string;
+    underlying: string;
+  }>;
+  const comboName = comboRecord.name ?? comboRecord.strategy ?? "Combo";
+  const comboUnderlier = comboRecord.underlier ?? comboRecord.underlying ?? null;
+  const comboId = combo.combo_id || `${comboName}-${index}`;
+  const legs = Array.isArray(combo.legs)
+    ? combo.legs.map((leg) => buildOptionLegApi(leg, comboId))
+    : [];
+  const netPriceAccumulator = legs.reduce(
+    (acc, leg) => {
+      const mark = toNumber(leg.mark_price ?? leg.mark);
+      const qty = toNumber(leg.quantity);
+      if (mark === null || qty === null) {
+        return acc;
+      }
+      return {
+        value: acc.value + (-mark * qty),
+        count: acc.count + 1,
+      };
+    },
+    { value: 0, count: 0 },
+  );
+  const netPrice = netPriceAccumulator.count > 0 ? netPriceAccumulator.value : null;
+  const expiry = resolveComboExpiry(legs);
+  const dte = expiry ? computeDte(expiry, asOf) : 0;
+  const underlying = comboUnderlier ?? legs[0]?.underlying ?? comboName;
+  const greeks = toGreekSummary(combo.greeks_agg);
+  const markSource = legs.reduce<string>(
+    (current, leg) => chooseMarkSource(current, leg.mark_source),
+    "MISSING",
+  ) as MarkSource;
+
+  return {
+    comboApi: {
+      combo_id: comboId,
+      strategy: comboName,
+      underlying: underlying ?? "UNKNOWN",
+      expiry,
+      dte,
+      mark_price: null,
+      mark_source: markSource,
+      mark_time: null,
+      net_price: netPrice ?? undefined,
+      net_premium: netPrice ?? undefined,
+      day_pnl_amount: toNumber(combo.pnl_intraday),
+      day_pnl_percent: toNumber(combo.day_pnl_percent ?? combo.day_pnl_pct),
+      total_pnl_amount: toNumber(combo.pnl_unrealized ?? combo.total_pnl),
+      total_pnl_percent: toNumber(
+        combo.pnl_unrealized_percent ??
+          combo.pnl_unrealized_pct ??
+          combo.total_pnl_percent,
+      ),
+      legs,
+      greeks,
+    },
+    legs,
+  };
+};
+
+const buildOptionsFromSnapshot = (snapshot: PSDSnapshot): OptionsApiResponse | null => {
+  const view = snapshot.positions_view;
+  if (!view) {
+    return null;
+  }
+  const combosSource = Array.isArray(view.option_combos) ? view.option_combos : [];
+  const singleOptionsSource = Array.isArray(view.single_options) ? view.single_options : [];
+  if (combosSource.length === 0 && singleOptionsSource.length === 0) {
+    // Snapshot stub; fall back to legacy options endpoint when no option data is present.
+    return null;
+  }
+  const normalizeSnapshotTimestamp = (value: number): number =>
+    value < 1e11 ? value * 1000 : value;
+  const asOf =
+    typeof snapshot.ts === "number" && Number.isFinite(snapshot.ts)
+      ? new Date(normalizeSnapshotTimestamp(snapshot.ts)).toISOString()
+      : null;
+  const comboEntries = combosSource.map((combo, index) => buildComboApi(combo, asOf, index));
+  const combos = comboEntries.map((entry) => entry.comboApi);
+  const comboLegs = comboEntries.flatMap((entry) => entry.legs);
+  const singleLegs = singleOptionsSource.map((leg) => buildOptionLegApi(leg, null));
+
+  return {
+    as_of: asOf,
+    combos,
+    legs: [...comboLegs, ...singleLegs],
+    combo_groups: [],
+    playbook: null,
+  };
 };
 
 const normalizeMarkTime = (value: unknown): string | null =>
@@ -920,6 +1154,18 @@ const buildGroupsFallback = (
 };
 
 async function fetchOptions(baseUrl = ""): Promise<OptionsApiResponse> {
+  if (!isTestEnvironment) {
+    try {
+      const snapshot = await fetchPsdSnapshot(baseUrl);
+      const fromSnapshot = buildOptionsFromSnapshot(snapshot);
+      if (fromSnapshot) {
+        return fromSnapshot;
+      }
+    } catch (error) {
+      // Fall back to legacy endpoint when snapshot is unavailable.
+    }
+  }
+
   const origin = resolveApiBaseUrl(baseUrl);
   const response = await fetch(`${origin}/positions/options`, {
     headers: { Accept: "application/json" },

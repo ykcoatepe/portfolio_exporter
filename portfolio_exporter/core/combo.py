@@ -10,6 +10,7 @@ import sqlite3
 import pandas as pd
 
 from .config import settings
+from .date_utils import utcnow
 from .io import _ensure_writable_dir, migrate_combo_schema
 
 log = logging.getLogger(__name__)
@@ -736,8 +737,9 @@ def detect_from_positions(
             i1, i2 = row_ids[0], row_ids[1]
             strike_first = float(u_df.loc[i1, "strike"])
             strike_second = float(u_df.loc[i2, "strike"])
-            side_first, _side_second = str(u_df.loc[i1, "side"]), str(
-                u_df.loc[i2, "side"]
+            side_first, _side_second = (
+                str(u_df.loc[i1, "side"]),
+                str(u_df.loc[i2, "side"]),
             )
             long_k = strike_first if side_first == "long" else strike_second
             short_k = strike_first if side_first == "short" else strike_second
@@ -1003,8 +1005,9 @@ def detect_from_positions(
                 ]
                 while ci < len(c_idx) and pi < len(p_idx):
                     ic, ip = c_idx[ci], p_idx[pi]
-                    kc, kp = float(u_df.loc[ic, "strike"]), float(
-                        u_df.loc[ip, "strike"]
+                    kc, kp = (
+                        float(u_df.loc[ic, "strike"]),
+                        float(u_df.loc[ip, "strike"]),
                     )
                     if kc == kp:  # straddle handled already
                         # advance the one with less remaining
@@ -1324,7 +1327,7 @@ def _pair_same_strike(df: pd.DataFrame, used: set[int]) -> list[list[int]]:
 
 def _sync_with_db(combo_df: pd.DataFrame, pos_df: pd.DataFrame) -> None:
     conn = _db()
-    now = _dt.datetime.utcnow().isoformat(timespec="seconds")
+    now = utcnow().isoformat(timespec="seconds")
     today = _dt.date.today().isoformat()
 
     active = set(combo_df.index)

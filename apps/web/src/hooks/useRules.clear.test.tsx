@@ -1,4 +1,4 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import {
   QueryClientProvider,
   type QueryClient,
@@ -53,13 +53,11 @@ describe("useFundamentals", () => {
 
     handleUpdate.mockClear();
 
-    act(() => {
-      rerender(
-        <QueryClientProvider client={client}>
-          <FundamentalsHarness symbols={[]} onUpdate={handleUpdate} />
-        </QueryClientProvider>,
-      );
-    });
+    rerender(
+      <QueryClientProvider client={client}>
+        <FundamentalsHarness symbols={[]} onUpdate={handleUpdate} />
+      </QueryClientProvider>,
+    );
 
     await waitFor(() => {
       const latest = handleUpdate.mock.calls.at(-1)?.[0];

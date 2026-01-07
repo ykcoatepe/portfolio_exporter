@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+import asyncio
 import contextlib
 import os
 import threading
@@ -12,6 +13,12 @@ os.environ.setdefault("PE_TEST_MODE", "1")
 os.environ.setdefault("MOMO_OFFLINE", "1")
 os.environ.setdefault("MOMO_DATA_MODE", "offline")
 os.environ.setdefault("MPLBACKEND", "Agg")
+
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    with contextlib.suppress(Exception):
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
 with contextlib.suppress(Exception):
     import matplotlib

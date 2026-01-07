@@ -6,20 +6,41 @@ import MSBActionBox from "../components/MSBActionBox";
 import MSBCard from "../components/MSBCard";
 import MSBMiniCharts from "../components/MSBMiniCharts";
 import OptionLegsTable from "../components/OptionLegsTable";
+import { PsdShell } from "../components/psd/PsdShell";
+import {
+  PsdStocksGrid,
+  mapLegsToStockRows,
+  GridParityHarness,
+  PsdStocksFilterBar,
+} from "../components/psd/data-grid";
 import RulesPanel from "../components/RulesPanel";
 import StatsRibbon from "../components/StatsRibbon";
 import StocksTable from "../components/StocksTable";
+import { getPsdGridMode } from "../hooks/getPsdGridMode";
 import { usePsdSnapshot } from "../hooks/usePsdSnapshot";
 import { formatDuration, formatMoney } from "../lib/format";
 import { buildFriendlyLegDisplay } from "../lib/labels";
 import type { PSDLeg, PSDPositionsView } from "../lib/types";
 import { formatSigned, valueTone } from "../components/tableUtils";
+import { usePsdStocksFilterStore } from "../state/psdStocksFilters";
+import { matchesNumberFilter, matchesStringFilter, type PsdNumberFilterValue } from "../components/psd/data-grid/filters";
 
-const columns = [
+const stockColumns = [
   { key: "symbol", label: "Symbol", align: "left" },
   { key: "qty", label: "Qty", align: "right" },
   { key: "mark", label: "Mark", align: "right" },
-  { key: "pnl", label: "P&L", align: "right" },
+  { key: "dayPnl", label: "Day P&L", align: "right" },
+  { key: "totalPnl", label: "Total P&L", align: "right" },
+  { key: "exposure", label: "Exposure", align: "right" },
+  { key: "source", label: "Source", align: "left" },
+  { key: "staleness", label: "Staleness", align: "right" },
+] as const;
+
+const optionColumns = [
+  { key: "symbol", label: "Symbol", align: "left" },
+  { key: "qty", label: "Qty", align: "right" },
+  { key: "mark", label: "Mark", align: "right" },
+  { key: "dayPnl", label: "Day P&L", align: "right" },
   { key: "delta", label: "Δ", align: "right" },
   { key: "gamma", label: "Γ", align: "right" },
   { key: "theta", label: "Θ", align: "right" },
@@ -27,20 +48,12 @@ const columns = [
   { key: "staleness", label: "Staleness", align: "right" },
 ] as const;
 
-type ColumnDefinition = (typeof columns)[number];
-type ColumnKey = ColumnDefinition["key"];
-type ColumnAlignment = ColumnDefinition["align"];
+type StockColumnKey = (typeof stockColumns)[number]["key"];
+type OptionColumnKey = (typeof optionColumns)[number]["key"];
+type ColumnAlignment = "left" | "right";
 
-const columnAlignmentByKey = columns.reduce<Record<ColumnKey, ColumnAlignment>>(
-  (acc, column) => {
-    acc[column.key] = column.align;
-    return acc;
-  },
-  {} as Record<ColumnKey, ColumnAlignment>,
-);
-
-const alignmentClass = (key: ColumnKey) =>
-  columnAlignmentByKey[key] === "right" ? "text-right" : "text-left";
+const alignmentClass = (key: string) =>
+  key === "symbol" || key === "source" ? "text-left" : "text-right";
 
 const finiteOrNull = (value: number | undefined | null): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -62,16 +75,19 @@ const formatStaleness = (seconds: number | undefined | null) =>
 
 function LegRow({ leg, tabIndex = -1, className = "", underlyingHint }: { leg: PSDLeg; tabIndex?: number; className?: string; underlyingHint?: string }) {
   const greeks = leg.greeks ?? {};
-  const pnlValue = finiteOrNull(leg.pnl_intraday);
+  const dayPnlValue = finiteOrNull(leg.pnl_intraday);
+  const totalPnlValue = finiteOrNull(leg.pnl_unrealized ?? leg.total_pnl ?? null);
   const isOptionLeg = leg.secType === "OPT" || leg.secType === "FOP";
+  const isStock = leg.secType === "STK";
+  const exposure = leg.mark != null ? leg.mark * Math.abs(leg.qty) : null;
   const friendlyDisplay = isOptionLeg
     ? buildFriendlyLegDisplay({
-        symbol: leg.symbol,
-        underlying: underlyingHint,
-        right: leg.right,
-        strike: leg.strike,
-        expiry: leg.expiry,
-      })
+      symbol: leg.symbol,
+      underlying: underlyingHint,
+      right: leg.right,
+      strike: leg.strike,
+      expiry: leg.expiry,
+    })
     : null;
   const labelText = friendlyDisplay?.label ?? leg.symbol;
   const labelTooltip = friendlyDisplay?.tooltip ?? leg.symbol;
@@ -92,15 +108,32 @@ function LegRow({ leg, tabIndex = -1, className = "", underlyingHint }: { leg: P
       <td
         className={clsx(
           "px-4 py-3 font-mono text-sm",
-          alignmentClass("pnl"),
-          valueTone(pnlValue),
+          alignmentClass("dayPnl"),
+          valueTone(dayPnlValue),
         )}
       >
         {formatMoneyMaybe(leg.pnl_intraday)}
       </td>
-      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("delta"))}>{formatGreek(greeks.delta)}</td>
-      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("gamma"))}>{formatGreek(greeks.gamma)}</td>
-      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("theta"))}>{formatGreek(greeks.theta)}</td>
+      {isStock ? (
+        <>
+          <td
+            className={clsx(
+              "px-4 py-3 font-mono text-sm",
+              alignmentClass("totalPnl"),
+              valueTone(totalPnlValue),
+            )}
+          >
+            {formatMoneyMaybe(totalPnlValue)}
+          </td>
+          <td className={clsx("px-4 py-3 font-mono text-sm text-slate-300", alignmentClass("exposure"))}>{formatMoneyMaybe(exposure)}</td>
+        </>
+      ) : (
+        <>
+          <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", "text-right")}>{formatGreek(greeks.delta)}</td>
+          <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", "text-right")}>{formatGreek(greeks.gamma)}</td>
+          <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", "text-right")}>{formatGreek(greeks.theta)}</td>
+        </>
+      )}
       <td
         className={clsx(
           "px-4 py-3 text-xs uppercase tracking-wide text-slate-400",
@@ -188,7 +221,7 @@ function CombosSection({ view }: { view: PSDPositionsView }) {
                 <table className="min-w-full" role="grid" aria-label={`${combo.name} legs`}>
                   <thead>
                     <tr className="text-xs uppercase tracking-wide text-slate-400">
-                      {columns.map(({ key, label }) => (
+                      {optionColumns.map(({ key, label }) => (
                         <th
                           key={`${combo.combo_id}-${key}`}
                           scope="col"
@@ -220,18 +253,143 @@ function CombosSection({ view }: { view: PSDPositionsView }) {
   );
 }
 
-function LegsTable({ label, legs }: { label: string; legs: PSDLeg[] }) {
+/**
+ * Stocks section with feature-flagged grid rendering.
+ * Supports: old (LegsTable), new (PsdStocksGrid), parity (side-by-side comparison)
+ */
+function StocksSectionWithGrid({
+  positionsView,
+  isDataStable,
+}: {
+  positionsView: PSDPositionsView | undefined;
+  isDataStable: boolean;
+}) {
+  const gridMode = getPsdGridMode();
+  const legs = positionsView?.single_stocks ?? [];
+  const stockRows = useMemo(() => mapLegsToStockRows(legs), [legs]);
+  const columnFilters = usePsdStocksFilterStore((state) => state.columnFilters);
+  const setColumnFilters = usePsdStocksFilterStore((state) => state.setColumnFilters);
+  const resetFilters = usePsdStocksFilterStore((state) => state.resetFilters);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("filters") !== "reset") {
+      return;
+    }
+    resetFilters();
+    params.delete("filters");
+    const next = params.toString();
+    const nextUrl = `${window.location.pathname}${next ? `?${next}` : ""}${window.location.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [resetFilters]);
+
+  const filteredStockRows = useMemo(() => {
+    if (columnFilters.length === 0) {
+      return stockRows;
+    }
+    return stockRows.filter((row) =>
+      columnFilters.every((filter) => {
+        if (filter.id === "symbol") {
+          return matchesStringFilter(row.symbol, filter.value as string | null | undefined);
+        }
+        if (filter.id === "quantity") {
+          return matchesNumberFilter(
+            row.quantity,
+            filter.value as PsdNumberFilterValue | null | undefined,
+          );
+        }
+        if (filter.id === "markPrice") {
+          return matchesNumberFilter(
+            row.markPrice,
+            filter.value as PsdNumberFilterValue | null | undefined,
+          );
+        }
+        if (filter.id === "dayPnlAmount") {
+          return matchesNumberFilter(
+            row.dayPnlAmount,
+            filter.value as PsdNumberFilterValue | null | undefined,
+          );
+        }
+        if (filter.id === "totalPnlAmount") {
+          return matchesNumberFilter(
+            row.totalPnlAmount,
+            filter.value as PsdNumberFilterValue | null | undefined,
+          );
+        }
+        return true;
+      }),
+    );
+  }, [stockRows, columnFilters]);
+
+  const filteredLegs = useMemo(() => {
+    if (columnFilters.length === 0) {
+      return legs;
+    }
+    const allowedIds = new Set(filteredStockRows.map((row) => row.id));
+    return legs.filter((leg) => allowedIds.has(`stock:${leg.conId ?? leg.symbol}`));
+  }, [legs, filteredStockRows, columnFilters]);
+
+  const renderOldGrid = () => (
+    <LegsTable label="Single Stocks (Old)" legs={filteredLegs} />
+  );
+
+  const renderNewGrid = () => (
+    <PsdStocksGrid
+      data={stockRows}
+      height="350px"
+      columnFilters={columnFilters}
+      onColumnFiltersChange={setColumnFilters}
+      isDataStable={isDataStable}
+    />
+  );
+
+  return (
+    <section
+      aria-label="Single Stocks"
+      className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5"
+    >
+      <h2 className="text-xl font-semibold text-slate-100">Single Stocks</h2>
+      <div className="mt-3">
+        <PsdStocksFilterBar
+          columnFilters={columnFilters}
+          onColumnFiltersChange={setColumnFilters}
+          onReset={resetFilters}
+        />
+      </div>
+      <div className="mt-4">
+        {gridMode === "parity" ? (
+          <GridParityHarness
+            legs={filteredLegs}
+            stockRows={filteredStockRows}
+            renderOld={() => renderOldGrid()}
+            renderNew={() => renderNewGrid()}
+          />
+        ) : gridMode === "new" ? (
+          renderNewGrid()
+        ) : (
+          <LegsTable label="Single Stocks" legs={filteredLegs} />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function LegsTable({ label, legs, type = "stock" }: { label: string; legs: PSDLeg[]; type?: "stock" | "option" }) {
   if (legs.length === 0) {
     return <p className="mt-3 text-sm text-slate-400">No positions available.</p>;
   }
+  const columnsToUse = type === "option" ? optionColumns : stockColumns;
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="min-w-full" role="grid" aria-label={label}>
         <thead>
           <tr className="text-xs uppercase tracking-wide text-slate-400">
-            {columns.map(({ key, label }) => (
+            {columnsToUse.map(({ key, label: colLabel }) => (
               <th key={`${label}-${key}`} scope="col" className={clsx("px-4 py-2", alignmentClass(key))}>
-                {label}
+                {colLabel}
               </th>
             ))}
           </tr>
@@ -251,7 +409,7 @@ function LegsTable({ label, legs }: { label: string; legs: PSDLeg[] }) {
 }
 
 const PSDPage = () => {
-  const { data: snapshot } = usePsdSnapshot();
+  const { data: snapshot, isFetching } = usePsdSnapshot();
   const positionsView = snapshot?.positions_view;
   const hasView = useMemo(() => {
     if (!positionsView) {
@@ -265,20 +423,8 @@ const PSDPage = () => {
   }, [positionsView]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-900/70 bg-slate-950/80">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Portfolio Sentinel Dashboard</h1>
-            <p className="mt-1 text-sm text-slate-400">Keyboard-first monitoring for equities and derivatives portfolios.</p>
-          </div>
-          <div className="rounded-full border border-slate-800 bg-slate-900/80 px-4 py-2 text-xs uppercase tracking-wide text-slate-400">
-            PSD • Preview
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1400px] space-y-10 px-6 py-8" aria-label="Portfolio Sentinel sections">
+    <PsdShell>
+      <div className="mx-auto max-w-[1400px] space-y-10 px-6 py-8" aria-label="Portfolio Sentinel sections">
         <StatsRibbon />
         <section
           aria-label="Market Stress Barometer overview"
@@ -293,10 +439,10 @@ const PSDPage = () => {
 
         {hasView ? (
           <>
-            <section aria-label="Single Stocks" className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
-              <h2 className="text-xl font-semibold text-slate-100">Single Stocks</h2>
-              <LegsTable label="Single Stocks" legs={positionsView?.single_stocks ?? []} />
-            </section>
+            <StocksSectionWithGrid
+              positionsView={positionsView}
+              isDataStable={!isFetching}
+            />
 
             <section aria-label="Options — Combos" className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
               <h2 className="text-xl font-semibold text-slate-100">Options — Combos</h2>
@@ -305,7 +451,7 @@ const PSDPage = () => {
 
             <section aria-label="Options — Singles" className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
               <h2 className="text-xl font-semibold text-slate-100">Options — Singles</h2>
-              <LegsTable label="Options — Singles" legs={positionsView?.single_options ?? []} />
+              <LegsTable label="Options — Singles" legs={positionsView?.single_options ?? []} type="option" />
             </section>
           </>
         ) : (
@@ -345,8 +491,8 @@ const PSDPage = () => {
             <RulesPanel />
           </div>
         </section>
-      </main>
-    </div>
+      </div>
+    </PsdShell>
   );
 };
 

@@ -28,6 +28,8 @@ import os
 import sys
 import time
 from datetime import datetime, timezone, date
+
+from portfolio_exporter.core.date_utils import parse_month_day_no_year, utcnow
 from typing import List, Sequence
 import zipfile
 from zoneinfo import ZoneInfo
@@ -183,7 +185,7 @@ def get_portfolio_tickers(ib: IB) -> List[str]:
 # ────────────── expiry helpers ──────────────
 def choose_expiry(expirations: Sequence[str]) -> str:
     """Pick weekly ≤ 7 days, else first Friday, else earliest."""
-    today = datetime.utcnow().date()
+    today = utcnow().date()
     # within a week
     for e in expirations:
         if (datetime.strptime(e, "%Y%m%d").date() - today).days <= 7:
@@ -237,14 +239,10 @@ def pick_expiry_with_hint(expirations: Sequence[str], hint: str | None) -> str:
     # month name / abbr
     # day + month input
     def parse_day_month(h: str) -> tuple[int, int] | tuple[None, None]:
-        fmts = ["%d %b", "%d %B", "%b %d", "%B %d", "%d/%m", "%d-%m", "%d.%m"]
-        for fmt in fmts:
-            try:
-                dt = datetime.strptime(h, fmt)
-                return dt.day, dt.month
-            except ValueError:
-                continue
-        return None, None
+        parsed = parse_month_day_no_year(h, base_date=utcnow().date())
+        if parsed is None:
+            return None, None
+        return parsed.day, parsed.month
 
     day, month = parse_day_month(hint)
     if day:

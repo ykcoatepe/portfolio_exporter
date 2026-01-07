@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import type { QueryClient } from "@tanstack/react-query";
@@ -56,24 +56,16 @@ describe("RulesPanel", () => {
     const listItems = await screen.findAllByRole("listitem", { name: /breach/i });
     expect(listItems.length).toBeGreaterThan(1);
 
-    await act(async () => {
-      await user.click(listItems[0]);
-    });
+    await user.click(listItems[0]);
     await waitFor(() => expect(listItems[0]).toHaveFocus());
 
-    await act(async () => {
-      await user.keyboard("{ArrowDown}");
-    });
+    await user.keyboard("{ArrowDown}");
     await waitFor(() => expect(listItems[1]).toHaveFocus());
 
-    await act(async () => {
-      await user.keyboard("{End}");
-    });
+    await user.keyboard("{End}");
     await waitFor(() => expect(listItems[listItems.length - 1]).toHaveFocus());
 
-    await act(async () => {
-      await user.keyboard("{Home}");
-    });
+    await user.keyboard("{Home}");
     await waitFor(() => expect(listItems[0]).toHaveFocus());
   });
 
@@ -85,20 +77,14 @@ describe("RulesPanel", () => {
     await screen.findByText(/Rules v12/i);
 
     const validateAndPublishButton = await screen.findByRole("button", { name: /Validate & Publish/i });
-    await act(async () => {
-      await user.click(validateAndPublishButton);
-    });
+    await user.click(validateAndPublishButton);
 
     const textarea = await screen.findByLabelText(/Catalog YAML/i);
     await user.clear(textarea);
-    await act(async () => {
-      fireEvent.change(textarea, { target: { value: "rules: []" } });
-    });
+    fireEvent.change(textarea, { target: { value: "rules: []" } });
 
     const validateButton = await screen.findByRole("button", { name: /^Validate$/i });
-    await act(async () => {
-      await user.click(validateButton);
-    });
+    await user.click(validateButton);
 
     await screen.findByText(/Validation passed/i);
     expect(await screen.findByText(/Catalog diff/i)).toBeInTheDocument();
@@ -106,9 +92,7 @@ describe("RulesPanel", () => {
     const publishButton = await screen.findByRole("button", { name: /^Publish$/i });
     expect(publishButton).not.toBeDisabled();
 
-    await act(async () => {
-      await user.click(publishButton);
-    });
+    await user.click(publishButton);
 
     await waitFor(() => {
       expect(screen.queryByLabelText(/Catalog YAML/i)).not.toBeInTheDocument();
@@ -153,9 +137,7 @@ describe("RulesPanel", () => {
       http.get("*/rules/summary", () => HttpResponse.json(buildRulesSummaryResponse())),
     );
 
-    await act(async () => {
-      await user.click(retryButton);
-    });
+    await user.click(retryButton);
 
     await waitFor(() => {
       expect(screen.getByText(/top breaches/i)).toBeInTheDocument();

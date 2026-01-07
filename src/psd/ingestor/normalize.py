@@ -3,9 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import time
 from collections import defaultdict
 from collections.abc import Iterable
-import time
 from typing import Any
 
 from psd.core.mark_router import Session, choose_mark, pnl_option, pnl_stock
@@ -102,10 +102,16 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
     if explicit_mark is not None:
         mark_raw, fallback_source = explicit_mark
     else:
-        mark_raw, fallback_source, fallback_stale = choose_mark(tick, normalized_session)
+        mark_raw, fallback_source, fallback_stale = choose_mark(
+            tick, normalized_session
+        )
 
     price_source_candidate = price_source_hint or (fallback_source or "unknown")
-    price_source = price_source_candidate.strip() if isinstance(price_source_candidate, str) else "unknown"
+    price_source = (
+        price_source_candidate.strip()
+        if isinstance(price_source_candidate, str)
+        else "unknown"
+    )
     if not price_source:
         price_source = "unknown"
 
@@ -118,7 +124,11 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         qty = _coerce_float(raw.get("position"))
     qty = qty if qty is not None else 0.0
 
-    avg_cost = _coerce_float(raw.get("avg_cost"))
+    # Prefer avg_cost_unit (per-share) over avg_cost (total=per_share*multiplier)
+    # IBKR provides options avg_cost as total cost, but mark is per-share
+    avg_cost = _coerce_float(raw.get("avg_cost_unit"))
+    if avg_cost is None:
+        avg_cost = _coerce_float(raw.get("avg_cost"))
     if avg_cost is None:
         avg_cost = _coerce_float(raw.get("average_cost"))
     avg_cost = avg_cost if avg_cost is not None else 0.0
@@ -165,7 +175,9 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
     if pnl_intraday_value is not None:
         base["pnl_day"] = float(pnl_intraday_value)
 
+    # Compute unrealized P&L: (mark - avg_cost) * qty * multiplier
     fallback_unrealized = (mark_value - avg_cost) * qty * multiplier
+    base["pnl_unrealized"] = fallback_unrealized
     base.setdefault("__fallback_unrealized", fallback_unrealized)
 
     if sec in {"OPT", "FOP"}:

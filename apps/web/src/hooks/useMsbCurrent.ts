@@ -37,6 +37,9 @@ export const fetchMsbCurrent = async (baseUrl?: string): Promise<MsbReading> => 
   });
 
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("No MSB history available");
+    }
     throw new Error(`MSB current request failed with status ${response.status}`);
   }
 

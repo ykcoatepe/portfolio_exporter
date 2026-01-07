@@ -118,9 +118,7 @@ async def connect(
                             )
                         with contextlib.suppress(Exception):
                             ib.disconnect()
-                raise ConnectionError(
-                    f"All ports failed: {ports_to_try}"
-                ) from last_exc
+                raise ConnectionError(f"All ports failed: {ports_to_try}") from last_exc
 
             task = asyncio.create_task(_do_connect())
             _connecting = task
