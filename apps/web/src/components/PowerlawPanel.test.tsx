@@ -32,6 +32,7 @@ describe("PowerlawPanel", () => {
     expect(screen.getByText("STALE")).toBeInTheDocument();
     expect(screen.getByText(/refresh failed/i)).toBeInTheDocument();
     expect(screen.getByText("PLKE")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /refresh powerlaw/i })).toBeInTheDocument();
   });
 
   test("renders nothing when powerlaw is missing", () => {

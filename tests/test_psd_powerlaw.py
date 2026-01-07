@@ -102,3 +102,15 @@ def test_powerlaw_snapshot_missing(monkeypatch, tmp_path):
     assert snapshot is not None
     assert snapshot["stale"] is True
     assert snapshot["stale_reason"] == "missing_snapshot"
+
+
+def test_request_refresh_disabled_when_missing_repo(monkeypatch):
+    monkeypatch.setenv("PSD_POWERLAW_REPO", "/tmp/psd-powerlaw-missing")
+    monkeypatch.setenv("PSD_POWERLAW_OUTPUT_DIR", "output")
+    monkeypatch.setenv("PSD_POWERLAW_REFRESH", "1")
+
+    result = psd_powerlaw.request_powerlaw_refresh(force=True)
+
+    assert result["started"] is False
+    assert result["status"] == "disabled"
+    assert result["reason"] == "config_missing"

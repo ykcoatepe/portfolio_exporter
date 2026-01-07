@@ -82,6 +82,18 @@ def load_powerlaw_snapshot(now: datetime | None = None) -> dict[str, Any] | None
     return payload
 
 
+def request_powerlaw_refresh(force: bool = False) -> dict[str, Any]:
+    cfg = _load_config()
+    if cfg.repo_root is None or cfg.output_dir is None:
+        return {
+            "started": False,
+            "status": "disabled",
+            "reason": "config_missing",
+            "refresh": _refresh_payload(cfg),
+        }
+    return _start_refresh(cfg, force=force)
+
+
 def _load_config() -> PowerlawConfig:
     repo_env = os.getenv("PSD_POWERLAW_REPO", "").strip()
     repo_root = Path(repo_env).expanduser() if repo_env else _default_repo_root()
@@ -358,13 +370,27 @@ def _fallback_trading_day(reference: date, stale_days: int) -> date:
 def _maybe_start_refresh(stale: bool, cfg: PowerlawConfig) -> None:
     if not stale or not cfg.refresh_enabled or cfg.repo_root is None:
         return
+    _start_refresh(cfg, force=False)
+
+
+def _start_refresh(cfg: PowerlawConfig, force: bool) -> dict[str, Any]:
     now = time.time()
     with _REFRESH_LOCK:
         if _REFRESH_STATE.in_flight:
-            return
+            return {
+                "started": False,
+                "status": "running",
+                "reason": "in_flight",
+                "refresh": _refresh_payload(cfg),
+            }
         last_attempt = _REFRESH_STATE.last_attempt or 0.0
-        if now - last_attempt < cfg.refresh_cooldown_sec:
-            return
+        if not force and now - last_attempt < cfg.refresh_cooldown_sec:
+            return {
+                "started": False,
+                "status": _REFRESH_STATE.last_status or "cooldown",
+                "reason": "cooldown",
+                "refresh": _refresh_payload(cfg),
+            }
         _REFRESH_STATE.in_flight = True
         _REFRESH_STATE.last_attempt = now
         _REFRESH_STATE.last_status = "running"
@@ -377,6 +403,12 @@ def _maybe_start_refresh(stale: bool, cfg: PowerlawConfig) -> None:
         daemon=True,
     )
     thread.start()
+    return {
+        "started": True,
+        "status": "running",
+        "reason": None,
+        "refresh": _refresh_payload(cfg),
+    }
 
 
 def _run_refresh(cfg: PowerlawConfig) -> None:
@@ -439,14 +471,17 @@ def _refresh_payload(cfg: PowerlawConfig) -> dict[str, Any]:
         last_status = _REFRESH_STATE.last_status
         last_error = _REFRESH_STATE.last_error
 
+    enabled = bool(cfg.refresh_enabled and cfg.repo_root and cfg.output_dir)
     status = "running" if in_flight else (last_status or "idle")
+    if not enabled:
+        status = "disabled"
     last_attempt_iso = (
         datetime.fromtimestamp(last_attempt, TZ_NY).isoformat()
         if last_attempt
         else None
     )
     return {
-        "enabled": cfg.refresh_enabled,
+        "enabled": enabled,
         "status": status,
         "last_attempt": last_attempt_iso,
         "last_error": last_error,

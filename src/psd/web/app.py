@@ -14,6 +14,7 @@ from prometheus_client import Counter, Gauge
 from pydantic import BaseModel, ConfigDict
 from starlette.middleware.cors import CORSMiddleware
 
+from portfolio_exporter.psd_powerlaw import request_powerlaw_refresh
 from psd.analytics.stats import compute_stats
 from psd.core.store import (
     init,
@@ -135,6 +136,16 @@ def state() -> JSONResponse:
             view = _empty_positions_view()
         snap = {**snap, "positions_view": view}
     return JSONResponse(snap)
+
+
+@router.post("/powerlaw/refresh", status_code=status.HTTP_200_OK)
+def powerlaw_refresh() -> JSONResponse:
+    try:
+        payload = request_powerlaw_refresh(force=True)
+    except Exception as exc:
+        log.warning("powerlaw refresh failed: %s", exc)
+        raise HTTPException(status_code=500, detail="powerlaw refresh failed") from exc
+    return JSONResponse(payload)
 
 
 @router.get("/stats")

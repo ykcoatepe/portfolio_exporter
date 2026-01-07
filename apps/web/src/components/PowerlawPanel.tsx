@@ -1,6 +1,8 @@
 import clsx from "clsx";
+import { useState } from "react";
 
 import { formatPercent } from "../lib/format";
+import { resolveApiBaseUrl } from "../lib/http";
 import type { PowerlawSnapshot } from "../lib/types";
 
 const formatNumber = (value: number | null | undefined, digits = 2): string => {
@@ -58,13 +60,28 @@ const MetricCard = ({ label, value, detail }: MetricCardProps) => (
 
 type PowerlawPanelProps = {
   powerlaw?: PowerlawSnapshot | null;
+  onRefresh?: () => Promise<unknown>;
 };
 
-export default function PowerlawPanel({ powerlaw }: PowerlawPanelProps): JSX.Element | null {
+async function triggerPowerlawRefresh(): Promise<void> {
+  const origin = resolveApiBaseUrl();
+  const response = await fetch(`${origin}/powerlaw/refresh`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Powerlaw refresh failed (${response.status})`);
+  }
+}
+
+export default function PowerlawPanel({ powerlaw, onRefresh }: PowerlawPanelProps): JSX.Element | null {
   if (!powerlaw) {
     return null;
   }
 
+  const [refreshing, setRefreshing] = useState(false);
   const stale = powerlaw.stale === true;
   const refreshStatus = powerlaw.refresh?.status ?? "idle";
   const asOfLabel = formatDate(powerlaw.as_of ?? undefined);
@@ -92,6 +109,23 @@ export default function PowerlawPanel({ powerlaw }: PowerlawPanelProps): JSX.Ele
               ? "Powerlaw feed not configured. Set PSD_POWERLAW_REPO."
               : "Snapshot is behind the latest trading day."
     : null;
+  const canRefresh = stale && staleReason !== "config_missing";
+  const refreshDisabled = refreshing || refreshStatus === "running";
+
+  const handleRefresh = async () => {
+    if (!canRefresh || refreshDisabled) {
+      return;
+    }
+    setRefreshing(true);
+    try {
+      await triggerPowerlawRefresh();
+      await onRefresh?.();
+    } catch {
+      await onRefresh?.();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const equityRows = Object.entries(powerlaw.equity_weights ?? {}).sort((a, b) =>
     a[0].localeCompare(b[0]),
@@ -125,8 +159,23 @@ export default function PowerlawPanel({ powerlaw }: PowerlawPanelProps): JSX.Ele
       </div>
 
       {staleMessage ? (
-        <div className="mt-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
-          {staleMessage}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
+          <span>{staleMessage}</span>
+          {canRefresh ? (
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshDisabled}
+              className={clsx(
+                "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide",
+                refreshDisabled
+                  ? "border-slate-700 text-slate-500"
+                  : "border-amber-400/50 text-amber-100 hover:border-amber-300 hover:text-amber-50",
+              )}
+            >
+              {refreshDisabled ? "Refreshing..." : "Refresh Powerlaw"}
+            </button>
+          ) : null}
         </div>
       ) : null}
 

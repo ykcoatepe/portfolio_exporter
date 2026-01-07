@@ -410,7 +410,7 @@ function LegsTable({ label, legs, type = "stock" }: { label: string; legs: PSDLe
 }
 
 const PSDPage = () => {
-  const { data: snapshot, isFetching } = usePsdSnapshot();
+  const { data: snapshot, isFetching, refetch } = usePsdSnapshot();
   const positionsView = snapshot?.positions_view;
   const hasView = useMemo(() => {
     if (!positionsView) {
@@ -427,7 +427,10 @@ const PSDPage = () => {
     <PsdShell>
       <div className="mx-auto max-w-[1400px] space-y-10 px-6 py-8" aria-label="Portfolio Sentinel sections">
         <StatsRibbon />
-        <PowerlawPanel powerlaw={snapshot?.powerlaw} />
+        <PowerlawPanel
+          powerlaw={snapshot?.powerlaw}
+          onRefresh={() => refetch()}
+        />
         <section
           aria-label="Market Stress Barometer overview"
           className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
