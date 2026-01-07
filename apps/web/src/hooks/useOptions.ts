@@ -426,19 +426,22 @@ const buildOptionsFromSnapshot = (snapshot: PSDSnapshot): OptionsApiResponse | n
   if (!view) {
     return null;
   }
+  const combosSource = Array.isArray(view.option_combos) ? view.option_combos : [];
+  const singleOptionsSource = Array.isArray(view.single_options) ? view.single_options : [];
+  if (combosSource.length === 0 && singleOptionsSource.length === 0) {
+    // Snapshot stub; fall back to legacy options endpoint when no option data is present.
+    return null;
+  }
   const normalizeSnapshotTimestamp = (value: number): number =>
     value < 1e11 ? value * 1000 : value;
   const asOf =
     typeof snapshot.ts === "number" && Number.isFinite(snapshot.ts)
       ? new Date(normalizeSnapshotTimestamp(snapshot.ts)).toISOString()
       : null;
-  const combosSource = Array.isArray(view.option_combos) ? view.option_combos : [];
   const comboEntries = combosSource.map((combo, index) => buildComboApi(combo, asOf, index));
   const combos = comboEntries.map((entry) => entry.comboApi);
   const comboLegs = comboEntries.flatMap((entry) => entry.legs);
-  const singleLegs = Array.isArray(view.single_options)
-    ? view.single_options.map((leg) => buildOptionLegApi(leg, null))
-    : [];
+  const singleLegs = singleOptionsSource.map((leg) => buildOptionLegApi(leg, null));
 
   return {
     as_of: asOf,

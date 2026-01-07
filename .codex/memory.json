@@ -240,6 +240,15 @@
       "details": "Handle ms vs sec timestamps when deriving options as_of from /state.",
       "event": "Normalize snapshot ts for options as_of",
       "timestamp": "2026-01-07T07:37:00Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-07T09:10:14Z"
+    },
+    {
+      "details": "Return null for empty PSD snapshot options data so fetchOptions falls back to /positions/options; timestamp normalization already uses magnitude guard.",
+      "event": "Options snapshot fallback",
+      "timestamp": "2026-01-07T09:15:49Z"
     }
   ],
   "decisions": [
@@ -492,6 +501,14 @@
       "rationale": "Live snapshots may omit positions_view; server-side fallback keeps PSD UI stable.",
       "timestamp": "2026-01-06T15:16:21Z",
       "title": "Backfill PSD positions_view in /state"
+    },
+    {
+      "context": null,
+      "decision": "Treat empty PSD snapshot option data as unavailable and fall back to legacy /positions/options; keep timestamp normalization to avoid ms/sec double-multiply.",
+      "id": 34,
+      "rationale": "Prevents blank options UI when PSD returns stub data while preserving correct DTE calculation.",
+      "timestamp": "2026-01-07T09:15:44Z",
+      "title": "Options snapshot fallback guard"
     }
   ],
   "preferences": {
