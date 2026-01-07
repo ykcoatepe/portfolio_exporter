@@ -426,9 +426,11 @@ const buildOptionsFromSnapshot = (snapshot: PSDSnapshot): OptionsApiResponse | n
   if (!view) {
     return null;
   }
+  const normalizeSnapshotTimestamp = (value: number): number =>
+    value < 1e11 ? value * 1000 : value;
   const asOf =
     typeof snapshot.ts === "number" && Number.isFinite(snapshot.ts)
-      ? new Date(snapshot.ts * 1000).toISOString()
+      ? new Date(normalizeSnapshotTimestamp(snapshot.ts)).toISOString()
       : null;
   const combosSource = Array.isArray(view.option_combos) ? view.option_combos : [];
   const comboEntries = combosSource.map((combo, index) => buildComboApi(combo, asOf, index));

@@ -114,3 +114,10 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Status:** open
 
 **Notes:** pytest -q, bun run typecheck/test/build, python -m build
+
+### 2026-01-07 • Task: PSD snapshot timestamp normalize • Branch: feature/fix-psd-live-data
+**Owner:** session/ai | **Scope:** normalize /state ts for options as_of in web hook
+
+**Interfaces:** /state
+
+**Status:** open

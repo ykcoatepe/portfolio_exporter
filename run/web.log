@@ -96,3 +96,15 @@ INFO:     127.0.0.1:58836 - "GET /msb/current HTTP/1.1" 404 Not Found
 INFO:     127.0.0.1:58835 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:58836 - "GET /rules/summary HTTP/1.1" 200 OK
 INFO:     127.0.0.1:58836 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60199 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60199 - "GET /assets/index-IsmTrgy2.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60203 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60199 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60200 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60203 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60206 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60204 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60199 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60205 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60200 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60200 - "GET /favicon.ico HTTP/1.1" 404 Not Found
