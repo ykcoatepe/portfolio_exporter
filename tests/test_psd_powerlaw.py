@@ -114,3 +114,30 @@ def test_request_refresh_disabled_when_missing_repo(monkeypatch):
     assert result["started"] is False
     assert result["status"] == "disabled"
     assert result["reason"] == "config_missing"
+
+
+def test_build_refresh_cmd_prefers_repo_venv(tmp_path):
+    repo = tmp_path / "powerlaw"
+    (repo / "scripts").mkdir(parents=True)
+    (repo / "output").mkdir(parents=True)
+    script_path = repo / "scripts" / "run_trader_v5_daily.py"
+    script_path.write_text("# placeholder", encoding="utf-8")
+    venv_python = repo / "venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.write_text("#!/usr/bin/env python", encoding="utf-8")
+
+    cfg = psd_powerlaw.PowerlawConfig(
+        repo_root=repo,
+        output_dir=repo / "output",
+        refresh_enabled=True,
+        stale_trading_days=1,
+        refresh_timeout_sec=300,
+        refresh_cooldown_sec=900,
+        refresh_cmd=None,
+    )
+
+    cmd = psd_powerlaw._build_refresh_cmd(cfg)
+
+    assert cmd[0] == str(venv_python)
+    assert cmd[1] == str(script_path)
+    assert cmd[-1] == str(repo / "output")

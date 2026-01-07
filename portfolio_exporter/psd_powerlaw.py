@@ -450,18 +450,37 @@ def _run_refresh(cfg: PowerlawConfig) -> None:
 def _build_refresh_cmd(cfg: PowerlawConfig) -> list[str]:
     if cfg.refresh_cmd:
         return list(cfg.refresh_cmd)
+    if cfg.repo_root is None:
+        raise ValueError("Powerlaw repo root not configured")
     output_dir = cfg.output_dir
     if output_dir is None:
         raise ValueError("Powerlaw output directory not configured")
+    script_path = cfg.repo_root / "scripts" / "run_trader_v5_daily.py"
+    if not script_path.exists():
+        raise FileNotFoundError(f"Missing Powerlaw refresh script: {script_path}")
+    python_path = _select_repo_python(cfg.repo_root)
     return [
-        sys.executable,
-        "scripts/run_trader_v5_daily.py",
+        str(python_path),
+        str(script_path),
         "--refresh-prices",
         "--refresh-vx",
         "--no-input",
         "--output-dir",
         str(output_dir),
     ]
+
+
+def _select_repo_python(repo_root: Path) -> Path:
+    candidates = (
+        repo_root / "venv" / "bin" / "python",
+        repo_root / ".venv" / "bin" / "python",
+        repo_root / "venv" / "Scripts" / "python.exe",
+        repo_root / ".venv" / "Scripts" / "python.exe",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return Path(sys.executable)
 
 
 def _refresh_payload(cfg: PowerlawConfig) -> dict[str, Any]:
