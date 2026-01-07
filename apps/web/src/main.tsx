@@ -16,7 +16,9 @@ function AppProviders(): JSX.Element {
 }
 
 async function enableMocking() {
-  if (!import.meta.env.DEV) {
+  // Only use MSW if explicitly enabled with VITE_USE_MOCKS=true
+  // By default, use real backend via Vite proxy
+  if (!import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS !== "true") {
     return;
   }
   const { worker } = await import("./mocks/browser");

@@ -63,7 +63,9 @@ describe("StatsRibbon", () => {
       return valueNode!.textContent?.trim();
     };
 
-    expect(valueFor("Day P&L")).toBe("$355.00");
+    await waitFor(() => {
+      expect(valueFor("Day P&L")).toBe("$355.00");
+    });
     expect(valueFor("Unrealized P&L")).toBe("$255.00");
     expect(valueFor("ΣΔ")).toBe("+15.10");
     expect(valueFor("ΣΘ / day")).toBe("-0.03");
@@ -213,7 +215,9 @@ describe("StatsRibbon", () => {
     expect(valueFor("Net Liq")).toBe("—");
     expect(valueFor("VaR 95%")).toBe("—");
     expect(valueFor("Margin %")).toBe("—");
-    expect(valueFor("Updated")).toBe("now");
+    await waitFor(() => {
+      expect(valueFor("Updated")).toBe("now");
+    });
 
     dateNowSpy.mockRestore();
     metricsSpy.mockRestore();

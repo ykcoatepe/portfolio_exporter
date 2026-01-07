@@ -99,3 +99,18 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Owner:** session/ai | **Scope:** pypdf/vite bumps, FRED HY toggle, Parquet export
 **Interfaces:** /msb/history(.csv|.parquet)
 **Status:** open → merged @ <sha> | **Next:** monitor FRED rate limits & front-end parquet UX
+
+### 2026-01-06 • Task: PSD dashboard API compatibility • Branch: feature/fix-psd-live-data
+**Owner:** session/ai | **Scope:** options/session hooks from snapshot, /state positions_view fallback, rules catalog gating, StatsRibbon test waits
+**Interfaces:** /state, /rules/summary
+**Status:** open
+**Risks/Notes:** rules catalog actions disabled unless VITE_RULES_CATALOG=true
+
+### 2026-01-07 • Task: PSD stocks grid cleanup • Branch: feature/fix-psd-live-data
+**Owner:** session/ai | **Scope:** drop stale delta column from PSD stocks grid; run checks
+
+**Interfaces:** none
+
+**Status:** open
+
+**Notes:** pytest -q, bun run typecheck/test/build, python -m build

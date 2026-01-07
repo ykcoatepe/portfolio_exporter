@@ -24,6 +24,7 @@ from psd.core.store import (
     read_msb_history,
     tail_events,
 )
+from psd.ingestor.normalize import split_positions
 from psd.sentinel.sched import start_msb_scheduler, stop_msb_scheduler
 from psd.ui.exporters import export_snapshot
 from psd.web.config import Settings, get_settings
@@ -54,6 +55,10 @@ STATS_BROADCASTS = Counter(
 )
 
 router = APIRouter()
+
+
+def _empty_positions_view() -> dict[str, list[Any]]:
+    return {"single_stocks": [], "option_combos": [], "single_options": []}
 
 
 class MsbDTO(BaseModel):
@@ -105,8 +110,30 @@ def state() -> JSONResponse:
     snap = latest_snapshot()
     if not snap:
         return JSONResponse(
-            {"ts": None, "positions": [], "quotes": {}, "risk": {}, "empty": True}
+            {
+                "ts": None,
+                "positions": [],
+                "positions_view": _empty_positions_view(),
+                "quotes": {},
+                "risk": {},
+                "empty": True,
+            }
         )
+    view = snap.get("positions_view")
+    if not isinstance(view, dict):
+        positions = snap.get("positions")
+        session = snap.get("session")
+        if not isinstance(session, str):
+            session = "EXT"
+        if isinstance(positions, list):
+            try:
+                view = split_positions(positions, session)
+            except Exception:
+                log.debug("positions_view fallback failed", exc_info=True)
+                view = _empty_positions_view()
+        else:
+            view = _empty_positions_view()
+        snap = {**snap, "positions_view": view}
     return JSONResponse(snap)
 
 
@@ -347,6 +374,36 @@ def msb_current() -> MsbDTO:
 def msb_history(days: int = 365) -> list[MsbDTO]:
     history = read_msb_history(days)
     return [MsbDTO.model_validate(entry) for entry in history]
+
+
+@router.get("/positions/combos")
+def positions_combos() -> list:
+    """Return strategy combos (backwards compat stub)."""
+    return []
+
+
+@router.get("/positions/legs")
+def positions_legs() -> list:
+    """Return option legs."""
+    snap = latest_snapshot()
+    if not snap:
+        return []
+    pos = snap.get("positions", [])
+    if isinstance(pos, list):
+        # Filter for options/futures options
+        return [p for p in pos if p.get("secType") in ("OPT", "FOP")]
+    return []
+
+
+@router.get("/rules/summary")
+def rules_summary() -> dict:
+    """Return rules summary (stub)."""
+    return {
+        "rules_total": 0,
+        "breaches": {"critical": 0, "warning": 0, "info": 0},
+        "top": [],
+        "as_of": datetime.now(UTC).isoformat(),
+    }
 
 
 @router.get("/msb/history.csv")

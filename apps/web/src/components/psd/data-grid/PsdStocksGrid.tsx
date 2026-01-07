@@ -50,16 +50,6 @@ const gridStockColumns: ColumnDef<StockRow>[] = [
         meta: { align: "right", numeric: true, sortable: true },
     },
     {
-        id: "delta",
-        accessorKey: "delta",
-        header: "Δ",
-        size: 70,
-        sortingFn: "basic",
-        sortUndefined: "last",
-        filterFn: "psdNumber",
-        meta: { align: "right", numeric: true, headerTooltip: "Delta" },
-    },
-    {
         id: "priceSource",
         accessorKey: "priceSource",
         header: "Source",

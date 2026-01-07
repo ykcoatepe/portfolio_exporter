@@ -11,6 +11,7 @@ import {
 } from "../hooks/useRules";
 import {
   type RuleCatalogValidationResult,
+  RULES_CATALOG_ENABLED,
   usePreviewRules,
   usePublishRules,
   useRuleCatalog,
@@ -252,6 +253,7 @@ export function RulesPanel(): JSX.Element {
   const catalogUpdatedBy = catalogData?.updatedBy ?? null;
   const catalogRulesCount = catalogData?.rulesCount ?? 0;
   const catalogRulesLabel = catalogData ? `${catalogRulesCount} rules` : "— rules";
+  const catalogEnabled = RULES_CATALOG_ENABLED;
 
   const isValidationPending = validateMutation.isPending || previewMutation.isPending;
   const isPublishPending = publishMutation.isPending;
@@ -270,6 +272,9 @@ export function RulesPanel(): JSX.Element {
   };
 
   const handleCatalogPanelToggle = () => {
+    if (!catalogEnabled) {
+      return;
+    }
     setCatalogPanelOpen((current) => {
       const nextOpen = !current;
       if (!nextOpen) {
@@ -400,13 +405,16 @@ export function RulesPanel(): JSX.Element {
             {catalogQuery.isFetching ? <span className="text-slate-400">Refreshing…</span> : null}
             {catalogErrorMessage ? <span className="text-rose-300">{catalogErrorMessage}</span> : null}
             {reloadErrorMessage ? <span className="text-rose-300">{reloadErrorMessage}</span> : null}
+            {!catalogEnabled ? (
+              <span className="text-slate-500">Catalog actions disabled</span>
+            ) : null}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => reloadMutation.mutate()}
-            disabled={reloadMutation.isPending}
+            disabled={!catalogEnabled || reloadMutation.isPending}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-700/70 bg-slate-900/60 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-slate-500/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {reloadMutation.isPending ? "Reloading…" : "Reload"}
@@ -414,6 +422,7 @@ export function RulesPanel(): JSX.Element {
           <button
             type="button"
             onClick={handleCatalogPanelToggle}
+            disabled={!catalogEnabled}
             className="inline-flex items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-sky-200 transition hover:border-sky-400/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
             {isCatalogPanelOpen ? "Hide Validator" : "Validate & Publish"}

@@ -201,6 +201,40 @@
     {
       "event": "session_start",
       "timestamp": "2026-01-05T07:13:31Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-06T10:09:09Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-06T10:30:23Z"
+    },
+    {
+      "event": "PSD dashboard uses /state for options/session; catalog actions gated",
+      "timestamp": "2026-01-06T11:02:45Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-06T12:17:56Z"
+    },
+    {
+      "details": "Added /state positions_view fallback, tightened session hook behavior, and waited for async StatsRibbon test expectations.",
+      "event": "Stabilized PSD dashboard fetches",
+      "timestamp": "2026-01-06T15:16:27Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-07T05:18:04Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-07T05:37:19Z"
+    },
+    {
+      "details": "Removed the stale delta column to match snapshot-based stock rows.",
+      "event": "PSD stocks grid column sync",
+      "timestamp": "2026-01-07T05:49:06Z"
     }
   ],
   "decisions": [
@@ -437,6 +471,22 @@
       "rationale": "Keeps typecheck meaningful and green while avoiding noisy legacy/app modules until they are typed.",
       "timestamp": "2026-01-05T06:59:36Z",
       "title": "Scope mypy checks"
+    },
+    {
+      "context": null,
+      "decision": "Options/session data now derives from /state; rules catalog actions are gated behind VITE_RULES_CATALOG.",
+      "id": 32,
+      "rationale": "Avoids 404s against psd.web.server while keeping catalog optional.",
+      "timestamp": "2026-01-06T11:02:38Z",
+      "title": "PSD dashboard snapshot-first hooks"
+    },
+    {
+      "context": null,
+      "decision": "Compute positions_view when missing so the dashboard can render without legacy /positions/options.",
+      "id": 33,
+      "rationale": "Live snapshots may omit positions_view; server-side fallback keeps PSD UI stable.",
+      "timestamp": "2026-01-06T15:16:21Z",
+      "title": "Backfill PSD positions_view in /state"
     }
   ],
   "preferences": {

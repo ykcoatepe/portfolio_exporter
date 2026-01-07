@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:all",
+    "test": "bun run test:all",
     "test:watch": "NODE_OPTIONS=--localstorage-file=/tmp/portfolio-exporter-localstorage.json vitest",
     "test:unit": "NODE_OPTIONS=--localstorage-file=/tmp/portfolio-exporter-localstorage.json vitest run --project unit",
     "test:e2e": "playwright test --config=playwright.config.ts",

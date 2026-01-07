@@ -25,11 +25,22 @@ import { formatSigned, valueTone } from "../components/tableUtils";
 import { usePsdStocksFilterStore } from "../state/psdStocksFilters";
 import { matchesNumberFilter, matchesStringFilter, type PsdNumberFilterValue } from "../components/psd/data-grid/filters";
 
-const columns = [
+const stockColumns = [
   { key: "symbol", label: "Symbol", align: "left" },
   { key: "qty", label: "Qty", align: "right" },
   { key: "mark", label: "Mark", align: "right" },
-  { key: "pnl", label: "P&L", align: "right" },
+  { key: "dayPnl", label: "Day P&L", align: "right" },
+  { key: "totalPnl", label: "Total P&L", align: "right" },
+  { key: "exposure", label: "Exposure", align: "right" },
+  { key: "source", label: "Source", align: "left" },
+  { key: "staleness", label: "Staleness", align: "right" },
+] as const;
+
+const optionColumns = [
+  { key: "symbol", label: "Symbol", align: "left" },
+  { key: "qty", label: "Qty", align: "right" },
+  { key: "mark", label: "Mark", align: "right" },
+  { key: "dayPnl", label: "Day P&L", align: "right" },
   { key: "delta", label: "Δ", align: "right" },
   { key: "gamma", label: "Γ", align: "right" },
   { key: "theta", label: "Θ", align: "right" },
@@ -37,20 +48,12 @@ const columns = [
   { key: "staleness", label: "Staleness", align: "right" },
 ] as const;
 
-type ColumnDefinition = (typeof columns)[number];
-type ColumnKey = ColumnDefinition["key"];
-type ColumnAlignment = ColumnDefinition["align"];
+type StockColumnKey = (typeof stockColumns)[number]["key"];
+type OptionColumnKey = (typeof optionColumns)[number]["key"];
+type ColumnAlignment = "left" | "right";
 
-const columnAlignmentByKey = columns.reduce<Record<ColumnKey, ColumnAlignment>>(
-  (acc, column) => {
-    acc[column.key] = column.align;
-    return acc;
-  },
-  {} as Record<ColumnKey, ColumnAlignment>,
-);
-
-const alignmentClass = (key: ColumnKey) =>
-  columnAlignmentByKey[key] === "right" ? "text-right" : "text-left";
+const alignmentClass = (key: string) =>
+  key === "symbol" || key === "source" ? "text-left" : "text-right";
 
 const finiteOrNull = (value: number | undefined | null): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -72,8 +75,11 @@ const formatStaleness = (seconds: number | undefined | null) =>
 
 function LegRow({ leg, tabIndex = -1, className = "", underlyingHint }: { leg: PSDLeg; tabIndex?: number; className?: string; underlyingHint?: string }) {
   const greeks = leg.greeks ?? {};
-  const pnlValue = finiteOrNull(leg.pnl_intraday);
+  const dayPnlValue = finiteOrNull(leg.pnl_intraday);
+  const totalPnlValue = finiteOrNull(leg.pnl_unrealized ?? leg.total_pnl ?? null);
   const isOptionLeg = leg.secType === "OPT" || leg.secType === "FOP";
+  const isStock = leg.secType === "STK";
+  const exposure = leg.mark != null ? leg.mark * Math.abs(leg.qty) : null;
   const friendlyDisplay = isOptionLeg
     ? buildFriendlyLegDisplay({
       symbol: leg.symbol,
@@ -102,15 +108,32 @@ function LegRow({ leg, tabIndex = -1, className = "", underlyingHint }: { leg: P
       <td
         className={clsx(
           "px-4 py-3 font-mono text-sm",
-          alignmentClass("pnl"),
-          valueTone(pnlValue),
+          alignmentClass("dayPnl"),
+          valueTone(dayPnlValue),
         )}
       >
         {formatMoneyMaybe(leg.pnl_intraday)}
       </td>
-      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("delta"))}>{formatGreek(greeks.delta)}</td>
-      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("gamma"))}>{formatGreek(greeks.gamma)}</td>
-      <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", alignmentClass("theta"))}>{formatGreek(greeks.theta)}</td>
+      {isStock ? (
+        <>
+          <td
+            className={clsx(
+              "px-4 py-3 font-mono text-sm",
+              alignmentClass("totalPnl"),
+              valueTone(totalPnlValue),
+            )}
+          >
+            {formatMoneyMaybe(totalPnlValue)}
+          </td>
+          <td className={clsx("px-4 py-3 font-mono text-sm text-slate-300", alignmentClass("exposure"))}>{formatMoneyMaybe(exposure)}</td>
+        </>
+      ) : (
+        <>
+          <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", "text-right")}>{formatGreek(greeks.delta)}</td>
+          <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", "text-right")}>{formatGreek(greeks.gamma)}</td>
+          <td className={clsx("px-4 py-3 font-mono text-xs text-slate-300", "text-right")}>{formatGreek(greeks.theta)}</td>
+        </>
+      )}
       <td
         className={clsx(
           "px-4 py-3 text-xs uppercase tracking-wide text-slate-400",
@@ -198,7 +221,7 @@ function CombosSection({ view }: { view: PSDPositionsView }) {
                 <table className="min-w-full" role="grid" aria-label={`${combo.name} legs`}>
                   <thead>
                     <tr className="text-xs uppercase tracking-wide text-slate-400">
-                      {columns.map(({ key, label }) => (
+                      {optionColumns.map(({ key, label }) => (
                         <th
                           key={`${combo.combo_id}-${key}`}
                           scope="col"
@@ -290,9 +313,9 @@ function StocksSectionWithGrid({
             filter.value as PsdNumberFilterValue | null | undefined,
           );
         }
-        if (filter.id === "delta") {
+        if (filter.id === "totalPnlAmount") {
           return matchesNumberFilter(
-            row.delta,
+            row.totalPnlAmount,
             filter.value as PsdNumberFilterValue | null | undefined,
           );
         }
@@ -354,18 +377,19 @@ function StocksSectionWithGrid({
   );
 }
 
-function LegsTable({ label, legs }: { label: string; legs: PSDLeg[] }) {
+function LegsTable({ label, legs, type = "stock" }: { label: string; legs: PSDLeg[]; type?: "stock" | "option" }) {
   if (legs.length === 0) {
     return <p className="mt-3 text-sm text-slate-400">No positions available.</p>;
   }
+  const columnsToUse = type === "option" ? optionColumns : stockColumns;
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="min-w-full" role="grid" aria-label={label}>
         <thead>
           <tr className="text-xs uppercase tracking-wide text-slate-400">
-            {columns.map(({ key, label }) => (
+            {columnsToUse.map(({ key, label: colLabel }) => (
               <th key={`${label}-${key}`} scope="col" className={clsx("px-4 py-2", alignmentClass(key))}>
-                {label}
+                {colLabel}
               </th>
             ))}
           </tr>
@@ -427,7 +451,7 @@ const PSDPage = () => {
 
             <section aria-label="Options — Singles" className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
               <h2 className="text-xl font-semibold text-slate-100">Options — Singles</h2>
-              <LegsTable label="Options — Singles" legs={positionsView?.single_options ?? []} />
+              <LegsTable label="Options — Singles" legs={positionsView?.single_options ?? []} type="option" />
             </section>
           </>
         ) : (

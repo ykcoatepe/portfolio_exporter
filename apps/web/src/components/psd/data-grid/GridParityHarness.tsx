@@ -9,18 +9,15 @@
 
 import type { PSDLeg } from "../../../lib/types";
 import type { StockRow } from "./mappers";
-import { sumPnlCents, sumDelta } from "./mappers";
+import { sumPnlCents } from "./mappers";
 
 interface ParityResult {
     rowCountMatch: boolean;
     totalPnlMatch: boolean;
-    totalDeltaMatch: boolean;
     oldRowCount: number;
     newRowCount: number;
     oldPnlCents: number;
     newPnlCents: number;
-    oldDelta: number;
-    newDelta: number;
     mismatches: ParityMismatch[];
 }
 
@@ -53,13 +50,6 @@ function sumLegPnlCents(legs: PSDLeg[]): number {
 }
 
 /**
- * Sum delta from raw PSDLeg array (old table calculation)
- */
-function sumLegDelta(legs: PSDLeg[]): number {
-    return legs.reduce((sum, leg) => sum + (leg.greeks?.delta ?? 0), 0);
-}
-
-/**
  * Compute parity between old (PSDLeg) and new (StockRow) data
  */
 function computeParity(legs: PSDLeg[], stockRows: StockRow[]): ParityResult {
@@ -72,16 +62,9 @@ function computeParity(legs: PSDLeg[], stockRows: StockRow[]): ParityResult {
     const newPnlCents = sumPnlCents(stockRows);
     const totalPnlMatch = oldPnlCents === newPnlCents;
 
-    // Total delta
-    const oldDelta = sumLegDelta(legs);
-    const newDelta = sumDelta(stockRows);
-    // Allow small epsilon for floating point
-    const totalDeltaMatch = Math.abs(oldDelta - newDelta) < 0.0001;
-
-    // Spot-check mismatches
+    // Spot-check mismatches (P&L only - stocks no longer have delta)
     const mismatches: ParityMismatch[] = [];
 
-    // Check row-level P&L mapping
     for (let i = 0; i < Math.min(legs.length, stockRows.length); i++) {
         const leg = legs[i];
         const row = stockRows[i];
@@ -95,28 +78,15 @@ function computeParity(legs: PSDLeg[], stockRows: StockRow[]): ParityResult {
                 newValue: String(row.dayPnlCents),
             });
         }
-
-        const legDelta = leg.greeks?.delta ?? null;
-        if (legDelta !== row.delta) {
-            mismatches.push({
-                rowId: row.id,
-                field: "delta",
-                oldValue: String(legDelta),
-                newValue: String(row.delta),
-            });
-        }
     }
 
     return {
         rowCountMatch,
         totalPnlMatch,
-        totalDeltaMatch,
         oldRowCount,
         newRowCount,
         oldPnlCents,
         newPnlCents,
-        oldDelta,
-        newDelta,
         mismatches,
     };
 }
@@ -139,7 +109,6 @@ export function GridParityHarness({
     const allMatch =
         parity.rowCountMatch &&
         parity.totalPnlMatch &&
-        parity.totalDeltaMatch &&
         parity.mismatches.length === 0;
 
     return (
@@ -147,8 +116,8 @@ export function GridParityHarness({
             {/* Parity Summary */}
             <div
                 className={`rounded-lg border p-4 ${allMatch
-                        ? "border-emerald-500/40 bg-emerald-500/10"
-                        : "border-rose-500/40 bg-rose-500/10"
+                    ? "border-emerald-500/40 bg-emerald-500/10"
+                    : "border-rose-500/40 bg-rose-500/10"
                     }`}
             >
                 <h3 className="text-sm font-semibold text-slate-200 mb-2">
@@ -160,7 +129,7 @@ export function GridParityHarness({
                         {allMatch ? "✓ PASS" : "✗ FAIL"}
                     </span>
                 </h3>
-                <dl className="grid grid-cols-3 gap-4 text-xs">
+                <dl className="grid grid-cols-2 gap-4 text-xs">
                     <div>
                         <dt className="text-slate-500">Row Count</dt>
                         <dd className={parity.rowCountMatch ? "text-slate-300" : "text-rose-400"}>
@@ -173,13 +142,6 @@ export function GridParityHarness({
                         <dd className={parity.totalPnlMatch ? "text-slate-300" : "text-rose-400"}>
                             {centsToDollars(parity.oldPnlCents)} → {centsToDollars(parity.newPnlCents)}
                             {!parity.totalPnlMatch && " ✗"}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-slate-500">Total Δ</dt>
-                        <dd className={parity.totalDeltaMatch ? "text-slate-300" : "text-rose-400"}>
-                            {parity.oldDelta.toFixed(2)} → {parity.newDelta.toFixed(2)}
-                            {!parity.totalDeltaMatch && " ✗"}
                         </dd>
                     </div>
                 </dl>

@@ -25,12 +25,14 @@ export interface StockRow {
     dayPnlAmount: number | null;
     /** Intraday P&L in cents (for parity comparison) */
     dayPnlCents: number;
-    /** Delta */
-    delta: number | null;
-    /** Gamma */
-    gamma: number | null;
-    /** Theta */
-    theta: number | null;
+    /** Intraday P&L percentage */
+    dayPnlPercent: number | null;
+    /** Total/unrealized P&L in dollars */
+    totalPnlAmount: number | null;
+    /** Total/unrealized P&L percentage */
+    totalPnlPercent: number | null;
+    /** Position exposure (market value) */
+    exposure: number | null;
     /** Price source (last, mid, etc.) */
     priceSource: string | null;
     /** Staleness in seconds */
@@ -49,20 +51,29 @@ function toCents(dollars: number | null | undefined): number {
  * Map PSDLeg array to StockRow array
  */
 export function mapLegsToStockRows(legs: PSDLeg[]): StockRow[] {
-    return legs.map((leg, index) => ({
-        id: `stock:${leg.conId ?? leg.symbol}`,
-        conId: leg.conId ?? null,
-        symbol: leg.symbol,
-        quantity: leg.qty,
-        markPrice: leg.mark ?? null,
-        dayPnlAmount: leg.pnl_intraday ?? null,
-        dayPnlCents: toCents(leg.pnl_intraday),
-        delta: leg.greeks?.delta ?? null,
-        gamma: leg.greeks?.gamma ?? null,
-        theta: leg.greeks?.theta ?? null,
-        priceSource: leg.price_source ?? null,
-        stalenessSeconds: leg.stale_s ?? null,
-    }));
+    return legs.map((leg, index) => {
+        const markPrice = leg.mark ?? null;
+        const quantity = leg.qty;
+        const dayPnl = leg.pnl_intraday ?? null;
+        const totalPnl = leg.pnl_unrealized ?? leg.total_pnl ?? null;
+        const exposure = markPrice != null ? markPrice * Math.abs(quantity) : null;
+
+        return {
+            id: `stock:${leg.conId ?? leg.symbol}`,
+            conId: leg.conId ?? null,
+            symbol: leg.symbol,
+            quantity: quantity,
+            markPrice: markPrice,
+            dayPnlAmount: dayPnl,
+            dayPnlCents: toCents(dayPnl),
+            dayPnlPercent: leg.day_pnl_percent ?? leg.day_pnl_pct ?? null,
+            totalPnlAmount: totalPnl,
+            totalPnlPercent: leg.pnl_unrealized_percent ?? leg.pnl_unrealized_pct ?? leg.total_pnl_percent ?? null,
+            exposure: exposure,
+            priceSource: leg.price_source ?? null,
+            stalenessSeconds: leg.stale_s ?? null,
+        };
+    });
 }
 
 /**
@@ -162,6 +173,6 @@ export function sumPnlCents(rows: { dayPnlCents: number }[]): number {
     return rows.reduce((sum, row) => sum + row.dayPnlCents, 0);
 }
 
-export function sumDelta(rows: { delta: number | null }[]): number {
+export function sumDelta(rows: { delta?: number | null }[]): number {
     return rows.reduce((sum, row) => sum + (row.delta ?? 0), 0);
 }

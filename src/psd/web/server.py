@@ -646,8 +646,46 @@ def make_app():
     if getattr(app.state, "psd_dashboard_registered", False):
         return app
 
+    from pathlib import Path as PathlibPath
+
+    from fastapi.staticfiles import StaticFiles
+
+    # Find apps/web/dist relative to the repo root
+    repo_root = PathlibPath(__file__).resolve().parents[3]
+    dist_dir = repo_root / "apps" / "web" / "dist"
+    assets_dir = dist_dir / "assets"
+
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
     @app.get("/", include_in_schema=False)
     async def index() -> HTMLResponse:  # type: ignore[override]
+        return HTMLResponse(content=_html_page())
+
+    @app.get("/psd", include_in_schema=False)
+    @app.get("/psd/{path:path}", include_in_schema=False)
+    async def psd_dashboard(path: str = "") -> HTMLResponse:  # type: ignore[override]
+        """Serve the React dashboard from apps/web/dist, or fallback to builtin HTML."""
+        from pathlib import Path as PathlibPath
+
+        from fastapi.responses import FileResponse
+
+        # Find apps/web/dist relative to the repo root
+        repo_root = PathlibPath(__file__).resolve().parents[3]
+        dist_dir = repo_root / "apps" / "web" / "dist"
+        index_html = dist_dir / "index.html"
+
+        if index_html.exists():
+            # If specific file requested, try to serve it
+            if path:
+                file_path = (dist_dir / path).resolve()
+                # Security: reject path traversal attempts that escape dist_dir
+                if file_path.is_relative_to(dist_dir) and file_path.exists() and file_path.is_file():
+                    return FileResponse(file_path)
+            # Otherwise serve index.html for SPA routing
+            return HTMLResponse(content=index_html.read_text(encoding="utf-8"))
+
+        # Fallback to builtin minimal HTML
         return HTMLResponse(content=_html_page())
 
     @app.websocket("/ws")
