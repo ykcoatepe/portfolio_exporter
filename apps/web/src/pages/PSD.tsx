@@ -6,6 +6,7 @@ import MSBActionBox from "../components/MSBActionBox";
 import MSBCard from "../components/MSBCard";
 import MSBMiniCharts from "../components/MSBMiniCharts";
 import OptionLegsTable from "../components/OptionLegsTable";
+import PowerlawPanel from "../components/PowerlawPanel";
 import { PsdShell } from "../components/psd/PsdShell";
 import {
   PsdStocksGrid,
@@ -426,6 +427,7 @@ const PSDPage = () => {
     <PsdShell>
       <div className="mx-auto max-w-[1400px] space-y-10 px-6 py-8" aria-label="Portfolio Sentinel sections">
         <StatsRibbon />
+        <PowerlawPanel powerlaw={snapshot?.powerlaw} />
         <section
           aria-label="Market Stress Barometer overview"
           className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"

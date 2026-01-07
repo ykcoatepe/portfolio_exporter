@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
+from portfolio_exporter.psd_powerlaw import load_powerlaw_snapshot
 from psd.core.mark_router import Session
 from psd.ingestor.normalize import split_positions
 
@@ -417,7 +418,13 @@ async def snapshot_once() -> dict[str, Any]:
             logger.debug("positions_view populated from engine fallback")
             positions_view = fallback_view
 
-    return {
+    powerlaw = None
+    try:
+        powerlaw = load_powerlaw_snapshot()
+    except Exception as exc:
+        logger.warning("snapshot powerlaw failed: %s", exc)
+
+    payload = {
         "ts": ts,
         "session": session,
         "positions": positions,
@@ -425,3 +432,6 @@ async def snapshot_once() -> dict[str, Any]:
         "quotes": marks,
         "risk": risk,
     }
+    if powerlaw is not None:
+        payload["powerlaw"] = powerlaw
+    return payload

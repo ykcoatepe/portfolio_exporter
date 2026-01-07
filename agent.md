@@ -53,6 +53,7 @@ Set these before launching PSD locally or in production:
 - `IB_HOST=127.0.0.1` (leave `IB_PORT` unset for Gateway->TWS auto-fallback)
 - For paper: set `IB_PORT=4002` (Gateway) or `IB_PORT=7497` (TWS)
 - `IB_CLIENT_ID=<unique>` per process/tool to avoid TWS collisions
+- Optional Powerlaw feed: `PSD_POWERLAW_REPO=/path/to/codeforge-powerlaw-trader` and `PSD_POWERLAW_REFRESH=1` to auto-refresh stale snapshots.
 - Optional: `PSD_HEARTBEAT_S=2.0` to keep the ingestor loop cadence explicit
 - Leave `PSD_SSE_TEST_MODE` unset outside of tests; labs toggle it to fake SSE frames
 

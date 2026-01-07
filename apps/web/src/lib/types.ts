@@ -591,6 +591,35 @@ export type PSDPositionsView = {
   single_options: PSDLeg[];
 };
 
+export type PowerlawSnapshot = {
+  as_of?: string | null;
+  stale?: boolean;
+  stale_reason?: string | null;
+  refresh?: {
+    enabled?: boolean;
+    status?: string;
+    last_attempt?: string | null;
+    last_error?: string | null;
+  };
+  data_quality?: string | null;
+  plke?: number | null;
+  plke_band_aplh?: string | null;
+  risk_state?: string | null;
+  vol_bucket?: string | null;
+  vutil_used?: number | null;
+  vutil_source?: string | null;
+  vix_spot?: number | null;
+  vvix_spot?: number | null;
+  vx_backwardation?: boolean | null;
+  equity_weights?: Record<string, number>;
+  hedge_notional?: Record<string, number>;
+  small_cap?: {
+    theta_pct_nav?: number | null;
+    can_open_new_trades?: boolean | null;
+    plke_band?: string | null;
+  };
+};
+
 export type PSDSnapshot = {
   ts?: number | null;
   session: "RTH" | "EXT" | "CLOSED";
@@ -603,5 +632,6 @@ export type PSDSnapshot = {
   positions_view?: PSDPositionsView;
   quotes?: Record<string, unknown>;
   risk?: Record<string, unknown>;
+  powerlaw?: PowerlawSnapshot;
   [key: string]: unknown;
 };
