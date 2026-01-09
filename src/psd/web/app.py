@@ -10,7 +10,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from prometheus_client import Counter, Gauge
+from prometheus_client import Counter, Gauge, REGISTRY
+from prometheus_client.metrics import MetricWrapperBase
 from pydantic import BaseModel, ConfigDict
 from starlette.middleware.cors import CORSMiddleware
 
@@ -46,13 +47,37 @@ log = logging.getLogger("psd.web.stats")
 STALE_ALERT_THRESHOLD = 10
 _DEFAULT_STATS_EMPTY = compute_stats(None)
 
-STREAM_CLIENTS = Gauge("psd_stream_clients", "Connected SSE clients")
-STREAM_EVENTS = Counter("psd_stream_events_total", "SSE events sent", ["kind"])
-STATS_STARTUP_BROADCASTS = Counter(
+def _get_or_create_metric(
+    factory: type[MetricWrapperBase],
+    name: str,
+    documentation: str,
+    *args: Any,
+    **kwargs: Any,
+) -> MetricWrapperBase:
+    try:
+        return factory(name, documentation, *args, **kwargs)
+    except ValueError as exc:
+        if "Duplicated timeseries" not in str(exc):
+            raise
+        existing = REGISTRY._names_to_collectors.get(name)  # type: ignore[attr-defined]
+        if existing is None:
+            raise
+        return existing
+
+
+STREAM_CLIENTS = _get_or_create_metric(
+    Gauge, "psd_stream_clients", "Connected SSE clients"
+)
+STREAM_EVENTS = _get_or_create_metric(
+    Counter, "psd_stream_events_total", "SSE events sent", ["kind"]
+)
+STATS_STARTUP_BROADCASTS = _get_or_create_metric(
+    Counter,
     "psd_stats_startup_broadcasts_total",
     "Initial stats broadcasts emitted during application startup",
 )
-STATS_BROADCASTS = Counter(
+STATS_BROADCASTS = _get_or_create_metric(
+    Counter,
     "psd_stats_broadcasts_total",
     "Portfolio stats SSE broadcasts emitted",
     ["trigger"],
@@ -114,7 +139,12 @@ def state() -> JSONResponse:
     snap = latest_snapshot()
     powerlaw = None
     try:
-        powerlaw = load_powerlaw_snapshot()
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(load_powerlaw_snapshot)
+            powerlaw = future.result(timeout=2.0)  # 2 second timeout
+    except concurrent.futures.TimeoutError:
+        log.warning("powerlaw snapshot load timed out (2s)")
     except Exception as exc:
         log.warning("powerlaw snapshot load failed: %s", exc)
     if not snap:
@@ -230,6 +260,20 @@ def _build_stats_payload(now: datetime | None = None) -> dict[str, Any] | None:
     payload["staleness_sec"] = staleness
     payload["served_at"] = reference.isoformat()
     return payload
+
+
+def _snapshot_as_of_iso(snapshot: dict[str, Any]) -> str | None:
+    ts = snapshot.get("ts")
+    if isinstance(ts, (int, float)):
+        ts_float = float(ts)
+        if ts_float > 0:
+            if ts_float < 1e11:
+                ts_float *= 1000
+            try:
+                return datetime.fromtimestamp(ts_float / 1000, tz=UTC).isoformat()
+            except (OverflowError, OSError, ValueError):
+                return None
+    return None
 
 
 @router.get("/stats/current")
@@ -402,6 +446,20 @@ def msb_history(days: int = 365) -> list[MsbDTO]:
 def positions_combos() -> list:
     """Return strategy combos (backwards compat stub)."""
     return []
+
+
+@router.get("/positions/options")
+def positions_options() -> dict[str, Any]:
+    """Return option combos/legs (compat stub)."""
+    snap = latest_snapshot()
+    as_of = _snapshot_as_of_iso(snap) if snap else None
+    return {
+        "as_of": as_of,
+        "combos": [],
+        "legs": [],
+        "combo_groups": [],
+        "playbook": None,
+    }
 
 
 @router.get("/positions/legs")

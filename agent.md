@@ -1,7 +1,8 @@
 # Portfolio Sentinel Dashboard (PSD)
 
 - Quickstart: `python -m apps.cli.run --analyzer micro_momo_analyzer --json-only --out out/micro_momo` or `make psd-run-momo` for the wrapped target.
-- Ops Menu: `make run-menu` opens the PSD Ops Menu (Rich TUI, no manual CLI needed).
+- Preferred entrypoint: `make run` (or `python main.py`) → Portfolio Sentinel.
+- Ops Menu (internal): `make run-menu` still launches the PSD Ops Menu when needed.
 - Structure/Naming: `apps/cli/run.py` wraps PSD analyzers, `src/psd/plugins/micro_momo_adapter.py` adapts Micro-MOMO into the PSD runtime, and sources live under `src/psd/**` (modules use snake_case; packages keep `__init__.py` + README placeholders).
 - Dev Commands: prefer `make psd-*` targets (`psd-run-momo`, `psd-run-momo-full`, `psd-scan-once`, `psd-dash`) and `make sanity-fast` for a quick Ruff+pytest pass.
 - Memory helpers: use `make memory-digest` / `make memory-rotate` (or the shorthand `make agent-digest` / `make agent-rotate`).
@@ -16,7 +17,7 @@ The menu auto-loads `.env` (or `PSD_ENV_FILE`) and fills safe defaults if keys a
 
 **Start (recommended)**
 1. Ensure env is set (see `.env.example`): `PSD_SNAPSHOT_FN`, `PSD_RULES_FN`, `IB_HOST/IB_PORT/IB_CLIENT_ID` (unique per process), optional `PSD_PORT`.
-2. Run `make run-menu` and press **4** "Start PSD".
+2. Run `make run` (or `python main.py`) and choose **Portfolio Sentinel**.
 3. Your browser opens `http://127.0.0.1:<port>`; logs stream to `run/*.log`.
 
 **Other actions**

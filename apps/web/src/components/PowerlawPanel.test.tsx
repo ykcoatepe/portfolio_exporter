@@ -13,7 +13,7 @@ describe("PowerlawPanel", () => {
       refresh: { status: "failed" },
       data_quality: "WARN",
       plke: 56.4,
-      plke_band_aplh: "Heating",
+      plke_band_alpha: "Heating",
       risk_state: "ON",
       vol_bucket: "LOW",
       vutil_used: 0.08,
@@ -35,8 +35,9 @@ describe("PowerlawPanel", () => {
     expect(screen.getByRole("button", { name: /refresh powerlaw/i })).toBeInTheDocument();
   });
 
-  test("renders nothing when powerlaw is missing", () => {
+  test("renders placeholder when powerlaw is missing", () => {
     render(<PowerlawPanel powerlaw={null} />);
-    expect(screen.queryByText("Powerlaw Signals")).toBeNull();
+    expect(screen.getByText("Powerlaw Signals")).toBeInTheDocument();
+    expect(screen.getByText(/not available/i)).toBeInTheDocument();
   });
 });

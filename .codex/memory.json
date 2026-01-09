@@ -249,6 +249,65 @@
       "details": "Return null for empty PSD snapshot options data so fetchOptions falls back to /positions/options; timestamp normalization already uses magnitude guard.",
       "event": "Options snapshot fallback",
       "timestamp": "2026-01-07T09:15:49Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-08T07:10:12Z"
+    },
+    {
+      "details": "Updated docs/Make targets to favor main.py and port 51127; aligned PSD launcher to respect PSD_PORT.",
+      "event": "PSD entrypoint consolidated",
+      "timestamp": "2026-01-08T07:18:21Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-08T07:29:04Z"
+    },
+    {
+      "details": "Normalize plke_band_alpha in PSD powerlaw payload, add refresh endpoint for apps/api, and proxy /powerlaw in Vite dev server.",
+      "event": "Fix Powerlaw wiring",
+      "timestamp": "2026-01-08T07:42:42Z"
+    },
+    {
+      "details": "Ignore Vite BASE_URL when resolving API origin so /state, /msb, /powerlaw are fetched at root even when UI is served under /psd.",
+      "event": "Fix PSD API base resolution",
+      "timestamp": "2026-01-08T07:47:25Z"
+    },
+    {
+      "details": "Reuse existing Prometheus collectors in psd.web.app to avoid duplicated timeseries errors during pytest collection.",
+      "event": "Guard PSD metrics registration",
+      "timestamp": "2026-01-08T08:44:16Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-08T11:22:33Z"
+    },
+    {
+      "details": "Normalize previous_close, add Yahoo fallback enrichment for stocks, and cover with tests.",
+      "event": "Fix stock day P&L when previous close missing",
+      "timestamp": "2026-01-08T11:25:00Z"
+    },
+    {
+      "details": "Use quote/Yahoo marks in psd_adapter snapshot to populate stock mark and compute day/total P&L.",
+      "event": "Backfill marks for PSD stock P&L",
+      "timestamp": "2026-01-08T11:40:32Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T05:32:31Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T05:56:25Z"
+    },
+    {
+      "details": "Use previous_close to derive fallback intraday P&L and expose previous_close in normalized rows.",
+      "event": "Compute day P&L from previous_close in split_positions",
+      "timestamp": "2026-01-09T05:57:47Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T05:58:25Z"
     }
   ],
   "decisions": [
@@ -509,6 +568,54 @@
       "rationale": "Prevents blank options UI when PSD returns stub data while preserving correct DTE calculation.",
       "timestamp": "2026-01-07T09:15:44Z",
       "title": "Options snapshot fallback guard"
+    },
+    {
+      "context": null,
+      "decision": "Use main.py menu as the primary PSD entrypoint and standardize PSD docs/targets on port 51127.",
+      "id": 35,
+      "rationale": "Reduce multiple launch paths and remove legacy port 8000 from user-facing docs.",
+      "timestamp": "2026-01-08T07:18:17Z",
+      "title": "PSD entrypoint"
+    },
+    {
+      "context": null,
+      "decision": "Emit plke_band_alpha in PSD powerlaw payload (accept legacy input), add /powerlaw/refresh on apps/api, and proxy /powerlaw in Vite.",
+      "id": 36,
+      "rationale": "Fix typo, keep refresh functional across PSD UI + API entrypoints without breaking legacy snapshots.",
+      "timestamp": "2026-01-08T07:42:38Z",
+      "title": "Powerlaw snapshot key + refresh wiring"
+    },
+    {
+      "context": null,
+      "decision": "Resolve API base to window origin (ignore Vite BASE_URL) so PSD UI under /psd hits /state, /msb, /powerlaw at root.",
+      "id": 37,
+      "rationale": "Prevent /psd/* API requests from returning HTML and breaking JSON parsing when the UI is hosted under /psd.",
+      "timestamp": "2026-01-08T07:47:20Z",
+      "title": "PSD API base URL resolution"
+    },
+    {
+      "context": "PSD dashboard showed /bin/zsh day/total P&L for stocks",
+      "decision": "Normalize stocks with previous_close (raw or Yahoo fallback) and recompute day P&L.",
+      "id": 38,
+      "rationale": "Avoid falling back to unrealized P&L when previous close is available.",
+      "timestamp": "2026-01-08T11:24:56Z",
+      "title": "Stock day P&L uses previous close"
+    },
+    {
+      "context": "Stocks showed /bin/zsh day/total P&L when quotes missing.",
+      "decision": "Apply quote/Yahoo mark fallbacks before split_positions to compute stock P&L.",
+      "id": 39,
+      "rationale": "Positions lacked mark/previous close; injecting marks fixes P&L calculations.",
+      "timestamp": "2026-01-08T11:40:27Z",
+      "title": "Enrich PSD snapshot marks"
+    },
+    {
+      "context": null,
+      "decision": "When explicit intraday P&L is missing, compute day P&L from previous_close while keeping total P&L based on avg_cost.",
+      "id": 40,
+      "rationale": null,
+      "timestamp": "2026-01-09T05:57:44Z",
+      "title": "Use previous_close for intraday P&L in split_positions"
     }
   ],
   "preferences": {

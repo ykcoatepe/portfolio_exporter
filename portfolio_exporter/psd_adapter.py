@@ -47,6 +47,59 @@ def _coerce_int(value: Any) -> int:
     return int(number) if number is not None else 0
 
 
+def _extract_mark_value(value: Any) -> float | None:
+    if isinstance(value, dict):
+        for key in ("price", "mark", "last", "value"):
+            candidate = _coerce_float(value.get(key))
+            if candidate is not None:
+                return candidate
+        return None
+    return _coerce_float(value)
+
+
+def _is_equity_position(row: dict[str, Any]) -> bool:
+    sec = (
+        row.get("secType")
+        or row.get("asset_class")
+        or row.get("instrument_type")
+        or ""
+    )
+    sec_norm = str(sec).strip().upper()
+    return sec_norm not in {"OPT", "FOP", "FUT", "BAG"}
+
+
+def _apply_marks_to_positions(
+    positions: list[dict[str, Any]],
+    marks: dict[str, Any],
+) -> None:
+    for row in positions:
+        if not isinstance(row, dict):
+            continue
+        if not _is_equity_position(row):
+            continue
+        symbol = str(row.get("symbol", "")).strip()
+        if not symbol:
+            continue
+        if _coerce_float(
+            row.get("mark")
+            or row.get("price")
+            or row.get("lastPrice")
+            or row.get("marketPrice")
+        ) is not None:
+            continue
+        mark_value = _extract_mark_value(marks.get(symbol))
+        if mark_value is None:
+            continue
+        row["mark"] = mark_value
+        if row.get("mark_source") in (None, ""):
+            source = marks.get(symbol)
+            if isinstance(source, dict):
+                source = source.get("source")
+            row["mark_source"] = source or "LAST"
+        if row.get("price_source") in (None, "") and row.get("mark_source"):
+            row["price_source"] = str(row["mark_source"]).lower()
+
+
 def _get_positions_engine_state() -> Any | None:
     global _ENGINE_STATE_CACHE
     if _ENGINE_STATE_CACHE is not _UNSET:
@@ -387,6 +440,41 @@ async def snapshot_once() -> dict[str, Any]:
     except Exception as exc:
         logger.warning("snapshot marks failed: %s", exc)
         marks = {}
+    if not isinstance(marks, dict):
+        marks = {}
+    _apply_marks_to_positions(positions, marks)
+    if positions:
+        missing_symbols = []
+        for row in positions:
+            if not isinstance(row, dict):
+                continue
+            if not _is_equity_position(row):
+                continue
+            symbol = str(row.get("symbol", "")).strip()
+            if not symbol:
+                continue
+            if _coerce_float(
+                row.get("mark")
+                or row.get("price")
+                or row.get("lastPrice")
+                or row.get("marketPrice")
+            ) is not None:
+                continue
+            if _extract_mark_value(marks.get(symbol)) is None:
+                missing_symbols.append(symbol)
+        if missing_symbols:
+            try:
+                from psd.datasources.yfin import fill_equity_marks_from_yf
+
+                yf_marks = fill_equity_marks_from_yf(missing_symbols)
+                if isinstance(yf_marks, dict):
+                    for sym, val in yf_marks.items():
+                        if val is None:
+                            continue
+                        marks.setdefault(sym, val)
+                    _apply_marks_to_positions(positions, marks)
+            except Exception as exc:  # pragma: no cover - best effort
+                logger.warning("snapshot Yahoo mark fallback failed: %s", exc)
     try:
         greeks = await compute_greeks(positions, marks)
     except Exception as exc:

@@ -76,12 +76,19 @@ async function triggerPowerlawRefresh(): Promise<void> {
   }
 }
 
-export default function PowerlawPanel({ powerlaw, onRefresh }: PowerlawPanelProps): JSX.Element | null {
-  if (!powerlaw) {
-    return null;
-  }
-
+export default function PowerlawPanel({ powerlaw, onRefresh }: PowerlawPanelProps): JSX.Element {
   const [refreshing, setRefreshing] = useState(false);
+
+  if (!powerlaw) {
+    return (
+      <section className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
+        <h2 className="text-xl font-semibold text-slate-100">Powerlaw Signals</h2>
+        <p className="mt-3 text-sm text-slate-400">
+          Powerlaw signals are not available. Check that PSD_POWERLAW_REPO is configured.
+        </p>
+      </section>
+    );
+  }
   const stale = powerlaw.stale === true;
   const refreshStatus = powerlaw.refresh?.status ?? "idle";
   const refreshError = powerlaw.refresh?.last_error ?? null;
@@ -192,7 +199,7 @@ export default function PowerlawPanel({ powerlaw, onRefresh }: PowerlawPanelProp
           <MetricCard
             label="PLKE"
             value={formatNumber(powerlaw.plke)}
-            detail={powerlaw.plke_band_aplh ? `Band: ${powerlaw.plke_band_aplh}` : null}
+            detail={powerlaw.plke_band_alpha ? `Band: ${powerlaw.plke_band_alpha}` : null}
           />
           <MetricCard
             label="Risk State"

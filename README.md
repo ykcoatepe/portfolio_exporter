@@ -1316,14 +1316,15 @@ Troubleshooting
 This project is licensed under the [MIT License](LICENSE).
 ### Browser Dashboard (PSD)
 
-Quick start via the Rich ops menu - no manual process juggling required:
+Quick start via the main menu (single entry point):
 
 ```bash
-make run-menu
-# [4] Start PSD   -> ingestor + scanner + web start and the dashboard opens automatically
-# [1] Status      -> show running services and PIDs
-# [2] Stop PSD    -> graceful shutdown (SIGINT->SIGTERM->SIGKILL)
+make run
+# or: python main.py
+# Choose: Portfolio Sentinel
 ```
+
+Ops menu remains available for operators, but the preferred path for users is the main menu.
 
 PID file lives at `run/psd-pids.json`; logs stream to `run/ingestor.log`, `run/scanner.log`, and `run/web.log`.
 
@@ -1339,7 +1340,7 @@ PID file lives at `run/psd-pids.json`; logs stream to `run/ingestor.log`, `run/s
 Quick smoke (local):
 - `python -m psd.menus.ops` -> press **4** to start -> `run/psd-pids.json` appears and `run/*.log` fills.
 - Press **1** for status, **2** to stop; confirm the PID file updates or disappears accordingly.
-- `POSITIONS_ENGINE_DEMO=1 python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000` launches the API with the demo dataset if no CSVs are present.
+- `POSITIONS_ENGINE_DEMO=1 uvicorn --factory psd.web.server:make_app --host 127.0.0.1 --port 51127` launches the PSD API with demo data if no CSVs are present.
 
 > **SSE Troubleshooting:** If events appear in bursts, check proxy buffering or ensure `X-Accel-Buffering: no` is not ignored by `proxy_ignore_headers`.
 

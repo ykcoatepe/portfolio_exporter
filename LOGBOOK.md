@@ -121,3 +121,46 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** /state
 
 **Status:** open
+
+### 2026-01-08 • Task: PSD entrypoint + port cleanup • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** make `python main.py` the primary PSD entrypoint, remove port 8000 docs, align Make targets to 51127
+
+**Interfaces:** /psd, /stream, /metrics
+
+**Status:** open
+
+### 2026-01-08 • Task: Powerlaw wiring fix • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** fix plke_band_alpha key, add /powerlaw/refresh API route, proxy /powerlaw in Vite
+
+**Interfaces:** /state, /powerlaw/refresh
+
+**Status:** open
+
+**Notes:** pytest -q tests/test_psd_powerlaw.py tests/test_psd_adapter_powerlaw.py tests/test_psd_state_powerlaw.py; cd apps/web && bun run test
+
+### 2026-01-08 • Task: PSD API base URL fix • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** use window origin for API base to avoid /psd prefix
+
+**Interfaces:** /state, /msb, /powerlaw
+
+**Status:** open
+
+**Notes:** cd apps/web && bun run test
+
+### 2026-01-08 • Task: PSD metrics registration guard • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** reuse Prometheus collectors to avoid duplicate registry errors in pytest
+
+**Interfaces:** /metrics
+
+**Status:** open
+
+**Notes:** make test (initially failed on duplicate psd_stream_clients); rerun pending full pytest
+
+### 2026-01-08 • Task: PSD stock marks fallback • Branch: local
+**Owner:** session/ai | **Scope:** enrich PSD snapshot positions with quote/YF marks so day/total P&L compute
+
+**Interfaces:** psd_adapter.snapshot_once
+
+**Status:** open
+
+**Notes:** pytest -vv -k snapshot_once_roundtrip / delayed_marks / fills_missing_marks (tests/tests_psd_adapter.py)

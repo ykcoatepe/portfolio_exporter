@@ -47,7 +47,7 @@ def test_powerlaw_plke_band_alpha_alias(monkeypatch, tmp_path):
     output_dir.mkdir(parents=True)
     _write_snapshot(
         output_dir / "trader_v5_daily_2025-01-03.json",
-        {"as_of": "2025-01-03", "plke_band_alpha": "Heating"},
+        {"as_of": "2025-01-03", "plke_band_aplh": "Heating"},
     )
 
     _configure_env(monkeypatch, repo)
@@ -62,7 +62,7 @@ def test_powerlaw_plke_band_alpha_alias(monkeypatch, tmp_path):
     )
 
     assert snapshot is not None
-    assert snapshot["plke_band_aplh"] == "Heating"
+    assert snapshot["plke_band_alpha"] == "Heating"
 
 
 def test_powerlaw_snapshot_stale(monkeypatch, tmp_path):

@@ -201,14 +201,14 @@ def _normalize_snapshot(raw: dict[str, Any] | None) -> dict[str, Any]:
     if vutil_used is None:
         vutil_used = _coerce_float(raw.get("v_vega_utilization"))
 
-    plke_band = _coerce_str(raw.get("plke_band_aplh"))
+    plke_band = _coerce_str(raw.get("plke_band_alpha"))
     if plke_band is None:
-        plke_band = _coerce_str(raw.get("plke_band_alpha"))
+        plke_band = _coerce_str(raw.get("plke_band_aplh"))
 
     return {
         "as_of": _coerce_str(raw.get("as_of")),
         "plke": _coerce_float(raw.get("plke")),
-        "plke_band_aplh": plke_band,
+        "plke_band_alpha": plke_band,
         "risk_state": _coerce_str(raw.get("risk_state")),
         "vol_bucket": _coerce_str(raw.get("vol_bucket")),
         "vutil_used": vutil_used,
@@ -465,6 +465,8 @@ def _build_refresh_cmd(cfg: PowerlawConfig) -> list[str]:
         "--refresh-prices",
         "--refresh-vx",
         "--no-input",
+        "--no-orders",
+        "--allow-warn",
         "--output-dir",
         str(output_dir),
     ]

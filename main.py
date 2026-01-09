@@ -39,6 +39,7 @@ def build_menu() -> None:
     table.add_row("2", "Live-Market")
     table.add_row("3", "Trades & Reports")
     table.add_row("4", "Portfolio Sentinel")
+    table.add_row("5", "Stop Portfolio Sentinel")
     table.add_row("0", "Exit")
     console.print(table)
     console.print("Hotkeys: s=Sync tickers, 0=Exit")
@@ -645,6 +646,13 @@ def _main_impl(args) -> None:
                 from portfolio_exporter.menus import psd
 
                 psd.launch(status, args.format)
+                continue
+            if choice == "5":
+                if status:
+                    status.update("Stopping Portfolio Sentinel", "yellow")
+                from portfolio_exporter.menus import psd
+
+                psd.stop(status, args.format)
                 continue
             console.print("[red]Invalid choice")
 

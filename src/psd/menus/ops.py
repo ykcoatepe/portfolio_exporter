@@ -299,7 +299,7 @@ def open_dashboard(console: Console) -> None:
     else:
         data = _load_pid_file()
         port = data.get("port", _port_from_env())
-        url = f"http://127.0.0.1:{port}"
+        url = f"http://127.0.0.1:{port}/psd"
     success = webbrowser.open(url)
     if success:
         console.print(f"[green]Opened dashboard:[/green] {url}")
@@ -377,16 +377,68 @@ def _kill_with_sequence(pid: int, console: Console) -> bool:
     return not _alive(pid)
 
 
-def stop_psd(console: Console) -> None:
+def _pids_listening_on_port(port: int) -> list[int]:
+    try:
+        import psutil  # type: ignore
+
+        pids: set[int] = set()
+        for conn in psutil.net_connections(kind="inet"):
+            if not conn.laddr:
+                continue
+            if conn.laddr.port != port:
+                continue
+            if conn.status != psutil.CONN_LISTEN:
+                continue
+            if conn.pid:
+                pids.add(int(conn.pid))
+        return sorted(pids)
+    except Exception:
+        pass
+
+    try:
+        output = subprocess.check_output(
+            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return []
+    pids = []
+    for line in output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            pids.append(int(line))
+        except ValueError:
+            continue
+    return sorted(set(pids))
+
+
+def _kill_port_listeners(port: int, console: Console) -> None:
+    pids = _pids_listening_on_port(port)
+    if not pids:
+        return
+    console.print(
+        f"[yellow]Found {len(pids)} listener(s) on port {port}; forcing shutdown.[/yellow]"
+    )
+    for pid in pids:
+        _kill_with_sequence(pid, console)
+
+
+def stop_psd(console: Console, force_port_kill: bool = False) -> None:
     data = _load_pid_file(console)
     if not data:
         console.print("[yellow]No PSD processes tracked.[/yellow]")
+        if force_port_kill:
+            _kill_port_listeners(_port_from_env(), console)
         return
     if not any(key in data for key in SERVICES):
         console.print("[yellow]No PSD processes tracked.[/yellow]")
         if PID_FILE.exists():
             PID_FILE.unlink()
             console.print("[green]Cleared pid file.[/green]")
+        if force_port_kill:
+            _kill_port_listeners(_port_from_env(), console)
         return
     results: list[tuple[str, str]] = []
     for service in SERVICES:
@@ -407,6 +459,14 @@ def stop_psd(console: Console) -> None:
         for svc in SERVICES
         if isinstance(data.get(svc), int) and _alive(int(data.get(svc)))
     }
+    if force_port_kill:
+        port_value = data.get("port", _port_from_env())
+        _kill_port_listeners(int(port_value), console)
+        remaining = {
+            svc: data.get(svc)
+            for svc in SERVICES
+            if isinstance(data.get(svc), int) and _alive(int(data.get(svc)))
+        }
     if remaining:
         port_value = data.get("port", _port_from_env())
         updated: dict[str, object] = {**remaining, "port": port_value}

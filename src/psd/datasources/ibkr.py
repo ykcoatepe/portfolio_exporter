@@ -314,6 +314,8 @@ def get_positions(
             continue
         qty = int(_safe_float(row.get("qty")) or 0)
         mark = _safe_float(row.get("price"))
+        avg_cost = _safe_float(row.get("avg_cost"))
+        avg_cost_unit = _safe_float(row.get("avg_cost_unit"))
         pos = {
             "uid": f"STK-{sym}",
             "symbol": sym,
@@ -321,6 +323,8 @@ def get_positions(
             "kind": "equity",
             "qty": qty,
             "mark": mark,
+            "avg_cost": avg_cost if avg_cost is not None else avg_cost_unit,
+            "avg_cost_unit": avg_cost_unit,
         }
         if mark is None:
             missing_equity_marks.append((len(positions), sym))

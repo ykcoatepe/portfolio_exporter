@@ -133,6 +133,14 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         avg_cost = _coerce_float(raw.get("average_cost"))
     avg_cost = avg_cost if avg_cost is not None else 0.0
 
+    previous_close = _coerce_float(raw.get("previous_close"))
+    if previous_close is None:
+        previous_close = _coerce_float(raw.get("prior_close"))
+    if previous_close is None:
+        previous_close = _coerce_float(raw.get("prev_close"))
+    if previous_close is None:
+        previous_close = _coerce_float(raw.get("prevClose"))
+
     mark_coerced = _coerce_float(mark_raw)
     mark_value = mark_coerced if mark_coerced is not None else avg_cost
 
@@ -148,10 +156,18 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
 
     pnl_intraday_raw = _coerce_float(raw.get("pnl_intraday"))
     pnl_leg_raw = _coerce_float(raw.get("pnl_leg"))
+    pnl_prev_close = None
+    if previous_close is not None:
+        pnl_prev_close = (mark_value - previous_close) * qty * multiplier
+
     pnl_intraday = (
         pnl_intraday_raw
         if pnl_intraday_raw is not None
-        else (pnl_leg_raw if pnl_leg_raw is not None else pnl_value)
+        else (
+            pnl_leg_raw
+            if pnl_leg_raw is not None
+            else (pnl_prev_close if pnl_prev_close is not None else pnl_value)
+        )
     )
 
     base: dict[str, Any] = {
@@ -167,6 +183,9 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         "pnl_intraday": pnl_intraday,
         "greeks": raw.get("greeks") or {},
     }
+
+    if previous_close is not None:
+        base["previous_close"] = previous_close
 
     if pnl_leg_raw is not None:
         base["pnl_leg"] = pnl_leg_raw

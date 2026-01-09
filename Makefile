@@ -11,7 +11,7 @@ THRESH ?= 3
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev fmt test lint build ci-home run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate agent-digest agent-rotate msb-compute msb-emit serve-api web-build web-test web-e2e psd-ci release-tag
+.PHONY: setup dev fmt test lint build ci-home run run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate agent-digest agent-rotate msb-compute msb-emit serve-api web-build web-test web-e2e psd-ci release-tag
 .PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
@@ -59,7 +59,7 @@ build:
 	python -m build
 
 serve-api:
-	uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+	uvicorn --factory psd.web.server:make_app --host 0.0.0.0 --port 51127 --reload
 
 # ------------------------------------------------------------------
 # Web build & CI helpers
@@ -81,8 +81,7 @@ psd-ci:
 # ------------------------------------------------------------------
 .PHONY: contract-sync typegen-local ui-test ui-test-contracts ui-dev api-test api-serve perf-check
 
-contract-sync:
-	cd apps/web && bunx openapi-typescript http://127.0.0.1:8000/openapi.json -o src/lib/api.d.ts
+contract-sync: typegen-local
 
 typegen-local:
 	python -c 'from apps.api.main import app; import json, sys; sys.stdout.write(json.dumps(app.openapi()))' > apps/web/openapi.json
@@ -96,12 +95,14 @@ ui-test-contracts:
 
 ui-dev: ; cd apps/web && bun run dev
 api-test: ; pytest -q libs/py/positions_engine/tests
-api-serve: ; uvicorn apps.api.main:app --reload
+api-serve: ; uvicorn --factory psd.web.server:make_app --host 0.0.0.0 --port 51127 --reload
 perf-check: ; python -m scripts.perf_fixture_run
 
-.PHONY: run-menu
-run-menu:
-	python -m psd.menus.ops
+.PHONY: run run-menu
+run:
+	python main.py
+
+run-menu: run
 
 .PHONY: sse-check
 sse-check:
@@ -319,7 +320,7 @@ endif
 
 run-ingestor: ; python -m psd.ingestor.main
 run-scan: ; python -m psd.sentinel.scan
-run-web: ; uvicorn psd.web.app:app --host 0.0.0.0 --port 51127 --ws none
+run-web: ; uvicorn --factory psd.web.server:make_app --host 0.0.0.0 --port 51127 --ws none
 
 psd-up: ; ( \
 	[ -n "$PSD_SNAPSHOT_FN" ] || export PSD_SNAPSHOT_FN=portfolio_exporter.psd_adapter:snapshot_once; \

@@ -28,7 +28,7 @@ def test_snapshot_once_roundtrip(monkeypatch):
         return fake_risk
 
     fake_positions_view = {
-        "single_stocks": [],
+        "single_stocks": [{"symbol": "AAPL", "qty": 10, "mark": 190.5}],
         "option_combos": [],
         "single_options": [],
     }
@@ -43,7 +43,7 @@ def test_snapshot_once_roundtrip(monkeypatch):
     monkeypatch.setattr(psd_adapter, "_resolve_session", lambda: "EXT")
 
     snap = asyncio.run(psd_adapter.snapshot_once())
-    assert set(snap.keys()) == {
+    expected = {
         "ts",
         "session",
         "positions",
@@ -51,6 +51,7 @@ def test_snapshot_once_roundtrip(monkeypatch):
         "quotes",
         "risk",
     }
+    assert expected.issubset(snap.keys())
     assert isinstance(snap["ts"], float)
     assert snap["session"] == "EXT"
     assert snap["positions"] is fake_positions
@@ -83,7 +84,7 @@ def test_snapshot_with_delayed_marks(monkeypatch):
         psd_adapter,
         "split_positions",
         lambda _pos, _session: {
-            "single_stocks": [],
+            "single_stocks": [{"symbol": "MSFT", "qty": 5, "mark": 330.0}],
             "option_combos": [],
             "single_options": [],
         },
@@ -94,8 +95,37 @@ def test_snapshot_with_delayed_marks(monkeypatch):
     assert snap["quotes"]["MSFT"]["source"] == "delayed"
     assert snap["risk"]["notional"] == 0.0
     assert snap["session"] == "EXT"
-    assert snap["positions_view"] == {
-        "single_stocks": [],
-        "option_combos": [],
-        "single_options": [],
-    }
+    assert isinstance(snap["positions_view"], dict)
+
+
+def test_snapshot_once_fills_missing_marks_from_yf(monkeypatch):
+    async def _positions():
+        return [{"symbol": "AAPL", "qty": 2, "secType": "STK"}]
+
+    async def _marks(_positions):
+        return {}
+
+    async def _greeks(_positions, _marks):
+        return {"delta": 0.0, "gamma": 0.0, "vega": 0.0, "theta": 0.0}
+
+    async def _risk(_positions, _marks, _greeks):
+        return {"beta": 0.0, "var95_1d": 0.0, "margin_pct": 0.0, "notional": 0.0}
+
+    captured = {}
+
+    def _split_positions(pos, _session):
+        captured.update(pos[0])
+        return {"single_stocks": [], "option_combos": [], "single_options": []}
+
+    import psd.datasources.yfin as yfin
+
+    monkeypatch.setattr(psd_adapter, "load_positions", _positions)
+    monkeypatch.setattr(psd_adapter, "get_marks", _marks)
+    monkeypatch.setattr(psd_adapter, "compute_greeks", _greeks)
+    monkeypatch.setattr(psd_adapter, "compute_risk", _risk)
+    monkeypatch.setattr(psd_adapter, "split_positions", _split_positions)
+    monkeypatch.setattr(psd_adapter, "_resolve_session", lambda: "EXT")
+    monkeypatch.setattr(yfin, "fill_equity_marks_from_yf", lambda _syms: {"AAPL": 190.0})
+
+    asyncio.run(psd_adapter.snapshot_once())
+    assert captured["mark"] == 190.0

@@ -603,7 +603,7 @@ export type PowerlawSnapshot = {
   };
   data_quality?: string | null;
   plke?: number | null;
-  plke_band_aplh?: string | null;
+  plke_band_alpha?: string | null;
   risk_state?: string | null;
   vol_bucket?: string | null;
   vutil_used?: number | null;
