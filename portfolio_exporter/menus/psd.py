@@ -270,7 +270,9 @@ def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for fu
         if status:
             try:
                 status.update("Starting Portfolio Sentinel (fresh)", "cyan")
-            except Exception:  # pragma: no cover - defensive: status may not support update
+            except (
+                Exception
+            ):  # pragma: no cover - defensive: status may not support update
                 pass
         start_psd_fresh(status)
     except Exception as exc:  # pragma: no cover - surfaced to the user below

@@ -5,6 +5,19 @@ import { formatPercent } from "../lib/format";
 import { resolveApiBaseUrl } from "../lib/http";
 import type { PowerlawSnapshot } from "../lib/types";
 
+export async function triggerPowerlawRefresh(): Promise<void> {
+  const origin = resolveApiBaseUrl();
+  const response = await fetch(`${origin}/powerlaw/refresh`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Powerlaw refresh failed (${response.status})`);
+  }
+}
+
 const formatNumber = (value: number | null | undefined, digits = 2): string => {
   if (value === null || value === undefined || Number.isNaN(value)) {
     return "N/A";
@@ -62,19 +75,6 @@ type PowerlawPanelProps = {
   powerlaw?: PowerlawSnapshot | null;
   onRefresh?: () => Promise<unknown>;
 };
-
-async function triggerPowerlawRefresh(): Promise<void> {
-  const origin = resolveApiBaseUrl();
-  const response = await fetch(`${origin}/powerlaw/refresh`, {
-    method: "POST",
-    headers: { Accept: "application/json" },
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Powerlaw refresh failed (${response.status})`);
-  }
-}
 
 export default function PowerlawPanel({ powerlaw, onRefresh }: PowerlawPanelProps): JSX.Element {
   const [refreshing, setRefreshing] = useState(false);

@@ -5,58 +5,10 @@
  * Uses PsdDataGrid with stock-specific columns and row identity.
  */
 
-import type { ColumnDef, ColumnFiltersState, OnChangeFn } from "@tanstack/react-table";
+import type { ColumnFiltersState, SortingState, OnChangeFn } from "@tanstack/react-table";
 import type { StockRow } from "./mappers";
 import { PsdDataGrid } from "./PsdDataGrid";
-
-// Define grid-specific columns inline to avoid type conflicts with lib/types StockRow
-const gridStockColumns: ColumnDef<StockRow>[] = [
-    {
-        id: "symbol",
-        accessorKey: "symbol",
-        header: "Symbol",
-        size: 100,
-        filterFn: "psdString",
-        meta: { align: "left", sortable: true },
-    },
-    {
-        id: "quantity",
-        accessorKey: "quantity",
-        header: "Qty",
-        size: 80,
-        sortingFn: "basic",
-        sortUndefined: "last",
-        filterFn: "psdNumber",
-        meta: { align: "right", numeric: true, sortable: true },
-    },
-    {
-        id: "markPrice",
-        accessorKey: "markPrice",
-        header: "Mark",
-        size: 90,
-        sortingFn: "basic",
-        sortUndefined: "last",
-        filterFn: "psdNumber",
-        meta: { align: "right", numeric: true, sortable: true },
-    },
-    {
-        id: "dayPnlAmount",
-        accessorKey: "dayPnlAmount",
-        header: "Day P&L",
-        size: 100,
-        sortingFn: "basic",
-        sortUndefined: "last",
-        filterFn: "psdNumber",
-        meta: { align: "right", numeric: true, sortable: true },
-    },
-    {
-        id: "priceSource",
-        accessorKey: "priceSource",
-        header: "Source",
-        size: 80,
-        meta: { align: "left" },
-    },
-];
+import { stockColumns } from "./columns";
 
 interface PsdStocksGridProps {
     /** Stock row data */
@@ -69,8 +21,16 @@ interface PsdStocksGridProps {
     columnFilters?: ColumnFiltersState;
     /** Column filter change handler */
     onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
+    /** Controlled sorting state */
+    sorting?: SortingState;
+    /** Sorting change handler */
+    onSortingChange?: OnChangeFn<SortingState>;
     /** Whether data is stable (no transient refetch empty state) */
     isDataStable?: boolean;
+    /** Selected row IDs (controlled) */
+    selectedRowIds?: Set<string>;
+    /** Callback when selection changes */
+    onSelectedRowIdsChange?: (ids: Set<string>) => void;
 }
 
 /**
@@ -86,12 +46,16 @@ export function PsdStocksGrid({
     className,
     columnFilters,
     onColumnFiltersChange,
+    sorting,
+    onSortingChange,
     isDataStable,
+    selectedRowIds,
+    onSelectedRowIdsChange,
 }: PsdStocksGridProps): JSX.Element {
     return (
         <PsdDataGrid
             data={data}
-            columns={gridStockColumns}
+            columns={stockColumns}
             getRowId={getStockRowId}
             ariaLabel="Single Stocks"
             height={height}
@@ -100,7 +64,11 @@ export function PsdStocksGrid({
             enableSelection={true}
             columnFilters={columnFilters}
             onColumnFiltersChange={onColumnFiltersChange}
+            sorting={sorting}
+            onSortingChange={onSortingChange}
             isDataStable={isDataStable}
+            selectedRowIds={selectedRowIds}
+            onSelectedRowIdsChange={onSelectedRowIdsChange}
         />
     );
 }

@@ -26,7 +26,7 @@ if (!globalThis.cancelAnimationFrame) {
 }
 
 if (!globalThis.Element.prototype.scrollIntoView) {
-  globalThis.Element.prototype.scrollIntoView = () => {};
+  globalThis.Element.prototype.scrollIntoView = () => { };
 }
 
 if (!("ResizeObserver" in globalThis)) {
@@ -49,8 +49,8 @@ if (!("ResizeObserver" in globalThis)) {
         this,
       );
     }
-    unobserve(): void {}
-    disconnect(): void {}
+    unobserve(): void { }
+    disconnect(): void { }
   }
   globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof globalThis.ResizeObserver;
 }
@@ -131,8 +131,8 @@ if (
 let server: typeof import("../mocks/server").server | undefined;
 
 if (
-  !globalThis.localStorage ||
-  typeof globalThis.localStorage.getItem !== "function"
+  !globalThis.sessionStorage ||
+  typeof globalThis.sessionStorage.getItem !== "function"
 ) {
   const store = new Map<string, string>();
   const storage: Storage = {
@@ -155,7 +155,7 @@ if (
       store.set(key, String(value));
     },
   };
-  globalThis.localStorage = storage;
+  globalThis.sessionStorage = storage;
 }
 
 const rafSpy = vi

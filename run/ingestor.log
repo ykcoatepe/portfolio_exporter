@@ -39,3 +39,1356 @@
 2026-01-09 09:55:50,762 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
 2026-01-09 09:56:02,188 INFO powerlaw refresh succeeded
 2026-01-09 09:56:31,793 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 10:45:58,142 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 10:46:39,324 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 10:46:48,705 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 10:47:01,690 INFO powerlaw refresh succeeded
+2026-01-09 10:47:29,894 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 10:49:48,876 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 10:50:29,987 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 10:50:44,815 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 10:50:54,464 INFO powerlaw refresh succeeded
+2026-01-09 10:51:25,876 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 10:54:35,801 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 10:55:16,911 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 10:55:26,542 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 10:55:38,605 INFO powerlaw refresh succeeded
+2026-01-09 10:56:07,659 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 11:40:04,213 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 11:47:22,265 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 11:48:03,433 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 11:48:12,563 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 11:48:24,414 INFO powerlaw refresh succeeded
+2026-01-09 11:48:53,749 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 11:53:16,565 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 11:53:57,665 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 11:54:07,009 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 11:54:19,928 INFO powerlaw refresh succeeded
+2026-01-09 11:54:47,671 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 12:00:59,787 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 12:54:09,190 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 12:54:50,359 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 12:54:59,068 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 12:55:11,115 INFO powerlaw refresh succeeded
+2026-01-09 12:55:39,803 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 12:55:48,332 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 12:56:28,917 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 12:56:37,346 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 12:57:17,846 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 12:57:26,838 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 12:58:07,350 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 12:58:15,869 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 12:58:56,603 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 12:59:04,571 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 12:59:45,160 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 12:59:54,132 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:00:34,722 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:00:43,213 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:01:23,870 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:01:32,330 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:02:13,384 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:02:21,600 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:03:02,189 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:03:10,301 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:03:50,889 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:03:58,936 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:04:39,512 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:04:47,608 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:05:28,191 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:05:36,893 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:06:17,388 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:06:25,747 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:07:06,172 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:07:14,597 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:07:55,327 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:08:03,200 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:08:43,861 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:08:51,984 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:09:32,416 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:09:40,744 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:25:51,551 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:25:52,384 ERROR $AAPL: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,390 ERROR $ASTS: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,392 ERROR $AVGO: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,395 ERROR $AXTI: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,398 ERROR $BFLY: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,399 ERROR $BKSY: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,401 ERROR $CAT: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,403 ERROR $CIFR: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,405 ERROR $CORZ: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,406 ERROR $COST: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,408 ERROR $CRWV: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,409 ERROR $DLTR: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,411 ERROR $DUK: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,413 ERROR $FCX: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,415 ERROR $GOOGL: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,424 ERROR $HIMS: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,425 ERROR $HOOD: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,427 ERROR $JNJ: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,428 ERROR $KTOS: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,430 ERROR $LAES: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,431 ERROR $LDI: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,432 ERROR $LPTH: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,432 ERROR $LWLG: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,433 ERROR $META: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,434 ERROR $MSFT: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,435 ERROR $NBIS: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,436 ERROR $NVDA: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,437 ERROR $OKLO: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,438 ERROR $PDBC: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,439 ERROR $PL: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,439 ERROR $PLD: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,440 ERROR $PLTR: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,441 ERROR $PONY: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,442 ERROR $RCAT: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,443 ERROR $RKLB: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,443 ERROR $RSP: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,444 ERROR $SCHD: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,445 ERROR $SLDP: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,446 ERROR $SOFI: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,447 ERROR $TSLA: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,448 ERROR $USAR: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,449 ERROR $WM: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:52,449 ERROR $WYFI: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:25:53,150 WARNING powerlaw refresh failed (exit 1)
+2026-01-09 13:25:54,868 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:26:35,526 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:26:56,676 ERROR $NBIS: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:27:06,682 ERROR $NVDA: possibly delisted; no price data found  (period=1d)
+2026-01-09 13:27:16,473 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:27:57,078 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:28:05,883 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:37:37,780 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:37:47,462 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:38:28,120 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:38:37,256 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:39:17,833 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:39:25,912 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:39:45,023 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:40:25,758 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:40:35,209 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:41:15,874 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:41:24,606 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:42:29,802 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:43:10,542 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:43:19,103 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:43:59,621 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:44:08,123 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:44:48,638 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:44:57,565 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:45:38,151 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:45:47,813 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:46:28,548 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:46:36,631 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:47:17,224 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:47:25,616 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:48:06,202 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:48:14,264 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:48:54,853 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:49:03,584 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:49:44,091 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:49:52,439 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:50:32,952 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:50:41,208 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:51:21,816 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:51:31,351 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:52:11,842 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:52:20,316 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:53:00,667 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:53:09,311 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:53:49,728 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:53:58,149 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:54:38,593 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:54:47,020 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:55:27,526 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:55:36,185 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:56:16,638 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:56:25,676 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:57:06,218 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:57:14,569 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:57:55,234 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:58:03,490 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:58:44,038 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:58:52,505 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 13:59:33,154 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 13:59:42,561 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:00:00,182 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:04:46,143 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:05:27,266 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:05:36,518 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:06:17,110 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:06:26,258 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:07:06,770 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:07:15,235 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:07:55,969 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:08:04,254 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:08:44,842 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:08:52,288 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:09:32,861 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:09:40,864 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:10:21,453 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:10:31,549 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:11:12,243 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:11:20,486 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:12:01,057 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:12:08,733 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:12:49,542 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:12:57,361 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:13:37,864 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:13:46,133 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:14:26,708 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:14:34,975 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:15:15,474 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:15:23,432 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:16:03,917 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:16:12,111 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:16:52,687 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:17:02,476 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:27:15,693 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:27:25,345 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:28:09,652 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:28:19,141 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:36:56,100 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:37:06,203 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:40:10,256 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:40:19,254 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:56:48,571 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:56:57,455 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:57:37,945 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:57:46,113 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:58:26,536 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:58:34,977 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 14:59:15,414 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 14:59:23,782 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:00:04,213 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:00:13,174 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:00:53,546 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:01:02,119 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:01:42,548 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:01:50,665 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:02:31,091 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:02:39,986 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:03:20,260 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:03:28,672 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:04:09,025 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:04:17,649 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:04:57,992 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:05:06,572 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:05:47,005 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:05:55,384 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:06:35,751 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:06:44,157 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:07:24,588 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:07:32,910 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:08:13,335 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:08:21,883 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:09:02,255 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:09:11,416 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:09:51,923 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:10:00,490 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:10:40,903 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:10:49,794 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:11:30,232 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:11:38,647 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:12:19,015 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:12:27,413 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:13:07,908 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:13:16,550 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:13:57,116 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:14:06,559 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:14:38,425 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:15:21,088 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:16:01,826 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:16:10,222 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:16:50,813 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:16:58,583 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:17:39,166 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:17:49,326 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:18:30,257 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:18:39,724 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:19:20,294 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:19:28,638 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:20:09,273 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:20:17,488 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:20:58,054 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:21:06,468 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:21:47,103 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:21:55,360 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:22:36,001 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:22:44,863 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:23:25,355 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:23:34,927 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:24:16,073 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:24:24,245 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:25:05,287 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:25:13,036 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:25:53,549 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:26:02,208 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:26:42,620 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:26:50,656 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:27:31,316 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:27:39,571 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:28:20,377 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:28:28,845 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:29:09,503 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:29:17,783 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:29:58,357 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:30:06,724 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-09 15:30:47,598 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-09 15:45:05,989 INFO Found 11 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:27:23,545 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:28:07,779 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:28:09,775 ERROR HTTP Error 404: 
+2026-01-12 14:28:10,982 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:11,474 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:11,474 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:28:11,875 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:12,273 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:12,911 ERROR HTTP Error 404: 
+2026-01-12 14:28:14,057 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:14,570 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:14,570 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:28:14,997 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:15,473 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:21,516 ERROR HTTP Error 404: 
+2026-01-12 14:28:22,796 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:23,251 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:23,251 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:28:23,655 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:24,060 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:25,661 ERROR HTTP Error 404: 
+2026-01-12 14:28:27,534 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:28,444 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:28,444 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:28:29,031 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:29,451 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:37,508 ERROR HTTP Error 404: 
+2026-01-12 14:28:38,761 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:39,267 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:39,268 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:28:39,686 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:40,274 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:52,606 ERROR HTTP Error 404: 
+2026-01-12 14:28:54,183 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:54,715 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:54,716 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:28:55,195 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:28:55,626 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:01,276 ERROR HTTP Error 404: 
+2026-01-12 14:29:02,655 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:03,073 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:03,073 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:29:03,807 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:04,416 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:05,020 ERROR HTTP Error 404: 
+2026-01-12 14:29:06,617 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:07,093 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:07,094 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:29:07,744 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:08,198 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:12,091 ERROR HTTP Error 404: 
+2026-01-12 14:29:13,664 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:14,291 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:14,291 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:29:14,822 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:15,351 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:21,529 ERROR HTTP Error 404: 
+2026-01-12 14:29:22,940 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:23,408 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:23,409 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:29:24,021 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:24,678 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:29:30,452 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:30:11,370 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:30:13,652 ERROR HTTP Error 404: 
+2026-01-12 14:30:15,146 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:15,810 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:15,811 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:30:16,247 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:16,705 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:17,335 ERROR HTTP Error 404: 
+2026-01-12 14:30:19,358 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:20,301 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:20,301 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:30:20,917 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:21,532 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:28,122 ERROR HTTP Error 404: 
+2026-01-12 14:30:30,027 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:30,434 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:30,435 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:30:30,858 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:31,386 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:32,947 ERROR HTTP Error 404: 
+2026-01-12 14:30:34,682 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:35,098 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:35,099 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:30:35,616 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:36,036 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:44,372 ERROR HTTP Error 404: 
+2026-01-12 14:30:45,682 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:46,259 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:46,259 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:30:46,734 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:47,154 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:30:59,889 ERROR HTTP Error 404: 
+2026-01-12 14:31:01,509 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:02,021 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:02,022 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:31:02,456 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:02,881 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:08,168 ERROR HTTP Error 404: 
+2026-01-12 14:31:09,416 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:09,829 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:09,830 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:31:10,251 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:10,812 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:11,403 ERROR HTTP Error 404: 
+2026-01-12 14:31:12,825 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:13,388 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:13,388 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:31:13,825 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:14,258 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:18,317 ERROR HTTP Error 404: 
+2026-01-12 14:31:19,605 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:20,033 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:20,033 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:31:20,555 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:21,078 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:27,368 ERROR HTTP Error 404: 
+2026-01-12 14:31:28,942 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:29,465 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:29,466 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:31:29,876 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:30,359 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:31:36,324 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:32:17,321 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:32:19,338 ERROR HTTP Error 404: 
+2026-01-12 14:32:20,719 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:21,305 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:21,306 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:32:21,959 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:22,485 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:23,059 ERROR HTTP Error 404: 
+2026-01-12 14:32:24,524 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:25,087 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:25,087 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:32:25,571 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:26,126 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:32,854 ERROR HTTP Error 404: 
+2026-01-12 14:32:34,350 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:34,972 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:34,973 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:32:35,503 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:36,025 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:38,020 ERROR HTTP Error 404: 
+2026-01-12 14:32:39,694 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:40,152 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:40,152 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:32:40,745 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:41,165 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:49,332 ERROR HTTP Error 404: 
+2026-01-12 14:32:50,609 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:51,135 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:51,135 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:32:51,783 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:32:52,247 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:04,307 ERROR HTTP Error 404: 
+2026-01-12 14:33:05,525 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:05,997 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:05,998 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:33:06,391 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:06,847 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:12,014 ERROR HTTP Error 404: 
+2026-01-12 14:33:13,328 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:13,946 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:13,947 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:33:14,417 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:14,890 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:15,617 ERROR HTTP Error 404: 
+2026-01-12 14:33:17,104 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:17,511 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:17,512 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:33:17,963 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:18,385 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:21,717 ERROR HTTP Error 404: 
+2026-01-12 14:33:22,913 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:23,478 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:23,478 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:33:23,924 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:24,422 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:29,677 ERROR HTTP Error 404: 
+2026-01-12 14:33:31,029 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:31,514 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:31,515 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:33:32,179 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:32,867 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:33:37,841 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:34:18,752 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:34:20,354 ERROR HTTP Error 404: 
+2026-01-12 14:34:21,805 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:22,413 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:22,414 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:34:22,944 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:23,371 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:24,021 ERROR HTTP Error 404: 
+2026-01-12 14:34:25,369 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:25,893 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:25,893 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:34:26,446 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:26,944 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:33,870 ERROR HTTP Error 404: 
+2026-01-12 14:34:35,517 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:35,992 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:35,992 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:34:36,780 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:37,300 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:39,010 ERROR HTTP Error 404: 
+2026-01-12 14:34:40,681 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:41,326 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:41,327 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:34:41,940 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:42,432 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:50,211 ERROR HTTP Error 404: 
+2026-01-12 14:34:51,451 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:51,974 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:51,974 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:34:52,689 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:34:53,220 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:07,711 ERROR HTTP Error 404: 
+2026-01-12 14:35:09,110 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:09,586 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:09,586 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:35:10,072 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:10,518 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:16,092 ERROR HTTP Error 404: 
+2026-01-12 14:35:17,664 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:18,294 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:18,295 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:35:18,820 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:19,430 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:20,286 ERROR HTTP Error 404: 
+2026-01-12 14:35:21,550 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:21,972 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:21,972 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:35:22,492 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:23,068 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:26,809 ERROR HTTP Error 404: 
+2026-01-12 14:35:28,303 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:28,717 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:28,718 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:35:29,172 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:30,358 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:35,678 ERROR HTTP Error 404: 
+2026-01-12 14:35:36,947 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:37,449 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:37,449 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:35:37,853 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:38,327 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:35:43,715 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:36:24,709 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:36:27,565 ERROR HTTP Error 404: 
+2026-01-12 14:36:29,044 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:29,554 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:29,555 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:36:30,152 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:31,088 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:31,877 ERROR HTTP Error 404: 
+2026-01-12 14:36:34,085 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:34,539 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:34,539 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:36:35,000 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:35,470 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:41,713 ERROR HTTP Error 404: 
+2026-01-12 14:36:43,228 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:43,655 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:43,655 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:36:44,079 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:44,497 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:46,010 ERROR HTTP Error 404: 
+2026-01-12 14:36:47,131 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:47,632 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:47,632 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:36:48,238 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:48,858 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:56,641 ERROR HTTP Error 404: 
+2026-01-12 14:36:57,806 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:58,256 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:58,257 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:36:58,719 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:36:59,312 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:11,559 ERROR HTTP Error 404: 
+2026-01-12 14:37:13,078 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:13,595 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:13,595 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:37:14,045 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:14,516 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:19,740 ERROR HTTP Error 404: 
+2026-01-12 14:37:21,066 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:21,556 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:21,557 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:37:21,966 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:22,380 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:22,971 ERROR HTTP Error 404: 
+2026-01-12 14:37:24,454 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:24,971 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:24,971 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:37:25,430 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:26,054 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:29,754 ERROR HTTP Error 404: 
+2026-01-12 14:37:31,287 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:31,722 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:31,722 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:37:32,449 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:32,865 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:38,961 ERROR HTTP Error 404: 
+2026-01-12 14:37:40,725 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:41,253 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:41,254 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:37:41,758 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:42,224 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:37:47,711 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:38:28,470 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:38:30,059 ERROR HTTP Error 404: 
+2026-01-12 14:38:31,186 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:31,671 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:31,671 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:38:32,065 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:32,492 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:33,140 ERROR HTTP Error 404: 
+2026-01-12 14:38:34,364 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:35,088 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:35,089 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:38:35,480 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:36,153 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:42,267 ERROR HTTP Error 404: 
+2026-01-12 14:38:43,709 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:44,421 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:44,422 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:38:44,891 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:45,367 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:46,884 ERROR HTTP Error 404: 
+2026-01-12 14:38:48,453 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:48,897 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:48,897 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:38:49,367 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:49,779 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:57,646 ERROR HTTP Error 404: 
+2026-01-12 14:38:58,886 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:59,361 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:38:59,361 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:38:59,807 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:00,460 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:12,955 ERROR HTTP Error 404: 
+2026-01-12 14:39:14,127 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:14,743 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:14,743 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:39:15,350 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:15,787 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:21,421 ERROR HTTP Error 404: 
+2026-01-12 14:39:22,619 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:23,085 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:23,086 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:39:23,513 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:24,143 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:24,876 ERROR HTTP Error 404: 
+2026-01-12 14:39:26,364 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:26,770 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:26,771 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:39:27,289 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:27,878 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:31,817 ERROR HTTP Error 404: 
+2026-01-12 14:39:33,167 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:33,702 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:33,702 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:39:34,216 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:34,803 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:40,730 ERROR HTTP Error 404: 
+2026-01-12 14:39:42,073 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:42,495 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:42,495 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:39:43,019 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:43,543 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:39:48,994 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:40:29,697 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:40:31,399 ERROR HTTP Error 404: 
+2026-01-12 14:40:32,523 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:32,975 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:32,975 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:40:33,492 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:33,883 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:34,487 ERROR HTTP Error 404: 
+2026-01-12 14:40:35,775 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:36,404 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:36,404 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:40:36,895 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:37,378 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:44,717 ERROR HTTP Error 404: 
+2026-01-12 14:40:46,017 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:46,443 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:46,444 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:40:47,007 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:47,501 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:49,713 ERROR HTTP Error 404: 
+2026-01-12 14:40:50,882 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:51,309 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:51,309 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:40:51,722 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:40:52,270 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:01,140 ERROR HTTP Error 404: 
+2026-01-12 14:41:02,372 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:02,782 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:02,782 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:41:03,234 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:03,902 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:16,952 ERROR HTTP Error 404: 
+2026-01-12 14:41:18,221 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:18,862 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:18,862 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:41:19,259 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:19,688 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:25,098 ERROR HTTP Error 404: 
+2026-01-12 14:41:26,547 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:27,121 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:27,122 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:41:27,520 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:27,919 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:28,575 ERROR HTTP Error 404: 
+2026-01-12 14:41:29,793 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:30,200 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:30,201 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:41:30,901 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:31,391 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:35,009 ERROR HTTP Error 404: 
+2026-01-12 14:41:36,436 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:36,844 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:36,845 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:41:37,328 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:38,018 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:43,407 ERROR HTTP Error 404: 
+2026-01-12 14:41:44,669 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:45,153 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:45,153 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:41:45,668 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:46,086 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:41:51,088 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:42:31,704 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:42:33,223 ERROR HTTP Error 404: 
+2026-01-12 14:42:34,537 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:35,012 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:35,012 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:42:35,571 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:36,007 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:36,825 ERROR HTTP Error 404: 
+2026-01-12 14:42:38,217 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:38,676 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:38,676 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:42:39,089 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:39,573 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:45,521 ERROR HTTP Error 404: 
+2026-01-12 14:42:46,774 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:47,283 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:47,284 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:42:47,790 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:48,256 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:49,764 ERROR HTTP Error 404: 
+2026-01-12 14:42:51,007 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:51,416 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:51,417 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:42:51,819 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:42:52,318 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:00,283 ERROR HTTP Error 404: 
+2026-01-12 14:43:01,755 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:02,263 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:02,263 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:43:02,827 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:03,226 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:15,573 ERROR HTTP Error 404: 
+2026-01-12 14:43:16,756 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:17,215 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:17,215 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:43:17,789 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:18,322 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:23,777 ERROR HTTP Error 404: 
+2026-01-12 14:43:25,040 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:25,449 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:25,449 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:43:25,882 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:26,356 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:26,991 ERROR HTTP Error 404: 
+2026-01-12 14:43:28,165 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:28,631 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:28,631 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:43:29,248 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:29,724 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:33,059 ERROR HTTP Error 404: 
+2026-01-12 14:43:34,233 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:34,650 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:34,651 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:43:35,279 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:35,774 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:41,105 ERROR HTTP Error 404: 
+2026-01-12 14:43:42,471 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:43,086 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:43,087 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:43:43,491 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:44,122 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:43:49,127 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:44:30,124 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:44:31,719 ERROR HTTP Error 404: 
+2026-01-12 14:44:33,201 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:33,621 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:33,622 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:44:34,146 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:34,670 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:35,269 ERROR HTTP Error 404: 
+2026-01-12 14:44:36,960 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:37,398 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:37,398 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:44:37,912 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:38,341 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:44,633 ERROR HTTP Error 404: 
+2026-01-12 14:44:45,869 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:46,484 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:46,484 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:44:46,886 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:47,369 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:49,061 ERROR HTTP Error 404: 
+2026-01-12 14:44:50,399 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:50,925 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:50,925 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:44:51,448 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:44:51,866 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:00,447 ERROR HTTP Error 404: 
+2026-01-12 14:45:01,933 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:02,377 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:02,377 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:45:03,177 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:03,663 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:16,958 ERROR HTTP Error 404: 
+2026-01-12 14:45:18,431 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:18,916 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:18,917 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:45:19,380 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:19,982 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:25,414 ERROR HTTP Error 404: 
+2026-01-12 14:45:26,819 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:27,285 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:27,286 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:45:27,699 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:28,151 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:29,054 ERROR HTTP Error 404: 
+2026-01-12 14:45:30,271 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:30,735 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:30,735 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:45:31,137 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:31,543 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:35,005 ERROR HTTP Error 404: 
+2026-01-12 14:45:36,291 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:36,842 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:36,843 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:45:37,374 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:37,872 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:43,382 ERROR HTTP Error 404: 
+2026-01-12 14:45:44,907 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:45,316 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:45,317 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:45:45,781 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:46,470 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:45:51,406 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:46:32,386 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:46:34,312 ERROR HTTP Error 404: 
+2026-01-12 14:46:35,493 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:35,923 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:35,924 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:46:36,375 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:36,801 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:37,405 ERROR HTTP Error 404: 
+2026-01-12 14:46:38,602 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:39,093 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:39,093 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:46:39,537 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:40,015 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:45,994 ERROR HTTP Error 404: 
+2026-01-12 14:46:47,194 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:47,592 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:47,592 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:46:48,206 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:48,613 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:50,171 ERROR HTTP Error 404: 
+2026-01-12 14:46:51,505 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:51,935 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:51,935 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:46:52,359 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:46:53,029 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:01,230 ERROR HTTP Error 404: 
+2026-01-12 14:47:02,576 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:03,103 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:03,104 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:47:03,513 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:04,233 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:16,641 ERROR HTTP Error 404: 
+2026-01-12 14:47:17,782 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:18,173 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:18,174 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:47:18,569 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:19,136 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:24,168 ERROR HTTP Error 404: 
+2026-01-12 14:47:25,581 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:26,082 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:26,082 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:47:26,588 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:27,008 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:27,663 ERROR HTTP Error 404: 
+2026-01-12 14:47:29,089 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:29,512 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:29,512 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:47:29,961 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:30,567 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:33,996 ERROR HTTP Error 404: 
+2026-01-12 14:47:35,261 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:35,688 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:35,689 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:47:36,085 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:36,501 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:42,283 ERROR HTTP Error 404: 
+2026-01-12 14:47:43,591 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:44,013 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:44,014 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:47:44,645 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:45,161 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:47:50,151 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:48:30,752 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:48:32,316 ERROR HTTP Error 404: 
+2026-01-12 14:48:33,514 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:33,975 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:33,975 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:48:34,503 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:35,026 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:35,627 ERROR HTTP Error 404: 
+2026-01-12 14:48:36,783 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:37,262 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:37,263 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:48:37,769 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:38,164 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:45,144 ERROR HTTP Error 404: 
+2026-01-12 14:48:46,542 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:47,241 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:47,241 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:48:47,766 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:48,290 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:50,063 ERROR HTTP Error 404: 
+2026-01-12 14:48:51,341 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:51,985 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:51,985 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:48:52,392 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:48:52,816 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:02,878 ERROR HTTP Error 404: 
+2026-01-12 14:49:04,461 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:05,019 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:05,019 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:49:05,557 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:06,154 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:19,034 ERROR HTTP Error 404: 
+2026-01-12 14:49:20,484 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:21,017 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:21,018 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:49:21,458 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:21,944 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:26,931 ERROR HTTP Error 404: 
+2026-01-12 14:49:28,347 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:28,827 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:28,827 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:49:29,477 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:29,888 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:30,732 ERROR HTTP Error 404: 
+2026-01-12 14:49:31,967 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:32,388 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:32,388 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:49:32,813 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:33,494 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:36,817 ERROR HTTP Error 404: 
+2026-01-12 14:49:38,019 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:38,573 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:38,573 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:49:39,049 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:39,749 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:45,112 ERROR HTTP Error 404: 
+2026-01-12 14:49:46,639 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:47,094 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:47,094 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:49:47,581 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:48,000 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:49:53,059 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:50:51,650 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:51:32,337 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:51:34,687 ERROR HTTP Error 404: 
+2026-01-12 14:51:35,790 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:36,241 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:36,242 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:51:36,644 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:37,302 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:37,882 ERROR HTTP Error 404: 
+2026-01-12 14:51:39,229 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:39,627 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:39,627 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:51:40,007 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:40,539 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:46,445 ERROR HTTP Error 404: 
+2026-01-12 14:51:47,724 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:48,128 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:48,128 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:51:48,531 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:48,933 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:50,363 ERROR HTTP Error 404: 
+2026-01-12 14:51:51,626 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:52,022 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:52,023 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:51:52,478 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:51:52,991 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:00,839 ERROR HTTP Error 404: 
+2026-01-12 14:52:02,230 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:02,732 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:02,732 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:52:03,187 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:03,742 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:16,070 ERROR HTTP Error 404: 
+2026-01-12 14:52:17,351 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:17,917 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:17,917 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:52:18,316 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:18,763 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:23,804 ERROR HTTP Error 404: 
+2026-01-12 14:52:25,039 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:25,446 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:25,446 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:52:25,896 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:26,348 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:26,960 ERROR HTTP Error 404: 
+2026-01-12 14:52:28,185 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:28,599 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:28,599 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:52:28,991 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:29,437 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:32,616 ERROR HTTP Error 404: 
+2026-01-12 14:52:33,811 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:34,318 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:34,318 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:52:34,720 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:35,127 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:40,200 ERROR HTTP Error 404: 
+2026-01-12 14:52:41,554 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:41,999 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:42,000 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:52:42,815 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:43,241 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:52:48,541 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:53:29,523 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:53:31,219 ERROR HTTP Error 404: 
+2026-01-12 14:53:32,395 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:32,886 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:32,886 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:53:33,280 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:33,729 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:34,315 ERROR HTTP Error 404: 
+2026-01-12 14:53:35,630 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:36,038 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:36,038 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:53:36,425 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:36,844 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:43,232 ERROR HTTP Error 404: 
+2026-01-12 14:53:44,431 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:44,886 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:44,887 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:53:45,306 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:45,722 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:47,337 ERROR HTTP Error 404: 
+2026-01-12 14:53:48,496 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:48,950 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:48,950 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:53:49,407 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:49,859 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:57,691 ERROR HTTP Error 404: 
+2026-01-12 14:53:59,034 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:59,454 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:53:59,454 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:53:59,888 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:00,522 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:14,470 ERROR HTTP Error 404: 
+2026-01-12 14:54:16,042 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:16,562 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:16,562 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:54:17,090 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:17,610 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:22,982 ERROR HTTP Error 404: 
+2026-01-12 14:54:24,337 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:24,739 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:24,740 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:54:25,258 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:25,704 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:26,345 ERROR HTTP Error 404: 
+2026-01-12 14:54:27,768 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:28,295 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:28,296 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:54:28,839 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:29,355 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:33,013 ERROR HTTP Error 404: 
+2026-01-12 14:54:34,393 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:35,017 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:35,017 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:54:35,441 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:35,964 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:41,464 ERROR HTTP Error 404: 
+2026-01-12 14:54:42,782 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:43,171 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:43,172 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:54:43,604 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:44,022 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:54:49,137 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:55:30,213 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:55:31,932 ERROR HTTP Error 404: 
+2026-01-12 14:55:33,331 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:33,922 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:33,922 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:55:34,450 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:34,872 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:35,507 ERROR HTTP Error 404: 
+2026-01-12 14:55:36,844 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:37,482 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:37,482 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:55:37,908 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:38,326 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:45,444 ERROR HTTP Error 404: 
+2026-01-12 14:55:46,893 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:47,490 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:47,490 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:55:48,186 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:48,942 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:50,701 ERROR HTTP Error 404: 
+2026-01-12 14:55:52,052 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:52,484 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:52,484 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:55:52,930 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:55:53,530 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:02,439 ERROR HTTP Error 404: 
+2026-01-12 14:56:03,961 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:04,468 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:04,468 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:56:05,166 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:05,640 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:19,468 ERROR HTTP Error 404: 
+2026-01-12 14:56:20,982 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:21,415 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:21,415 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:56:21,933 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:22,368 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:27,781 ERROR HTTP Error 404: 
+2026-01-12 14:56:29,336 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:29,846 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:29,847 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:56:30,401 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:30,807 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:31,460 ERROR HTTP Error 404: 
+2026-01-12 14:56:32,612 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:33,088 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:33,088 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:56:33,713 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:34,111 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:37,382 ERROR HTTP Error 404: 
+2026-01-12 14:56:38,581 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:39,001 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:39,002 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:56:39,524 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:39,942 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:45,129 ERROR HTTP Error 404: 
+2026-01-12 14:56:46,686 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:47,088 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:47,088 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:56:47,468 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:47,923 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:56:52,852 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:57:33,912 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:57:35,475 ERROR HTTP Error 404: 
+2026-01-12 14:57:36,903 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:37,647 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:37,647 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:57:38,049 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:38,501 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:39,315 ERROR HTTP Error 404: 
+2026-01-12 14:57:40,518 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:40,976 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:40,976 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:57:41,461 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:41,849 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:47,597 ERROR HTTP Error 404: 
+2026-01-12 14:57:48,809 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:49,271 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:49,271 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:57:49,822 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:50,212 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:51,613 ERROR HTTP Error 404: 
+2026-01-12 14:57:52,760 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:53,299 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:53,299 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:57:53,758 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:57:54,207 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:06,884 ERROR HTTP Error 404: 
+2026-01-12 14:58:08,060 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:08,441 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:08,441 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 14:58:08,839 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:09,363 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:21,589 ERROR HTTP Error 404: 
+2026-01-12 14:58:22,843 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:23,235 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:23,235 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 14:58:23,698 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:24,087 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:30,274 ERROR HTTP Error 404: 
+2026-01-12 14:58:31,471 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:31,974 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:31,974 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 14:58:32,428 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:32,885 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:33,581 ERROR HTTP Error 404: 
+2026-01-12 14:58:34,854 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:35,283 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:35,283 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 14:58:35,801 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:36,207 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:39,420 ERROR HTTP Error 404: 
+2026-01-12 14:58:40,594 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:41,038 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:41,038 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 14:58:41,471 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:41,935 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:47,418 ERROR HTTP Error 404: 
+2026-01-12 14:58:48,677 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:49,114 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:49,114 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 14:58:49,620 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:50,024 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:58:55,323 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 14:59:36,248 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 14:59:37,852 ERROR HTTP Error 404: 
+2026-01-12 14:59:39,036 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:39,456 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:39,456 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 14:59:39,938 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:40,456 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:41,232 ERROR HTTP Error 404: 
+2026-01-12 14:59:42,655 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:43,112 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:43,112 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 14:59:43,512 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:44,448 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:50,548 ERROR HTTP Error 404: 
+2026-01-12 14:59:51,817 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:52,199 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:52,199 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 14:59:52,692 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:53,209 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:54,780 ERROR HTTP Error 404: 
+2026-01-12 14:59:55,966 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:56,469 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:56,469 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 14:59:56,913 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 14:59:57,342 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:05,021 ERROR HTTP Error 404: 
+2026-01-12 15:00:06,585 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:06,982 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:06,983 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 15:00:07,411 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:08,004 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:21,019 ERROR HTTP Error 404: 
+2026-01-12 15:00:22,183 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:22,666 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:22,666 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 15:00:23,206 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:23,609 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:29,149 ERROR HTTP Error 404: 
+2026-01-12 15:00:30,610 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:31,143 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:31,143 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 15:00:31,750 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:32,330 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:33,012 ERROR HTTP Error 404: 
+2026-01-12 15:00:34,372 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:34,813 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:34,813 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 15:00:35,585 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:36,062 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:39,949 ERROR HTTP Error 404: 
+2026-01-12 15:00:41,187 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:41,712 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:41,712 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 15:00:42,148 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:42,569 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:48,336 ERROR HTTP Error 404: 
+2026-01-12 15:00:49,577 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:50,018 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:50,018 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 15:00:50,541 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:51,484 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:00:57,142 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…
+2026-01-12 15:01:38,206 WARNING Timeout waiting for Greeks; some tickers may lack data.
+2026-01-12 15:01:40,110 ERROR HTTP Error 404: 
+2026-01-12 15:01:41,790 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:42,400 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:42,400 WARNING yfinance resolution failed for AMD   260220C00270000: 'currentTradingPeriod'
+2026-01-12 15:01:43,567 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:44,129 ERROR $AMD   260220C00270000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:44,730 ERROR HTTP Error 404: 
+2026-01-12 15:01:46,013 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:46,507 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:46,507 WARNING yfinance resolution failed for AMZN  260220C00255000: 'currentTradingPeriod'
+2026-01-12 15:01:47,150 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:47,744 ERROR $AMZN  260220C00255000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:54,265 ERROR HTTP Error 404: 
+2026-01-12 15:01:55,620 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:56,019 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:56,019 WARNING yfinance resolution failed for CDNS  260116P00335000: 'currentTradingPeriod'
+2026-01-12 15:01:56,536 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:57,091 ERROR $CDNS  260116P00335000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:01:58,873 ERROR HTTP Error 404: 
+2026-01-12 15:02:00,125 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:00,662 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:00,662 WARNING yfinance resolution failed for CLSK  260320C00017000: 'currentTradingPeriod'
+2026-01-12 15:02:01,278 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:01,872 ERROR $CLSK  260320C00017000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:09,894 ERROR HTTP Error 404: 
+2026-01-12 15:02:11,333 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:11,933 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:11,933 WARNING yfinance resolution failed for GOOGL 260918C00350000: 'currentTradingPeriod'
+2026-01-12 15:02:12,363 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:12,800 ERROR $GOOGL 260918C00350000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:24,935 ERROR HTTP Error 404: 
+2026-01-12 15:02:26,420 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:26,825 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:26,826 WARNING yfinance resolution failed for NVDA  260116C00214000: 'currentTradingPeriod'
+2026-01-12 15:02:27,277 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:27,763 ERROR $NVDA  260116C00214000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:32,801 ERROR HTTP Error 404: 
+2026-01-12 15:02:34,197 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:34,653 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:34,654 WARNING yfinance resolution failed for PLTR  260116C00200000: 'currentTradingPeriod'
+2026-01-12 15:02:35,094 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:35,573 ERROR $PLTR  260116C00200000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:36,244 ERROR HTTP Error 404: 
+2026-01-12 15:02:37,439 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:37,893 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:37,893 WARNING yfinance resolution failed for PLTR  260618C00230000: 'currentTradingPeriod'
+2026-01-12 15:02:38,308 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:38,773 ERROR $PLTR  260618C00230000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:42,677 ERROR HTTP Error 404: 
+2026-01-12 15:02:44,030 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:45,021 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:45,021 WARNING yfinance resolution failed for RKLB  260417C00070000: 'currentTradingPeriod'
+2026-01-12 15:02:45,418 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:45,810 ERROR $RKLB  260417C00070000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:50,807 ERROR HTTP Error 404: 
+2026-01-12 15:02:52,208 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:52,664 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:52,664 WARNING yfinance resolution failed for TSLA  260130C00520000: 'currentTradingPeriod'
+2026-01-12 15:02:53,238 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=5d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:53,723 ERROR $TSLA  260130C00520000: possibly delisted; no price data found  (period=2d) (Yahoo error = "No data found, symbol may be delisted")
+2026-01-12 15:02:58,642 INFO Found 10 option/FOP positions. Requesting live market data (Greeks)…

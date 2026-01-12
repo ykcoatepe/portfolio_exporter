@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 from datetime import date, datetime
 from pathlib import Path
 
@@ -41,6 +43,30 @@ def test_powerlaw_snapshot_fresh(monkeypatch, tmp_path):
     assert snapshot["equity_weights"]["SPY"] == 0.5
 
 
+def test_powerlaw_snapshot_allows_one_day_lag(monkeypatch, tmp_path):
+    repo = tmp_path / "powerlaw"
+    output_dir = repo / "output"
+    output_dir.mkdir(parents=True)
+    _write_snapshot(
+        output_dir / "trader_v5_daily_2025-01-02.json",
+        {"as_of": "2025-01-02", "plke": 40.0},
+    )
+
+    _configure_env(monkeypatch, repo)
+    monkeypatch.setattr(
+        psd_powerlaw,
+        "_calendar_trading_days",
+        lambda reference, lookback: [date(2025, 1, 2), date(2025, 1, 3)],
+    )
+
+    snapshot = psd_powerlaw.load_powerlaw_snapshot(
+        now=datetime(2025, 1, 3, 12, tzinfo=psd_powerlaw.TZ_NY)
+    )
+
+    assert snapshot is not None
+    assert snapshot["stale"] is False
+
+
 def test_powerlaw_plke_band_alpha_alias(monkeypatch, tmp_path):
     repo = tmp_path / "powerlaw"
     output_dir = repo / "output"
@@ -70,15 +96,15 @@ def test_powerlaw_snapshot_stale(monkeypatch, tmp_path):
     output_dir = repo / "output"
     output_dir.mkdir(parents=True)
     _write_snapshot(
-        output_dir / "trader_v5_daily_2025-01-02.json",
-        {"as_of": "2025-01-02", "plke": 40.0},
+        output_dir / "trader_v5_daily_2025-01-01.json",
+        {"as_of": "2025-01-01", "plke": 40.0},
     )
 
     _configure_env(monkeypatch, repo)
     monkeypatch.setattr(
         psd_powerlaw,
         "_calendar_trading_days",
-        lambda reference, lookback: [date(2025, 1, 3)],
+        lambda reference, lookback: [date(2025, 1, 2), date(2025, 1, 3)],
     )
 
     snapshot = psd_powerlaw.load_powerlaw_snapshot(
@@ -141,3 +167,41 @@ def test_build_refresh_cmd_prefers_repo_venv(tmp_path):
     assert cmd[0] == str(venv_python)
     assert cmd[1] == str(script_path)
     assert cmd[-1] == str(repo / "output")
+
+
+def test_start_refresh_in_flight_returns(tmp_path):
+    repo = tmp_path / "powerlaw"
+    (repo / "output").mkdir(parents=True)
+    cfg = psd_powerlaw.PowerlawConfig(
+        repo_root=repo,
+        output_dir=repo / "output",
+        refresh_enabled=True,
+        stale_trading_days=1,
+        refresh_timeout_sec=300,
+        refresh_cooldown_sec=900,
+        refresh_cmd=None,
+    )
+
+    state = psd_powerlaw._REFRESH_STATE
+    prev = (state.in_flight, state.last_attempt, state.last_status, state.last_error)
+    state.in_flight = True
+    state.last_attempt = time.time()
+    state.last_status = "running"
+    state.last_error = None
+
+    result_holder: dict[str, dict] = {}
+
+    def runner() -> None:
+        result_holder["result"] = psd_powerlaw._start_refresh(cfg, force=False)
+
+    thread = threading.Thread(target=runner)
+    try:
+        thread.start()
+        thread.join(timeout=1.0)
+        assert not thread.is_alive()
+        result = result_holder["result"]
+        assert result["started"] is False
+        assert result["status"] == "running"
+        assert result["reason"] == "in_flight"
+    finally:
+        state.in_flight, state.last_attempt, state.last_status, state.last_error = prev

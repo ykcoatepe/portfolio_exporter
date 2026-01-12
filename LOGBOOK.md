@@ -164,3 +164,39 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Status:** open
 
 **Notes:** pytest -vv -k snapshot_once_roundtrip / delayed_marks / fills_missing_marks (tests/tests_psd_adapter.py)
+
+### 2026-01-09 • Task: Powerlaw stale lag allowance • Branch: local
+**Owner:** session/ai | **Scope:** allow 1 trading-day lag for Powerlaw staleness; update tests
+**Interfaces:** /state
+**Status:** open
+**Notes:** pytest -q tests/test_psd_powerlaw.py
+
+### 2026-01-09 • Task: Default PSD stocks grid to sortable table • Branch: local
+**Owner:** session/ai | **Scope:** default PSD stocks grid to the new sortable data grid
+**Interfaces:** none
+**Status:** open
+**Notes:** fallback grid mode now returns "new"; query/localStorage/env overrides still apply
+
+### 2026-01-09 • Task: Remove legacy PSD stocks grid path • Branch: local
+**Owner:** session/ai | **Scope:** always render PsdStocksGrid for Single Stocks when positions_view exists
+**Interfaces:** none
+**Status:** open
+**Notes:** removed grid mode branching/parity/legacy table in StocksSectionWithGrid
+
+### 2026-01-09 • Task: PSD options singles grid sorting • Branch: local
+**Owner:** session/ai | **Scope:** render PsdOptionLegsGrid for Options — Singles with sortable headers
+**Interfaces:** none
+**Status:** open
+**Notes:** added PSD option-leg columns + sorting state; map option labels via buildFriendlyLegDisplay
+
+### 2026-01-09 • Task: Portfolio stats alignment • Branch: local
+**Owner:** session/ai | **Scope:** prefer snapshot-derived metrics for Day/Unrealized P&L and greeks; keep stats for risk fields
+**Interfaces:** /stats/current, /state
+**Status:** open
+**Notes:** staleness now reflects max of snapshot + stats sources
+
+### 2026-01-12 • Task: Restore intraday P&L fallbacks • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** keep non-option day P&L populated when broker omits day_pnl fields
+**Interfaces:** src/psd/ingestor/normalize.py
+**Status:** open
+**Notes:** restored pnl_leg/prev_close/value fallback order; web unit tests currently failing (PSD tab order, PsdDataGrid selection test timeout); per user request, tests not rerun

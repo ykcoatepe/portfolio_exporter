@@ -242,6 +242,10 @@ describe("PSD page", () => {
     expect(statsRegion).toHaveFocus();
 
     await user.tab();
+    const refreshButton = await screen.findByRole("button", { name: /refresh psd/i });
+    expect(refreshButton).toHaveFocus();
+
+    await user.tab();
     const msb7dToggle = await screen.findByRole("button", { name: "7D" });
     expect(msb7dToggle).toHaveFocus();
 

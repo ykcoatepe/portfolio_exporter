@@ -19,6 +19,30 @@ function toFinite(value: number | null | undefined): number | null {
   return Number.isFinite(asNumber) ? asNumber : null;
 }
 
+function pickFirstNumber(
+  ...values: Array<number | null | undefined>
+): number | null {
+  for (const value of values) {
+    const normalized = toFinite(value);
+    if (normalized !== null) {
+      return normalized;
+    }
+  }
+  return null;
+}
+
+function maxNumber(
+  ...values: Array<number | null | undefined>
+): number | null {
+  const normalized = values
+    .map((value) => toFinite(value))
+    .filter((value): value is number => value !== null);
+  if (normalized.length === 0) {
+    return null;
+  }
+  return Math.max(...normalized);
+}
+
 function selectLatestTimestamp(timestamps: number[]): number | null {
   if (timestamps.length === 0) {
     return null;
@@ -62,7 +86,13 @@ function formatRelativeFromNow(timestamp: number, now: number): string {
   return relativeTimeFormat.format(Math.round(diffSeconds / 86_400), "day");
 }
 
-export default function StatsRibbon(): JSX.Element {
+type StatsRibbonProps = {
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  refreshStatus?: "idle" | "running" | "success" | "failed" | "timeout";
+};
+
+export default function StatsRibbon({ onRefresh, refreshing, refreshStatus }: StatsRibbonProps): JSX.Element {
   const { data: stats } = useStats();
   const metrics = usePortfolioMetrics();
   const sessionSeed = stats?.session ?? stats?.sessionInfo ?? null;
@@ -108,9 +138,11 @@ export default function StatsRibbon(): JSX.Element {
     : undefined;
 
   const totals = stats?.totals ?? null;
-  const metricsStaleness = metrics.stalenessSeconds;
-  const stalenessSeconds =
-    stats?.stalenessSec ?? totals?.stalenessSecs ?? metricsStaleness ?? null;
+  const stalenessSeconds = maxNumber(
+    metrics.stalenessSeconds,
+    stats?.stalenessSec,
+    totals?.stalenessSecs,
+  );
   const isStale =
     stalenessSeconds !== null && stalenessSeconds >= FALLBACK_STALE_THRESHOLD_SEC;
   const stalenessLabel = stalenessSeconds !== null ? formatDuration(stalenessSeconds) : null;
@@ -126,10 +158,26 @@ export default function StatsRibbon(): JSX.Element {
     ? new Date(sessionUpdatedTimestamp).toLocaleString()
     : undefined;
 
-  const dayPnlValue = totals?.pnlDay ?? stats?.dayPnl ?? metrics.dayPnl;
-  const unrealizedValue = totals?.unrealized ?? stats?.unrealizedPnl ?? metrics.totalPnl;
-  const sigmaTotalValue = stats?.sigmaTotal ?? totals?.sumDelta ?? metrics.sumDelta;
-  const sigmaPerDayValue = stats?.sigmaPerDay ?? totals?.sumTheta ?? metrics.sumTheta;
+  const dayPnlValue = pickFirstNumber(
+    metrics.dayPnl,
+    totals?.pnlDay,
+    stats?.dayPnl,
+  );
+  const unrealizedValue = pickFirstNumber(
+    metrics.totalPnl,
+    totals?.unrealized,
+    stats?.unrealizedPnl,
+  );
+  const sigmaTotalValue = pickFirstNumber(
+    metrics.sumDelta,
+    totals?.sumDelta,
+    stats?.sigmaTotal,
+  );
+  const sigmaPerDayValue = pickFirstNumber(
+    metrics.sumTheta,
+    totals?.sumTheta,
+    stats?.sigmaPerDay,
+  );
   const netLiqValue = stats?.netLiq;
   const var95Value = stats?.var95;
   const marginValue = stats?.marginPct;
@@ -228,6 +276,28 @@ export default function StatsRibbon(): JSX.Element {
             >
               STALE {stalenessLabel ?? "—"}
             </span>
+          ) : null}
+          {onRefresh ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={refreshing || refreshStatus === "running"}
+                className={clsx(
+                  "rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide",
+                  refreshing || refreshStatus === "running"
+                    ? "border-slate-700 text-slate-500"
+                    : "border-sky-400/50 text-sky-100 hover:border-sky-300 hover:text-sky-50",
+                )}
+              >
+                {refreshing || refreshStatus === "running" ? "Refreshing..." : "Refresh PSD"}
+              </button>
+              {refreshStatus === "running" ? (
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-800">
+                  <div className="h-full w-1/2 animate-pulse rounded-full bg-sky-400/70" />
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

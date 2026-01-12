@@ -292,11 +292,15 @@ def _is_stale(
 
 def _stale_threshold(reference: date, stale_days: int) -> date:
     stale_days = max(stale_days, 1)
-    trading_days = _calendar_trading_days(reference, lookback=max(20, stale_days * 5))
+    # Treat stale_days as the allowed trading-day lag (1 => yesterday is still fresh).
+    allowed_window = stale_days + 1
+    trading_days = _calendar_trading_days(
+        reference, lookback=max(20, allowed_window * 5)
+    )
     if trading_days:
-        idx = -min(stale_days, len(trading_days))
+        idx = -min(allowed_window, len(trading_days))
         return trading_days[idx]
-    return _fallback_trading_day(reference, stale_days)
+    return _fallback_trading_day(reference, allowed_window)
 
 
 def _calendar_trading_days(reference: date, lookback: int) -> list[date]:
@@ -375,38 +379,43 @@ def _maybe_start_refresh(stale: bool, cfg: PowerlawConfig) -> None:
 
 def _start_refresh(cfg: PowerlawConfig, force: bool) -> dict[str, Any]:
     now = time.time()
+    thread: threading.Thread | None = None
+    started = False
+    status = "idle"
+    reason: str | None = None
     with _REFRESH_LOCK:
         if _REFRESH_STATE.in_flight:
-            return {
-                "started": False,
-                "status": "running",
-                "reason": "in_flight",
-                "refresh": _refresh_payload(cfg),
-            }
-        last_attempt = _REFRESH_STATE.last_attempt or 0.0
-        if not force and now - last_attempt < cfg.refresh_cooldown_sec:
-            return {
-                "started": False,
-                "status": _REFRESH_STATE.last_status or "cooldown",
-                "reason": "cooldown",
-                "refresh": _refresh_payload(cfg),
-            }
-        _REFRESH_STATE.in_flight = True
-        _REFRESH_STATE.last_attempt = now
-        _REFRESH_STATE.last_status = "running"
-        _REFRESH_STATE.last_error = None
+            started = False
+            status = "running"
+            reason = "in_flight"
+        else:
+            last_attempt = _REFRESH_STATE.last_attempt or 0.0
+            if not force and now - last_attempt < cfg.refresh_cooldown_sec:
+                started = False
+                status = _REFRESH_STATE.last_status or "cooldown"
+                reason = "cooldown"
+            else:
+                _REFRESH_STATE.in_flight = True
+                _REFRESH_STATE.last_attempt = now
+                _REFRESH_STATE.last_status = "running"
+                _REFRESH_STATE.last_error = None
+                started = True
+                status = "running"
+                reason = None
+                thread = threading.Thread(
+                    target=_run_refresh,
+                    name="psd-powerlaw-refresh",
+                    args=(cfg,),
+                    daemon=True,
+                )
 
-    thread = threading.Thread(
-        target=_run_refresh,
-        name="psd-powerlaw-refresh",
-        args=(cfg,),
-        daemon=True,
-    )
-    thread.start()
+    if thread is not None:
+        thread.start()
+
     return {
-        "started": True,
-        "status": "running",
-        "reason": None,
+        "started": started,
+        "status": status,
+        "reason": reason,
         "refresh": _refresh_payload(cfg),
     }
 

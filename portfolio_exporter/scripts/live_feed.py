@@ -96,6 +96,7 @@ def _yf_resolve_last_price(
     label: str | None = None,
     info: dict[str, Any] | None = None,
     fast: dict[str, Any] | None = None,
+    ticker: Any | None = None,
 ) -> float:
     """
     Best-effort ladder to resolve a last price from Yahoo Finance.
@@ -110,7 +111,7 @@ def _yf_resolve_last_price(
     Returns float or NaN.
     """
     try:
-        tk = yf.Ticker(yf_symbol)
+        tk = ticker if ticker is not None else yf.Ticker(yf_symbol)
         if fast is None:
             try:
                 fast = tk.fast_info or {}
@@ -203,6 +204,52 @@ def _yf_resolve_last_price(
         if label:
             logging.warning("yfinance resolution failed for %s: %s", label, e)
         return float("nan")
+
+
+def _yf_resolve_previous_close(
+    yf_symbol: str,
+    *,
+    info: dict[str, Any] | None = None,
+    fast: dict[str, Any] | None = None,
+    ticker: Any | None = None,
+    label: str | None = None,
+) -> float | None:
+    try:
+        tk = ticker if ticker is not None else yf.Ticker(yf_symbol)
+        if fast is None:
+            try:
+                fast = tk.fast_info or {}
+            except Exception:
+                fast = {}
+        if info is None:
+            try:
+                info = tk.info
+            except Exception:
+                info = {}
+        prev_close = _first_valid(
+            (fast or {}).get("previous_close"),
+            (fast or {}).get("previousClose"),
+            (info or {}).get("previousClose"),
+            (info or {}).get("regularMarketPreviousClose"),
+        )
+        if prev_close is None or pd.isna(prev_close):
+            try:
+                daily = tk.history(period="2d", interval="1d")
+                if daily is not None and not daily.empty:
+                    close_vals = daily["Close"].dropna()
+                    if len(close_vals) >= 2:
+                        prev_close = float(close_vals.iloc[-2])
+                    elif len(close_vals) == 1:
+                        prev_close = float(close_vals.iloc[-1])
+            except Exception:
+                pass
+        if prev_close is None or pd.isna(prev_close):
+            return None
+        return float(prev_close)
+    except Exception as e:
+        if label:
+            logging.warning("yfinance prev_close failed for %s: %s", label, e)
+        return None
 
 
 # optional PDF dependencies
@@ -987,7 +1034,7 @@ def main():
 
 ### Removed legacy lightweight run() in favor of unified run() above.
 def _snapshot_quotes(tickers: list[str], fmt: str = "csv") -> pd.DataFrame:
-    """Return a minimal snapshot quotes DataFrame with columns [symbol, price].
+    """Return a minimal snapshot quotes DataFrame with columns [symbol, price, prev_close, source].
 
     Uses yfinance ladder via _yf_resolve_last_price; IBKR path is handled in
     upstream helpers. Designed to be test-friendly and offline-capable.
@@ -995,10 +1042,28 @@ def _snapshot_quotes(tickers: list[str], fmt: str = "csv") -> pd.DataFrame:
     rows = []
     for t in tickers:
         try:
-            price = _yf_resolve_last_price(t)
+            tk = yf.Ticker(t)
+            try:
+                fast = tk.fast_info or {}
+            except Exception:
+                fast = {}
+            try:
+                info = tk.info
+            except Exception:
+                info = {}
+            price = _yf_resolve_last_price(t, label=t, info=info, fast=fast, ticker=tk)
+            prev_close = _yf_resolve_previous_close(
+                t, info=info, fast=fast, ticker=tk, label=t
+            )
         except Exception:
-            price = float("nan")
+            price = _yf_resolve_last_price(t, label=t)
+            prev_close = _yf_resolve_previous_close(t, label=t)
         rows.append(
-            {"symbol": t, "price": float(price) if price is not None else float("nan")}
+            {
+                "symbol": t,
+                "price": float(price) if price is not None else float("nan"),
+                "prev_close": prev_close,
+                "source": "YF",
+            }
         )
     return pd.DataFrame(rows)

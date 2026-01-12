@@ -5,7 +5,8 @@
  * Ensures stable formatting and row identity.
  */
 
-import type { PSDLeg, PSDPositionsView, PSDCombo } from "../../../lib/types";
+import type { PSDLeg } from "../../../lib/types";
+import { buildFriendlyLegDisplay } from "../../../lib/labels";
 
 /**
  * Row type for single stocks grid
@@ -119,51 +120,44 @@ function calculateDte(expiry: string | null | undefined): number | null {
 }
 
 /**
- * Build friendly option label (e.g., "TSLA 250C 01/19")
- */
-function buildOptionLabel(leg: PSDLeg, underlying?: string): string {
-    const ticker = underlying ?? leg.symbol.split(" ")[0] ?? leg.symbol;
-    const strike = leg.strike != null ? leg.strike.toString() : "";
-    const right = leg.right === "CALL" ? "C" : leg.right === "PUT" ? "P" : "";
-    const expiry = leg.expiry
-        ? `${leg.expiry.slice(4, 6)}/${leg.expiry.slice(6, 8)}`
-        : "";
-
-    if (strike && right && expiry) {
-        return `${ticker} ${strike}${right} ${expiry}`;
-    }
-    return leg.symbol;
-}
-
-/**
  * Map PSDLeg array to OptionLegRow array
  */
 export function mapLegsToOptionLegRows(
     legs: PSDLeg[],
     underlying?: string,
 ): OptionLegRow[] {
-    return legs.map((leg) => ({
-        id: `leg:${leg.conId ?? leg.symbol}`,
-        conId: leg.conId ?? null,
-        symbol: leg.symbol,
-        label: buildOptionLabel(leg, underlying),
-        shortUnderlying: underlying ?? null,
-        quantity: leg.qty,
-        dte: calculateDte(leg.expiry),
-        markPrice: leg.mark ?? null,
-        dayPnlAmount: leg.pnl_intraday ?? null,
-        dayPnlCents: toCents(leg.pnl_intraday),
-        delta: leg.greeks?.delta ?? null,
-        gamma: leg.greeks?.gamma ?? null,
-        theta: leg.greeks?.theta ?? null,
-        vega: null, // Not available in PSDGreeks
-        iv: null, // Not available in PSDGreeks
-        right: leg.right === "CALL" ? "CALL" : leg.right === "PUT" ? "PUT" : null,
-        strike: leg.strike ?? null,
-        expiry: leg.expiry ?? null,
-        priceSource: leg.price_source ?? null,
-        stalenessSeconds: leg.stale_s ?? null,
-    }));
+    return legs.map((leg) => {
+        const display = buildFriendlyLegDisplay({
+            symbol: leg.symbol,
+            underlying,
+            right: leg.right ?? null,
+            strike: leg.strike ?? null,
+            expiry: leg.expiry ?? null,
+        });
+
+        return {
+            id: `leg:${leg.conId ?? leg.symbol}`,
+            conId: leg.conId ?? null,
+            symbol: leg.symbol,
+            label: display.label,
+            shortUnderlying: display.shortUnderlying ?? null,
+            quantity: leg.qty,
+            dte: calculateDte(leg.expiry),
+            markPrice: leg.mark ?? null,
+            dayPnlAmount: leg.pnl_intraday ?? null,
+            dayPnlCents: toCents(leg.pnl_intraday),
+            delta: leg.greeks?.delta ?? null,
+            gamma: leg.greeks?.gamma ?? null,
+            theta: leg.greeks?.theta ?? null,
+            vega: null, // Not available in PSDGreeks
+            iv: null, // Not available in PSDGreeks
+            right: leg.right === "CALL" ? "CALL" : leg.right === "PUT" ? "PUT" : null,
+            strike: leg.strike ?? null,
+            expiry: leg.expiry ?? null,
+            priceSource: leg.price_source ?? null,
+            stalenessSeconds: leg.stale_s ?? null,
+        };
+    });
 }
 
 /**

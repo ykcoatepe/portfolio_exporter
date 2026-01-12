@@ -308,6 +308,85 @@
     {
       "event": "session_start",
       "timestamp": "2026-01-09T05:58:25Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T07:44:15Z"
+    },
+    {
+      "details": "Use explicit ThreadPoolExecutor shutdown(wait=False, cancel_futures=True) and increase timeout to 10s.",
+      "event": "Fix /state powerlaw timeout",
+      "timestamp": "2026-01-09T07:44:56Z"
+    },
+    {
+      "details": "Allow choice 5 in queued input validation so Stop Portfolio Sentinel works.",
+      "event": "Fix main menu option 5",
+      "timestamp": "2026-01-09T07:51:26Z"
+    },
+    {
+      "details": "Refetch after trigger and clear refreshing when status is not running to avoid stuck refresh UI.",
+      "event": "Reset PSD refresh state on non-running status",
+      "timestamp": "2026-01-09T09:08:38Z"
+    },
+    {
+      "details": "Restructure _start_refresh so it doesn't call _refresh_payload while holding _REFRESH_LOCK.",
+      "event": "Fix powerlaw refresh deadlock",
+      "timestamp": "2026-01-09T09:30:07Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T09:58:54Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T10:02:33Z"
+    },
+    {
+      "details": "Shifted stale threshold to allow prior trading day snapshots; updated powerlaw staleness tests.",
+      "event": "Powerlaw staleness allows one-day lag",
+      "timestamp": "2026-01-09T10:03:11Z"
+    },
+    {
+      "details": "Changed getPsdGridMode fallback to return new so sortable grid is the default.",
+      "event": "Default PSD stocks grid to new mode",
+      "timestamp": "2026-01-09T10:40:57Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T10:41:12Z"
+    },
+    {
+      "details": "Removed grid mode branching in StocksSectionWithGrid; legacy table no longer used when positions_view is present.",
+      "event": "Always render PSD stocks grid",
+      "timestamp": "2026-01-09T10:47:17Z"
+    },
+    {
+      "details": "Preserve engine-provided day vs total P&L fields in psd_adapter fallback view and compute missing values from previous_close/avg_cost.",
+      "event": "Fix PSD fallback day/total P&L mapping",
+      "timestamp": "2026-01-09T10:51:00Z"
+    },
+    {
+      "details": "Replaced legacy options singles table with PsdOptionLegsGrid, added sortable columns and option-legs sorting state.",
+      "event": "Options singles use PSD grid",
+      "timestamp": "2026-01-09T11:40:23Z"
+    },
+    {
+      "details": "Enriched quote snapshots with prev_close, wired into PSD marks, and stopped using total/unrealized P&L as day P&L for equities when prev_close is absent; updated tests accordingly.",
+      "event": "Fix day P&L derivation and prev_close propagation",
+      "timestamp": "2026-01-09T12:24:15Z"
+    },
+    {
+      "details": "StatsRibbon now prioritizes positions_view-derived Day/Unrealized P&L and greeks; staleness uses max across sources.",
+      "event": "Align portfolio stats with snapshot metrics",
+      "timestamp": "2026-01-09T12:26:44Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T11:33:09Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T12:00:46Z"
     }
   ],
   "decisions": [
@@ -616,6 +695,94 @@
       "rationale": null,
       "timestamp": "2026-01-09T05:57:44Z",
       "title": "Use previous_close for intraday P&L in split_positions"
+    },
+    {
+      "context": null,
+      "decision": "Stop waiting on the thread pool shutdown after a timeout; log and return after 10s.",
+      "id": 41,
+      "rationale": "ThreadPoolExecutor context manager blocks on shutdown and defeats the timeout when load hangs.",
+      "timestamp": "2026-01-09T07:44:52Z",
+      "title": "Bound /state powerlaw load latency"
+    },
+    {
+      "context": null,
+      "decision": "Include menu option 5 in queued main menu validation so Stop Portfolio Sentinel is accepted.",
+      "id": 42,
+      "rationale": "Validation guard excluded 5, causing invalid choice for the Stop PSD option.",
+      "timestamp": "2026-01-09T07:51:20Z",
+      "title": "Allow Stop PSD menu choice"
+    },
+    {
+      "context": null,
+      "decision": "After triggering the refresh, refetch once and clear the refreshing flag when the backend status is not running.",
+      "id": 43,
+      "rationale": "Avoids leaving the UI stuck when the refresh trigger fails or returns idle/failed.",
+      "timestamp": "2026-01-09T09:08:33Z",
+      "title": "Reset PSD refresh UI when refresh never starts"
+    },
+    {
+      "context": null,
+      "decision": "Stop calling _refresh_payload while holding _REFRESH_LOCK by restructuring _start_refresh to build payload after releasing the lock.",
+      "id": 44,
+      "rationale": "Nested lock acquisition deadlocked when a refresh was already in-flight, stalling /state.",
+      "timestamp": "2026-01-09T09:30:02Z",
+      "title": "Avoid refresh lock deadlock"
+    },
+    {
+      "context": null,
+      "decision": "Treat PSD powerlaw staleness as allowed trading-day lag so yesterday's snapshot stays fresh.",
+      "id": 45,
+      "rationale": "Powerlaw signals are produced one trading day behind, so prior-day snapshots should not be flagged stale.",
+      "timestamp": "2026-01-09T10:03:05Z",
+      "title": "Powerlaw stale lag"
+    },
+    {
+      "context": "Sorting UI only exists in PsdDataGrid; old table hides sorting.",
+      "decision": "Use new grid mode as fallback so sortable headers show by default.",
+      "id": 46,
+      "rationale": null,
+      "timestamp": "2026-01-09T10:40:53Z",
+      "title": "Default PSD stocks grid to new"
+    },
+    {
+      "context": "User wants sorting visible without grid mode toggles; legacy table has no sorting UI.",
+      "decision": "Always render PsdStocksGrid for Single Stocks when positions_view is available.",
+      "id": 47,
+      "rationale": null,
+      "timestamp": "2026-01-09T10:47:12Z",
+      "title": "Remove legacy PSD stocks grid path"
+    },
+    {
+      "context": null,
+      "decision": "Compute day vs total P&L separately when PSD snapshot uses engine fallback, preserving provided fields and only computing missing values.",
+      "id": 48,
+      "rationale": "Fallback adapter previously mirrored unrealized into intraday, making day and total P&L identical in PSD UI.",
+      "timestamp": "2026-01-09T10:50:54Z",
+      "title": "Fix PSD fallback P&L parity"
+    },
+    {
+      "context": "Legacy table has no sorting UI; user requested same behavior as stocks.",
+      "decision": "Switch Options \u2014 Singles to the new PsdOptionLegsGrid so sorting is visible by default.",
+      "id": 49,
+      "rationale": null,
+      "timestamp": "2026-01-09T11:40:17Z",
+      "title": "Always render PSD options singles grid"
+    },
+    {
+      "context": null,
+      "decision": "Enrich PSD mark snapshots with previous_close and stop using total P&L as day P&L for equities without explicit intraday data.",
+      "id": 50,
+      "rationale": "Day P&L was falling back to total/unrealized when prev_close missing; feeding prev_close and tightening fallbacks fixes day vs total parity.",
+      "timestamp": "2026-01-09T12:24:09Z",
+      "title": "Add prev-close to PSD marks"
+    },
+    {
+      "context": "Stats ribbon should match the visible positions data.",
+      "decision": "Use positions_view-derived metrics for Day/Unrealized P&L and greeks; keep net liq/var/margin from /stats.",
+      "id": 51,
+      "rationale": null,
+      "timestamp": "2026-01-09T12:26:38Z",
+      "title": "Prefer snapshot metrics in Portfolio Stats"
     }
   ],
   "preferences": {

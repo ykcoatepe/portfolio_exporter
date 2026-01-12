@@ -5,31 +5,31 @@
  */
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { StockRow, OptionLegRow, OptionComboRow, OptionComboGroupRow } from "../../../lib/types";
+import type { OptionLegRow as LibOptionLegRow, OptionComboRow, OptionComboGroupRow } from "../../../lib/types";
+import type { StockRow, OptionLegRow as PsdOptionLegRow } from "./mappers";
 import {
     SymbolCell,
     CurrencyCell,
     PercentCell,
     GreekCell,
     TextCell,
-    BadgeCell,
     ProgressCell,
-    formatCurrency,
-    formatPercent,
-    valueTone,
+    stalenessTone,
+    CellWrapper,
 } from "./cells";
+import { formatDuration } from "../../../lib/format";
 
 /**
  * Generate stable row ID for StockRow
  */
 export function getStockRowId(row: StockRow): string {
-    return `stock:${row.symbol}`;
+    return row.id;
 }
 
 /**
  * Generate stable row ID for OptionLegRow
  */
-export function getOptionLegRowId(row: OptionLegRow): string {
+export function getOptionLegRowId(row: LibOptionLegRow): string {
     return `leg:${row.id}`;
 }
 
@@ -165,12 +165,47 @@ export const stockColumns: ColumnDef<StockRow>[] = [
             <CurrencyCell value={getValue() as number | undefined} />
         ),
     },
+    {
+        id: "priceSource",
+        accessorKey: "priceSource",
+        header: "Source",
+        size: 80,
+        sortingFn: "alphanumeric",
+        meta: {
+            align: "left",
+            sortable: true,
+        },
+        cell: ({ getValue }) => (
+            <TextCell value={getValue() as string | null} />
+        ),
+    },
+    {
+        id: "staleness",
+        accessorKey: "stalenessSeconds",
+        header: "Staleness",
+        size: 90,
+        sortingFn: "basic",
+        sortUndefined: "last",
+        meta: {
+            align: "right",
+            numeric: true,
+            sortable: true,
+        },
+        cell: ({ getValue }) => {
+            const seconds = getValue() as number | null;
+            return (
+                <CellWrapper align="right" className={stalenessTone(seconds)}>
+                    {formatDuration(seconds)}
+                </CellWrapper>
+            );
+        },
+    },
 ];
 
 /**
  * Option legs table columns
  */
-export const optionLegColumns: ColumnDef<OptionLegRow>[] = [
+export const optionLegColumns: ColumnDef<LibOptionLegRow>[] = [
     {
         id: "symbol",
         accessorKey: "symbol",
@@ -314,9 +349,153 @@ export const optionLegColumns: ColumnDef<OptionLegRow>[] = [
     },
 ];
 
+/**
+ * PSD option legs table columns (for positions_view)
+ */
+export const psdOptionLegColumns: ColumnDef<PsdOptionLegRow>[] = [
+    {
+        id: "symbol",
+        accessorKey: "label",
+        header: "Symbol",
+        size: 200,
+        meta: {
+            align: "left",
+            sortable: true,
+        },
+        cell: ({ row }) => (
+            <SymbolCell symbol={row.original.label} />
+        ),
+    },
+    {
+        id: "quantity",
+        accessorKey: "quantity",
+        header: "Qty",
+        size: 70,
+        meta: {
+            align: "right",
+            numeric: true,
+            sortable: true,
+        },
+        cell: ({ getValue }) => {
+            const value = getValue() as number;
+            return (
+                <TextCell
+                    value={String(value)}
+                    align="right"
+                    className={value >= 0 ? "text-emerald-400" : "text-rose-400"}
+                />
+            );
+        },
+    },
+    {
+        id: "markPrice",
+        accessorKey: "markPrice",
+        header: "Mark",
+        size: 90,
+        meta: {
+            align: "right",
+            numeric: true,
+            sortable: true,
+        },
+        cell: ({ getValue }) => (
+            <CurrencyCell value={getValue() as number | null} />
+        ),
+    },
+    {
+        id: "dayPnlAmount",
+        accessorKey: "dayPnlAmount",
+        header: "Day P&L",
+        size: 110,
+        meta: {
+            align: "right",
+            numeric: true,
+            sortable: true,
+        },
+        cell: ({ getValue }) => (
+            <CurrencyCell value={getValue() as number | null} showSign />
+        ),
+    },
+    {
+        id: "delta",
+        accessorKey: "delta",
+        header: "Δ",
+        size: 70,
+        meta: {
+            align: "right",
+            numeric: true,
+            sortable: true,
+            headerTooltip: "Delta",
+        },
+        cell: ({ getValue }) => <GreekCell value={getValue() as number | null} />,
+    },
+    {
+        id: "gamma",
+        accessorKey: "gamma",
+        header: "Γ",
+        size: 70,
+        meta: {
+            align: "right",
+            numeric: true,
+            sortable: true,
+            headerTooltip: "Gamma",
+        },
+        cell: ({ getValue }) => <GreekCell value={getValue() as number | null} />,
+    },
+    {
+        id: "theta",
+        accessorKey: "theta",
+        header: "Θ",
+        size: 70,
+        meta: {
+            align: "right",
+            numeric: true,
+            sortable: true,
+            headerTooltip: "Theta",
+        },
+        cell: ({ getValue }) => <GreekCell value={getValue() as number | null} />,
+    },
+    {
+        id: "priceSource",
+        accessorKey: "priceSource",
+        header: "Source",
+        size: 90,
+        sortingFn: "alphanumeric",
+        meta: {
+            align: "left",
+            sortable: true,
+        },
+        cell: ({ getValue }) => {
+            const value = getValue() as string | null;
+            return <TextCell value={value ? value.toUpperCase() : value} />;
+        },
+    },
+    {
+        id: "staleness",
+        accessorKey: "stalenessSeconds",
+        header: "Staleness",
+        size: 90,
+        sortingFn: "basic",
+        sortUndefined: "last",
+        meta: {
+            align: "right",
+            numeric: true,
+            sortable: true,
+        },
+        cell: ({ getValue }) => {
+            const seconds = getValue() as number | null;
+            return (
+                <CellWrapper align="right" className={stalenessTone(seconds)}>
+                    {formatDuration(seconds)}
+                </CellWrapper>
+            );
+        },
+    },
+];
+
 export default {
     stockColumns,
     optionLegColumns,
+    psdOptionLegColumns,
     getStockRowId,
     getOptionLegRowId,
     getComboRowId,

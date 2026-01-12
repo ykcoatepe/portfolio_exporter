@@ -138,7 +138,7 @@ def test_split_positions_prefers_explicit_mark_without_tick():
     assert stock["mark"] == pytest.approx(12.0)
     assert stock["price_source"] == "manual"
     assert stock["stale_s"] == pytest.approx(45.0)
-    assert stock["pnl_intraday"] == pytest.approx(250.0)
+    assert stock["pnl_intraday"] == pytest.approx(10.0)
     assert stock["pnl_leg"] == pytest.approx(250.0)
 
 

@@ -27,7 +27,7 @@ function isValidMode(value: string | null): value is PsdGridMode {
 export function getPsdGridMode(): PsdGridMode {
     // SSR / test guard
     if (typeof window === "undefined") {
-        return "old";
+        return "new";
     }
 
     try {
@@ -60,7 +60,7 @@ export function getPsdGridMode(): PsdGridMode {
         return envMode;
     }
 
-    return "old";
+    return "new";
 }
 
 /**

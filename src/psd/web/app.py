@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from prometheus_client import Counter, Gauge, REGISTRY
+from prometheus_client import REGISTRY, Counter, Gauge
 from prometheus_client.metrics import MetricWrapperBase
 from pydantic import BaseModel, ConfigDict
 from starlette.middleware.cors import CORSMiddleware
@@ -46,6 +46,7 @@ except Exception:  # pragma: no cover - metrics should still render
 log = logging.getLogger("psd.web.stats")
 STALE_ALERT_THRESHOLD = 10
 _DEFAULT_STATS_EMPTY = compute_stats(None)
+
 
 def _get_or_create_metric(
     factory: type[MetricWrapperBase],
@@ -140,11 +141,15 @@ def state() -> JSONResponse:
     powerlaw = None
     try:
         import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(load_powerlaw_snapshot)
-            powerlaw = future.result(timeout=2.0)  # 2 second timeout
-    except concurrent.futures.TimeoutError:
-        log.warning("powerlaw snapshot load timed out (2s)")
+
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(load_powerlaw_snapshot)
+        try:
+            powerlaw = future.result(timeout=10.0)  # 10 second timeout
+        except concurrent.futures.TimeoutError:
+            log.warning("powerlaw snapshot load timed out (10s)")
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
     except Exception as exc:
         log.warning("powerlaw snapshot load failed: %s", exc)
     if not snap:

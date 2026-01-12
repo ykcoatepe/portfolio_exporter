@@ -616,7 +616,7 @@ def _main_impl(args) -> None:
                 update_tickers.run(args.format)
                 continue
             # Only numeric choices are supported for queued input
-            if choice not in {"1", "2", "3", "4"}:
+            if choice not in {"1", "2", "3", "4", "5"}:
                 console.print("[red]Invalid choice")
                 continue
             if choice == "1":

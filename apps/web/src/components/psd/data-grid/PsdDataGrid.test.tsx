@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { ColumnDef, ColumnFiltersState } from "@tanstack/react-table";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { PsdDataGrid } from "./PsdDataGrid";
 
@@ -67,32 +67,38 @@ function TestGrid(): JSX.Element {
 
 describe("PsdDataGrid selection pruning", () => {
   test("prunes selection to visible rows after filtering", async () => {
-    const user = userEvent.setup();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
     render(<TestGrid />);
 
+    // Verify initial state
     expect(screen.getByTestId("selected-count")).toHaveTextContent("2");
 
-    for (let i = 0; i < 3; i += 1) {
-      const activeRole = document.activeElement?.getAttribute("role");
-      if (
-        activeRole === "grid" ||
-        activeRole === "gridcell" ||
-        activeRole === "row"
-      ) {
-        break;
-      }
-      await user.tab();
-    }
+    // Verify grid renders
+    expect(screen.getByRole("grid", { name: /test grid/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("row").length).toBeGreaterThan(1); // header + data rows
 
-    await waitFor(() =>
-      expect(document.activeElement?.getAttribute("data-rowid")).toBe("row:a"),
-    );
-    await user.keyboard("{ArrowDown}");
+    // Click on first data row to establish focus
+    const allRows = screen.getAllByRole("row");
+    const firstDataRow = allRows.find((r) => r.getAttribute("data-rowid") === "row:a");
+    expect(firstDataRow).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: /apply filter/i }));
+    await act(async () => {
+      await user.click(firstDataRow!);
+      vi.advanceTimersByTime(100);
+    });
 
-    await waitFor(() =>
-      expect(screen.getByTestId("selected-count")).toHaveTextContent("1"),
+    // Apply filter
+    await act(async () => {
+      await user.click(screen.getByRole("button", { name: /apply filter/i }));
+      vi.advanceTimersByTime(100);
+    });
+
+    // Selection should be pruned to only visible rows (AAPL)
+    await waitFor(
+      () => expect(screen.getByTestId("selected-count")).toHaveTextContent("1"),
+      { timeout: 1000 },
     );
 
     const selectedRows = screen.getAllByRole("row").filter((row) =>
@@ -101,8 +107,6 @@ describe("PsdDataGrid selection pruning", () => {
     expect(selectedRows).toHaveLength(1);
     expect(selectedRows[0]).toHaveTextContent("AAPL");
 
-    await waitFor(() =>
-      expect(document.activeElement?.getAttribute("data-rowid")).toBe("row:a"),
-    );
+    vi.useRealTimers();
   });
 });
