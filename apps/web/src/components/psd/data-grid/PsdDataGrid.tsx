@@ -12,7 +12,13 @@
 
 import type { ReactNode, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RowData, Row, ExpandedState } from "@tanstack/react-table";
+import type {
+    RowData,
+    Row,
+    ExpandedState,
+    SortingState,
+    ColumnFiltersState,
+} from "@tanstack/react-table";
 import {
     useReactTable,
     getCoreRowModel,
@@ -42,6 +48,8 @@ function defaultGetRowId<TData>(row: TData, index: number): string {
     if (typeof r.symbol === "string") return r.symbol;
     return String(index);
 }
+
+const EMPTY_COLUMN_FILTERS: ColumnFiltersState = [];
 
 /**
  * Grid loading skeleton
@@ -119,9 +127,9 @@ export function PsdDataGrid<TData extends RowData>({
     selectedRowIds,
     onSelectedRowIdsChange,
     enableSelection = false,
-    columnFilters = [],
+    columnFilters = EMPTY_COLUMN_FILTERS,
     onColumnFiltersChange,
-    sorting = [],
+    sorting,
     onSortingChange,
     isDataStable = true,
 }: PsdDataGridProps<TData>): JSX.Element {
@@ -193,10 +201,25 @@ export function PsdDataGrid<TData extends RowData>({
         [expanded, onExpandedChange],
     );
 
+    // Sorting state (controlled or uncontrolled)
+    const [internalSorting, setInternalSorting] = useState<SortingState>([]);
+    const isSortingControlled = sorting !== undefined && typeof onSortingChange === "function";
+    const sortingState = isSortingControlled ? sorting : internalSorting;
+    const handleSortingChange = isSortingControlled ? onSortingChange : setInternalSorting;
+
     // Virtualization config
     const virtualConfig = useMemo(
         () => mergeVirtualConfig(partialVirtualConfig),
         [partialVirtualConfig],
+    );
+
+    const tableState = useMemo(
+        () => ({
+            expanded: enableExpansion ? expanded : undefined,
+            columnFilters,
+            sorting: sortingState,
+        }),
+        [enableExpansion, expanded, columnFilters, sortingState],
     );
 
     // TanStack Table instance
@@ -209,14 +232,10 @@ export function PsdDataGrid<TData extends RowData>({
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getExpandedRowModel: enableExpansion ? getExpandedRowModel() : undefined,
-        state: {
-            expanded: enableExpansion ? expanded : undefined,
-            columnFilters,
-            sorting,
-        },
+        state: tableState,
         onExpandedChange: enableExpansion ? handleExpandedChange : undefined,
         onColumnFiltersChange,
-        onSortingChange,
+        onSortingChange: handleSortingChange,
     });
 
     const { rows } = table.getRowModel();
@@ -243,6 +262,11 @@ export function PsdDataGrid<TData extends RowData>({
         onSelectedRowIdsChange,
         orderedRowIds,
     });
+
+    // Store selection methods in ref to avoid infinite effect loops
+    // The effect needs to call pruneSelection/pruneAnchor but shouldn't re-run when selection changes
+    const selectionRef = useRef(selection);
+    selectionRef.current = selection;
 
     // Focus row by index
     const focusRowByIndex = useCallback(
@@ -274,9 +298,10 @@ export function PsdDataGrid<TData extends RowData>({
         }
 
         if (enableSelection) {
-            selection.pruneSelection(visibleRowIds);
+            // Use ref to avoid triggering effect when selection changes
+            selectionRef.current.pruneSelection(visibleRowIds);
             const nextActiveId = rows.length > 0 ? rows[0].id : null;
-            selection.pruneAnchor(visibleRowIds, focusedRowIdRef.current ?? nextActiveId);
+            selectionRef.current.pruneAnchor(visibleRowIds, focusedRowIdRef.current ?? nextActiveId);
         }
 
         if (rows.length === 0) {
@@ -289,7 +314,12 @@ export function PsdDataGrid<TData extends RowData>({
 
         const focusedId = focusedRowIdRef.current;
         if (!focusedId || !visibleRowIds.has(focusedId)) {
-            focusRowByIndex(0);
+            // Don't call focusRowByIndex here - it causes infinite re-renders
+            // Just reset the focus state without DOM side effects
+            if (rows.length > 0) {
+                setFocusedRowIndex(0);
+                focusedRowIdRef.current = rows[0].id;
+            }
             return;
         }
 
@@ -300,11 +330,9 @@ export function PsdDataGrid<TData extends RowData>({
     }, [
         enableSelection,
         isDataStable,
-        selection,
         visibleRowIds,
         rows,
         focusedRowIndex,
-        focusRowByIndex,
         filtersKey,
     ]);
 

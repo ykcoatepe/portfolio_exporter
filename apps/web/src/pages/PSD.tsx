@@ -25,7 +25,6 @@ import type { PSDLeg, PSDPositionsView } from "../lib/types";
 import { formatSigned, valueTone } from "../components/tableUtils";
 import { usePsdStocksFilterStore } from "../state/psdStocksFilters";
 import { usePsdStocksSorting, setPsdStocksSorting } from "../state/psdStocksSorting";
-import { usePsdOptionLegsSorting, setPsdOptionLegsSorting } from "../state/psdOptionLegsSorting";
 import { usePsdUiState } from "../state/psdUiState";
 
 const optionColumns = [
@@ -60,6 +59,8 @@ const formatQty = (value: number): string => {
 
 const formatStaleness = (seconds: number | undefined | null) =>
   formatDuration(finiteOrNull(typeof seconds === "number" ? seconds : null));
+
+const EMPTY_PSD_LEGS: PSDLeg[] = [];
 
 function LegRow({ leg, tabIndex = -1, className = "", underlyingHint }: { leg: PSDLeg; tabIndex?: number; className?: string; underlyingHint?: string }) {
   const greeks = leg.greeks ?? {};
@@ -240,7 +241,7 @@ function StocksSectionWithGrid({
   positionsView: PSDPositionsView | undefined;
   isDataStable: boolean;
 }) {
-  const legs = positionsView?.single_stocks ?? [];
+  const legs = positionsView?.single_stocks ?? EMPTY_PSD_LEGS;
   const stockRows = useMemo(() => mapLegsToStockRows(legs), [legs]);
   const columnFilters = usePsdStocksFilterStore((state) => state.columnFilters);
   const setColumnFilters = usePsdStocksFilterStore((state) => state.setColumnFilters);
@@ -300,9 +301,8 @@ const PSDPage = () => {
   const refreshStatus: "idle" | "running" | "success" | "failed" | "timeout" =
     (snapshot?.powerlaw?.refresh?.status as "idle" | "running" | "success" | "failed" | "timeout" | undefined) ?? "idle";
   const positionsView = snapshot?.positions_view;
-  const optionLegs = positionsView?.single_options ?? [];
+  const optionLegs = positionsView?.single_options ?? EMPTY_PSD_LEGS;
   const optionLegRows = useMemo(() => mapLegsToOptionLegRows(optionLegs), [optionLegs]);
-  const optionLegSorting = usePsdOptionLegsSorting();
   const hasView = useMemo(() => {
     if (!positionsView) {
       return false;
@@ -398,8 +398,6 @@ const PSDPage = () => {
               <PsdOptionLegsGrid
                 data={optionLegRows}
                 height="350px"
-                sorting={optionLegSorting}
-                onSortingChange={setPsdOptionLegsSorting}
                 isDataStable={!isFetching}
               />
             </section>

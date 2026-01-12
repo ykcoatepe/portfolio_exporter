@@ -387,6 +387,48 @@
     {
       "event": "session_start",
       "timestamp": "2026-01-12T12:00:46Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T12:39:30Z"
+    },
+    {
+      "details": "Use label/symbol fallback sort key for PSD options singles to prevent UI lockups on header click.",
+      "event": "Fix options singles symbol sorting freeze",
+      "timestamp": "2026-01-12T12:51:33Z"
+    },
+    {
+      "details": "Move option-legs sorting state into the grid component to avoid full-page rerenders when toggling Symbol sort.",
+      "event": "Limit options singles sort rerenders",
+      "timestamp": "2026-01-12T13:01:04Z"
+    },
+    {
+      "details": "Pre-sort option leg rows in grid, disable TanStack sorted row model for that table, preserve header sort state.",
+      "event": "PSD options singles manual sorting",
+      "timestamp": "2026-01-12T13:25:07Z"
+    },
+    {
+      "details": "Generate unique option leg row IDs using expiry/right/strike fallback and disable autoResetSorting for that grid.",
+      "event": "PSD options singles row id fix",
+      "timestamp": "2026-01-12T13:45:26Z"
+    },
+    {
+      "details": "Removed autoResetSorting attempt (unsupported in tanstack v8.21) and kept row-id uniqueness fix.",
+      "event": "PSD options sorting config cleanup",
+      "timestamp": "2026-01-12T13:47:01Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T13:58:06Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T13:59:41Z"
+    },
+    {
+      "details": "Use internal sorting state for options grid and stable empty filter references to align with TanStack Table state memoization guidance.",
+      "event": "PSD options sorting state stabilization",
+      "timestamp": "2026-01-12T14:05:45Z"
     }
   ],
   "decisions": [
@@ -783,6 +825,46 @@
       "rationale": null,
       "timestamp": "2026-01-09T12:26:38Z",
       "title": "Prefer snapshot metrics in Portfolio Stats"
+    },
+    {
+      "context": "apps/web PSD grid",
+      "decision": "Sort Options \u2014 Singles by label/symbol fallback to avoid header click lockups.",
+      "id": 52,
+      "rationale": "Ensure stable, string-only sort keys for the symbol column.",
+      "timestamp": "2026-01-12T12:51:27Z",
+      "title": "PSD option singles sorting"
+    },
+    {
+      "context": null,
+      "decision": "Switch Options \u2014 Singles grid to manual sorting with pre-sorted data to avoid UI freezes.",
+      "id": 53,
+      "rationale": "TanStack sorting appears to lock the PSD view when sorting option legs; manual sorting keeps header state without table sort model.",
+      "timestamp": "2026-01-12T13:25:02Z",
+      "title": "PSD options singles sorting"
+    },
+    {
+      "context": null,
+      "decision": "Use composite option leg identifiers (symbol/right/strike/expiry) when conId is missing and disable autoResetSorting for the options grid.",
+      "id": 54,
+      "rationale": "Duplicate row IDs can destabilize TanStack Table sorting; avoiding auto reset prevents sorting loops when data arrays change.",
+      "timestamp": "2026-01-12T13:45:20Z",
+      "title": "PSD option leg row IDs"
+    },
+    {
+      "context": null,
+      "decision": "Drop autoResetSorting (unsupported in current TanStack Table) and focus on unique row IDs to stabilize sorting.",
+      "id": 55,
+      "rationale": "TableOptions in v8.21 does not expose autoResetSorting; duplicate row IDs are more likely to cause sort instability.",
+      "timestamp": "2026-01-12T13:46:56Z",
+      "title": "PSD options sorting config"
+    },
+    {
+      "context": null,
+      "decision": "Move Options \u2014 Singles grid to internal sorting state (uncontrolled) and stabilize default column filter references.",
+      "id": 56,
+      "rationale": "TanStack Table FAQ warns that unstable data/state references can cause re-render loops; uncontrolled sorting and stable defaults reduce churn.",
+      "timestamp": "2026-01-12T14:05:39Z",
+      "title": "PSD option grid sorting state"
     }
   ],
   "preferences": {

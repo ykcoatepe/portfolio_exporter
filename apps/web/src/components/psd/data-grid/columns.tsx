@@ -211,6 +211,7 @@ export const optionLegColumns: ColumnDef<LibOptionLegRow>[] = [
         accessorKey: "symbol",
         header: "Contract",
         size: 180,
+        sortingFn: "text",
         meta: {
             align: "left",
             sortable: true,
@@ -355,9 +356,10 @@ export const optionLegColumns: ColumnDef<LibOptionLegRow>[] = [
 export const psdOptionLegColumns: ColumnDef<PsdOptionLegRow>[] = [
     {
         id: "symbol",
-        accessorKey: "label",
+        accessorFn: (row) => row.label || row.symbol || "",
         header: "Symbol",
         size: 200,
+        sortingFn: "text",
         meta: {
             align: "left",
             sortable: true,

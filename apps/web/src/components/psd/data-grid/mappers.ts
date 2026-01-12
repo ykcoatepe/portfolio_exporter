@@ -134,11 +134,21 @@ export function mapLegsToOptionLegRows(
             strike: leg.strike ?? null,
             expiry: leg.expiry ?? null,
         });
+        const symbol = typeof leg.symbol === "string" && leg.symbol.trim()
+            ? leg.symbol
+            : display.label;
+        const fallbackId = [
+            symbol,
+            leg.right ?? "",
+            leg.strike ?? "",
+            leg.expiry ?? "",
+        ].join("|");
+        const idSeed = leg.conId != null ? String(leg.conId) : fallbackId || display.label;
 
         return {
-            id: `leg:${leg.conId ?? leg.symbol}`,
+            id: `leg:${idSeed}`,
             conId: leg.conId ?? null,
-            symbol: leg.symbol,
+            symbol: symbol,
             label: display.label,
             shortUnderlying: display.shortUnderlying ?? null,
             quantity: leg.qty,

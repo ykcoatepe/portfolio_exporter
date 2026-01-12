@@ -118,6 +118,21 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 ### 2026-01-07 • Task: PSD snapshot timestamp normalize • Branch: feature/fix-psd-live-data
 **Owner:** session/ai | **Scope:** normalize /state ts for options as_of in web hook
 
+### 2026-01-12 • Task: MSB config knobs + IB datasource + edge-case tests • Branch: local
+**Owner:** codex
+
+**Scope:** MSBConfig defaults, calendar/ffill policy, Rule B raw deltas w/ clip guard, IBKR VX/SPX refresh with fallback, msb_refresh CLI, scheduler auto-refresh, new unit tests, docs/msb.md refresh.
+
+**Key files:** src/psd/analytics/msb.py, src/psd/datasources/msb_vendor.py, src/psd/sentinel/sched.py, scripts/msb_compute.py, scripts/msb_refresh.py, tests/test_msb_compute.py, tests/test_msb_vendor_refresh.py, docs/manual.md, docs/msb.md
+
+**Interfaces:** MSB compute CLI, MSB analytics
+
+**Status:** open
+
+**Next:** run make lint && make test; confirm calibration golden expectations.
+
+**Notes:** legacy behavior available via MSBConfig.legacy() or CLI flags.
+
 **Interfaces:** /state
 
 **Status:** open
@@ -200,3 +215,27 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** src/psd/ingestor/normalize.py
 **Status:** open
 **Notes:** restored pnl_leg/prev_close/value fallback order; web unit tests currently failing (PSD tab order, PsdDataGrid selection test timeout); per user request, tests not rerun
+
+### 2026-01-12 • Task: Fix PSD options singles symbol sorting freeze • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** make options singles sort key safe + label-based
+**Interfaces:** apps/web
+**Status:** open
+**Notes:** symbol header now sorts on label/symbol fallback; option-legs sorting state moved into grid to avoid full-page rerenders
+
+### 2026-01-12 • Task: Stabilize PSD options singles sorting • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** bypass TanStack sorting for option legs and apply manual sorting
+**Interfaces:** apps/web
+**Status:** open
+**Notes:** options singles grid now pre-sorts data for supported columns and uses manual sorting to avoid UI lockups
+
+### 2026-01-12 • Task: Harden PSD options singles row identity • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** ensure unique option-leg row IDs and prevent sorting auto-reset loops
+**Interfaces:** apps/web
+**Status:** open
+**Notes:** option leg ids now include expiry/right/strike fallback to avoid duplicate row IDs
+
+### 2026-01-12 • Task: Stabilize PSD options singles sorting state • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** avoid controlled sorting loops by using internal table state and stable empty filters
+**Interfaces:** apps/web
+**Status:** open
+**Notes:** options grid now relies on internal sorting state; default column filter array is stable per table FAQ guidance
