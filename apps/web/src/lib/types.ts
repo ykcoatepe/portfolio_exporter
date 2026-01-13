@@ -19,6 +19,53 @@ export interface MsbReading {
   cooldown_until: string | null;
 }
 
+export interface MsbStatus {
+  status: string;
+  refreshed_at: string | null;
+  last_date: string | null;
+  detail?: string | null;
+}
+
+export interface MsbHelpSection {
+  title: string;
+  bullets: string[];
+}
+
+export interface MsbHelpTerm {
+  key: string;
+  title: string;
+  body?: string | null;
+  bullets?: string[] | null;
+}
+
+export interface MsbSignalsHelp {
+  title: string;
+  subtitle?: string | null;
+  sections: MsbHelpSection[];
+  terms?: MsbHelpTerm[] | null;
+  footnotes?: string[] | null;
+}
+
+export interface PowerlawHelpSection {
+  title: string;
+  bullets: string[];
+}
+
+export interface PowerlawHelpTerm {
+  key: string;
+  title: string;
+  body?: string | null;
+  bullets?: string[] | null;
+}
+
+export interface PowerlawSignalsHelp {
+  title: string;
+  subtitle?: string | null;
+  sections: PowerlawHelpSection[];
+  terms?: PowerlawHelpTerm[] | null;
+  footnotes?: string[] | null;
+}
+
 export interface StockPositionApi {
   symbol: string;
   quantity: number;
@@ -591,6 +638,36 @@ export type PSDPositionsView = {
   single_options: PSDLeg[];
 };
 
+export type PowerlawSnapshot = {
+  as_of?: string | null;
+  stale?: boolean;
+  stale_reason?: string | null;
+  refresh?: {
+    enabled?: boolean;
+    status?: string;
+    last_attempt?: string | null;
+    last_error?: string | null;
+  };
+  data_quality?: string | null;
+  data_quality_detail?: string[] | null;
+  plke?: number | null;
+  plke_band_alpha?: string | null;
+  risk_state?: string | null;
+  vol_bucket?: string | null;
+  vutil_used?: number | null;
+  vutil_source?: string | null;
+  vix_spot?: number | null;
+  vvix_spot?: number | null;
+  vx_backwardation?: boolean | null;
+  equity_weights?: Record<string, number>;
+  hedge_notional?: Record<string, number>;
+  small_cap?: {
+    theta_pct_nav?: number | null;
+    can_open_new_trades?: boolean | null;
+    plke_band?: string | null;
+  };
+};
+
 export type PSDSnapshot = {
   ts?: number | null;
   session: "RTH" | "EXT" | "CLOSED";
@@ -603,5 +680,6 @@ export type PSDSnapshot = {
   positions_view?: PSDPositionsView;
   quotes?: Record<string, unknown>;
   risk?: Record<string, unknown>;
+  powerlaw?: PowerlawSnapshot;
   [key: string]: unknown;
 };

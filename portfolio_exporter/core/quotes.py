@@ -5,7 +5,9 @@ This keeps a single source of truth for snapshot behavior, including
 retry/fallback logic and proxy mappings.
 """
 
+import math
 from collections.abc import Callable, Sequence
+from typing import Any
 
 
 def snapshot(tickers: Sequence[str]) -> dict[str, float]:
@@ -41,6 +43,41 @@ def snapshot(tickers: Sequence[str]) -> dict[str, float]:
         str(sym): float(val) if val is not None else float("nan")
         for sym, val in zip(df["symbol"], df["price"], strict=True)
     }
+
+
+def _coerce_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def snapshot_detail(
+    tickers: Sequence[str],
+) -> dict[str, dict[str, float | None | str]]:
+    """Fetch snapshot quotes and include previous close when available."""
+    from portfolio_exporter.scripts.live_feed import _snapshot_quotes
+
+    df = _snapshot_quotes(list(tickers), fmt="csv")
+    if df is None or df.empty:
+        return {}
+
+    details: dict[str, dict[str, float | None | str]] = {}
+    for _, row in df.iterrows():
+        symbol = str(row.get("symbol", "")).strip()
+        if not symbol:
+            continue
+        price = _coerce_float(row.get("price"))
+        prev_close = _coerce_float(row.get("prev_close"))
+        source_raw = row.get("source")
+        source = source_raw.strip() if isinstance(source_raw, str) else None
+        details[symbol] = {
+            "price": price,
+            "previous_close": prev_close,
+            "source": source,
+        }
+    return details
 
 
 # Placeholders for test monkeypatching compatibility.

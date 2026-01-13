@@ -4,17 +4,22 @@ import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import MSBMiniCharts from "./MSBMiniCharts";
 import type { MsbReading } from "../lib/types";
 import { useMsbHistory } from "../hooks/useMsbHistory";
+import { useMsbSignalsHelp } from "../hooks/useMsbSignalsHelp";
 
 vi.mock("../hooks/useMsbHistory", () => ({
   useMsbHistory: vi.fn(),
 }));
+vi.mock("../hooks/useMsbSignalsHelp", () => ({
+  useMsbSignalsHelp: vi.fn(),
+}));
 
 const mockedUseMsbHistory = vi.mocked(useMsbHistory);
+const mockedUseMsbSignalsHelp = vi.mocked(useMsbSignalsHelp);
 
 class ResizeObserverMock {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
+  observe(): void { }
+  unobserve(): void { }
+  disconnect(): void { }
 }
 
 beforeAll(() => {
@@ -46,6 +51,16 @@ const makeHistory = (): MsbReading[] =>
 beforeEach(() => {
   mockedUseMsbHistory.mockReturnValue({
     data: makeHistory(),
+    isLoading: false,
+    error: null,
+  } as never);
+  mockedUseMsbSignalsHelp.mockReturnValue({
+    data: {
+      title: "MSB Signals Guide",
+      subtitle: "Mini charts help",
+      sections: [{ title: "HY-OAS", bullets: ["Sample bullet."] }],
+      footnotes: [],
+    },
     isLoading: false,
     error: null,
   } as never);

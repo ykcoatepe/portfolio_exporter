@@ -8,10 +8,11 @@ import os
 import threading
 import time
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
+from portfolio_exporter.psd_powerlaw import load_powerlaw_snapshot
 from psd.core.mark_router import Session
 from psd.ingestor.normalize import split_positions
 
@@ -46,6 +47,68 @@ def _coerce_int(value: Any) -> int:
     return int(number) if number is not None else 0
 
 
+def _extract_mark_value(value: Any) -> float | None:
+    if isinstance(value, dict):
+        for key in ("price", "mark", "last", "value"):
+            candidate = _coerce_float(value.get(key))
+            if candidate is not None:
+                return candidate
+        return None
+    return _coerce_float(value)
+
+
+def _is_equity_position(row: dict[str, Any]) -> bool:
+    sec = (
+        row.get("secType") or row.get("asset_class") or row.get("instrument_type") or ""
+    )
+    sec_norm = str(sec).strip().upper()
+    return sec_norm not in {"OPT", "FOP", "FUT", "BAG"}
+
+
+def _apply_marks_to_positions(
+    positions: list[dict[str, Any]],
+    marks: dict[str, Any],
+) -> None:
+    for row in positions:
+        if not isinstance(row, dict):
+            continue
+        if not _is_equity_position(row):
+            continue
+        symbol = str(row.get("symbol", "")).strip()
+        if not symbol:
+            continue
+        mark_entry = marks.get(symbol)
+        if mark_entry is None:
+            continue
+        mark_value = _extract_mark_value(mark_entry)
+        has_mark = (
+            _coerce_float(
+                row.get("mark")
+                or row.get("price")
+                or row.get("lastPrice")
+                or row.get("marketPrice")
+            )
+            is not None
+        )
+        if mark_value is not None and not has_mark:
+            row["mark"] = mark_value
+            if row.get("mark_source") in (None, ""):
+                source = (
+                    mark_entry.get("source") if isinstance(mark_entry, dict) else None
+                )
+                row["mark_source"] = source or "LAST"
+            if row.get("price_source") in (None, "") and row.get("mark_source"):
+                row["price_source"] = str(row["mark_source"]).lower()
+        if isinstance(mark_entry, dict):
+            prev_close = _coerce_float(
+                mark_entry.get("previous_close")
+                or mark_entry.get("prev_close")
+                or mark_entry.get("previousClose")
+            )
+            if prev_close is not None and row.get("previous_close") in (None, ""):
+                row["previous_close"] = prev_close
+
+
 def _get_positions_engine_state() -> Any | None:
     global _ENGINE_STATE_CACHE
     if _ENGINE_STATE_CACHE is not _UNSET:
@@ -78,6 +141,40 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
     if state is None:
         return _empty_positions_view()
 
+    def _first_float(record: dict[str, Any], *keys: str) -> float | None:
+        for key in keys:
+            if key not in record:
+                continue
+            value = _coerce_float(record.get(key))
+            if value is not None:
+                return value
+        return None
+
+    def _compute_percent(amount: float | None, basis: float | None) -> float | None:
+        if amount is None or basis is None:
+            return None
+        if not math.isfinite(amount) or not math.isfinite(basis):
+            return None
+        denominator = abs(basis)
+        if denominator == 0:
+            return None
+        return (amount / denominator) * 100
+
+    def _position_multiplier(record: dict[str, Any]) -> float:
+        mult = _first_float(record, "multiplier", "contract_multiplier", "mult")
+        if mult is not None and math.isfinite(mult) and mult != 0:
+            return abs(mult)
+        sec = (
+            record.get("secType")
+            or record.get("asset_class")
+            or record.get("instrument_type")
+            or ""
+        )
+        sec_norm = str(sec).strip().upper()
+        if sec_norm in {"OPT", "FOP"}:
+            return 100.0
+        return 1.0
+
     try:
         stocks_iter = state.stocks()  # type: ignore[attr-defined]
     except AttributeError:
@@ -96,21 +193,53 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
             str(record.get("symbol") or record.get("underlying") or "").strip() or "?"
         )
         qty = _coerce_float(record.get("qty") or record.get("quantity")) or 0.0
-        mark = _coerce_float(record.get("mark") or record.get("mid"))
+        mark_raw = _coerce_float(record.get("mark") or record.get("mid"))
+        mark = mark_raw
         avg_cost = _coerce_float(record.get("avg_cost") or record.get("avg"))
         if mark is None and avg_cost is not None:
             mark = avg_cost
-        pnl_unrealized = 0.0
-        if mark is not None and avg_cost is not None:
-            pnl_unrealized = (mark - avg_cost) * qty
+        has_mark = mark_raw is not None
+        previous_close = _first_float(
+            record, "previous_close", "prev_close", "prior_close", "previousClose"
+        )
+        day_pnl = _first_float(record, "day_pnl", "pnl_intraday", "day_pnl_amount")
+        mult = _position_multiplier(record)
+        if day_pnl is None and has_mark and previous_close is not None:
+            day_pnl = (mark - previous_close) * qty * mult
+        pnl_unrealized = _first_float(
+            record, "total_pnl", "pnl_unrealized", "total_pnl_amount"
+        )
+        if pnl_unrealized is None and mark is not None and avg_cost is not None:
+            pnl_unrealized = (mark - avg_cost) * qty * mult
+        day_pnl_percent = _first_float(record, "day_pnl_percent", "day_pnl_pct")
+        if day_pnl_percent is None and previous_close is not None:
+            day_basis = abs(qty) * previous_close * mult
+            day_pnl_percent = _compute_percent(day_pnl, day_basis)
+        total_pnl_percent = _first_float(
+            record,
+            "total_pnl_percent",
+            "pnl_unrealized_percent",
+            "pnl_unrealized_pct",
+        )
+        if total_pnl_percent is None and avg_cost is not None:
+            total_basis = abs(qty) * avg_cost * mult
+            total_pnl_percent = _compute_percent(pnl_unrealized, total_basis)
         stocks_view.append(
             {
                 "symbol": symbol,
                 "qty": qty,
                 "mark": mark if mark is not None else 0.0,
                 "avg_cost": avg_cost,
+                "previous_close": previous_close,
+                "day_pnl": day_pnl,
+                "pnl_intraday": day_pnl,
+                "day_pnl_percent": day_pnl_percent,
+                "day_pnl_pct": day_pnl_percent,
                 "pnl_unrealized": pnl_unrealized,
-                "pnl_intraday": pnl_unrealized,
+                "total_pnl": pnl_unrealized,
+                "total_pnl_percent": total_pnl_percent,
+                "pnl_unrealized_percent": total_pnl_percent,
+                "pnl_unrealized_pct": total_pnl_percent,
                 "greeks": {"delta": 0.0, "gamma": 0.0, "theta": 0.0},
                 "mark_source": record.get("mark_source"),
                 "stale_seconds": _coerce_int(record.get("stale_seconds")),
@@ -163,9 +292,9 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
 
         greeks_payload = combo.get("sum_greeks") or combo.get("greeks") or {}
         greeks = greeks_payload if isinstance(greeks_payload, dict) else {}
-        pnl_combo = (
-            _coerce_float(combo.get("total_pnl_amount") or combo.get("day_pnl_amount"))
-            or 0.0
+        pnl_day = _first_float(combo, "day_pnl_amount", "day_pnl", "pnl_intraday")
+        pnl_total = _first_float(
+            combo, "total_pnl_amount", "total_pnl", "pnl_unrealized"
         )
         combos_view.append(
             {
@@ -175,8 +304,19 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
                 "dte": combo.get("dte"),
                 "net_price": combo.get("net_price"),
                 "greeks": greeks,
-                "pnl_unrealized": pnl_combo,
-                "pnl_intraday": pnl_combo,
+                "pnl_unrealized": pnl_total,
+                "pnl_intraday": pnl_day,
+                "day_pnl": pnl_day,
+                "total_pnl": pnl_total,
+                "day_pnl_percent": _first_float(
+                    combo, "day_pnl_percent", "day_pnl_pct"
+                ),
+                "total_pnl_percent": _first_float(
+                    combo,
+                    "total_pnl_percent",
+                    "pnl_unrealized_percent",
+                    "pnl_unrealized_pct",
+                ),
                 "legs": legs,
             }
         )
@@ -184,10 +324,8 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
     for leg in options_payload.get("legs", []) or []:
         if not isinstance(leg, dict):
             continue
-        pnl_leg = (
-            _coerce_float(leg.get("total_pnl_amount") or leg.get("day_pnl_amount"))
-            or 0.0
-        )
+        pnl_day = _first_float(leg, "day_pnl_amount", "day_pnl", "pnl_intraday")
+        pnl_total = _first_float(leg, "total_pnl_amount", "total_pnl", "pnl_unrealized")
         legs_view.append(
             {
                 "symbol": leg.get("symbol") or leg.get("underlying"),
@@ -201,8 +339,17 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
                     "delta": _coerce_float(leg.get("delta")) or 0.0,
                     "theta": _coerce_float(leg.get("theta")) or 0.0,
                 },
-                "pnl_unrealized": pnl_leg,
-                "pnl_intraday": pnl_leg,
+                "pnl_unrealized": pnl_total,
+                "pnl_intraday": pnl_day,
+                "day_pnl": pnl_day,
+                "total_pnl": pnl_total,
+                "day_pnl_percent": _first_float(leg, "day_pnl_percent", "day_pnl_pct"),
+                "total_pnl_percent": _first_float(
+                    leg,
+                    "total_pnl_percent",
+                    "pnl_unrealized_percent",
+                    "pnl_unrealized_pct",
+                ),
                 "mark_source": leg.get("mark_source"),
                 "stale_seconds": _coerce_int(leg.get("stale_seconds")),
             }
@@ -244,6 +391,34 @@ def _resolve_session() -> Session:
     return _infer_session_from_clock()
 
 
+def _build_session_info(session_state: Session) -> dict[str, Any]:
+    """Build a full session info dict for the snapshot payload."""
+    now = datetime.now(UTC)
+    tz_str = "America/New_York"
+    tz = ZoneInfo(tz_str)
+    local_now = now.astimezone(tz)
+    
+    # Calculate RTH window for today
+    rth_open = local_now.replace(hour=9, minute=30, second=0, microsecond=0)
+    rth_close = local_now.replace(hour=16, minute=0, second=0, microsecond=0)
+    
+    override = os.getenv("PSD_SESSION", "").strip().upper()
+    source = "env" if override in _ALLOWED_SESSIONS else "clock"
+    
+    # Frontend expects ETH (Extended Trading Hours), not EXT
+    state_for_frontend = "ETH" if session_state == "EXT" else session_state
+    
+    return {
+        "exchange": "NYSE",
+        "tz": tz_str,
+        "state": state_for_frontend,
+        "as_of": now.isoformat(),
+        "rth_open": rth_open.isoformat() if session_state != "CLOSED" else None,
+        "rth_close": rth_close.isoformat() if session_state != "CLOSED" else None,
+        "source": source,
+    }
+
+
 async def load_positions() -> list[dict[str, Any]]:
     """Fetch the latest positions using the portfolio exporter data layer."""
 
@@ -269,7 +444,7 @@ def _normalize_positions(df: Any, pd_module: Any) -> list[dict[str, Any]]:
         return []
 
 
-async def get_marks(positions: Iterable[dict[str, Any]]) -> dict[str, float]:
+async def get_marks(positions: Iterable[dict[str, Any]]) -> dict[str, Any]:
     """Return mark prices for all symbols using the resilient quotes helper."""
     symbols = sorted(
         {str(row.get("symbol", "")).strip() for row in positions if row.get("symbol")}
@@ -279,6 +454,9 @@ async def get_marks(positions: Iterable[dict[str, Any]]) -> dict[str, float]:
     try:
         from portfolio_exporter.core import quotes
 
+        details = await asyncio.to_thread(quotes.snapshot_detail, symbols)
+        if isinstance(details, dict) and details:
+            return details
         return await asyncio.to_thread(quotes.snapshot, symbols)
     except Exception as exc:  # pragma: no cover - defensive fallback
         logger.warning("get_marks fallback: %s", exc)
@@ -287,7 +465,7 @@ async def get_marks(positions: Iterable[dict[str, Any]]) -> dict[str, float]:
 
 async def compute_greeks(
     positions: Iterable[dict[str, Any]],
-    marks: dict[str, float],
+    marks: dict[str, Any],
 ) -> dict[str, float]:
     """Aggregate greek exposures from the provided positions."""
     totals = {"delta": 0.0, "gamma": 0.0, "vega": 0.0, "theta": 0.0}
@@ -386,6 +564,51 @@ async def snapshot_once() -> dict[str, Any]:
     except Exception as exc:
         logger.warning("snapshot marks failed: %s", exc)
         marks = {}
+    if not isinstance(marks, dict):
+        marks = {}
+    _apply_marks_to_positions(positions, marks)
+    if positions:
+        missing_symbols = []
+        for row in positions:
+            if not isinstance(row, dict):
+                continue
+            if not _is_equity_position(row):
+                continue
+            symbol = str(row.get("symbol", "")).strip()
+            if not symbol:
+                continue
+            if (
+                _coerce_float(
+                    row.get("mark")
+                    or row.get("price")
+                    or row.get("lastPrice")
+                    or row.get("marketPrice")
+                )
+                is not None
+            ):
+                continue
+            if _extract_mark_value(marks.get(symbol)) is None:
+                missing_symbols.append(symbol)
+        if missing_symbols:
+            try:
+                from psd.datasources.yfin import fill_equity_marks_from_yf
+
+                yf_marks = fill_equity_marks_from_yf(missing_symbols)
+                if isinstance(yf_marks, dict):
+                    for sym, val in yf_marks.items():
+                        if val is None:
+                            continue
+                        existing = marks.get(sym)
+                        if isinstance(existing, dict):
+                            if _extract_mark_value(existing) is None:
+                                existing["price"] = val
+                                if existing.get("source") in (None, ""):
+                                    existing["source"] = "YF"
+                        else:
+                            marks[sym] = val
+                    _apply_marks_to_positions(positions, marks)
+            except Exception as exc:  # pragma: no cover - best effort
+                logger.warning("snapshot Yahoo mark fallback failed: %s", exc)
     try:
         greeks = await compute_greeks(positions, marks)
     except Exception as exc:
@@ -417,11 +640,22 @@ async def snapshot_once() -> dict[str, Any]:
             logger.debug("positions_view populated from engine fallback")
             positions_view = fallback_view
 
-    return {
+    powerlaw = None
+    try:
+        powerlaw = load_powerlaw_snapshot()
+    except Exception as exc:
+        logger.warning("snapshot powerlaw failed: %s", exc)
+
+    payload = {
         "ts": ts,
         "session": session,
+        "session_info": _build_session_info(session),
+        "data_source": "ibkr",
         "positions": positions,
         "positions_view": positions_view,
         "quotes": marks,
         "risk": risk,
     }
+    if powerlaw is not None:
+        payload["powerlaw"] = powerlaw
+    return payload

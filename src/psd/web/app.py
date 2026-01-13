@@ -3,17 +3,25 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from prometheus_client import Counter, Gauge
+from prometheus_client import REGISTRY, Counter, Gauge
+from prometheus_client.metrics import MetricWrapperBase
 from pydantic import BaseModel, ConfigDict
 from starlette.middleware.cors import CORSMiddleware
 
+from portfolio_exporter.psd_powerlaw import (
+    load_powerlaw_snapshot,
+    request_powerlaw_refresh,
+)
 from psd.analytics.stats import compute_stats
 from psd.core.store import (
     init,
@@ -25,7 +33,11 @@ from psd.core.store import (
     tail_events,
 )
 from psd.ingestor.normalize import split_positions
-from psd.sentinel.sched import start_msb_scheduler, stop_msb_scheduler
+from psd.sentinel.sched import (
+    run_msb_scheduler_once,
+    start_msb_scheduler,
+    stop_msb_scheduler,
+)
 from psd.ui.exporters import export_snapshot
 from psd.web.config import Settings, get_settings
 from psd.web.ready import router as ready_router
@@ -42,13 +54,38 @@ log = logging.getLogger("psd.web.stats")
 STALE_ALERT_THRESHOLD = 10
 _DEFAULT_STATS_EMPTY = compute_stats(None)
 
-STREAM_CLIENTS = Gauge("psd_stream_clients", "Connected SSE clients")
-STREAM_EVENTS = Counter("psd_stream_events_total", "SSE events sent", ["kind"])
-STATS_STARTUP_BROADCASTS = Counter(
+
+def _get_or_create_metric(
+    factory: type[MetricWrapperBase],
+    name: str,
+    documentation: str,
+    *args: Any,
+    **kwargs: Any,
+) -> MetricWrapperBase:
+    try:
+        return factory(name, documentation, *args, **kwargs)
+    except ValueError as exc:
+        if "Duplicated timeseries" not in str(exc):
+            raise
+        existing = REGISTRY._names_to_collectors.get(name)  # type: ignore[attr-defined]
+        if existing is None:
+            raise
+        return existing
+
+
+STREAM_CLIENTS = _get_or_create_metric(
+    Gauge, "psd_stream_clients", "Connected SSE clients"
+)
+STREAM_EVENTS = _get_or_create_metric(
+    Counter, "psd_stream_events_total", "SSE events sent", ["kind"]
+)
+STATS_STARTUP_BROADCASTS = _get_or_create_metric(
+    Counter,
     "psd_stats_startup_broadcasts_total",
     "Initial stats broadcasts emitted during application startup",
 )
-STATS_BROADCASTS = Counter(
+STATS_BROADCASTS = _get_or_create_metric(
+    Counter,
     "psd_stats_broadcasts_total",
     "Portfolio stats SSE broadcasts emitted",
     ["trigger"],
@@ -84,6 +121,420 @@ class MsbDTO(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class MsbRefreshDTO(BaseModel):
+    ok: bool
+    status: str
+    detail: str | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class MsbStatusDTO(BaseModel):
+    status: str
+    refreshed_at: str | None = None
+    last_date: str | None = None
+    detail: str | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class MsbHelpSectionDTO(BaseModel):
+    """MSB help section payload."""
+
+    title: str
+    bullets: list[str]
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class MsbHelpTermDTO(BaseModel):
+    """MSB help term definition for stat tooltips."""
+
+    key: str
+    title: str
+    body: str | None = None
+    bullets: list[str] | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class MsbHelpDTO(BaseModel):
+    """MSB help payload for the dashboard tooltip."""
+
+    title: str
+    subtitle: str | None = None
+    sections: list[MsbHelpSectionDTO]
+    terms: list[MsbHelpTermDTO] | None = None
+    footnotes: list[str] | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PowerlawHelpSectionDTO(BaseModel):
+    """Powerlaw help section definition."""
+
+    title: str
+    bullets: list[str]
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PowerlawHelpTermDTO(BaseModel):
+    """Powerlaw help term definition for stat tooltips."""
+
+    key: str
+    title: str
+    body: str | None = None
+    bullets: list[str] | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PowerlawHelpDTO(BaseModel):
+    """Powerlaw help payload for the dashboard tooltip."""
+
+    title: str
+    subtitle: str | None = None
+    sections: list[PowerlawHelpSectionDTO]
+    terms: list[PowerlawHelpTermDTO] | None = None
+    footnotes: list[str] | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+_MSB_TRIGGER_LABELS = {
+    "A": "RULE_A_VIX_BACKWARDATION",
+    "B": "RULE_B_HY_SHOCK",
+    "C": "RULE_C_MSB_60x3D",
+}
+
+
+def _normalize_msb_payload(record: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(record)
+    triggers = payload.get("triggers")
+    if isinstance(triggers, list):
+        mapped: list[str] = []
+        for item in triggers:
+            if not isinstance(item, str):
+                continue
+            key = item.strip().upper()
+            mapped.append(_MSB_TRIGGER_LABELS.get(key, item))
+        payload["triggers"] = mapped
+    return payload
+
+
+_DEFAULT_MSB_HELP: dict[str, Any] = {
+    "title": "MSB Signals Guide",
+    "subtitle": "How to read HY-OAS and VX1/VX2 charts",
+    "sections": [
+        {
+            "title": "HY-OAS (credit stress)",
+            "bullets": [
+                "Represents the option-adjusted spread for high yield credit.",
+                "Rising HY-OAS signals widening credit spreads and stress.",
+                "Watch for sharp 1D and 5D jumps (Rule B thresholds: +0.25 / +0.60).",
+                "Falling or stable HY-OAS suggests easing credit conditions.",
+            ],
+        },
+        {
+            "title": "VX1/VX2 ratio (vol term structure)",
+            "bullets": [
+                "VX1 is front month VIX (or VIX index) and VX2 is next month or VIX3M.",
+                "Ratio > 1.0 implies backwardation (near-term stress).",
+                "Sustained > 1.05 or rising slope often precedes equity drawdowns.",
+                "Rule A: backwardation plus negative SPX return triggers escalation.",
+            ],
+        },
+        {
+            "title": "Market Stress Barometer terms",
+            "bullets": [
+                "Stress = HY Score + VIX Score (0–100). Color bands: <30 green, 30–49 yellow, 50–69 orange, ≥70 red.",
+                "HY Score (0–50) scales the HY-OAS level vs history; higher means wider credit spreads.",
+                "VIX Score (0–50) tracks VIX term structure and calendar spread magnitude; higher means near-term vol stress.",
+                "Term Ratio = (VX1 / VX2) − 1. Positive = backwardation, negative = contango.",
+                "Cal Spread % = (VX1 − VX2) / VX2, same idea as term ratio but shown as a percent.",
+            ],
+        },
+    ],
+    "terms": [
+        {
+            "key": "hy",
+            "title": "HY Score",
+            "body": "Scaled measure of HY-OAS stress (0–50). Higher = wider credit spreads.",
+            "bullets": [
+                "Uses HY-OAS levels vs historical bands.",
+                "Sharp daily/weekly widening lifts the score quickly.",
+            ],
+        },
+        {
+            "key": "vix",
+            "title": "VIX Score",
+            "body": "Scaled measure of volatility stress (0–50). Higher = near-term vol pressure.",
+            "bullets": [
+                "Combines calendar spread and term structure signals.",
+                "Saturation adds extra points when VX1 is elevated.",
+            ],
+        },
+        {
+            "key": "term",
+            "title": "Term Ratio",
+            "body": "Defined as (VX1 / VX2) − 1. Positive means backwardation.",
+            "bullets": [
+                "Positive = short-term vol higher than longer-term (stress).",
+                "Negative = contango (calmer conditions).",
+            ],
+        },
+        {
+            "key": "cal",
+            "title": "Cal Spread %",
+            "body": "Defined as (VX1 − VX2) / VX2. A percent view of the term spread.",
+            "bullets": [
+                "Large positive values suggest near-term stress.",
+                "Negative values indicate contango.",
+            ],
+        },
+    ],
+    "footnotes": [
+        "Rule B uses HY-OAS delta in index points (approx 25 bps in 1D or 60 bps in 5D).",
+        "Rule A requires VX1 > VX2 and SPX return < 0 on the same day.",
+    ],
+}
+
+
+_DEFAULT_POWERLAW_HELP: dict[str, Any] = {
+    "title": "Powerlaw Signals Guide",
+    "subtitle": "How to read PLKE, risk state, and sleeve controls",
+    "sections": [
+        {
+            "title": "What this panel summarizes",
+            "bullets": [
+                "Daily snapshot after market close from the TRADER v5 pipeline.",
+                "PLKE shows market criticality and its regime band.",
+                "Risk State gates equity exposure and hedge sizing.",
+                "Equity weights and hedge notional are target sleeve settings.",
+                "Small-cap overlay shows theta target and whether new trades are allowed.",
+            ],
+        },
+        {
+            "title": "PLKE bands (Extremistan)",
+            "bullets": [
+                "PLKE is a 0-100 criticality index built from tail, clustering, and acceleration signals.",
+                "Operational bands: Calm <30, Heating 30-60, Critical 60-80, Dragon >=80.",
+                "Higher bands scale down equity exposure and tighten vega caps.",
+            ],
+        },
+        {
+            "title": "Risk State + V/VIX",
+            "bullets": [
+                "Risk State is ON, NEUTRAL, or OFF using VIX, VX term structure, and PLKE overlay.",
+                "OFF is a hard risk-off gate; equity weights are reduced and small-cap theta goes to zero.",
+                "Backwardation (VX1 > VX2) can be required for OFF depending on config.",
+            ],
+        },
+        {
+            "title": "Small-cap income overlay",
+            "bullets": [
+                "Theta target is the small-cap income budget as percent of NAV.",
+                "New trades are blocked in Critical/Dragon or when Risk State is OFF.",
+                "Heating band can block new trades if V/VIX utilization is above the cap.",
+            ],
+        },
+        {
+            "title": "Data quality",
+            "bullets": [
+                "OK means inputs are fresh; WARN means stale or missing inputs.",
+                "Details list which symbols or data series are stale.",
+                "Treat WARN snapshots as informational until data is refreshed.",
+            ],
+        },
+    ],
+    "terms": [
+        {
+            "key": "plke",
+            "title": "PLKE (market criticality)",
+            "body": "PLKE is a 0-100 measure of market stress; higher values mean higher tail risk.",
+            "bullets": [
+                "Bands: Calm <30, Heating 30-60, Critical 60-80, Dragon >=80.",
+                "Band scales equity exposure and vega caps.",
+            ],
+        },
+        {
+            "key": "risk_state",
+            "title": "Risk State",
+            "body": "ON, NEUTRAL, or OFF regime derived from VIX, VX1/VX2, and PLKE overlay.",
+            "bullets": [
+                "OFF is a hard risk-off state; equity exposure is reduced.",
+                "PLKE Critical/Dragon prevents upgrades to ON.",
+            ],
+        },
+        {
+            "key": "vutil_used",
+            "title": "V/VIX Utilization",
+            "body": "Active utilization used for gating and hedge sizing (real if available, else budget).",
+            "bullets": [
+                "Bucketed into LOW / MED / HIGH for quick read.",
+                "Higher utilization tightens small-cap gating in Heating band.",
+            ],
+        },
+        {
+            "key": "vix_vvix",
+            "title": "VIX / VVIX",
+            "body": "Spot VIX and VVIX values used by the risk state and vega caps.",
+            "bullets": [
+                "Backwardation = VX1 > VX2 when VX futures are available.",
+                "High VVIX can reduce vega caps.",
+            ],
+        },
+        {
+            "key": "equity_weights",
+            "title": "Equity Weights",
+            "body": "Target sleeve weights for SPY/QQQ/IWM after PLKE and risk overlays.",
+            "bullets": [
+                "Used to size core equity exposure.",
+                "Scaled down further in OFF state.",
+            ],
+        },
+        {
+            "key": "hedge_notional",
+            "title": "Hedge Notional",
+            "body": "Target hedge sizing (notional fractions) for tail risk protection.",
+            "bullets": [
+                "Examples include SPX put spreads or VIX hedges.",
+                "Sized from PLKE band and risk state.",
+            ],
+        },
+        {
+            "key": "small_cap_theta",
+            "title": "Small-cap Theta",
+            "body": "Target theta budget for the income overlay as percent of NAV.",
+            "bullets": [
+                "Calm: ~0.30% NAV; Heating: ~0.24%; Critical: ~0.18%; Dragon: ~0.12% or 0.",
+                "Risk State OFF sets theta to 0.",
+            ],
+        },
+        {
+            "key": "small_cap_gate",
+            "title": "Small-cap Gate",
+            "body": "Whether new small-cap trades are allowed today.",
+            "bullets": [
+                "Blocked in Risk State OFF and in Critical/Dragon bands.",
+                "Heating can block when V/VIX utilization exceeds the cap.",
+            ],
+        },
+        {
+            "key": "data_quality",
+            "title": "Data Quality",
+            "body": "Snapshot quality status based on freshness of inputs.",
+            "bullets": [
+                "OK: all required inputs are current.",
+                "WARN: one or more inputs are stale or missing (see details).",
+            ],
+        },
+    ],
+    "footnotes": [
+        "TRADER v5 snapshot is intended to run after market close using latest EOD data.",
+        "PLKE band thresholds are calibrated in notebooks and used operationally in production.",
+    ],
+}
+
+
+def _resolve_msb_help_path(path: str) -> Path:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    if candidate.exists():
+        return candidate
+    repo_root = Path(__file__).resolve().parents[3]
+    return repo_root / candidate
+
+
+def _resolve_powerlaw_repo_root() -> Path | None:
+    repo_env = os.getenv("PSD_POWERLAW_REPO", "").strip()
+    if repo_env:
+        candidate = Path(repo_env).expanduser()
+        return candidate if candidate.exists() else None
+    repo_root = Path(__file__).resolve().parents[3]
+    candidate = repo_root.parent / "codeforge-powerlaw-trader"
+    return candidate if candidate.exists() else None
+
+
+def _resolve_powerlaw_help_path(path: str) -> Path:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    if candidate.exists():
+        return candidate
+    repo_root = _resolve_powerlaw_repo_root()
+    if repo_root is not None:
+        return repo_root / path
+    repo_root = Path(__file__).resolve().parents[3]
+    return repo_root / candidate
+
+
+def _load_msb_help() -> dict[str, Any]:
+    env = os.environ
+    raw_json = env.get("PSD_MSB_SIGNALS_HELP_JSON")
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            log.warning("invalid PSD_MSB_SIGNALS_HELP_JSON; using defaults")
+    path = env.get("PSD_MSB_SIGNALS_HELP_PATH", "config/msb_signals_help.json")
+    try:
+        resolved = _resolve_msb_help_path(path)
+        data = resolved.read_text(encoding="utf-8")
+        parsed = json.loads(data)
+        if isinstance(parsed, dict):
+            return parsed
+    except FileNotFoundError:
+        return _DEFAULT_MSB_HELP
+    except Exception as exc:
+        log.warning("failed to load msb help config: %s", exc)
+    return _DEFAULT_MSB_HELP
+
+
+def _load_powerlaw_help() -> dict[str, Any]:
+    env = os.environ
+    raw_json = env.get("PSD_POWERLAW_HELP_JSON")
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            log.warning("invalid PSD_POWERLAW_HELP_JSON; using defaults")
+    path = env.get("PSD_POWERLAW_HELP_PATH", "docs/powerlaw_signals_help.json")
+    try:
+        resolved = _resolve_powerlaw_help_path(path)
+        data = resolved.read_text(encoding="utf-8")
+        parsed = json.loads(data)
+        if isinstance(parsed, dict):
+            return parsed
+    except FileNotFoundError:
+        return _DEFAULT_POWERLAW_HELP
+    except Exception as exc:
+        log.warning("failed to load powerlaw help config: %s", exc)
+    return _DEFAULT_POWERLAW_HELP
+
+
+def _set_msb_refresh_state(
+    app: FastAPI,
+    *,
+    status: str,
+    detail: str | None = None,
+) -> None:
+    record = read_msb_current()
+    last_date = record.get("date") if record else None
+    app.state.msb_refresh = {
+        "status": status,
+        "detail": detail,
+        "refreshed_at": datetime.now(UTC).isoformat(),
+        "last_date": last_date,
+    }
+
+
 def _create_lifespan(settings: Settings) -> Any:
     if settings.disable_background:
         return None
@@ -92,6 +543,28 @@ def _create_lifespan(settings: Settings) -> Any:
     async def lifespan(_app: FastAPI):
         init()
         start_msb_scheduler(_app)
+        if settings.msb_startup_refresh:
+            def _startup_refresh() -> None:
+                try:
+                    updated = run_msb_scheduler_once(
+                        _app,
+                        allow_stale=True,
+                        force_refresh=True,
+                    )
+                    _set_msb_refresh_state(
+                        _app,
+                        status="updated" if updated else "skipped",
+                        detail=None if updated else "no new data",
+                    )
+                except Exception as exc:  # pragma: no cover - depends on runtime IO
+                    log.warning("msb startup refresh failed", exc_info=True)
+                    _set_msb_refresh_state(_app, status="error", detail=str(exc))
+
+            threading.Thread(
+                target=_startup_refresh,
+                name="psd-msb-startup-refresh",
+                daemon=True,
+            ).start()
         try:
             if broadcast_latest_stats(_app, trigger="startup"):
                 STATS_STARTUP_BROADCASTS.inc()
@@ -108,17 +581,32 @@ def _create_lifespan(settings: Settings) -> Any:
 @router.get("/state")
 def state() -> JSONResponse:
     snap = latest_snapshot()
+    powerlaw = None
+    try:
+        import concurrent.futures
+
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(load_powerlaw_snapshot)
+        try:
+            powerlaw = future.result(timeout=10.0)  # 10 second timeout
+        except concurrent.futures.TimeoutError:
+            log.warning("powerlaw snapshot load timed out (10s)")
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+    except Exception as exc:
+        log.warning("powerlaw snapshot load failed: %s", exc)
     if not snap:
-        return JSONResponse(
-            {
-                "ts": None,
-                "positions": [],
-                "positions_view": _empty_positions_view(),
-                "quotes": {},
-                "risk": {},
-                "empty": True,
-            }
-        )
+        payload = {
+            "ts": None,
+            "positions": [],
+            "positions_view": _empty_positions_view(),
+            "quotes": {},
+            "risk": {},
+            "empty": True,
+        }
+        if powerlaw is not None:
+            payload["powerlaw"] = powerlaw
+        return JSONResponse(payload)
     view = snap.get("positions_view")
     if not isinstance(view, dict):
         positions = snap.get("positions")
@@ -134,7 +622,19 @@ def state() -> JSONResponse:
         else:
             view = _empty_positions_view()
         snap = {**snap, "positions_view": view}
+    if powerlaw is not None:
+        snap = {**snap, "powerlaw": powerlaw}
     return JSONResponse(snap)
+
+
+@router.post("/powerlaw/refresh", status_code=status.HTTP_200_OK)
+def powerlaw_refresh() -> JSONResponse:
+    try:
+        payload = request_powerlaw_refresh(force=True)
+    except Exception as exc:
+        log.warning("powerlaw refresh failed: %s", exc)
+        raise HTTPException(status_code=500, detail="powerlaw refresh failed") from exc
+    return JSONResponse(payload)
 
 
 @router.get("/stats")
@@ -208,6 +708,20 @@ def _build_stats_payload(now: datetime | None = None) -> dict[str, Any] | None:
     payload["staleness_sec"] = staleness
     payload["served_at"] = reference.isoformat()
     return payload
+
+
+def _snapshot_as_of_iso(snapshot: dict[str, Any]) -> str | None:
+    ts = snapshot.get("ts")
+    if isinstance(ts, (int, float)):
+        ts_float = float(ts)
+        if ts_float > 0:
+            if ts_float < 1e11:
+                ts_float *= 1000
+            try:
+                return datetime.fromtimestamp(ts_float / 1000, tz=UTC).isoformat()
+            except (OverflowError, OSError, ValueError):
+                return None
+    return None
 
 
 @router.get("/stats/current")
@@ -367,19 +881,33 @@ def msb_current() -> MsbDTO:
     record = read_msb_current()
     if not record:
         raise HTTPException(status_code=404, detail="MSB reading unavailable")
-    return MsbDTO.model_validate(record)
+    return MsbDTO.model_validate(_normalize_msb_payload(record))
 
 
 @router.get("/msb/history", response_model=list[MsbDTO])
 def msb_history(days: int = 365) -> list[MsbDTO]:
     history = read_msb_history(days)
-    return [MsbDTO.model_validate(entry) for entry in history]
+    return [MsbDTO.model_validate(_normalize_msb_payload(entry)) for entry in history]
 
 
 @router.get("/positions/combos")
 def positions_combos() -> list:
     """Return strategy combos (backwards compat stub)."""
     return []
+
+
+@router.get("/positions/options")
+def positions_options() -> dict[str, Any]:
+    """Return option combos/legs (compat stub)."""
+    snap = latest_snapshot()
+    as_of = _snapshot_as_of_iso(snap) if snap else None
+    return {
+        "as_of": as_of,
+        "combos": [],
+        "legs": [],
+        "combo_groups": [],
+        "playbook": None,
+    }
 
 
 @router.get("/positions/legs")
@@ -408,7 +936,7 @@ def rules_summary() -> dict:
 
 @router.get("/msb/history.csv")
 def msb_history_csv(days: int = 365) -> Response:
-    history = read_msb_history(days)
+    history = [_normalize_msb_payload(entry) for entry in read_msb_history(days)]
     content, media_type, filename = export_snapshot(history, fmt="csv")
     headers = {"Content-Disposition": f"attachment; filename={filename}"}
     return Response(content=content, media_type=media_type, headers=headers)
@@ -416,10 +944,57 @@ def msb_history_csv(days: int = 365) -> Response:
 
 @router.get("/msb/history.parquet")
 def msb_history_parquet(days: int = 365) -> Response:
-    history = read_msb_history(days)
+    history = [_normalize_msb_payload(entry) for entry in read_msb_history(days)]
     content, media_type, filename = export_snapshot(history, fmt="parquet")
     headers = {"Content-Disposition": f"attachment; filename={filename}"}
     return Response(content=content, media_type=media_type, headers=headers)
+
+
+@router.post("/msb/refresh", response_model=MsbRefreshDTO)
+async def msb_refresh(request: Request) -> MsbRefreshDTO:
+    try:
+        updated = await asyncio.to_thread(
+            run_msb_scheduler_once,
+            request.app,
+            allow_stale=True,
+            force_refresh=True,
+        )
+    except Exception as exc:
+        log.warning("msb refresh failed: %s", exc, exc_info=True)
+        _set_msb_refresh_state(request.app, status="error", detail=str(exc))
+        raise HTTPException(status_code=500, detail="MSB refresh failed") from exc
+    if updated:
+        _set_msb_refresh_state(request.app, status="updated", detail=None)
+        return MsbRefreshDTO(ok=True, status="updated")
+    _set_msb_refresh_state(request.app, status="skipped", detail="no new data")
+    return MsbRefreshDTO(ok=False, status="skipped", detail="no new data")
+
+
+@router.get("/msb/status", response_model=MsbStatusDTO)
+def msb_status(request: Request) -> MsbStatusDTO:
+    state = getattr(request.app.state, "msb_refresh", None)
+    record = read_msb_current()
+    last_date = record.get("date") if record else None
+    if not isinstance(state, dict):
+        return MsbStatusDTO(status="unknown", last_date=last_date)
+    return MsbStatusDTO(
+        status=str(state.get("status") or "unknown"),
+        refreshed_at=state.get("refreshed_at"),
+        last_date=state.get("last_date") or last_date,
+        detail=state.get("detail"),
+    )
+
+
+@router.get("/msb/help", response_model=MsbHelpDTO)
+def msb_help() -> MsbHelpDTO:
+    payload = _load_msb_help()
+    return MsbHelpDTO.model_validate(payload)
+
+
+@router.get("/powerlaw/help", response_model=PowerlawHelpDTO)
+def powerlaw_help() -> PowerlawHelpDTO:
+    payload = _load_powerlaw_help()
+    return PowerlawHelpDTO.model_validate(payload)
 
 
 @router.post("/msb/broadcast", status_code=status.HTTP_200_OK)
@@ -437,7 +1012,7 @@ def broadcast_latest_msb(app: FastAPI) -> bool:
     record = read_msb_current()
     if not record:
         return False
-    dto = MsbDTO.model_validate(record).model_dump(mode="json")
+    dto = MsbDTO.model_validate(_normalize_msb_payload(record)).model_dump(mode="json")
     manager.broadcast("msb.update", dto)
     try:
         broadcast_latest_stats(app, trigger="msb")
@@ -481,6 +1056,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     manager = SseManager(heartbeat_interval=resolved.sse_heartbeat_sec)
     app.state.sse = manager
     app.state.settings = resolved
+    app.state.msb_refresh = {
+        "status": "unknown",
+        "detail": None,
+        "refreshed_at": None,
+        "last_date": None,
+    }
     app.dependency_overrides[get_settings] = lambda: resolved
 
     @app.get("/sse")

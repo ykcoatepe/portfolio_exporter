@@ -4,8 +4,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import App from "./App";
 import "./index.css";
+import { setupQueryPersistence } from "./lib/queryPersistence";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5_000, // Consider data stale after 5 seconds
+      gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours
+      refetchOnMount: true, // Refetch on mount
+      refetchOnWindowFocus: false, // Don't refetch on focus
+      retry: 1,
+    },
+  },
+});
+
+// Setup query persistence to localStorage
+setupQueryPersistence(queryClient);
 
 function AppProviders(): JSX.Element {
   return (

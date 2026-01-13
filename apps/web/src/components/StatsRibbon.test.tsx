@@ -24,7 +24,7 @@ const buildSessionPayload = (
 });
 
 describe("StatsRibbon", () => {
-  test("renders stats metrics from backend", async () => {
+  test("prefers snapshot metrics for core stats", async () => {
     const now = Date.parse("2024-02-01T12:00:00Z");
     const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
 
@@ -64,11 +64,11 @@ describe("StatsRibbon", () => {
     };
 
     await waitFor(() => {
-      expect(valueFor("Day P&L")).toBe("$355.00");
+      expect(valueFor("Day P&L")).toBe("$760.80");
     });
-    expect(valueFor("Unrealized P&L")).toBe("$255.00");
-    expect(valueFor("ΣΔ")).toBe("+15.10");
-    expect(valueFor("ΣΘ / day")).toBe("-0.03");
+    expect(valueFor("Unrealized P&L")).toBe("$590.80");
+    expect(valueFor("ΣΔ")).toBe("+119.82");
+    expect(valueFor("ΣΘ / day")).toBe("-0.07");
     expect(valueFor("Net Liq")).toBe("$1,245,320.54");
     expect(valueFor("VaR 95%")).toBe("$58,320.12");
     expect(valueFor("Margin %")).toBe("37.00%");

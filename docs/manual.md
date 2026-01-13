@@ -11,8 +11,9 @@
 - Licensing: vendor CSVs are cached locally and **not** committed.
 
 **Data Hygiene.**
-- Business-day index (B). Forward-fill gaps ≤2B.
-- Winsorize HY per rolling window to [1st, 99th] percentile; log clipped counts.
+- Observed-union index by default (no synthetic holiday rows); legacy weekday mode available.
+- Forward-fill HY/VX gaps ≤2B; SPX returns are **not** forward-filled by default.
+- Winsorize HY/VX per rolling window to [1st, 99th] percentile; log clipped counts.
 - Primary window **252B**; fallback **63B** if data sparse.
 
 **Metrics.**
@@ -21,10 +22,10 @@
   - Ratio: `term_ratio = (VX1 / VX2) − 1`.
   - Calendar %: `(VX1 − VX2) / VX2`.
   - Calendar abs: `VX1 − VX2`.
-- Saturation flag: when VX1 ≥ 40, `term_ratio` ~flat (|Δ|<0.005), but abs spread ↑.
+- Saturation flag: when VX1 ≥ 40, `term_ratio` ~flat (|Δ|<0.05), but abs spread ↑.
 
 **Scoring (0–100).**
-- HY score (0–50): runtime-calibrated so `q50→25`, `q90→80`, `q99→95`; fallback linear `12*z_hy + 25`; clamp [0,50].
+- HY score (0–50): runtime-calibrated so `q50→25`, `q90→40`, `q99→50`; fallback linear `12*z_hy + 25`; clamp [0,50].
 - VIX score (0–50): max of calibrated ratio% and abs tracks; +3 if saturated; clamp [0,50].
 - MSB = HY score + VIX score (0–100).
 - Colors: 0–29 **Green**, 30–49 **Yellow**, 50–69 **Orange**, 70–100 **Red**.
@@ -33,7 +34,7 @@
 **Triggers & Actions.**
 - **Rule A — VIX Backwardation Probe.** Condition: `VX1 > VX2` **and** SPX daily return < 0.
   - Action: Stage **VIX 25/35 call spread (2–6w)**, cost **0.10–0.35% NAV**.
-- **Rule B — HY Shock.** Condition: HY-OAS **+25 bps d/d** or **+60 bps in 5B**.
+- **Rule B — HY Shock.** Condition: HY-OAS **+25 bps d/d** or **+60 bps in 5B** (raw aligned HY; bad prints clipped).
   - Action: Add downside hedge (e.g., **SPX/IWM put spread 2–4w**, cost **0.15–0.40% NAV**).
 - **Rule C — Persistent Stress.** Condition: **MSB ≥ 60** for **3 consecutive B-days**.
   - Action: Reduce equity beta **−20–40%** and increase delta hedge.
@@ -43,6 +44,7 @@
 - Schedule: **daily 17:30 TRT** via paced scheduler.
 - Persist: last row stored in SQLite `msb_readings`; history export at `/msb/history(.csv)`.
 - Live update: SSE `msb.update` to UI & tools.
+- API/SSE triggers are normalized to `RULE_*` labels (`A/B/C` remain internal).
 - Live Status Bar: append/update a hedge row with columns `Hedge | Cost % NAV | Status | Expiry | Trigger | TriggerTimeTRT | Notes`.
 
 **Operator Checklist (daily).**
@@ -53,7 +55,7 @@
 5) Export `/msb/history.csv` (attach to journal if any triggers fired).
 
 **Rollback.**
-- Disable feature with `PSD_MSB=0` (hides API/UI; scheduler stops).
+- Disable vendor refresh with `PSD_MSB_AUTO_REFRESH=0` (MSB still computes from cached CSVs).
 - Remove staged hedge rows from Live Bar if rule withdrawn.
 
 **KPIs & Gates.**

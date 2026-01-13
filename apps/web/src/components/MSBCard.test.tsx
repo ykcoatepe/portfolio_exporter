@@ -4,12 +4,22 @@ import { describe, expect, test, vi, beforeEach } from "vitest";
 import MSBCard from "./MSBCard";
 import type { MsbReading } from "../lib/types";
 import { useMsbCurrent } from "../hooks/useMsbCurrent";
+import { useMsbSignalsHelp } from "../hooks/useMsbSignalsHelp";
+import { useMsbStatus } from "../hooks/useMsbStatus";
 
 vi.mock("../hooks/useMsbCurrent", () => ({
   useMsbCurrent: vi.fn(),
 }));
+vi.mock("../hooks/useMsbSignalsHelp", () => ({
+  useMsbSignalsHelp: vi.fn(),
+}));
+vi.mock("../hooks/useMsbStatus", () => ({
+  useMsbStatus: vi.fn(),
+}));
 
 const mockedUseMsbCurrent = vi.mocked(useMsbCurrent);
+const mockedUseMsbSignalsHelp = vi.mocked(useMsbSignalsHelp);
+const mockedUseMsbStatus = vi.mocked(useMsbStatus);
 
 const sampleReading: MsbReading = {
   date: "2024-02-01",
@@ -33,6 +43,28 @@ const sampleReading: MsbReading = {
 beforeEach(() => {
   mockedUseMsbCurrent.mockReturnValue({
     data: sampleReading,
+    isLoading: false,
+    error: null,
+  } as never);
+  mockedUseMsbSignalsHelp.mockReturnValue({
+    data: {
+      title: "MSB Signals Guide",
+      subtitle: "How to read HY-OAS and VX1/VX2 charts",
+      sections: [
+        { title: "HY-OAS", bullets: ["Sample bullet."] },
+      ],
+      footnotes: [],
+    },
+    isLoading: false,
+    error: null,
+  } as never);
+  mockedUseMsbStatus.mockReturnValue({
+    data: {
+      status: "updated",
+      refreshed_at: "2024-02-01T12:00:00Z",
+      last_date: "2024-02-01",
+      detail: null,
+    },
     isLoading: false,
     error: null,
   } as never);

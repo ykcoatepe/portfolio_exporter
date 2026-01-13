@@ -1,0 +1,76 @@
+{
+  "title": "MSB Signals Guide",
+  "subtitle": "How to read HY-OAS and VX1/VX2 charts",
+  "sections": [
+    {
+      "title": "HY-OAS (credit stress)",
+      "bullets": [
+        "Represents the option-adjusted spread for high yield credit.",
+        "Rising HY-OAS signals widening credit spreads and stress.",
+        "Watch for sharp 1D and 5D jumps (Rule B thresholds: +0.25 / +0.60).",
+        "Falling or stable HY-OAS suggests easing credit conditions."
+      ]
+    },
+    {
+      "title": "VX1/VX2 ratio (vol term structure)",
+      "bullets": [
+        "VX1 is front month VIX (or VIX index) and VX2 is next month or VIX3M.",
+        "Ratio > 1.0 implies backwardation (near-term stress).",
+        "Sustained > 1.05 or rising slope often precedes equity drawdowns.",
+        "Rule A: backwardation plus negative SPX return triggers escalation."
+      ]
+    },
+    {
+      "title": "Market Stress Barometer terms",
+      "bullets": [
+        "Stress = HY Score + VIX Score (0–100). Color bands: <30 green, 30–49 yellow, 50–69 orange, ≥70 red.",
+        "HY Score (0–50) scales the HY-OAS level vs history; higher means wider credit spreads.",
+        "VIX Score (0–50) tracks VIX term structure and calendar spread magnitude; higher means near-term vol stress.",
+        "Term Ratio = (VX1 / VX2) − 1. Positive = backwardation, negative = contango.",
+        "Cal Spread % = (VX1 − VX2) / VX2, same idea as term ratio but shown as a percent."
+      ]
+    }
+  ],
+  "terms": [
+    {
+      "key": "hy",
+      "title": "HY Score",
+      "body": "Scaled measure of HY-OAS stress (0–50). Higher = wider credit spreads.",
+      "bullets": [
+        "Uses HY-OAS levels vs historical bands.",
+        "Sharp daily/weekly widening lifts the score quickly."
+      ]
+    },
+    {
+      "key": "vix",
+      "title": "VIX Score",
+      "body": "Scaled measure of volatility stress (0–50). Higher = near-term vol pressure.",
+      "bullets": [
+        "Combines calendar spread and term structure signals.",
+        "Saturation adds extra points when VX1 is elevated."
+      ]
+    },
+    {
+      "key": "term",
+      "title": "Term Ratio",
+      "body": "Defined as (VX1 / VX2) − 1. Positive means backwardation.",
+      "bullets": [
+        "Positive = short-term vol higher than longer-term (stress).",
+        "Negative = contango (calmer conditions)."
+      ]
+    },
+    {
+      "key": "cal",
+      "title": "Cal Spread %",
+      "body": "Defined as (VX1 − VX2) / VX2. A percent view of the term spread.",
+      "bullets": [
+        "Large positive values suggest near-term stress.",
+        "Negative values indicate contango."
+      ]
+    }
+  ],
+  "footnotes": [
+    "Rule B uses HY-OAS delta in index points (approx 25 bps in 1D or 60 bps in 5D).",
+    "Rule A requires VX1 > VX2 and SPX return < 0 on the same day."
+  ]
+}

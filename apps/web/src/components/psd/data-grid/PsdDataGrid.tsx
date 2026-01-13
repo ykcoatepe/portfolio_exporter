@@ -12,7 +12,13 @@
 
 import type { ReactNode, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RowData, Row, ExpandedState } from "@tanstack/react-table";
+import type {
+    RowData,
+    Row,
+    ExpandedState,
+    SortingState,
+    ColumnFiltersState,
+} from "@tanstack/react-table";
 import {
     useReactTable,
     getCoreRowModel,
@@ -42,6 +48,8 @@ function defaultGetRowId<TData>(row: TData, index: number): string {
     if (typeof r.symbol === "string") return r.symbol;
     return String(index);
 }
+
+const EMPTY_COLUMN_FILTERS: ColumnFiltersState = [];
 
 /**
  * Grid loading skeleton
@@ -119,8 +127,10 @@ export function PsdDataGrid<TData extends RowData>({
     selectedRowIds,
     onSelectedRowIdsChange,
     enableSelection = false,
-    columnFilters = [],
+    columnFilters = EMPTY_COLUMN_FILTERS,
     onColumnFiltersChange,
+    sorting,
+    onSortingChange,
     isDataStable = true,
 }: PsdDataGridProps<TData>): JSX.Element {
     // Refs
@@ -130,6 +140,40 @@ export function PsdDataGrid<TData extends RowData>({
     // Keyboard nav state
     const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
     const focusedRowIdRef = useRef<string | null>(null);
+
+    // Scroll position persistence using sessionStorage
+    // Skip in test environments to avoid interference with virtualization
+    const scrollStorageKey = `psd-scroll-${ariaLabel}`;
+    const isTestEnv = typeof globalThis !== "undefined" && (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT === true;
+
+    // Restore scroll position on mount
+    useEffect(() => {
+        if (isTestEnv) return;
+        const container = containerRef.current;
+        if (!container) return;
+
+        const savedScroll = sessionStorage.getItem(scrollStorageKey);
+        if (savedScroll) {
+            const scrollTop = parseInt(savedScroll, 10);
+            if (!isNaN(scrollTop)) {
+                container.scrollTop = scrollTop;
+            }
+        }
+    }, [scrollStorageKey, isTestEnv]);
+
+    // Save scroll position on scroll
+    useEffect(() => {
+        if (isTestEnv) return;
+        const container = containerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            sessionStorage.setItem(scrollStorageKey, String(container.scrollTop));
+        };
+
+        container.addEventListener('scroll', handleScroll, { passive: true });
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [scrollStorageKey, isTestEnv]);
 
     // Expansion state (controlled or uncontrolled)
     const [internalExpanded, setInternalExpanded] = useState<ExpandedState>({});
@@ -157,10 +201,25 @@ export function PsdDataGrid<TData extends RowData>({
         [expanded, onExpandedChange],
     );
 
+    // Sorting state (controlled or uncontrolled)
+    const [internalSorting, setInternalSorting] = useState<SortingState>([]);
+    const isSortingControlled = sorting !== undefined && typeof onSortingChange === "function";
+    const sortingState = isSortingControlled ? sorting : internalSorting;
+    const handleSortingChange = isSortingControlled ? onSortingChange : setInternalSorting;
+
     // Virtualization config
     const virtualConfig = useMemo(
         () => mergeVirtualConfig(partialVirtualConfig),
         [partialVirtualConfig],
+    );
+
+    const tableState = useMemo(
+        () => ({
+            expanded: enableExpansion ? expanded : undefined,
+            columnFilters,
+            sorting: sortingState,
+        }),
+        [enableExpansion, expanded, columnFilters, sortingState],
     );
 
     // TanStack Table instance
@@ -173,12 +232,10 @@ export function PsdDataGrid<TData extends RowData>({
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getExpandedRowModel: enableExpansion ? getExpandedRowModel() : undefined,
-        state: {
-            expanded: enableExpansion ? expanded : undefined,
-            columnFilters,
-        },
+        state: tableState,
         onExpandedChange: enableExpansion ? handleExpandedChange : undefined,
         onColumnFiltersChange,
+        onSortingChange: handleSortingChange,
     });
 
     const { rows } = table.getRowModel();
@@ -205,6 +262,11 @@ export function PsdDataGrid<TData extends RowData>({
         onSelectedRowIdsChange,
         orderedRowIds,
     });
+
+    // Store selection methods in ref to avoid infinite effect loops
+    // The effect needs to call pruneSelection/pruneAnchor but shouldn't re-run when selection changes
+    const selectionRef = useRef(selection);
+    selectionRef.current = selection;
 
     // Focus row by index
     const focusRowByIndex = useCallback(
@@ -236,9 +298,10 @@ export function PsdDataGrid<TData extends RowData>({
         }
 
         if (enableSelection) {
-            selection.pruneSelection(visibleRowIds);
+            // Use ref to avoid triggering effect when selection changes
+            selectionRef.current.pruneSelection(visibleRowIds);
             const nextActiveId = rows.length > 0 ? rows[0].id : null;
-            selection.pruneAnchor(visibleRowIds, focusedRowIdRef.current ?? nextActiveId);
+            selectionRef.current.pruneAnchor(visibleRowIds, focusedRowIdRef.current ?? nextActiveId);
         }
 
         if (rows.length === 0) {
@@ -251,7 +314,12 @@ export function PsdDataGrid<TData extends RowData>({
 
         const focusedId = focusedRowIdRef.current;
         if (!focusedId || !visibleRowIds.has(focusedId)) {
-            focusRowByIndex(0);
+            // Don't call focusRowByIndex here - it causes infinite re-renders
+            // Just reset the focus state without DOM side effects
+            if (rows.length > 0) {
+                setFocusedRowIndex(0);
+                focusedRowIdRef.current = rows[0].id;
+            }
             return;
         }
 
@@ -262,11 +330,9 @@ export function PsdDataGrid<TData extends RowData>({
     }, [
         enableSelection,
         isDataStable,
-        selection,
         visibleRowIds,
         rows,
         focusedRowIndex,
-        focusRowByIndex,
         filtersKey,
     ]);
 
@@ -494,14 +560,20 @@ export function PsdDataGrid<TData extends RowData>({
                                                 "border-b border-slate-700 px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500",
                                                 meta?.align === "right" && "text-right",
                                                 meta?.align === "center" && "text-center",
-                                                meta?.sortable && "cursor-pointer select-none hover:text-slate-300",
+                                                meta?.sortable && "cursor-pointer select-none hover:text-slate-300 hover:bg-slate-800/50 transition-colors",
                                             )}
                                             style={{
                                                 width: header.getSize(),
                                                 minWidth: meta?.minWidth,
                                                 maxWidth: meta?.maxWidth,
                                             }}
-                                            title={meta?.headerTooltip}
+                                            title={
+                                                meta?.headerTooltip
+                                                    ? meta.headerTooltip
+                                                    : meta?.sortable
+                                                        ? "Click to sort"
+                                                        : undefined
+                                            }
                                             onClick={
                                                 meta?.sortable
                                                     ? header.column.getToggleSortingHandler()
@@ -516,15 +588,21 @@ export function PsdDataGrid<TData extends RowData>({
                                                     : undefined
                                             }
                                         >
-                                            {flexRender(
-                                                header.column.columnDef.header,
-                                                header.getContext(),
-                                            )}
-                                            {header.column.getIsSorted() && (
-                                                <span className="ml-1">
-                                                    {header.column.getIsSorted() === "asc" ? "↑" : "↓"}
-                                                </span>
-                                            )}
+                                            <div className={clsx("flex items-center gap-1", meta?.align === "right" && "justify-end", meta?.align === "center" && "justify-center")}>
+                                                {flexRender(
+                                                    header.column.columnDef.header,
+                                                    header.getContext(),
+                                                )}
+                                                {meta?.sortable && (
+                                                    <span className={clsx("text-[10px]", !header.column.getIsSorted() && "opacity-30")}>
+                                                        {header.column.getIsSorted() === "asc"
+                                                            ? "↑"
+                                                            : header.column.getIsSorted() === "desc"
+                                                                ? "↓"
+                                                                : "⇅"}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </th>
                                     );
                                 })}

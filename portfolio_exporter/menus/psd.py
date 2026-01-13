@@ -13,20 +13,42 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
+from rich.console import Console
+from rich.panel import Panel
+
 # Primary: Vite dev server (modern dashboard)
 DEV_HOST, DEV_PORT = "localhost", 5173
 # Fallback: PSD backend (FastAPI)
-API_HOST, API_PORT = "127.0.0.1", 51127
+API_HOST = "127.0.0.1"
+_DEFAULT_API_PORT = 51127
 MODULE_PATH = Path(__file__).resolve()
 REPO_ROOT = MODULE_PATH.parents[2]
 WEB_ROOT = REPO_ROOT / "apps" / "web"
 DIST_INDEX = WEB_ROOT / "dist" / "index.html"
 PSD_ENV_PATH = REPO_ROOT / ".psd.env"
-_DASH_URL = f"http://{API_HOST}:{API_PORT}/psd"
-_DEV_DASH_URL = f"http://{DEV_HOST}:{DEV_PORT}/psd"
+
+
+def _api_port() -> int:
+    raw = os.getenv("PSD_PORT")
+    if not raw:
+        raw = _load_psd_env().get("PSD_PORT")
+    raw = raw or str(_DEFAULT_API_PORT)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return _DEFAULT_API_PORT
+
 
 _AUTO_STARTED = False
 _DEFAULT_STARTUP_TIMEOUT_S = 20.0
+
+
+def _dev_port() -> int:
+    raw = os.getenv("PSD_DEV_PORT", str(DEV_PORT))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEV_PORT
 
 
 def _is_dev_mode() -> bool:
@@ -40,7 +62,7 @@ def _is_dev_mode() -> bool:
     if os.getenv("PYTEST_CURRENT_TEST"):
         return False
     # Auto-detect: check if Vite is running
-    return _port_open(DEV_HOST, DEV_PORT)
+    return _port_open(DEV_HOST, _dev_port())
 
 
 def _build_uvicorn_command() -> list[str]:
@@ -53,7 +75,9 @@ def _build_uvicorn_command() -> list[str]:
         "--host",
         API_HOST,
         "--port",
-        str(API_PORT),
+        str(_api_port()),
+        "--ws",
+        "none",
     ]
 
 
@@ -161,10 +185,11 @@ def start_psd_dashboard() -> None:
     """Build the PSD web bundle if needed, ensure the API is live, and open /psd."""
 
     if not DIST_INDEX.exists():
-        subprocess.check_call(["npm", "ci"], cwd=str(WEB_ROOT))
-        subprocess.check_call(["npm", "run", "build"], cwd=str(WEB_ROOT))
+        subprocess.check_call(["bun", "install"], cwd=str(WEB_ROOT))
+        subprocess.check_call(["bun", "run", "build"], cwd=str(WEB_ROOT))
 
-    if _port_open(API_HOST, API_PORT):
+    port = _api_port()
+    if _port_open(API_HOST, port):
         _open_dash_tab()
         return
 
@@ -182,7 +207,7 @@ def start_psd_dashboard() -> None:
     timeout_s = _startup_timeout_s()
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        if _port_open(API_HOST, API_PORT):
+        if _port_open(API_HOST, port):
             break
         if proc.poll() is not None:
             raise RuntimeError(_format_start_failure(proc.returncode))
@@ -192,12 +217,12 @@ def start_psd_dashboard() -> None:
             raise RuntimeError(_format_start_failure(proc.returncode))
         raise TimeoutError(
             "Timed out waiting "
-            f"({timeout_s:.1f}s) for Portfolio Sentinel API on {API_HOST}:{API_PORT}. "
+            f"({timeout_s:.1f}s) for Portfolio Sentinel API on {API_HOST}:{port}. "
             f"Run `{_uvicorn_command_display()}` for diagnostics or set "
             "PSD_API_STARTUP_TIMEOUT_S to increase the wait."
         )
 
-    if not _port_open(API_HOST, API_PORT):
+    if not _port_open(API_HOST, port):
         raise RuntimeError(
             "Portfolio Sentinel API did not respond after startup. Check for firewall blocks or port conflicts."
         )
@@ -206,8 +231,55 @@ def start_psd_dashboard() -> None:
 
 
 def _open_dash_tab() -> None:
-    url = _DEV_DASH_URL if _is_dev_mode() else _DASH_URL
+    if _is_dev_mode():
+        url = f"http://{DEV_HOST}:{_dev_port()}/psd"
+    else:
+        url = f"http://{API_HOST}:{_api_port()}/psd"
     webbrowser.open_new_tab(url)
+
+
+def _console_from_status(status: Any) -> Console:
+    console = getattr(status, "console", None)
+    if isinstance(console, Console):
+        return console
+    return Console()
+
+
+def start_psd_fresh(status: Any, mode: str | None = None) -> None:
+    from psd.menus import ops as psd_ops
+
+    console = _console_from_status(status)
+    psd_ops.stop_psd(console, force_port_kill=True)
+    psd_ops.start_psd(console, mode=mode, open_browser=False)
+    psd_ops.open_dashboard_when_ready(console, timeout=_startup_timeout_s())
+
+
+def stop_psd_fresh(status: Any) -> None:
+    from psd.menus import ops as psd_ops
+
+    console = _console_from_status(status)
+    psd_ops.stop_psd(console, force_port_kill=True)
+
+
+def _prompt_psd_mode(console: Console) -> str | None:
+    options = [
+        "[1] User mode (built UI on backend)",
+        "[2] Dev mode (Vite UI server)",
+        "[3] Open Dashboard",
+        "[0] Back",
+    ]
+    console.print(Panel("\n".join(options), title="Portfolio Sentinel Mode"))
+    choice = console.input("Select mode: ").strip().lower()
+    if choice in {"", "1", "user"}:
+        return "user"
+    if choice in {"2", "dev", "development"}:
+        return "dev"
+    if choice in {"3", "open"}:
+        return "open"
+    if choice in {"0", "back", "exit"}:
+        return None
+    console.print("[red]Invalid selection. Choose 0-3.[/red]")
+    return None
 
 
 def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for future
@@ -215,23 +287,53 @@ def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for fu
 
     global _AUTO_STARTED
 
-    if status:
-        try:
-            status.update("Opening Portfolio Sentinel Dashboard", "cyan")
-        except Exception:  # pragma: no cover - defensive: status may not support update
-            pass
-
     try:
-        if _is_dev_mode():
-            # In dev mode, just open the Vite dev server directly
+        if status is None or os.getenv("PYTEST_CURRENT_TEST"):
+            if _is_dev_mode():
+                # In dev mode, just open the Vite dev server directly
+                _open_dash_tab()
+            elif not _AUTO_STARTED or not _port_open(API_HOST, _api_port()):
+                _AUTO_STARTED = True
+                start_psd_dashboard()
+            else:
+                _open_dash_tab()
+            return
+
+        console = _console_from_status(status)
+        mode = _prompt_psd_mode(console)
+        if mode is None:
+            return
+        if mode == "open":
             _open_dash_tab()
-        elif not _AUTO_STARTED or not _port_open(API_HOST, API_PORT):
-            _AUTO_STARTED = True
-            start_psd_dashboard()
-        else:
-            _open_dash_tab()
+            return
+        if mode == "dev":
+            os.environ["PSD_DEV_MODE"] = "1"
+        elif mode == "user":
+            os.environ["PSD_DEV_MODE"] = "0"
+        if status:
+            try:
+                status.update("Starting Portfolio Sentinel (fresh)", "cyan")
+            except Exception:  # pragma: no cover - defensive
+                pass
+        start_psd_fresh(status, mode=mode)
     except Exception as exc:  # pragma: no cover - surfaced to the user below
         _AUTO_STARTED = False
+        _notify_psd_error(status, str(exc))
+    else:
+        if status:
+            try:
+                status.update("Ready", "green")
+            except Exception:  # pragma: no cover
+                pass
+
+
+def stop(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for future
+    """Stop PSD processes (hard stop) from the main menu."""
+    try:
+        if status:
+            status.update("Stopping Portfolio Sentinel", "yellow")
+        stop_psd_fresh(status)
+    except Exception as exc:  # pragma: no cover - surfaced to the user below
         _notify_psd_error(status, str(exc))
     else:
         if status:

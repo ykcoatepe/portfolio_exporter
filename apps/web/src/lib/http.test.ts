@@ -28,13 +28,13 @@ describe("resolveApiBaseUrl", () => {
     expect(resolveApiBaseUrl("https://example.com/api/")).toBe("https://example.com/api");
   });
 
-  test("uses window origin with vite base path", () => {
+  test("uses window origin and ignores Vite base path", () => {
     vi.stubEnv("BASE_URL", "/psd/");
     globalThis.window = {
       location: { origin: "https://dash.example.com" },
     } as unknown as Window & typeof globalThis;
 
-    expect(resolveApiBaseUrl()).toBe("https://dash.example.com/psd");
+    expect(resolveApiBaseUrl()).toBe("https://dash.example.com");
   });
 
   test("falls back to localhost when window is unavailable", () => {

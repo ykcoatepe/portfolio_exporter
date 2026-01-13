@@ -10,6 +10,7 @@ import type {
     ColumnDef,
     Table,
     ColumnFiltersState,
+    SortingState,
     OnChangeFn,
     FilterFn,
 } from "@tanstack/react-table";
@@ -142,6 +143,10 @@ export interface PsdDataGridProps<TData extends RowData> {
     columnFilters?: ColumnFiltersState;
     /** Column filter change handler */
     onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>;
+    /** Controlled sorting state */
+    sorting?: SortingState;
+    /** Sorting change handler */
+    onSortingChange?: OnChangeFn<SortingState>;
     /** Indicates data is stable (no transient refetch empty states) */
     isDataStable?: boolean;
 }

@@ -5,7 +5,8 @@
  * Ensures stable formatting and row identity.
  */
 
-import type { PSDLeg, PSDPositionsView, PSDCombo } from "../../../lib/types";
+import type { PSDLeg } from "../../../lib/types";
+import { buildFriendlyLegDisplay } from "../../../lib/labels";
 
 /**
  * Row type for single stocks grid
@@ -47,15 +48,53 @@ function toCents(dollars: number | null | undefined): number {
     return Math.round(dollars * 100);
 }
 
+function toNullableNumber(value: unknown): number | null {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function computePercent(amount: number | null, basis: number | null): number | null {
+    if (amount === null || basis === null) {
+        return null;
+    }
+    if (!Number.isFinite(amount) || !Number.isFinite(basis)) {
+        return null;
+    }
+    const denominator = Math.abs(basis);
+    if (denominator === 0) {
+        return null;
+    }
+    const ratio = amount / denominator;
+    return Number.isFinite(ratio) ? ratio * 100 : null;
+}
+
 /**
  * Map PSDLeg array to StockRow array
  */
 export function mapLegsToStockRows(legs: PSDLeg[]): StockRow[] {
     return legs.map((leg, index) => {
         const markPrice = leg.mark ?? null;
-        const quantity = leg.qty;
-        const dayPnl = leg.pnl_intraday ?? null;
-        const totalPnl = leg.pnl_unrealized ?? leg.total_pnl ?? null;
+        const quantity = toNullableNumber(leg.qty) ?? 0;
+        const dayPnl = toNullableNumber(leg.day_pnl ?? leg.pnl_intraday);
+        const totalPnl = toNullableNumber(leg.pnl_unrealized ?? leg.total_pnl);
+        const previousClose = toNullableNumber(leg.previous_close);
+        const avgCost = toNullableNumber(leg.avg_cost);
+        const dayBasis =
+            previousClose !== null ? Math.abs(quantity) * previousClose : null;
+        const totalBasis =
+            avgCost !== null ? Math.abs(quantity) * avgCost : null;
+        const dayPercentFromApi = toNullableNumber(
+            leg.day_pnl_percent ?? leg.day_pnl_pct,
+        );
+        const totalPercentFromApi = toNullableNumber(
+            leg.pnl_unrealized_percent ?? leg.pnl_unrealized_pct ?? leg.total_pnl_percent,
+        );
+        const dayPnlPercent = dayPercentFromApi ?? computePercent(dayPnl, dayBasis);
+        const totalPnlPercent =
+            totalPercentFromApi ?? computePercent(totalPnl, totalBasis);
         const exposure = markPrice != null ? markPrice * Math.abs(quantity) : null;
 
         return {
@@ -66,9 +105,9 @@ export function mapLegsToStockRows(legs: PSDLeg[]): StockRow[] {
             markPrice: markPrice,
             dayPnlAmount: dayPnl,
             dayPnlCents: toCents(dayPnl),
-            dayPnlPercent: leg.day_pnl_percent ?? leg.day_pnl_pct ?? null,
+            dayPnlPercent: dayPnlPercent,
             totalPnlAmount: totalPnl,
-            totalPnlPercent: leg.pnl_unrealized_percent ?? leg.pnl_unrealized_pct ?? leg.total_pnl_percent ?? null,
+            totalPnlPercent: totalPnlPercent,
             exposure: exposure,
             priceSource: leg.price_source ?? null,
             stalenessSeconds: leg.stale_s ?? null,
@@ -119,51 +158,54 @@ function calculateDte(expiry: string | null | undefined): number | null {
 }
 
 /**
- * Build friendly option label (e.g., "TSLA 250C 01/19")
- */
-function buildOptionLabel(leg: PSDLeg, underlying?: string): string {
-    const ticker = underlying ?? leg.symbol.split(" ")[0] ?? leg.symbol;
-    const strike = leg.strike != null ? leg.strike.toString() : "";
-    const right = leg.right === "CALL" ? "C" : leg.right === "PUT" ? "P" : "";
-    const expiry = leg.expiry
-        ? `${leg.expiry.slice(4, 6)}/${leg.expiry.slice(6, 8)}`
-        : "";
-
-    if (strike && right && expiry) {
-        return `${ticker} ${strike}${right} ${expiry}`;
-    }
-    return leg.symbol;
-}
-
-/**
  * Map PSDLeg array to OptionLegRow array
  */
 export function mapLegsToOptionLegRows(
     legs: PSDLeg[],
     underlying?: string,
 ): OptionLegRow[] {
-    return legs.map((leg) => ({
-        id: `leg:${leg.conId ?? leg.symbol}`,
-        conId: leg.conId ?? null,
-        symbol: leg.symbol,
-        label: buildOptionLabel(leg, underlying),
-        shortUnderlying: underlying ?? null,
-        quantity: leg.qty,
-        dte: calculateDte(leg.expiry),
-        markPrice: leg.mark ?? null,
-        dayPnlAmount: leg.pnl_intraday ?? null,
-        dayPnlCents: toCents(leg.pnl_intraday),
-        delta: leg.greeks?.delta ?? null,
-        gamma: leg.greeks?.gamma ?? null,
-        theta: leg.greeks?.theta ?? null,
-        vega: null, // Not available in PSDGreeks
-        iv: null, // Not available in PSDGreeks
-        right: leg.right === "CALL" ? "CALL" : leg.right === "PUT" ? "PUT" : null,
-        strike: leg.strike ?? null,
-        expiry: leg.expiry ?? null,
-        priceSource: leg.price_source ?? null,
-        stalenessSeconds: leg.stale_s ?? null,
-    }));
+    return legs.map((leg) => {
+        const display = buildFriendlyLegDisplay({
+            symbol: leg.symbol,
+            underlying,
+            right: leg.right ?? null,
+            strike: leg.strike ?? null,
+            expiry: leg.expiry ?? null,
+        });
+        const symbol = typeof leg.symbol === "string" && leg.symbol.trim()
+            ? leg.symbol
+            : display.label;
+        const fallbackId = [
+            symbol,
+            leg.right ?? "",
+            leg.strike ?? "",
+            leg.expiry ?? "",
+        ].join("|");
+        const idSeed = leg.conId != null ? String(leg.conId) : fallbackId || display.label;
+
+        return {
+            id: `leg:${idSeed}`,
+            conId: leg.conId ?? null,
+            symbol: symbol,
+            label: display.label,
+            shortUnderlying: display.shortUnderlying ?? null,
+            quantity: leg.qty,
+            dte: calculateDte(leg.expiry),
+            markPrice: leg.mark ?? null,
+            dayPnlAmount: leg.pnl_intraday ?? null,
+            dayPnlCents: toCents(leg.pnl_intraday),
+            delta: leg.greeks?.delta ?? null,
+            gamma: leg.greeks?.gamma ?? null,
+            theta: leg.greeks?.theta ?? null,
+            vega: null, // Not available in PSDGreeks
+            iv: null, // Not available in PSDGreeks
+            right: leg.right === "CALL" ? "CALL" : leg.right === "PUT" ? "PUT" : null,
+            strike: leg.strike ?? null,
+            expiry: leg.expiry ?? null,
+            priceSource: leg.price_source ?? null,
+            stalenessSeconds: leg.stale_s ?? null,
+        };
+    });
 }
 
 /**

@@ -249,6 +249,440 @@
       "details": "Return null for empty PSD snapshot options data so fetchOptions falls back to /positions/options; timestamp normalization already uses magnitude guard.",
       "event": "Options snapshot fallback",
       "timestamp": "2026-01-07T09:15:49Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-08T07:10:12Z"
+    },
+    {
+      "details": "Updated docs/Make targets to favor main.py and port 51127; aligned PSD launcher to respect PSD_PORT.",
+      "event": "PSD entrypoint consolidated",
+      "timestamp": "2026-01-08T07:18:21Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-08T07:29:04Z"
+    },
+    {
+      "details": "Normalize plke_band_alpha in PSD powerlaw payload, add refresh endpoint for apps/api, and proxy /powerlaw in Vite dev server.",
+      "event": "Fix Powerlaw wiring",
+      "timestamp": "2026-01-08T07:42:42Z"
+    },
+    {
+      "details": "Ignore Vite BASE_URL when resolving API origin so /state, /msb, /powerlaw are fetched at root even when UI is served under /psd.",
+      "event": "Fix PSD API base resolution",
+      "timestamp": "2026-01-08T07:47:25Z"
+    },
+    {
+      "details": "Reuse existing Prometheus collectors in psd.web.app to avoid duplicated timeseries errors during pytest collection.",
+      "event": "Guard PSD metrics registration",
+      "timestamp": "2026-01-08T08:44:16Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-08T11:22:33Z"
+    },
+    {
+      "details": "Normalize previous_close, add Yahoo fallback enrichment for stocks, and cover with tests.",
+      "event": "Fix stock day P&L when previous close missing",
+      "timestamp": "2026-01-08T11:25:00Z"
+    },
+    {
+      "details": "Use quote/Yahoo marks in psd_adapter snapshot to populate stock mark and compute day/total P&L.",
+      "event": "Backfill marks for PSD stock P&L",
+      "timestamp": "2026-01-08T11:40:32Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T05:32:31Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T05:56:25Z"
+    },
+    {
+      "details": "Use previous_close to derive fallback intraday P&L and expose previous_close in normalized rows.",
+      "event": "Compute day P&L from previous_close in split_positions",
+      "timestamp": "2026-01-09T05:57:47Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T05:58:25Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T07:44:15Z"
+    },
+    {
+      "details": "Use explicit ThreadPoolExecutor shutdown(wait=False, cancel_futures=True) and increase timeout to 10s.",
+      "event": "Fix /state powerlaw timeout",
+      "timestamp": "2026-01-09T07:44:56Z"
+    },
+    {
+      "details": "Allow choice 5 in queued input validation so Stop Portfolio Sentinel works.",
+      "event": "Fix main menu option 5",
+      "timestamp": "2026-01-09T07:51:26Z"
+    },
+    {
+      "details": "Refetch after trigger and clear refreshing when status is not running to avoid stuck refresh UI.",
+      "event": "Reset PSD refresh state on non-running status",
+      "timestamp": "2026-01-09T09:08:38Z"
+    },
+    {
+      "details": "Restructure _start_refresh so it doesn't call _refresh_payload while holding _REFRESH_LOCK.",
+      "event": "Fix powerlaw refresh deadlock",
+      "timestamp": "2026-01-09T09:30:07Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T09:58:54Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T10:02:33Z"
+    },
+    {
+      "details": "Shifted stale threshold to allow prior trading day snapshots; updated powerlaw staleness tests.",
+      "event": "Powerlaw staleness allows one-day lag",
+      "timestamp": "2026-01-09T10:03:11Z"
+    },
+    {
+      "details": "Changed getPsdGridMode fallback to return new so sortable grid is the default.",
+      "event": "Default PSD stocks grid to new mode",
+      "timestamp": "2026-01-09T10:40:57Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-09T10:41:12Z"
+    },
+    {
+      "details": "Removed grid mode branching in StocksSectionWithGrid; legacy table no longer used when positions_view is present.",
+      "event": "Always render PSD stocks grid",
+      "timestamp": "2026-01-09T10:47:17Z"
+    },
+    {
+      "details": "Preserve engine-provided day vs total P&L fields in psd_adapter fallback view and compute missing values from previous_close/avg_cost.",
+      "event": "Fix PSD fallback day/total P&L mapping",
+      "timestamp": "2026-01-09T10:51:00Z"
+    },
+    {
+      "details": "Replaced legacy options singles table with PsdOptionLegsGrid, added sortable columns and option-legs sorting state.",
+      "event": "Options singles use PSD grid",
+      "timestamp": "2026-01-09T11:40:23Z"
+    },
+    {
+      "details": "Enriched quote snapshots with prev_close, wired into PSD marks, and stopped using total/unrealized P&L as day P&L for equities when prev_close is absent; updated tests accordingly.",
+      "event": "Fix day P&L derivation and prev_close propagation",
+      "timestamp": "2026-01-09T12:24:15Z"
+    },
+    {
+      "details": "StatsRibbon now prioritizes positions_view-derived Day/Unrealized P&L and greeks; staleness uses max across sources.",
+      "event": "Align portfolio stats with snapshot metrics",
+      "timestamp": "2026-01-09T12:26:44Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T11:33:09Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T12:00:46Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T12:39:30Z"
+    },
+    {
+      "details": "Use label/symbol fallback sort key for PSD options singles to prevent UI lockups on header click.",
+      "event": "Fix options singles symbol sorting freeze",
+      "timestamp": "2026-01-12T12:51:33Z"
+    },
+    {
+      "details": "Move option-legs sorting state into the grid component to avoid full-page rerenders when toggling Symbol sort.",
+      "event": "Limit options singles sort rerenders",
+      "timestamp": "2026-01-12T13:01:04Z"
+    },
+    {
+      "details": "Pre-sort option leg rows in grid, disable TanStack sorted row model for that table, preserve header sort state.",
+      "event": "PSD options singles manual sorting",
+      "timestamp": "2026-01-12T13:25:07Z"
+    },
+    {
+      "details": "Generate unique option leg row IDs using expiry/right/strike fallback and disable autoResetSorting for that grid.",
+      "event": "PSD options singles row id fix",
+      "timestamp": "2026-01-12T13:45:26Z"
+    },
+    {
+      "details": "Removed autoResetSorting attempt (unsupported in tanstack v8.21) and kept row-id uniqueness fix.",
+      "event": "PSD options sorting config cleanup",
+      "timestamp": "2026-01-12T13:47:01Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T13:58:06Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T13:59:41Z"
+    },
+    {
+      "details": "Use internal sorting state for options grid and stable empty filter references to align with TanStack Table state memoization guidance.",
+      "event": "PSD options sorting state stabilization",
+      "timestamp": "2026-01-12T14:05:45Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T14:12:57Z"
+    },
+    {
+      "details": "Scheduler now calls vendor refresh by default (disable via PSD_MSB_AUTO_REFRESH=0); API/SSE map A/B/C triggers to RULE_* labels; docs updated.",
+      "event": "MSB refresh default + trigger normalization",
+      "timestamp": "2026-01-12T14:14:53Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T14:17:50Z"
+    },
+    {
+      "details": "PSD start checks data/vendor for HY/VX1/VX2, refreshes via IBKR/FRED/Yahoo fallbacks, and warns if FRED_API_KEY is missing.",
+      "event": "Auto-seed MSB vendor data on PSD start",
+      "timestamp": "2026-01-12T14:26:09Z"
+    },
+    {
+      "details": "msb-run-now now loads .env, sets MSB_SOURCE=ibkr, and runs run_msb_scheduler_once; scheduler log payload uses vendor key to avoid duplicate status arg.",
+      "event": "Fix MSB scheduler logging + msb-run-now",
+      "timestamp": "2026-01-12T14:41:21Z"
+    },
+    {
+      "details": "IBKR default VIX roots and Yahoo ^VIX/^VIX3M fallbacks; MSB refresh endpoint + UI button; startup background refresh; scheduler skips when vendor inputs missing.",
+      "event": "Add MSB refresh flow",
+      "timestamp": "2026-01-12T14:54:41Z"
+    },
+    {
+      "details": "ops now treats zombie PIDs as not alive and spawns web via python -m uvicorn to avoid exec format errors.",
+      "event": "Fix PSD ops process checks",
+      "timestamp": "2026-01-13T07:04:39Z"
+    },
+    {
+      "details": "MSB refresh/startup now force vendor refresh and accept latest available date; msb refresh UI shows skip status; IBKR MSB vendor defaults to useRTH=False.",
+      "event": "Allow stale MSB refresh",
+      "timestamp": "2026-01-13T07:14:27Z"
+    },
+    {
+      "details": "Expose /msb/status with last refresh state/date and render status badge on MSB card.",
+      "event": "Add MSB status badge",
+      "timestamp": "2026-01-13T07:22:16Z"
+    },
+    {
+      "details": "Scheduler now stores full vendor MSB history on first successful refresh; tests updated accordingly.",
+      "event": "Backfill MSB history",
+      "timestamp": "2026-01-13T07:25:57Z"
+    },
+    {
+      "details": "Scheduler now backfills full vendor history if DB has <=1 row and vendor history is longer.",
+      "event": "Backfill MSB when only one row exists",
+      "timestamp": "2026-01-13T07:28:44Z"
+    },
+    {
+      "details": "MSB backfill now drops rows missing hy/vx1/vx2 to avoid NOT NULL constraint failures.",
+      "event": "Drop null MSB rows before backfill",
+      "timestamp": "2026-01-13T07:35:16Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T08:02:01Z"
+    },
+    {
+      "details": "Added missing os import so /msb/help can load tooltip config without 500.",
+      "event": "Fix MSB help endpoint",
+      "timestamp": "2026-01-13T08:11:04Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T08:18:37Z"
+    },
+    {
+      "details": "Added MSB card help tooltip and expanded help content to define HY/VIX scores, term ratio, cal spread, and stress bands.",
+      "event": "Extend MSB help terms",
+      "timestamp": "2026-01-13T08:19:04Z"
+    },
+    {
+      "details": "Added per-stat tooltip support via MSB help terms and wired tooltips into the barometer stat cards.",
+      "event": "Add MSB stat tooltips",
+      "timestamp": "2026-01-13T08:26:54Z"
+    },
+    {
+      "details": "Resolve PSD_MSB_SIGNALS_HELP_PATH relative to repo root when needed so term tooltips load.",
+      "event": "Fix MSB help config resolution",
+      "timestamp": "2026-01-13T08:31:13Z"
+    },
+    {
+      "details": "Added Focus vs Range styles with latest/delta/range labels and reference lines for readability.",
+      "event": "Add MSB chart alternates",
+      "timestamp": "2026-01-13T08:42:25Z"
+    },
+    {
+      "details": "Added Mermaid menu/task flow charts and SVG renders in docs/diagrams.",
+      "event": "Add main flow diagrams",
+      "timestamp": "2026-01-13T08:45:54Z"
+    },
+    {
+      "details": "Added main menu/task flow SVG embeds to README.",
+      "event": "Embed flow diagrams in README",
+      "timestamp": "2026-01-13T08:49:54Z"
+    },
+    {
+      "details": "Added static PSD-themed HTML mockups for chart readability options A, B, and F.",
+      "event": "Create MSB chart mockups",
+      "timestamp": "2026-01-13T08:50:13Z"
+    },
+    {
+      "details": "Applied Option A layout to MSB mini charts and removed mockup files.",
+      "event": "Implement MSB Option A",
+      "timestamp": "2026-01-13T08:58:41Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:00:41Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:01:55Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:06:11Z"
+    },
+    {
+      "details": "Compute fallback day/total percent in PSD grid mapper and normalize positions view percents in PSD ingestor/adapter.",
+      "event": "Fix PSD single stocks % columns",
+      "timestamp": "2026-01-13T09:14:13Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:23:30Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:28:10Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:30:32Z"
+    },
+    {
+      "details": "Load Powerlaw help JSON from powerlaw repo, expose /powerlaw/help, add PSD tooltips, and emit data_quality/detail in Powerlaw snapshots.",
+      "event": "Add Powerlaw help bundles + data quality detail",
+      "timestamp": "2026-01-13T09:55:46Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T10:10:27Z"
+    },
+    {
+      "details": "Adjusted PSD page tests for grid rows, combo expansion state, and MSB action tab order.",
+      "event": "Update PSD unit tests",
+      "timestamp": "2026-01-13T10:19:51Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T10:24:18Z"
+    },
+    {
+      "details": "Menu 4 now detects Vite dev server, builds frontend bundle if missing, and opens /psd reliably.",
+      "event": "Fix PSD menu launch",
+      "timestamp": "2026-01-13T10:31:20Z"
+    },
+    {
+      "details": "Menu 4 now installs uvicorn deps if missing, starts UI dev server when PSD_DEV_MODE=1, and waits for the web port before opening.",
+      "event": "PSD menu starts UI + backend",
+      "timestamp": "2026-01-13T10:42:24Z"
+    },
+    {
+      "details": "Menu 4 now prompts for user vs dev mode; ops menu exposes separate start options.",
+      "event": "Add PSD dev/user modes",
+      "timestamp": "2026-01-13T10:45:55Z"
+    },
+    {
+      "details": "Spawn PSD services in a new session to avoid SIGINT shutting down uvicorn when the menu exits.",
+      "event": "Keep PSD services alive",
+      "timestamp": "2026-01-13T10:54:30Z"
+    },
+    {
+      "details": "Menu start now restarts the web service if PID is alive but 127.0.0.1:51127 is not listening.",
+      "event": "Restart PSD web when port closed",
+      "timestamp": "2026-01-13T10:59:11Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T11:01:26Z"
+    },
+    {
+      "details": "Start PSD without opening the browser immediately; wait for web port before opening and print manual URL if still down.",
+      "event": "Delay PSD dashboard open until web responds",
+      "timestamp": "2026-01-13T11:09:52Z"
+    },
+    {
+      "details": "Use repo-root run dir and vendor data path; ensure PYTHONPATH includes src and spawn services from repo root so menu 4 works even when CWD differs.",
+      "event": "Anchor PSD runtime paths to repo root",
+      "timestamp": "2026-01-13T11:16:29Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T11:18:37Z"
+    },
+    {
+      "details": "Added docs/powerlaw_signals_help.json in codeforge-powerlaw-trader, defaulted PSD powerlaw data_quality when missing, and cast QueryClient in query persistence to avoid TanStack type mismatch during web builds.",
+      "event": "Powerlaw help bundles + web build fix",
+      "timestamp": "2026-01-13T11:35:01Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T11:37:46Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T11:55:27Z"
+    },
+    {
+      "details": "Use latest NY trading day (calendar-aware) for VX contract eligibility instead of UTC datetime comparison.",
+      "event": "Adjust MSB VX expiry filtering",
+      "timestamp": "2026-01-13T12:00:48Z"
+    },
+    {
+      "details": "Update PSD adapter to fill missing quote dicts (price=None) with Yahoo marks; add regression test.",
+      "event": "Fix Yahoo fallback for null marks",
+      "timestamp": "2026-01-13T12:36:52Z"
+    },
+    {
+      "details": "Require an actual mark before using previous_close for intraday P&L and prefer previous_close over pnl_leg when both are present.",
+      "event": "Guard day P&L without mark",
+      "timestamp": "2026-01-13T12:49:24Z"
+    },
+    {
+      "details": "Read powerlaw snapshots from absolute PSD_POWERLAW_OUTPUT_DIR even when repo root is missing; add coverage.",
+      "event": "Allow absolute powerlaw output dir",
+      "timestamp": "2026-01-13T13:07:02Z"
+    },
+    {
+      "details": "Enable refresh when PSD_POWERLAW_CMD is configured even without repo root; add test coverage.",
+      "event": "Allow powerlaw refresh with command",
+      "timestamp": "2026-01-13T13:24:29Z"
+    },
+    {
+      "details": "Session info now reports source=env only for valid PSD_SESSION values; add regression test.",
+      "event": "Fix session source labeling",
+      "timestamp": "2026-01-13T13:24:38Z"
+    },
+    {
+      "details": "Reduce stale window by one trading day on non-trading dates and add weekend regression coverage.",
+      "event": "Tighten powerlaw stale threshold",
+      "timestamp": "2026-01-13T13:39:53Z"
+    },
+    {
+      "details": "Engine fallback no longer derives day_pnl from avg_cost when marks are missing; add regression test.",
+      "event": "Skip day PnL when engine mark missing",
+      "timestamp": "2026-01-13T13:50:06Z"
     }
   ],
   "decisions": [
@@ -509,6 +943,278 @@
       "rationale": "Prevents blank options UI when PSD returns stub data while preserving correct DTE calculation.",
       "timestamp": "2026-01-07T09:15:44Z",
       "title": "Options snapshot fallback guard"
+    },
+    {
+      "context": null,
+      "decision": "Use main.py menu as the primary PSD entrypoint and standardize PSD docs/targets on port 51127.",
+      "id": 35,
+      "rationale": "Reduce multiple launch paths and remove legacy port 8000 from user-facing docs.",
+      "timestamp": "2026-01-08T07:18:17Z",
+      "title": "PSD entrypoint"
+    },
+    {
+      "context": null,
+      "decision": "Emit plke_band_alpha in PSD powerlaw payload (accept legacy input), add /powerlaw/refresh on apps/api, and proxy /powerlaw in Vite.",
+      "id": 36,
+      "rationale": "Fix typo, keep refresh functional across PSD UI + API entrypoints without breaking legacy snapshots.",
+      "timestamp": "2026-01-08T07:42:38Z",
+      "title": "Powerlaw snapshot key + refresh wiring"
+    },
+    {
+      "context": null,
+      "decision": "Resolve API base to window origin (ignore Vite BASE_URL) so PSD UI under /psd hits /state, /msb, /powerlaw at root.",
+      "id": 37,
+      "rationale": "Prevent /psd/* API requests from returning HTML and breaking JSON parsing when the UI is hosted under /psd.",
+      "timestamp": "2026-01-08T07:47:20Z",
+      "title": "PSD API base URL resolution"
+    },
+    {
+      "context": "PSD dashboard showed /bin/zsh day/total P&L for stocks",
+      "decision": "Normalize stocks with previous_close (raw or Yahoo fallback) and recompute day P&L.",
+      "id": 38,
+      "rationale": "Avoid falling back to unrealized P&L when previous close is available.",
+      "timestamp": "2026-01-08T11:24:56Z",
+      "title": "Stock day P&L uses previous close"
+    },
+    {
+      "context": "Stocks showed /bin/zsh day/total P&L when quotes missing.",
+      "decision": "Apply quote/Yahoo mark fallbacks before split_positions to compute stock P&L.",
+      "id": 39,
+      "rationale": "Positions lacked mark/previous close; injecting marks fixes P&L calculations.",
+      "timestamp": "2026-01-08T11:40:27Z",
+      "title": "Enrich PSD snapshot marks"
+    },
+    {
+      "context": null,
+      "decision": "When explicit intraday P&L is missing, compute day P&L from previous_close while keeping total P&L based on avg_cost.",
+      "id": 40,
+      "rationale": null,
+      "timestamp": "2026-01-09T05:57:44Z",
+      "title": "Use previous_close for intraday P&L in split_positions"
+    },
+    {
+      "context": null,
+      "decision": "Stop waiting on the thread pool shutdown after a timeout; log and return after 10s.",
+      "id": 41,
+      "rationale": "ThreadPoolExecutor context manager blocks on shutdown and defeats the timeout when load hangs.",
+      "timestamp": "2026-01-09T07:44:52Z",
+      "title": "Bound /state powerlaw load latency"
+    },
+    {
+      "context": null,
+      "decision": "Include menu option 5 in queued main menu validation so Stop Portfolio Sentinel is accepted.",
+      "id": 42,
+      "rationale": "Validation guard excluded 5, causing invalid choice for the Stop PSD option.",
+      "timestamp": "2026-01-09T07:51:20Z",
+      "title": "Allow Stop PSD menu choice"
+    },
+    {
+      "context": null,
+      "decision": "After triggering the refresh, refetch once and clear the refreshing flag when the backend status is not running.",
+      "id": 43,
+      "rationale": "Avoids leaving the UI stuck when the refresh trigger fails or returns idle/failed.",
+      "timestamp": "2026-01-09T09:08:33Z",
+      "title": "Reset PSD refresh UI when refresh never starts"
+    },
+    {
+      "context": null,
+      "decision": "Stop calling _refresh_payload while holding _REFRESH_LOCK by restructuring _start_refresh to build payload after releasing the lock.",
+      "id": 44,
+      "rationale": "Nested lock acquisition deadlocked when a refresh was already in-flight, stalling /state.",
+      "timestamp": "2026-01-09T09:30:02Z",
+      "title": "Avoid refresh lock deadlock"
+    },
+    {
+      "context": null,
+      "decision": "Treat PSD powerlaw staleness as allowed trading-day lag so yesterday's snapshot stays fresh.",
+      "id": 45,
+      "rationale": "Powerlaw signals are produced one trading day behind, so prior-day snapshots should not be flagged stale.",
+      "timestamp": "2026-01-09T10:03:05Z",
+      "title": "Powerlaw stale lag"
+    },
+    {
+      "context": "Sorting UI only exists in PsdDataGrid; old table hides sorting.",
+      "decision": "Use new grid mode as fallback so sortable headers show by default.",
+      "id": 46,
+      "rationale": null,
+      "timestamp": "2026-01-09T10:40:53Z",
+      "title": "Default PSD stocks grid to new"
+    },
+    {
+      "context": "User wants sorting visible without grid mode toggles; legacy table has no sorting UI.",
+      "decision": "Always render PsdStocksGrid for Single Stocks when positions_view is available.",
+      "id": 47,
+      "rationale": null,
+      "timestamp": "2026-01-09T10:47:12Z",
+      "title": "Remove legacy PSD stocks grid path"
+    },
+    {
+      "context": null,
+      "decision": "Compute day vs total P&L separately when PSD snapshot uses engine fallback, preserving provided fields and only computing missing values.",
+      "id": 48,
+      "rationale": "Fallback adapter previously mirrored unrealized into intraday, making day and total P&L identical in PSD UI.",
+      "timestamp": "2026-01-09T10:50:54Z",
+      "title": "Fix PSD fallback P&L parity"
+    },
+    {
+      "context": "Legacy table has no sorting UI; user requested same behavior as stocks.",
+      "decision": "Switch Options \u2014 Singles to the new PsdOptionLegsGrid so sorting is visible by default.",
+      "id": 49,
+      "rationale": null,
+      "timestamp": "2026-01-09T11:40:17Z",
+      "title": "Always render PSD options singles grid"
+    },
+    {
+      "context": null,
+      "decision": "Enrich PSD mark snapshots with previous_close and stop using total P&L as day P&L for equities without explicit intraday data.",
+      "id": 50,
+      "rationale": "Day P&L was falling back to total/unrealized when prev_close missing; feeding prev_close and tightening fallbacks fixes day vs total parity.",
+      "timestamp": "2026-01-09T12:24:09Z",
+      "title": "Add prev-close to PSD marks"
+    },
+    {
+      "context": "Stats ribbon should match the visible positions data.",
+      "decision": "Use positions_view-derived metrics for Day/Unrealized P&L and greeks; keep net liq/var/margin from /stats.",
+      "id": 51,
+      "rationale": null,
+      "timestamp": "2026-01-09T12:26:38Z",
+      "title": "Prefer snapshot metrics in Portfolio Stats"
+    },
+    {
+      "context": "apps/web PSD grid",
+      "decision": "Sort Options \u2014 Singles by label/symbol fallback to avoid header click lockups.",
+      "id": 52,
+      "rationale": "Ensure stable, string-only sort keys for the symbol column.",
+      "timestamp": "2026-01-12T12:51:27Z",
+      "title": "PSD option singles sorting"
+    },
+    {
+      "context": null,
+      "decision": "Switch Options \u2014 Singles grid to manual sorting with pre-sorted data to avoid UI freezes.",
+      "id": 53,
+      "rationale": "TanStack sorting appears to lock the PSD view when sorting option legs; manual sorting keeps header state without table sort model.",
+      "timestamp": "2026-01-12T13:25:02Z",
+      "title": "PSD options singles sorting"
+    },
+    {
+      "context": null,
+      "decision": "Use composite option leg identifiers (symbol/right/strike/expiry) when conId is missing and disable autoResetSorting for the options grid.",
+      "id": 54,
+      "rationale": "Duplicate row IDs can destabilize TanStack Table sorting; avoiding auto reset prevents sorting loops when data arrays change.",
+      "timestamp": "2026-01-12T13:45:20Z",
+      "title": "PSD option leg row IDs"
+    },
+    {
+      "context": null,
+      "decision": "Drop autoResetSorting (unsupported in current TanStack Table) and focus on unique row IDs to stabilize sorting.",
+      "id": 55,
+      "rationale": "TableOptions in v8.21 does not expose autoResetSorting; duplicate row IDs are more likely to cause sort instability.",
+      "timestamp": "2026-01-12T13:46:56Z",
+      "title": "PSD options sorting config"
+    },
+    {
+      "context": null,
+      "decision": "Move Options \u2014 Singles grid to internal sorting state (uncontrolled) and stabilize default column filter references.",
+      "id": 56,
+      "rationale": "TanStack Table FAQ warns that unstable data/state references can cause re-render loops; uncontrolled sorting and stable defaults reduce churn.",
+      "timestamp": "2026-01-12T14:05:39Z",
+      "title": "PSD option grid sorting state"
+    },
+    {
+      "context": null,
+      "decision": "Check data/vendor for HY/VX1/VX2 and refresh via IBKR/FRED/Yahoo before launching PSD; default MSB_SOURCE=ibkr.",
+      "id": 57,
+      "rationale": "Avoid empty MSB history when PSD starts.",
+      "timestamp": "2026-01-12T14:26:05Z",
+      "title": "Auto-seed MSB vendor data on PSD start"
+    },
+    {
+      "context": null,
+      "decision": "Web app now launches a background MSB refresh on startup and exposes /msb/refresh for UI-triggered updates.",
+      "id": 58,
+      "rationale": "Make MSB data available immediately after starting PSD without manual steps.",
+      "timestamp": "2026-01-12T14:54:35Z",
+      "title": "Auto-refresh MSB on PSD startup"
+    },
+    {
+      "context": null,
+      "decision": "Load Powerlaw help content from docs/powerlaw_signals_help.json in the powerlaw repo with PSD fallback defaults.",
+      "id": 59,
+      "rationale": "Keeps PSD tooltips aligned with Powerlaw definitions while preserving offline fallback.",
+      "timestamp": "2026-01-13T09:55:54Z",
+      "title": "Powerlaw help source"
+    },
+    {
+      "context": "Powerlaw info bundles not visible because dist build failed due to TanStack type mismatch; help content needs to be discoverable from powerlaw repo.",
+      "decision": "Use powerlaw repo JSON for help tooltips when available; default data_quality to OK/WARN based on staleness; cast QueryClient to align TanStack types for persistence.",
+      "id": 60,
+      "rationale": "Keeps PSD UI parity with MSB, avoids DATA: N/A, and unblocks web build.",
+      "timestamp": "2026-01-13T11:34:54Z",
+      "title": "Powerlaw help + data quality fallback"
+    },
+    {
+      "context": null,
+      "decision": "Compare VX expiry dates to the latest NY trading day using exchange calendars when available, with weekday fallback.",
+      "id": 61,
+      "rationale": "Prevents front-month VX from dropping early after UTC midnight on expiry day.",
+      "timestamp": "2026-01-13T12:00:45Z",
+      "title": "MSB VX expiry eligibility"
+    },
+    {
+      "context": null,
+      "decision": "Allow Yahoo fallback to fill missing mark entries even when snapshot_detail returns dicts with null prices.",
+      "id": 62,
+      "rationale": "setdefault skipped existing dicts, leaving positions unpriced despite available Yahoo marks.",
+      "timestamp": "2026-01-13T12:36:47Z",
+      "title": "PSD Yahoo fallback marks"
+    },
+    {
+      "context": null,
+      "decision": "Only compute day P&L from previous_close when a real mark is present; otherwise fall back to unrealized (avg_cost-based) values.",
+      "id": 63,
+      "rationale": "Avoids non-zero intraday P&L when marks are missing and preserves expected intraday precedence.",
+      "timestamp": "2026-01-13T12:49:19Z",
+      "title": "Day P&L requires real mark"
+    },
+    {
+      "context": null,
+      "decision": "Permit load_powerlaw_snapshot to read from an absolute PSD_POWERLAW_OUTPUT_DIR even when PSD_POWERLAW_REPO is missing; keep refresh disabled without repo.",
+      "id": 64,
+      "rationale": "Deployments can ship snapshots without the repo while still exposing powerlaw data.",
+      "timestamp": "2026-01-13T13:06:58Z",
+      "title": "Allow repo-less powerlaw snapshots"
+    },
+    {
+      "context": null,
+      "decision": "Permit powerlaw refresh when PSD_POWERLAW_CMD is set even without repo_root or output_dir; rely on command for execution context.",
+      "id": 65,
+      "rationale": "Supports repo-less deployments with external refresh runner.",
+      "timestamp": "2026-01-13T13:24:21Z",
+      "title": "Allow refresh with custom powerlaw command"
+    },
+    {
+      "context": null,
+      "decision": "Mark session_info source as env only when PSD_SESSION contains a valid value; otherwise report clock.",
+      "id": 66,
+      "rationale": "Avoid mislabeling invalid overrides in UI/logs.",
+      "timestamp": "2026-01-13T13:24:25Z",
+      "title": "Session source reflects valid override"
+    },
+    {
+      "context": null,
+      "decision": "When today is not a trading day, reduce the allowed trading-day lag by one so stale thresholds anchor to the last trading day.",
+      "id": 67,
+      "rationale": "Avoids weekend/holiday extra slack that can keep two-day-old snapshots marked fresh.",
+      "timestamp": "2026-01-13T13:39:46Z",
+      "title": "Tighten stale threshold on non-trading days"
+    },
+    {
+      "context": null,
+      "decision": "When engine fallback lacks a real mark, do not compute day_pnl from previous_close; only compute when a real mark is present.",
+      "id": 68,
+      "rationale": "Prevents bogus intraday PnL during feed outages or stale marks.",
+      "timestamp": "2026-01-13T13:50:00Z",
+      "title": "Avoid day PnL from avg_cost in engine fallback"
     }
   ],
   "preferences": {

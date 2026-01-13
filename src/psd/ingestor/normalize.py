@@ -21,6 +21,17 @@ def _coerce_float(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _compute_percent(amount: float | None, basis: float | None) -> float | None:
+    if amount is None or basis is None:
+        return None
+    if not math.isfinite(amount) or not math.isfinite(basis):
+        return None
+    denominator = abs(basis)
+    if denominator == 0:
+        return None
+    return (amount / denominator) * 100
+
+
 def _extract_price_source(raw: dict[str, Any]) -> str | None:
     for key in ("price_source", "priceSource", "mark_source", "markSource"):
         source_raw = raw.get(key)
@@ -133,6 +144,24 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         avg_cost = _coerce_float(raw.get("average_cost"))
     avg_cost = avg_cost if avg_cost is not None else 0.0
 
+    previous_close = _coerce_float(raw.get("previous_close"))
+    if previous_close is None:
+        previous_close = _coerce_float(raw.get("prior_close"))
+    if previous_close is None:
+        previous_close = _coerce_float(raw.get("prev_close"))
+    if previous_close is None:
+        previous_close = _coerce_float(raw.get("prevClose"))
+
+    raw_day_pct = _coerce_float(raw.get("day_pnl_percent"))
+    if raw_day_pct is None:
+        raw_day_pct = _coerce_float(raw.get("day_pnl_pct"))
+
+    raw_total_pct = _coerce_float(raw.get("total_pnl_percent"))
+    if raw_total_pct is None:
+        raw_total_pct = _coerce_float(raw.get("pnl_unrealized_percent"))
+    if raw_total_pct is None:
+        raw_total_pct = _coerce_float(raw.get("pnl_unrealized_pct"))
+
     mark_coerced = _coerce_float(mark_raw)
     mark_value = mark_coerced if mark_coerced is not None else avg_cost
 
@@ -147,12 +176,23 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
     )
 
     pnl_intraday_raw = _coerce_float(raw.get("pnl_intraday"))
+    if pnl_intraday_raw is None:
+        pnl_intraday_raw = _coerce_float(raw.get("day_pnl"))
+    if pnl_intraday_raw is None:
+        pnl_intraday_raw = _coerce_float(raw.get("day_pnl_amount"))
     pnl_leg_raw = _coerce_float(raw.get("pnl_leg"))
-    pnl_intraday = (
-        pnl_intraday_raw
-        if pnl_intraday_raw is not None
-        else (pnl_leg_raw if pnl_leg_raw is not None else pnl_value)
-    )
+    pnl_prev_close = None
+    if previous_close is not None and mark_coerced is not None:
+        pnl_prev_close = (mark_value - previous_close) * qty * multiplier
+
+    if pnl_intraday_raw is not None:
+        pnl_intraday = pnl_intraday_raw
+    elif pnl_prev_close is not None:
+        pnl_intraday = pnl_prev_close
+    elif pnl_leg_raw is not None:
+        pnl_intraday = pnl_leg_raw
+    else:
+        pnl_intraday = pnl_value
 
     base: dict[str, Any] = {
         "secType": sec,
@@ -168,6 +208,9 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         "greeks": raw.get("greeks") or {},
     }
 
+    if previous_close is not None:
+        base["previous_close"] = previous_close
+
     if pnl_leg_raw is not None:
         base["pnl_leg"] = pnl_leg_raw
 
@@ -179,6 +222,26 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
     fallback_unrealized = (mark_value - avg_cost) * qty * multiplier
     base["pnl_unrealized"] = fallback_unrealized
     base.setdefault("__fallback_unrealized", fallback_unrealized)
+
+    day_basis = None
+    if previous_close is not None:
+        day_basis = abs(qty) * previous_close * multiplier
+    total_basis = abs(qty) * avg_cost * multiplier
+
+    day_pct = raw_day_pct if raw_day_pct is not None else _compute_percent(
+        pnl_intraday, day_basis
+    )
+    total_pct = raw_total_pct if raw_total_pct is not None else _compute_percent(
+        fallback_unrealized, total_basis
+    )
+
+    if day_pct is not None:
+        base["day_pnl_percent"] = day_pct
+        base["day_pnl_pct"] = day_pct
+    if total_pct is not None:
+        base["total_pnl_percent"] = total_pct
+        base["pnl_unrealized_percent"] = total_pct
+        base["pnl_unrealized_pct"] = total_pct
 
     if sec in {"OPT", "FOP"}:
         base.update(

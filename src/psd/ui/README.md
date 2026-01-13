@@ -13,7 +13,7 @@
 
 ## SPA Build
 - `npm run build` (surfaced via `make web-build`) emits the production bundle into `apps/web/dist`.
-- `apps/api/main.py` mounts the dist directory at `/psd`, and the fallback middleware serves `index.html` for unknown routes to support client-side routing.
+- `psd.web.server` mounts the dist directory at `/psd`, and the fallback middleware serves `index.html` for unknown routes to support client-side routing.
 - CI installs Node 20, runs `make web-build`, and fails fast if `apps/web/dist/index.html` is missing, keeping backend + frontend releases in lockstep.
 
 ## Mount Test

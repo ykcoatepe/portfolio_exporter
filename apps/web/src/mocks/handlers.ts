@@ -1500,6 +1500,21 @@ export const buildRulesCatalogValidationResponse = (
   };
 };
 
+const powerlawHelpFixture = {
+  title: "Powerlaw Signals Guide",
+  subtitle: "How to read PLKE, risk state, and sleeve controls",
+  sections: [{ title: "Overview", bullets: ["Sample Powerlaw help bullet."] }],
+  terms: [
+    {
+      key: "plke",
+      title: "PLKE",
+      body: "Market criticality score on a 0-100 scale.",
+      bullets: ["Higher values indicate higher tail risk."],
+    },
+  ],
+  footnotes: [],
+};
+
 export const handlers = [
   http.get("*/state", () => HttpResponse.json(buildPsdSnapshot())),
   http.get("*/rules/catalog", () => HttpResponse.json(buildRulesCatalogResponse())),
@@ -1544,6 +1559,7 @@ export const handlers = [
   http.get("*/stats", () => HttpResponse.json(buildStatsResponse())),
   http.get("*/msb/current", () => HttpResponse.json(buildMsbReading())),
   http.get("*/msb/history", () => HttpResponse.json(buildMsbHistory())),
+  http.get("*/powerlaw/help", () => HttpResponse.json(powerlawHelpFixture)),
   http.get("*/rules/summary", () => HttpResponse.json(buildRulesSummaryResponse())),
   http.get("*/fundamentals.json", () => HttpResponse.json(fundamentalsFixture)),
 ];

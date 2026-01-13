@@ -47,6 +47,15 @@ from positions_engine.service import (  # noqa: E402
     quotes_from_records,
 )
 
+try:
+    from portfolio_exporter.psd_powerlaw import (  # noqa: E402
+        load_powerlaw_snapshot,
+        request_powerlaw_refresh,
+    )
+except ImportError:
+    load_powerlaw_snapshot = None
+    request_powerlaw_refresh = None
+
 logger = logging.getLogger(__name__)
 
 _state = PositionsState()
@@ -297,7 +306,27 @@ def state_snapshot() -> dict[str, Any]:
         meta["session"] = session_info
     payload["session_info"] = session_info
 
+    # Load powerlaw signals if available
+    if load_powerlaw_snapshot is not None:
+        try:
+            powerlaw = load_powerlaw_snapshot()
+            if powerlaw is not None:
+                payload["powerlaw"] = powerlaw
+        except Exception:
+            logger.debug("powerlaw snapshot load failed", exc_info=True)
+
     return payload
+
+
+@app.post("/powerlaw/refresh", tags=["positions"])
+def powerlaw_refresh() -> dict[str, Any]:
+    if request_powerlaw_refresh is None:
+        raise HTTPException(status_code=501, detail="powerlaw refresh unavailable")
+    try:
+        return request_powerlaw_refresh(force=True)
+    except Exception as exc:
+        logger.debug("powerlaw refresh failed", exc_info=True)
+        raise HTTPException(status_code=500, detail="powerlaw refresh failed") from exc
 
 
 @app.get(

@@ -12,6 +12,7 @@ def _stock_fixture():
         "conId": 123,
         "qty": 10,
         "avg_cost": 150.0,
+        "previous_close": 150.0,
         "tick": {"last": 155.0, "ts": 1_700_000_000},
         "greeks": {"delta": 10.0},
     }
@@ -121,6 +122,7 @@ def test_split_positions_prefers_explicit_mark_without_tick():
             "conId": 987,
             "qty": 5,
             "avg_cost": 10.0,
+            "previous_close": 10.0,
             "price": 12.0,
             "mark_source": "manual",
             "stale_seconds": 45,
@@ -136,5 +138,46 @@ def test_split_positions_prefers_explicit_mark_without_tick():
     assert stock["mark"] == pytest.approx(12.0)
     assert stock["price_source"] == "manual"
     assert stock["stale_s"] == pytest.approx(45.0)
-    assert stock["pnl_intraday"] == pytest.approx(250.0)
+    assert stock["pnl_intraday"] == pytest.approx(10.0)
     assert stock["pnl_leg"] == pytest.approx(250.0)
+
+
+def test_split_positions_computes_day_pnl_with_previous_close():
+    raw_positions = [
+        {
+            "secType": "STK",
+            "symbol": "AAPL",
+            "conId": 999,
+            "qty": 10,
+            "avg_cost": 150.0,
+            "previous_close": 152.0,
+            "tick": {"last": 155.0, "ts": 1_700_000_000},
+        }
+    ]
+
+    result = split_positions(raw_positions, "RTH")
+    stock = result["single_stocks"][0]
+
+    assert stock["pnl_intraday"] == pytest.approx(30.0)
+    assert stock["pnl_unrealized"] == pytest.approx(50.0)
+    assert stock["previous_close"] == pytest.approx(152.0)
+
+
+def test_split_positions_skips_prev_close_without_mark():
+    raw_positions = [
+        {
+            "secType": "STK",
+            "symbol": "AAPL",
+            "conId": 1001,
+            "qty": 10,
+            "avg_cost": 150.0,
+            "previous_close": 152.0,
+        }
+    ]
+
+    result = split_positions(raw_positions, "RTH")
+    stock = result["single_stocks"][0]
+
+    assert stock["mark"] == pytest.approx(150.0)
+    assert stock["pnl_intraday"] == pytest.approx(0.0)
+    assert stock["previous_close"] == pytest.approx(152.0)

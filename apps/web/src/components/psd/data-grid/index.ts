@@ -6,6 +6,7 @@
 
 export { PsdDataGrid } from "./PsdDataGrid";
 export { PsdStocksGrid } from "./PsdStocksGrid";
+export { PsdOptionLegsGrid } from "./PsdOptionLegsGrid";
 export { GridParityHarness } from "./GridParityHarness";
 export { useGridSelection } from "./useGridSelection";
 export { useContextMenu } from "./useContextMenu";

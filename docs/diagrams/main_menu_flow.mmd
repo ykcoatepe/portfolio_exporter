@@ -1,0 +1,29 @@
+flowchart TD
+  Start([START]) --> Parse[parse_args]
+  Parse --> Impl[_main_impl]
+  Impl --> HasTasks{tasks specified?}
+
+  HasTasks -- Yes --> Tasks[execute tasks<br/>see tasks flow diagram]
+  HasTasks -- No --> Menu[build_menu]
+  Menu --> Prompt[prompt_input]
+  Prompt --> Tokens[split input into tokens]
+  Tokens --> Choice{token}
+
+  Choice -- "0" --> End([END])
+  Choice -- "s" --> Sync[update_tickers.run]
+  Choice -- "1" --> Pre[menus.pre.launch]
+  Choice -- "2" --> Live[menus.live.launch]
+  Choice -- "3" --> Trade[menus.trade.launch]
+  Choice -- "4" --> Psd[menus.psd.launch]
+  Choice -- "5" --> PsdStop[menus.psd.stop]
+  Choice -- other --> Invalid[print invalid choice]
+
+  Sync --> IBKR[IBKR positions]
+  Sync --> Tickers[write tickers_live.txt]
+
+  Invalid --> Menu
+  Pre --> Menu
+  Live --> Menu
+  Trade --> Menu
+  Psd --> Menu
+  PsdStop --> Menu

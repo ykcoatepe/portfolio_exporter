@@ -1,0 +1,88 @@
+flowchart TD
+  Start([START]) --> Parse[parse_args]
+  Parse --> Impl[_main_impl]
+  Impl --> HasTasks{tasks specified?}
+  HasTasks -- No --> End([END])
+  HasTasks -- Yes --> Loop[for each task]
+
+  Loop --> Normalize[normalize name]
+  Normalize --> Lookup[registry lookup]
+  Lookup --> Exists{task exists?}
+
+  Exists -- No --> Unknown[print unknown task]
+  Unknown --> StopOnFail{stop_on_fail?}
+  StopOnFail -- Yes --> End
+  StopOnFail -- No --> Loop
+
+  Exists -- Yes --> Run[run task]
+  Run --> Failed{exception?}
+  Failed -- Yes --> RecordFail[record failure]
+  Failed -- No --> Success[logbook_on_success]
+  RecordFail --> StopOnFail2{stop_on_fail?}
+  StopOnFail2 -- Yes --> End
+  StopOnFail2 -- No --> Loop
+  Success --> Loop
+
+  %% --- task expansions (data flow + deps) ---
+  Run -->|snapshot-quotes| LiveFeed[live_feed.run]
+  LiveFeed --> IB1[IBKR TWS/Gateway]
+  LiveFeed --> YF1[Yahoo Finance]
+  LiveFeed --> QuotesOut[write live_quotes_*.csv]
+
+  Run -->|portfolio-greeks| Greeks[portfolio_greeks.run]
+  Greeks --> IB2[IBKR positions + market data]
+  Greeks --> CP1[Client Portal REST]
+  Greeks --> YF2[Yahoo OI fallback]
+  Greeks --> GreeksOut[write greeks CSV/Excel/PDF<br/>nav_history.csv]
+
+  Run -->|option-chain-snapshot| Chain[option_chain_snapshot.run]
+  Chain --> IB3[IBKR market data]
+  Chain --> YF3[Yahoo Finance]
+  Chain --> ChainOut[write chain CSV/Excel/PDF + ZIP]
+
+  Run -->|trades-report| Trades[trades_report.run]
+  Trades --> IB4[IBKR executions]
+  Trades --> ExecCSV[executions CSV optional]
+  Trades --> PriorPos[prior positions CSV]
+  Trades --> TradesOut[write trades CSV/Excel/PDF]
+
+  Run -->|daily-report| Daily[daily_report.run]
+  Daily --> LatestGreeks[latest greeks CSVs]
+  Daily --> LatestCombos[latest combos CSVs]
+  Daily --> DailyOut[write HTML/PDF/Excel]
+
+  Run -->|netliq-export| Netliq[net_liq_history_export.run]
+  Netliq --> TWS[TWS dailyNetLiq.csv]
+  Netliq --> CP2[Client Portal API]
+  Netliq --> Fixture[fixture CSV]
+  Netliq --> NetliqOut[write netliq CSV/Excel/PDF]
+
+  Run -->|micro-momo| Momo[micro_momo_analyzer.main]
+  Momo --> ScanCSV[meme_scan_*.csv]
+  Momo --> ChainsCSV[chains CSVs]
+  Momo --> Cfg[micro_momo_config.json]
+  Momo --> Providers[IBKR + Yahoo]
+  Momo --> Halts[NASDAQ halts]
+  Momo --> MomoOut[write scored/orders/journal CSVs]
+  Momo --> Webhook[alerts webhook]
+
+  Run -->|micro-momo-sentinel| Sentinel[micro_momo_sentinel.main]
+  Sentinel --> Scored[micro_momo_scored.csv]
+  Sentinel --> Halts2[NASDAQ halts]
+  Sentinel --> Webhook2[alerts webhook]
+  Sentinel --> SentOut[write triggers_log + journal]
+
+  Run -->|micro-momo-eod| EOD[micro_momo_eod.main]
+  EOD --> Journal[micro_momo_journal.csv]
+  EOD --> EodOut[write eod summary CSV]
+
+  Run -->|micro-momo-dashboard| Dash[micro_momo_dashboard.main]
+  Dash --> DashIn[scored/orders/journal/eod/triggers CSVs]
+  Dash --> DashOut[write micro_momo_dashboard.html]
+
+  Run -->|micro-momo-go| Go[micro_momo_go.main]
+  Go --> Momo
+  Go --> Dash
+  Go --> Publish[out/publish]
+  Go --> Slack[Slack API/webhook]
+  Go --> Sentinel

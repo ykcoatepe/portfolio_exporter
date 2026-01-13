@@ -680,7 +680,11 @@ def make_app():
             if path:
                 file_path = (dist_dir / path).resolve()
                 # Security: reject path traversal attempts that escape dist_dir
-                if file_path.is_relative_to(dist_dir) and file_path.exists() and file_path.is_file():
+                if (
+                    file_path.is_relative_to(dist_dir)
+                    and file_path.exists()
+                    and file_path.is_file()
+                ):
                     return FileResponse(file_path)
             # Otherwise serve index.html for SPA routing
             return HTMLResponse(content=index_html.read_text(encoding="utf-8"))

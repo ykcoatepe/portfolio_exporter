@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
@@ -12,6 +13,10 @@ import pandas as pd
 from pandas.tseries.offsets import BDay
 
 ColorLiteral = Literal["green", "yellow", "orange", "red"]
+CalendarMode = Literal["observed_union", "legacy_weekdays"]
+RuleBSource = Literal["raw", "winsor"]
+
+_LOG = logging.getLogger("psd.analytics.msb")
 
 
 @dataclass(slots=True)
@@ -36,6 +41,30 @@ class MsbReading:
     cooldown_until: date | None
 
 
+@dataclass(slots=True)
+class MSBConfig:
+    """Configuration knobs for MSB analytics."""
+
+    calendar_mode: CalendarMode = "observed_union"
+    ffill_hy_days: int = 2
+    ffill_vix_days: int = 2
+    ffill_spx_ret_days: int = 0
+    rule_b_source: RuleBSource = "raw"
+    rule_b_delta_clip_abs: float | None = 3.00
+    hy_targets: tuple[float, float, float] = (25.0, 40.0, 50.0)
+    require_fresh_streak_after_cooldown: bool = False
+
+    @classmethod
+    def legacy(cls) -> MSBConfig:
+        """Return a config that mirrors the pre-2026 MSB defaults."""
+        return cls(
+            calendar_mode="legacy_weekdays",
+            ffill_spx_ret_days=2,
+            rule_b_source="winsor",
+            hy_targets=(25.0, 80.0, 95.0),
+        )
+
+
 def _ensure_series(name: str, raw: Iterable[float] | pd.Series) -> pd.Series:
     if isinstance(raw, pd.Series):
         series = raw.copy()
@@ -47,6 +76,73 @@ def _ensure_series(name: str, raw: Iterable[float] | pd.Series) -> pd.Series:
     series = pd.Series(series.astype(float).to_numpy(), index=idx, name=name)
     series.sort_index(inplace=True)
     return series
+
+
+def _normalize_series(name: str, raw: Iterable[float] | pd.Series) -> pd.Series:
+    series = _ensure_series(name, raw)
+    series.index = pd.to_datetime(series.index).normalize()
+    series = series[~series.index.duplicated(keep="last")]
+    series.sort_index(inplace=True)
+    return series
+
+
+def _build_calendar_index(
+    hy_series: pd.Series,
+    vx1_series: pd.Series,
+    vx2_series: pd.Series,
+    spx_series: pd.Series | None,
+    config: MSBConfig,
+) -> pd.DatetimeIndex:
+    if config.calendar_mode == "legacy_weekdays":
+        start = min(
+            hy_series.index.min(),
+            vx1_series.index.min(),
+            vx2_series.index.min(),
+        )
+        end = max(
+            hy_series.index.max(),
+            vx1_series.index.max(),
+            vx2_series.index.max(),
+        )
+        if spx_series is not None and not spx_series.empty:
+            start = min(start, spx_series.index.min())
+            end = max(end, spx_series.index.max())
+        return pd.bdate_range(start=start, end=end)
+
+    indices = [hy_series.index, vx1_series.index, vx2_series.index]
+    if spx_series is not None and not spx_series.empty:
+        indices.append(spx_series.index)
+    union_idx = indices[0]
+    for extra in indices[1:]:
+        union_idx = union_idx.union(extra)
+    return union_idx.sort_values()
+
+
+def _apply_ffill(series: pd.Series, limit: int) -> pd.Series:
+    if limit <= 0:
+        return series
+    return series.ffill(limit=limit)
+
+
+def _clip_rule_b_delta(
+    series: pd.Series,
+    abs_limit: float | None,
+    label: str,
+) -> pd.Series:
+    if abs_limit is None:
+        return series
+    limit = float(abs_limit)
+    if limit <= 0:
+        return series
+    mask = series.abs() > limit
+    if mask.any():
+        _LOG.warning(
+            "MSB Rule B %s delta clipped for %s points (limit=%.2f)",
+            label,
+            int(mask.sum()),
+            limit,
+        )
+    return series.clip(lower=-limit, upper=limit)
 
 
 def _rolling_winsorize(
@@ -161,20 +257,22 @@ def compute_msb(
     lq: float = 0.01,
     uq: float = 0.99,
     spx_ret: pd.Series | None = None,
+    config: MSBConfig | None = None,
 ) -> pd.DataFrame:
     """Compute MSB analytics with guardrails."""
-    hy_series = _ensure_series("hy", hy)
-    vx1_series = _ensure_series("vx1", vx1)
-    vx2_series = _ensure_series("vx2", vx2)
-    start = min(hy_series.index.min(), vx1_series.index.min(), vx2_series.index.min())
-    end = max(hy_series.index.max(), vx1_series.index.max(), vx2_series.index.max())
-    b_index = pd.bdate_range(start=start, end=end)
+    cfg = config or MSBConfig()
+    hy_series = _normalize_series("hy", hy)
+    vx1_series = _normalize_series("vx1", vx1)
+    vx2_series = _normalize_series("vx2", vx2)
+    spx_series_raw = _normalize_series("spx", spx_ret) if spx_ret is not None else None
 
-    df = (
-        pd.concat([hy_series, vx1_series, vx2_series], axis=1)
-        .reindex(b_index)
-        .ffill(limit=2)
-    )
+    idx = _build_calendar_index(hy_series, vx1_series, vx2_series, spx_series_raw, cfg)
+
+    hy_aligned = _apply_ffill(hy_series.reindex(idx), cfg.ffill_hy_days)
+    vx1_aligned = _apply_ffill(vx1_series.reindex(idx), cfg.ffill_vix_days)
+    vx2_aligned = _apply_ffill(vx2_series.reindex(idx), cfg.ffill_vix_days)
+
+    df = pd.concat([hy_aligned, vx1_aligned, vx2_aligned], axis=1)
     df.columns = ["hy", "vx1", "vx2"]
     df = df.dropna(how="all")
 
@@ -203,7 +301,7 @@ def compute_msb(
     )
 
     hy_calibrated = _calibrated_score(
-        w_df["hy"], window, fallback, targets=(25.0, 80.0, 95.0)
+        w_df["hy"], window, fallback, targets=cfg.hy_targets
     )
     hy_fallback = 12.0 * z_hy + 25.0
     hy_score = hy_calibrated.where(hy_calibrated.notna(), hy_fallback)
@@ -241,9 +339,9 @@ def compute_msb(
         name="color",
     )
 
-    if spx_ret is not None:
-        spx_series = _ensure_series("spx", spx_ret).reindex(b_index).ffill(limit=2)
-        spx_series = spx_series.reindex(w_df.index).ffill(limit=2)
+    if spx_series_raw is not None:
+        spx_series = spx_series_raw.reindex(w_df.index)
+        spx_series = _apply_ffill(spx_series, cfg.ffill_spx_ret_days)
     else:
         spx_series = pd.Series(index=w_df.index, dtype=float)
 
@@ -252,8 +350,14 @@ def compute_msb(
     cooldown_active_until: pd.Timestamp | None = None
 
     msb_ge_60 = msb >= 60
-    hy_delta = w_df["hy"].diff()
-    hy_delta5 = w_df["hy"].diff(5)
+    hy_delta_source = w_df["hy"] if cfg.rule_b_source == "winsor" else df["hy"]
+    hy_delta = _clip_rule_b_delta(
+        hy_delta_source.diff(), cfg.rule_b_delta_clip_abs, "d1"
+    )
+    hy_delta5 = _clip_rule_b_delta(
+        hy_delta_source.diff(5), cfg.rule_b_delta_clip_abs, "d5"
+    )
+    post_cooldown_streak = 0
 
     for idx in w_df.index:
         trigger_flags: list[str] = []
@@ -269,14 +373,26 @@ def compute_msb(
 
         current_cooldown = cooldown_active_until
         trigger_c = False
+        in_cooldown = current_cooldown is not None and idx <= current_cooldown
         if msb_ge_60.at[idx]:
+            if cfg.require_fresh_streak_after_cooldown:
+                if in_cooldown:
+                    post_cooldown_streak = 0
+                else:
+                    post_cooldown_streak += 1
             prev_idx = w_df.index.get_loc(idx)
-            if prev_idx >= 2:
+            if cfg.require_fresh_streak_after_cooldown:
+                if post_cooldown_streak >= 3 and not in_cooldown:
+                    trigger_c = True
+            elif prev_idx >= 2:
                 window_slice = msb_ge_60.iloc[prev_idx - 2 : prev_idx + 1]
-                if window_slice.all():
-                    if current_cooldown is None or idx > current_cooldown:
-                        trigger_c = True
-                        cooldown_active_until = (idx + BDay(5)).normalize()
+                if window_slice.all() and not in_cooldown:
+                    trigger_c = True
+        else:
+            post_cooldown_streak = 0
+
+        if trigger_c:
+            cooldown_active_until = (idx + BDay(5)).normalize()
         if trigger_c:
             trigger_flags.append("C")
             cooldown_until.append(cooldown_active_until)
@@ -314,4 +430,4 @@ def compute_msb(
     return msb_df
 
 
-__all__ = ["MsbReading", "compute_msb"]
+__all__ = ["MSBConfig", "MsbReading", "compute_msb"]

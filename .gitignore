@@ -22,6 +22,7 @@ debug/*.log
 debug/*_logs.txt
 
 # PSD
+run/
 var/memos/
 .pytest_cache/
 .ruff_cache/
@@ -32,6 +33,7 @@ apps/web/node_modules
 apps/web/dep-tree.before.txt
 apps/web/dep-tree.after.txt
 apps/web/audit.json
+apps/web/dist/
 
 # Local scratch at repo root
 node_modules/
