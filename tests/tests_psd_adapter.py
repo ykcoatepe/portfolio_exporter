@@ -162,3 +162,14 @@ def test_snapshot_once_overwrites_null_mark_with_yf(monkeypatch):
 
     asyncio.run(psd_adapter.snapshot_once())
     assert captured["mark"] == 190.0
+
+
+def test_session_info_source_ignores_invalid_override(monkeypatch):
+    monkeypatch.setenv("PSD_SESSION", "not-a-session")
+    monkeypatch.setattr(psd_adapter, "_infer_session_from_clock", lambda: "EXT")
+
+    session = psd_adapter._resolve_session()
+    info = psd_adapter._build_session_info(session)
+
+    assert session == "EXT"
+    assert info["source"] == "clock"

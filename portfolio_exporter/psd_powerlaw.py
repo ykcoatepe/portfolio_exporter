@@ -86,7 +86,14 @@ def load_powerlaw_snapshot(now: datetime | None = None) -> dict[str, Any] | None
 
 def request_powerlaw_refresh(force: bool = False) -> dict[str, Any]:
     cfg = _load_config()
-    if cfg.repo_root is None or cfg.output_dir is None:
+    if cfg.output_dir is None and cfg.refresh_cmd is None:
+        return {
+            "started": False,
+            "status": "disabled",
+            "reason": "config_missing",
+            "refresh": _refresh_payload(cfg),
+        }
+    if cfg.repo_root is None and cfg.refresh_cmd is None:
         return {
             "started": False,
             "status": "disabled",
@@ -394,7 +401,9 @@ def _fallback_trading_day(reference: date, stale_days: int) -> date:
 
 
 def _maybe_start_refresh(stale: bool, cfg: PowerlawConfig) -> None:
-    if not stale or not cfg.refresh_enabled or cfg.repo_root is None:
+    if not stale or not cfg.refresh_enabled:
+        return
+    if cfg.repo_root is None and cfg.refresh_cmd is None:
         return
     _start_refresh(cfg, force=False)
 
@@ -523,7 +532,11 @@ def _refresh_payload(cfg: PowerlawConfig) -> dict[str, Any]:
         last_status = _REFRESH_STATE.last_status
         last_error = _REFRESH_STATE.last_error
 
-    enabled = bool(cfg.refresh_enabled and cfg.repo_root and cfg.output_dir)
+    enabled = bool(
+        cfg.refresh_enabled
+        and (cfg.repo_root or cfg.refresh_cmd)
+        and (cfg.output_dir or cfg.refresh_cmd)
+    )
     status = "running" if in_flight else (last_status or "idle")
     if not enabled:
         status = "disabled"

@@ -663,6 +663,16 @@
       "details": "Read powerlaw snapshots from absolute PSD_POWERLAW_OUTPUT_DIR even when repo root is missing; add coverage.",
       "event": "Allow absolute powerlaw output dir",
       "timestamp": "2026-01-13T13:07:02Z"
+    },
+    {
+      "details": "Enable refresh when PSD_POWERLAW_CMD is configured even without repo root; add test coverage.",
+      "event": "Allow powerlaw refresh with command",
+      "timestamp": "2026-01-13T13:24:29Z"
+    },
+    {
+      "details": "Session info now reports source=env only for valid PSD_SESSION values; add regression test.",
+      "event": "Fix session source labeling",
+      "timestamp": "2026-01-13T13:24:38Z"
     }
   ],
   "decisions": [
@@ -1163,6 +1173,22 @@
       "rationale": "Deployments can ship snapshots without the repo while still exposing powerlaw data.",
       "timestamp": "2026-01-13T13:06:58Z",
       "title": "Allow repo-less powerlaw snapshots"
+    },
+    {
+      "context": null,
+      "decision": "Permit powerlaw refresh when PSD_POWERLAW_CMD is set even without repo_root or output_dir; rely on command for execution context.",
+      "id": 65,
+      "rationale": "Supports repo-less deployments with external refresh runner.",
+      "timestamp": "2026-01-13T13:24:21Z",
+      "title": "Allow refresh with custom powerlaw command"
+    },
+    {
+      "context": null,
+      "decision": "Mark session_info source as env only when PSD_SESSION contains a valid value; otherwise report clock.",
+      "id": 66,
+      "rationale": "Avoid mislabeling invalid overrides in UI/logs.",
+      "timestamp": "2026-01-13T13:24:25Z",
+      "title": "Session source reflects valid override"
     }
   ],
   "preferences": {

@@ -400,7 +400,8 @@ def _build_session_info(session_state: Session) -> dict[str, Any]:
     rth_open = local_now.replace(hour=9, minute=30, second=0, microsecond=0)
     rth_close = local_now.replace(hour=16, minute=0, second=0, microsecond=0)
     
-    source = "env" if os.getenv("PSD_SESSION", "").strip() else "clock"
+    override = os.getenv("PSD_SESSION", "").strip().upper()
+    source = "env" if override in _ALLOWED_SESSIONS else "clock"
     
     # Frontend expects ETH (Extended Trading Hours), not EXT
     state_for_frontend = "ETH" if session_state == "EXT" else session_state

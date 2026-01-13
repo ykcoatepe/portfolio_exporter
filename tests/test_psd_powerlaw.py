@@ -174,6 +174,29 @@ def test_request_refresh_disabled_when_missing_repo(monkeypatch):
     assert result["reason"] == "config_missing"
 
 
+def test_request_refresh_allows_cmd_without_repo(monkeypatch, tmp_path):
+    output_dir = tmp_path / "powerlaw-output"
+    monkeypatch.setenv("PSD_POWERLAW_REPO", "/tmp/psd-powerlaw-missing")
+    monkeypatch.setenv("PSD_POWERLAW_OUTPUT_DIR", str(output_dir))
+    monkeypatch.setenv("PSD_POWERLAW_REFRESH", "1")
+    monkeypatch.setenv("PSD_POWERLAW_CMD", "echo powerlaw-refresh")
+
+    def _fake_start(cfg, force=False):
+        return {
+            "started": True,
+            "status": "running",
+            "reason": None,
+            "refresh": {"enabled": True},
+        }
+
+    monkeypatch.setattr(psd_powerlaw, "_start_refresh", _fake_start)
+
+    result = psd_powerlaw.request_powerlaw_refresh(force=True)
+
+    assert result["started"] is True
+    assert result["status"] == "running"
+
+
 def test_build_refresh_cmd_prefers_repo_venv(tmp_path):
     repo = tmp_path / "powerlaw"
     (repo / "scripts").mkdir(parents=True)
