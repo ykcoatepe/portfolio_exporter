@@ -595,7 +595,14 @@ async def snapshot_once() -> dict[str, Any]:
                     for sym, val in yf_marks.items():
                         if val is None:
                             continue
-                        marks.setdefault(sym, val)
+                        existing = marks.get(sym)
+                        if isinstance(existing, dict):
+                            if _extract_mark_value(existing) is None:
+                                existing["price"] = val
+                                if existing.get("source") in (None, ""):
+                                    existing["source"] = "YF"
+                        else:
+                            marks[sym] = val
                     _apply_marks_to_positions(positions, marks)
             except Exception as exc:  # pragma: no cover - best effort
                 logger.warning("snapshot Yahoo mark fallback failed: %s", exc)

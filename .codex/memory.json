@@ -648,6 +648,11 @@
       "details": "Use latest NY trading day (calendar-aware) for VX contract eligibility instead of UTC datetime comparison.",
       "event": "Adjust MSB VX expiry filtering",
       "timestamp": "2026-01-13T12:00:48Z"
+    },
+    {
+      "details": "Update PSD adapter to fill missing quote dicts (price=None) with Yahoo marks; add regression test.",
+      "event": "Fix Yahoo fallback for null marks",
+      "timestamp": "2026-01-13T12:36:52Z"
     }
   ],
   "decisions": [
@@ -1124,6 +1129,14 @@
       "rationale": "Prevents front-month VX from dropping early after UTC midnight on expiry day.",
       "timestamp": "2026-01-13T12:00:45Z",
       "title": "MSB VX expiry eligibility"
+    },
+    {
+      "context": null,
+      "decision": "Allow Yahoo fallback to fill missing mark entries even when snapshot_detail returns dicts with null prices.",
+      "id": 62,
+      "rationale": "setdefault skipped existing dicts, leaving positions unpriced despite available Yahoo marks.",
+      "timestamp": "2026-01-13T12:36:47Z",
+      "title": "PSD Yahoo fallback marks"
     }
   ],
   "preferences": {
