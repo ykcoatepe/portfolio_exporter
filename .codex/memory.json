@@ -639,6 +639,15 @@
     {
       "event": "session_start",
       "timestamp": "2026-01-13T11:37:46Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T11:55:27Z"
+    },
+    {
+      "details": "Use latest NY trading day (calendar-aware) for VX contract eligibility instead of UTC datetime comparison.",
+      "event": "Adjust MSB VX expiry filtering",
+      "timestamp": "2026-01-13T12:00:48Z"
     }
   ],
   "decisions": [
@@ -1107,6 +1116,14 @@
       "rationale": "Keeps PSD UI parity with MSB, avoids DATA: N/A, and unblocks web build.",
       "timestamp": "2026-01-13T11:34:54Z",
       "title": "Powerlaw help + data quality fallback"
+    },
+    {
+      "context": null,
+      "decision": "Compare VX expiry dates to the latest NY trading day using exchange calendars when available, with weekday fallback.",
+      "id": 61,
+      "rationale": "Prevents front-month VX from dropping early after UTC midnight on expiry day.",
+      "timestamp": "2026-01-13T12:00:45Z",
+      "title": "MSB VX expiry eligibility"
     }
   ],
   "preferences": {

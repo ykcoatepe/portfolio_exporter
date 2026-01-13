@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -76,3 +77,8 @@ def test_msb_vendor_refresh_uses_ibkr_when_available(
     assert (vendor_dir / "vx1.csv").exists()
     assert (vendor_dir / "vx2.csv").exists()
     assert (vendor_dir / "spx_ret.csv").exists()
+
+
+def test_msb_vendor_latest_trading_day_weekend() -> None:
+    reference = datetime(2025, 2, 15, 12, tzinfo=ZoneInfo("America/New_York"))
+    assert msb_vendor._latest_trading_day(reference) == date(2025, 2, 14)

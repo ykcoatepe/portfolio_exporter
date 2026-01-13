@@ -7,9 +7,10 @@ import os
 import re
 import time
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -37,6 +38,9 @@ _DEFAULT_IBKR_BAR_SIZE = "1 day"
 _DEFAULT_IBKR_WHAT = "TRADES"
 _DEFAULT_IBKR_USE_RTH = False
 _DEFAULT_MIN_VX_ROWS = 30
+_TRADING_DAY_LOOKBACK_DAYS = 14
+_VX_CALENDAR_CANDIDATES = ("XCFE", "CFE", "XCBF", "XNYS")
+TZ_NY = ZoneInfo("America/New_York")
 
 
 def _env_flag(env_map: Mapping[str, str], key: str, default: bool) -> bool:
@@ -125,6 +129,68 @@ def _parse_future_expiry(raw: str | None) -> datetime:
     return datetime(1900, 1, 1)
 
 
+def _reference_trading_date(reference: datetime | date | None) -> date:
+    if reference is None:
+        return datetime.now(TZ_NY).date()
+    if isinstance(reference, datetime):
+        if reference.tzinfo is None:
+            reference = reference.replace(tzinfo=TZ_NY)
+        return reference.astimezone(TZ_NY).date()
+    return reference
+
+
+def _calendar_latest_trading_day(reference: date) -> date | None:
+    start = reference - timedelta(days=_TRADING_DAY_LOOKBACK_DAYS)
+    try:
+        import exchange_calendars as xc  # type: ignore
+    except Exception:  # pragma: no cover - optional dependency
+        xc = None
+    if xc is not None:
+        for cal_name in _VX_CALENDAR_CANDIDATES:
+            try:
+                cal = xc.get_calendar(cal_name)
+                schedule = cal.schedule(start, reference)
+            except Exception:
+                continue
+            if schedule is not None and not schedule.empty:
+                last_open = pd.Timestamp(schedule["market_open"].iloc[-1])
+                if last_open.tzinfo is None:
+                    last_open = last_open.tz_localize("UTC")
+                return last_open.tz_convert(TZ_NY).date()
+
+    try:
+        import pandas_market_calendars as pmc  # type: ignore
+    except Exception:  # pragma: no cover - optional dependency
+        pmc = None
+    if pmc is not None:
+        for cal_name in _VX_CALENDAR_CANDIDATES:
+            try:
+                cal = pmc.get_calendar(cal_name)
+                schedule = cal.schedule(start_date=start, end_date=reference)
+            except Exception:
+                continue
+            if schedule is not None and not schedule.empty:
+                last_open = pd.Timestamp(schedule["market_open"].iloc[-1])
+                if last_open.tzinfo is None:
+                    last_open = last_open.tz_localize("UTC")
+                return last_open.tz_convert(TZ_NY).date()
+
+    return None
+
+
+def _fallback_latest_trading_day(reference: date) -> date:
+    current = reference
+    while current.weekday() >= 5:
+        current -= timedelta(days=1)
+    return current
+
+
+def _latest_trading_day(reference: datetime | date | None = None) -> date:
+    ref_date = _reference_trading_date(reference)
+    calendar_day = _calendar_latest_trading_day(ref_date)
+    return calendar_day or _fallback_latest_trading_day(ref_date)
+
+
 def _bars_to_series(bars: list[Any]) -> pd.Series:
     if not bars:
         return pd.Series(dtype=float)
@@ -210,11 +276,11 @@ def _download_close_series_ibkr_future(
     details = ib.reqContractDetails(Future(root, exchange=exchange, currency=currency))
     if not details:
         return pd.Series(dtype=float)
-    today = datetime.utcnow()
+    today_trading_day = _latest_trading_day()
     contracts = []
     for detail in details:
-        expiry = _parse_future_expiry(detail.contract.lastTradeDateOrContractMonth)
-        if expiry >= today:
+        expiry = _parse_future_expiry(detail.contract.lastTradeDateOrContractMonth).date()
+        if expiry >= today_trading_day:
             contracts.append((expiry, detail.contract))
     contracts.sort(key=lambda item: item[0])
     if len(contracts) <= position:
