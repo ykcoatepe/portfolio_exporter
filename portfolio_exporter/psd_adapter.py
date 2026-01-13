@@ -193,16 +193,18 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
             str(record.get("symbol") or record.get("underlying") or "").strip() or "?"
         )
         qty = _coerce_float(record.get("qty") or record.get("quantity")) or 0.0
-        mark = _coerce_float(record.get("mark") or record.get("mid"))
+        mark_raw = _coerce_float(record.get("mark") or record.get("mid"))
+        mark = mark_raw
         avg_cost = _coerce_float(record.get("avg_cost") or record.get("avg"))
         if mark is None and avg_cost is not None:
             mark = avg_cost
+        has_mark = mark_raw is not None
         previous_close = _first_float(
             record, "previous_close", "prev_close", "prior_close", "previousClose"
         )
         day_pnl = _first_float(record, "day_pnl", "pnl_intraday", "day_pnl_amount")
         mult = _position_multiplier(record)
-        if day_pnl is None and mark is not None and previous_close is not None:
+        if day_pnl is None and has_mark and previous_close is not None:
             day_pnl = (mark - previous_close) * qty * mult
         pnl_unrealized = _first_float(
             record, "total_pnl", "pnl_unrealized", "total_pnl_amount"

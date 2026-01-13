@@ -678,6 +678,11 @@
       "details": "Reduce stale window by one trading day on non-trading dates and add weekend regression coverage.",
       "event": "Tighten powerlaw stale threshold",
       "timestamp": "2026-01-13T13:39:53Z"
+    },
+    {
+      "details": "Engine fallback no longer derives day_pnl from avg_cost when marks are missing; add regression test.",
+      "event": "Skip day PnL when engine mark missing",
+      "timestamp": "2026-01-13T13:50:06Z"
     }
   ],
   "decisions": [
@@ -1202,6 +1207,14 @@
       "rationale": "Avoids weekend/holiday extra slack that can keep two-day-old snapshots marked fresh.",
       "timestamp": "2026-01-13T13:39:46Z",
       "title": "Tighten stale threshold on non-trading days"
+    },
+    {
+      "context": null,
+      "decision": "When engine fallback lacks a real mark, do not compute day_pnl from previous_close; only compute when a real mark is present.",
+      "id": 68,
+      "rationale": "Prevents bogus intraday PnL during feed outages or stale marks.",
+      "timestamp": "2026-01-13T13:50:00Z",
+      "title": "Avoid day PnL from avg_cost in engine fallback"
     }
   ],
   "preferences": {

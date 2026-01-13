@@ -132,3 +132,26 @@ def test_snapshot_once_uses_engine_fallback(monkeypatch) -> None:
     assert legs[0]["symbol"] == "TSLA 20240419C00750000"
     assert view["single_options"], "fallback should include orphan option legs"
     assert view["single_options"][0]["symbol"] == "MSFT 20240419P00250000"
+
+
+def test_engine_fallback_skips_day_pnl_without_mark() -> None:
+    class _NoMarkState:
+        def equities_payload(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "symbol": "AAPL",
+                    "qty": 10,
+                    "avg_cost": 100.0,
+                    "previous_close": 105.0,
+                }
+            ]
+
+        def options_payload(self) -> dict[str, object]:
+            return {"combos": [], "legs": []}
+
+    view = psd_adapter._build_positions_view_from_engine(_NoMarkState())
+
+    stock = view["single_stocks"][0]
+    assert stock["mark"] == 100.0
+    assert stock["day_pnl"] is None
+    assert stock["pnl_intraday"] is None
