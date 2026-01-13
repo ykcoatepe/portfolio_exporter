@@ -182,15 +182,15 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         pnl_intraday_raw = _coerce_float(raw.get("day_pnl_amount"))
     pnl_leg_raw = _coerce_float(raw.get("pnl_leg"))
     pnl_prev_close = None
-    if previous_close is not None:
+    if previous_close is not None and mark_coerced is not None:
         pnl_prev_close = (mark_value - previous_close) * qty * multiplier
 
     if pnl_intraday_raw is not None:
         pnl_intraday = pnl_intraday_raw
-    elif pnl_leg_raw is not None:
-        pnl_intraday = pnl_leg_raw
     elif pnl_prev_close is not None:
         pnl_intraday = pnl_prev_close
+    elif pnl_leg_raw is not None:
+        pnl_intraday = pnl_leg_raw
     else:
         pnl_intraday = pnl_value
 

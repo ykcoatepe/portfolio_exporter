@@ -161,3 +161,23 @@ def test_split_positions_computes_day_pnl_with_previous_close():
     assert stock["pnl_intraday"] == pytest.approx(30.0)
     assert stock["pnl_unrealized"] == pytest.approx(50.0)
     assert stock["previous_close"] == pytest.approx(152.0)
+
+
+def test_split_positions_skips_prev_close_without_mark():
+    raw_positions = [
+        {
+            "secType": "STK",
+            "symbol": "AAPL",
+            "conId": 1001,
+            "qty": 10,
+            "avg_cost": 150.0,
+            "previous_close": 152.0,
+        }
+    ]
+
+    result = split_positions(raw_positions, "RTH")
+    stock = result["single_stocks"][0]
+
+    assert stock["mark"] == pytest.approx(150.0)
+    assert stock["pnl_intraday"] == pytest.approx(0.0)
+    assert stock["previous_close"] == pytest.approx(152.0)
