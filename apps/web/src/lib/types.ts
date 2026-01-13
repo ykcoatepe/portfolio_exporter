@@ -19,6 +19,13 @@ export interface MsbReading {
   cooldown_until: string | null;
 }
 
+export interface MsbStatus {
+  status: string;
+  refreshed_at: string | null;
+  last_date: string | null;
+  detail?: string | null;
+}
+
 export interface StockPositionApi {
   symbol: string;
   quantity: number;

@@ -1566,3 +1566,2636 @@ INFO:     127.0.0.1:51251 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 INFO:     127.0.0.1:51242 - "GET /state HTTP/1.1" 200 OK
 INFO:     127.0.0.1:51249 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:51251 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51396 - "GET /psd HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [16168]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51420 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51420 - "GET /assets/index-Cq_GV_cL.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51422 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51420 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51423 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51425 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51424 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51420 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51422 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51421 - "GET /state HTTP/1.1" 200 OK
+INFO:     Started server process [19955]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51812 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51812 - "GET /assets/index-Cq_GV_cL.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:51814 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51812 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51815 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51816 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51814 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51812 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51813 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [19955]
+INFO:     Started server process [20989]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:52061 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52061 - "GET /assets/index-Cq_GV_cL.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:52063 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52064 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52063 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52066 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52061 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52065 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52064 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52062 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52105 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52106 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52118 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52118 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52119 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52125 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52126 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52154 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52154 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52155 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52204 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52205 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52216 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52216 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52217 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52227 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52228 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52232 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52232 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52233 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52264 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52264 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52268 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52268 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52269 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52282 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52283 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52293 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52293 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52294 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52301 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52302 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52306 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52306 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52307 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52317 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52317 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52321 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52321 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52322 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52328 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52329 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52332 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52332 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52333 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52344 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52345 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52352 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52352 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52353 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52390 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52391 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52440 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52440 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52441 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52487 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52487 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52488 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52488 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52499 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52507 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52508 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52514 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52514 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52514 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52522 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52523 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52651 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52651 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52652 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52695 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52696 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52725 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52725 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52726 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52789 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52790 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52812 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52812 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52813 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52819 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52820 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52858 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52858 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52859 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52990 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52990 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53061 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53061 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53062 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53110 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53111 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53145 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53145 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53146 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53175 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53175 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53203 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53203 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53204 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53232 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53232 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53233 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53233 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53259 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53282 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53283 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53288 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53288 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53289 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53772 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53773 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [20989]
+INFO:     Started server process [26940]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53819 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53819 - "GET /assets/index-Cq_GV_cL.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53821 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53819 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53822 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53824 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53821 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53819 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53823 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53820 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26940]
+INFO:     Started server process [27168]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:53838 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53840 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53838 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53842 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53843 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53841 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53839 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [27168]
+INFO:     Started server process [28917]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54584 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54584 - "GET /assets/index-CWncawVo.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54586 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54584 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54586 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54589 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54587 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54584 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54588 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54585 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [28917]
+INFO:     Started server process [29217]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:54657 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54657 - "GET /assets/index-CWncawVo.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:54659 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54657 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54660 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54659 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54662 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54661 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54658 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54658 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54658 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54661 - "GET /assets/index-CWncawVo.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54661 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54658 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54658 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54661 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54657 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55554 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55554 - "GET /assets/index-C1K39JSa.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55556 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55557 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55554 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55558 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55554 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55556 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55558 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55557 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55554 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55601 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55601 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29217]
+INFO:     Started server process [36159]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:55909 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55909 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55910 - "GET /assets/index-C1K39JSa.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:55911 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55913 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55910 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55912 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55911 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55914 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55909 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [36159]
+INFO:     Started server process [36735]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56031 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56031 - "GET /assets/index-C1K39JSa.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56032 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56033 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56034 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56037 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56033 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56034 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56036 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56031 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [36735]
+INFO:     Started server process [42213]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56727 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56728 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56727 - "GET /assets/index-DWSYofQh.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56729 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56727 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56730 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56732 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56729 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56727 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56731 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56728 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [42213]
+INFO:     Started server process [48891]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57573 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57573 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57574 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57575 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57573 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57576 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57575 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57578 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57573 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57574 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57631 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57632 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57641 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57641 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57642 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57712 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57713 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57717 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57717 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57720 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57753 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57754 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57757 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57757 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57758 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57766 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57767 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57769 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57769 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57770 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57782 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57783 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57783 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57783 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57782 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57782 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57784 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57783 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57784 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57782 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57783 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57825 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57826 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57884 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57884 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57885 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57891 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57892 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57908 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57908 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57909 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57914 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57915 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57925 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57925 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57926 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57945 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57946 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57946 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57946 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57945 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57945 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57951 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57946 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57950 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57950 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57946 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57951 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [48891]
+INFO:     Started server process [51506]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57969 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57971 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57969 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57971 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57974 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57972 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57973 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57970 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58004 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58005 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58048 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58048 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58048 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58090 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58091 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58126 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58126 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58127 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58128 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58127 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58129 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58126 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58131 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58128 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58127 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58130 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "POST /powerlaw/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58198 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58233 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58257 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58257 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58264 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58274 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58300 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58317 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58317 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58320 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58322 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "POST /powerlaw/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58343 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58389 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58389 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58415 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58415 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58415 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58419 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58419 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58449 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58449 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58449 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58458 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58458 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58474 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58474 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58474 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58482 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58482 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58491 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58491 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58491 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58504 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58504 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58534 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58534 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58534 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58565 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58565 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58578 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58578 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58578 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58582 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58582 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58618 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58618 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58618 - "GET /state HTTP/1.1" 200 OK
+HTTP Error 404: 
+
+1 Failed download:
+['VX=F']: YFPricesMissingError('possibly delisted; no price data found  (period=5y) (Yahoo error = "No data found, symbol may be delisted")')
+HTTP Error 404: 
+
+1 Failed download:
+['VXF=F']: YFPricesMissingError('possibly delisted; no price data found  (period=5y) (Yahoo error = "No data found, symbol may be delisted")')
+MSB vendor refresh failed: Per-column arrays must each be 1-dimensional
+{"attempt":1,"date":"2026-01-12","error":"[Errno 2] No such file or directory: 'data/vendor/hy.csv'","event":"msb.scheduler","status":"error"}
+{"attempt":2,"date":"2026-01-12","error":"[Errno 2] No such file or directory: 'data/vendor/hy.csv'","event":"msb.scheduler","status":"error"}
+{"attempt":3,"date":"2026-01-12","error":"[Errno 2] No such file or directory: 'data/vendor/hy.csv'","event":"msb.scheduler","status":"error"}
+MSB scheduler run failed: [Errno 2] No such file or directory: 'data/vendor/hy.csv'
+Traceback (most recent call last):
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/src/psd/sentinel/sched.py", line 481, in _scheduler_loop
+    run_msb_scheduler_once(app, vendor_dir=vendor_root, now=run_at)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/src/psd/sentinel/sched.py", line 409, in run_msb_scheduler_once
+    hy, vx1, vx2, spx = _load_vendor(vendor_root)
+                        ~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/src/psd/sentinel/sched.py", line 193, in _load_vendor
+    hy = _load_series(root / "hy.csv")
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/src/psd/sentinel/sched.py", line 182, in _load_series
+    frame = pd.read_csv(csv_path, parse_dates=["date"])
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/.venv/lib/python3.13/site-packages/pandas/io/parsers/readers.py", line 1026, in read_csv
+    return _read(filepath_or_buffer, kwds)
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/.venv/lib/python3.13/site-packages/pandas/io/parsers/readers.py", line 620, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/.venv/lib/python3.13/site-packages/pandas/io/parsers/readers.py", line 1620, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/.venv/lib/python3.13/site-packages/pandas/io/parsers/readers.py", line 1880, in _make_engine
+    self.handles = get_handle(
+                   ~~~~~~~~~~^
+        f,
+        ^^
+    ...<6 lines>...
+        storage_options=self.options.get("storage_options", None),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yordamkocatepe/PycharmProjects/portfolio_exporter/.venv/lib/python3.13/site-packages/pandas/io/common.py", line 873, in get_handle
+    handle = open(
+        handle,
+    ...<3 lines>...
+        newline="",
+    )
+FileNotFoundError: [Errno 2] No such file or directory: 'data/vendor/hy.csv'
+{"date":"2026-01-12","event":"msb.scheduler","reason":"background_failure","status":"error"}
+INFO:     127.0.0.1:58988 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58988 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58989 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58988 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58988 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58993 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58991 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58989 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58991 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58993 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58992 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58990 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59021 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59022 - "GET /state HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51506]
+INFO:     Started server process [54812]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:59069 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59071 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59069 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59071 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59074 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59073 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59072 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59070 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59120 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59121 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59141 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59141 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59142 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59171 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59172 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59184 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59185 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59184 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59186 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59185 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59187 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59186 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59189 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59184 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59188 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59185 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [54812]
+INFO:     Started server process [55687]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:59218 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59220 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59218 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59222 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59223 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59221 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59219 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59245 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59246 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59284 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59284 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59285 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59318 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59319 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59362 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59362 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59363 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59387 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59388 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59435 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59435 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59436 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59449 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59450 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59468 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59468 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59471 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59528 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59529 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59543 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59543 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59544 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59554 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59555 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59578 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59578 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59579 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59600 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59601 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59630 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59630 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59631 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59656 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59657 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59693 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59693 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59694 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59718 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59719 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59743 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59743 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59744 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59788 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59789 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59813 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59813 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59814 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59840 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59841 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59870 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59870 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59871 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "POST /powerlaw/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59889 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59935 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59935 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59943 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59962 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59978 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59985 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59985 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59993 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59996 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59997 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60004 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60004 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60005 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60008 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60009 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60015 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60015 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60032 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60056 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60063 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60073 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60073 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60074 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60100 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60118 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60139 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60139 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60151 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60198 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60200 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60208 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60208 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60231 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60255 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60299 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60347 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60347 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60354 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60362 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60363 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60385 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60385 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60386 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60397 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60419 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60425 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60425 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60428 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60439 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60440 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60447 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60447 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60448 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60456 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60457 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60464 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60464 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60471 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60474 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60475 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60484 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60484 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60485 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60488 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60489 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60498 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60498 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60506 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60515 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60518 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60528 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60528 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60529 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60535 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60538 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60545 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60545 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60548 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60559 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60560 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60575 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60575 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60578 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60581 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60583 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60591 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60591 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60592 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60597 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60600 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60609 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60609 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60615 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60628 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60630 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60631 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60627 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60629 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60673 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60674 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60677 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60677 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60678 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60685 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60686 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60694 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60694 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60695 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60699 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60700 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60712 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60716 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60717 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60723 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60723 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60724 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60730 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60731 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60740 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60740 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60741 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60746 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60747 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60763 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60763 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60764 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60769 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60770 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60780 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60780 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60781 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60785 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60786 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60793 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60793 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60794 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60801 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60803 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60812 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60812 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60813 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60818 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60819 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60833 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60833 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60834 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60839 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60840 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60848 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60848 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60849 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60857 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60858 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60872 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60872 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60873 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60880 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60881 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60890 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60890 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60891 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60896 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60897 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60906 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60906 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60907 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60912 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60913 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60924 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60924 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60925 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60932 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60933 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60940 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60940 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60941 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60947 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60948 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60956 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60956 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60957 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60962 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60963 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60978 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60978 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60980 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60985 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60986 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60993 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60993 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60994 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61001 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61002 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61018 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61018 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61019 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61024 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61025 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61036 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61036 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61038 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61044 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61045 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61052 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61052 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61053 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61061 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61062 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61068 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61068 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61069 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61076 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61077 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61092 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61092 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61093 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61099 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61099 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61108 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61108 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61108 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61114 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61114 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61120 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61120 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61120 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61129 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61129 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61136 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61136 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61136 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61143 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61150 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61150 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61150 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61157 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61157 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61168 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61168 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61168 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61176 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61176 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61187 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61187 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61187 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61197 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61197 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61202 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61202 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61202 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61209 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61209 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61216 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61216 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61216 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61223 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61223 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61229 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61229 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61229 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61239 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61239 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61244 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61244 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61244 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61252 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61265 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61265 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61265 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61272 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61272 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61280 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61280 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61280 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61288 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61288 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61293 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61293 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61293 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61305 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61305 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61310 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61310 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61310 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61317 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61317 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61325 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61325 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61325 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61333 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61333 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61345 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61345 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61345 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61353 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61353 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61358 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61358 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61358 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61367 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61367 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61373 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61373 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61373 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61382 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61382 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61389 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61389 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61389 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61398 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61398 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61403 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61403 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61403 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61412 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61412 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61420 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61420 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61420 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61429 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61429 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61440 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61440 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61440 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61447 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61447 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61453 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61453 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61453 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61461 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61461 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61467 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61467 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61467 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61477 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61477 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61482 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61482 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61482 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61489 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61489 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61504 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61504 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61504 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61512 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61512 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61518 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61518 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61518 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61528 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61528 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61538 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61538 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61538 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61547 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61547 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61552 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61552 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61552 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61559 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61559 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61567 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61567 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61567 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61575 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61575 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61582 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61582 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61582 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61602 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61602 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61607 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61607 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61607 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61615 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61615 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61622 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61622 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61622 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61631 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61631 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61637 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61637 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61637 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61645 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61645 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61650 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61650 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61650 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61659 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61659 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61670 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61670 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61670 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61678 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61678 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61690 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61690 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61690 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61697 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61697 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61702 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61702 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61702 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61711 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61711 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61717 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61717 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61717 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61727 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61727 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61733 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61733 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61733 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61740 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61740 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61748 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61748 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61748 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61755 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61755 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61761 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61761 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61761 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61772 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61772 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61782 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61782 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61782 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61789 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61789 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61800 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61800 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61800 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61807 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61807 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61814 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61814 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61814 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61824 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61824 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61830 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61830 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61830 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61839 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61839 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61844 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61844 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61844 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61851 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61851 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61859 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61859 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61859 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61867 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61867 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61878 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61878 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61878 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61887 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61887 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61892 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61892 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61892 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61902 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61902 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61911 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61911 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61911 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61919 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61919 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61926 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61926 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61926 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61933 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61933 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61938 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61938 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61938 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61951 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61951 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61957 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61957 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61957 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61965 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61965 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61977 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61977 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61977 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61984 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61984 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61996 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61996 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61996 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62005 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62005 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62012 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62012 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62012 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62022 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62022 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62027 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62027 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62027 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62035 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62035 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62042 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62042 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62042 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62049 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62049 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62055 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62065 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62065 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62076 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62076 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62076 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62084 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62084 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62090 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62090 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62090 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62097 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62097 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62104 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62104 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62104 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62113 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62113 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62118 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62118 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62118 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62127 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62127 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62132 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62132 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62132 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62139 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62139 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62152 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62152 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62152 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62160 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62160 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62170 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62170 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62170 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62179 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62179 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62184 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62184 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62184 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62193 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62193 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62199 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62199 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62199 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62207 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62207 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62214 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62214 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62214 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62221 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62221 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62227 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62227 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62227 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62236 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62236 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62242 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62242 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62242 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62251 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62251 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62262 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62262 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62262 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62269 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62269 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62275 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62275 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62275 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62284 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62284 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62290 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62290 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62290 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62300 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62300 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62306 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62306 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62306 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62314 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62314 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62321 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62321 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62321 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62328 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62328 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62334 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62334 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62334 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62344 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62344 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62354 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62354 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62354 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62362 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62362 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62369 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62369 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62369 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62376 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62376 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62388 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62388 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62388 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62396 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62396 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62401 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62401 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62401 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62410 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62410 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62415 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62415 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62415 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62422 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62422 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62430 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62430 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62430 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62438 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62438 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62448 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62448 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62448 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62456 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62456 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62469 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62469 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62469 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62488 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62488 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62494 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62494 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62494 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62502 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62502 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62509 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62509 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62509 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62516 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62516 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62522 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62522 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62522 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62531 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62531 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62537 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62537 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62537 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62546 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62546 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62553 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62553 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62553 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62560 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62560 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62571 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62571 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62571 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62580 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62580 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62586 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62586 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62586 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62596 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62596 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62601 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62601 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62601 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62608 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62608 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62615 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62615 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62615 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62622 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62622 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62633 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62633 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62633 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62646 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62646 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62651 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62651 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62651 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62660 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62660 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62670 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62670 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62670 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62677 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62677 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62685 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62685 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62685 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62693 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62693 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62698 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62698 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62698 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62707 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62707 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62713 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62713 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62713 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62721 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62721 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62732 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62732 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62732 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62741 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62741 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62747 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62747 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62747 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62755 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62755 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62766 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62766 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62766 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62775 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62775 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62781 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62781 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62781 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62789 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62789 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62797 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62797 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62797 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62804 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62804 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62811 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62811 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62811 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62820 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62820 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62826 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62826 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62826 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62836 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62836 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62841 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62841 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62841 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62848 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62848 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62860 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62860 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62860 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62867 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62867 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62875 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62875 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62875 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62885 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62885 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62891 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62891 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62891 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62899 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62899 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62905 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62905 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62905 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62914 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62914 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63039 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63039 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63039 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63048 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63048 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63053 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63053 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63053 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63067 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63067 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63082 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63082 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63082 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63089 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63089 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63097 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63097 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63097 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63105 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63105 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63110 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63110 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63110 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63120 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63120 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63125 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63125 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63125 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63134 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63134 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63141 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63141 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63141 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63149 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63149 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63162 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63162 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63162 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63169 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63169 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63174 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63174 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63174 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63183 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63183 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63189 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63189 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63189 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63197 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63197 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63204 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63204 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63204 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63211 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63211 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63216 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63216 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63216 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63225 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63225 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63236 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63236 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63236 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63246 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63246 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63256 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63256 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63256 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63263 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63263 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63270 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63270 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63270 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63277 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63277 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63283 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63283 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63283 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63293 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63293 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63298 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63298 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63298 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63306 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63306 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63313 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63313 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63313 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63320 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63320 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63327 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63327 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63327 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63336 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63336 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63346 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63346 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63346 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63356 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63356 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63361 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63361 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63361 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63368 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63368 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63384 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63384 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63390 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63390 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63390 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63397 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63397 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63404 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63404 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63404 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63411 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63411 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63419 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63419 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63419 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63425 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63425 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63440 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63440 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63440 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63445 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63445 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63452 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63452 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63452 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63459 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63459 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63469 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63469 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63469 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63487 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63487 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63496 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63496 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63496 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63503 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63503 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63513 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63513 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63513 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63519 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63519 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63527 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63527 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63527 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63534 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63534 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63542 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63542 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63542 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63547 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63547 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63563 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63563 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63563 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63569 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63569 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63582 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63582 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63582 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63597 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63597 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63597 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63604 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63604 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63612 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63612 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63612 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63617 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63617 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63627 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63627 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63627 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63632 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63632 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63641 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63641 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63641 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63648 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63648 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63655 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63655 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63655 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63661 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63661 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63675 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63675 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63675 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63680 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63680 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63689 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63689 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63689 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63695 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63695 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63702 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63702 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63702 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63709 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63709 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63722 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63722 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63722 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63727 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63727 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63737 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63737 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63737 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63742 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63742 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63749 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63749 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63749 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63756 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63756 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63769 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63769 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63769 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63776 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63776 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63788 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63788 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63788 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63793 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63793 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63803 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63803 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63803 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63809 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63809 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63818 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63818 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63818 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63825 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63825 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63835 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63835 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63835 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63841 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63841 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63850 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63850 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63850 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63855 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63855 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63869 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63869 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63869 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63875 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63875 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63884 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63884 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63884 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63891 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63891 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63898 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63898 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63898 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63903 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63903 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63916 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63916 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63916 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63921 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63921 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63929 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63929 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63929 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63936 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63936 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63948 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63948 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63948 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63954 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63954 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63965 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63965 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63965 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63970 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63970 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63979 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63979 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63979 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63985 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63985 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63992 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63992 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63992 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63999 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63999 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64007 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64007 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64007 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64013 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64013 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64023 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64023 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64023 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64028 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64028 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64049 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64049 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64049 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64056 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64056 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64063 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64071 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64071 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64079 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64079 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64079 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64087 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64087 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64096 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64096 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64096 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64101 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64101 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64108 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64108 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64108 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64116 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64116 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64130 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64130 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64136 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64136 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64145 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64145 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64145 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64150 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64150 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64158 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64158 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64158 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64165 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64165 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64173 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64173 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64173 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64180 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64180 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64187 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64187 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64187 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64192 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64192 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64206 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64206 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64206 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64213 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64213 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64226 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64226 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64226 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64233 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64233 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64240 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64240 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64240 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64247 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64247 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64254 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64254 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64254 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64260 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64260 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64270 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64270 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64270 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64275 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64275 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64283 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64283 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64283 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64290 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64290 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64297 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64297 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64297 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64304 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64304 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64318 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64318 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64318 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64323 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64323 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64331 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64331 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64331 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64337 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64337 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64344 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64344 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64344 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64353 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64353 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64362 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64362 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64362 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64378 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64378 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64387 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64387 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64387 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64392 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64392 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64399 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64399 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64399 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64407 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64407 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64415 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64415 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64415 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64429 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64429 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64429 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64435 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64435 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64450 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64450 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64450 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64455 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64455 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64469 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64469 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64469 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64475 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64475 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64483 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64483 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64483 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64488 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64488 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64497 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64497 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64497 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64502 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64502 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64512 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64512 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64512 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64517 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64517 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64535 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64535 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64535 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64541 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64541 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64549 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64549 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64549 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64554 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64554 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64570 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64570 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64570 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64574 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64574 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64582 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64588 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64588 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64596 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64596 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64596 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64603 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64603 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64614 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64614 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64614 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64618 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64618 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64628 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64628 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64628 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64633 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64633 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64641 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64641 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64641 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64648 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64648 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64662 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64662 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64662 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64667 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64667 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64676 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64676 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64676 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64681 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64681 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64695 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64695 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64695 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64701 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64701 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64710 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64710 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64710 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64716 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64716 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64728 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64728 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64728 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64732 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64732 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64744 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64744 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64744 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64749 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64749 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64763 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64763 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64763 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64769 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64769 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64779 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64779 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64779 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64785 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64785 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64793 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64793 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64793 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64798 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64809 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64809 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64809 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64814 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64814 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64823 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64823 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64823 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64830 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64830 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64838 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64838 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64838 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64844 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64844 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64860 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64860 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64860 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64864 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64864 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64872 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64872 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64872 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64878 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64878 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64886 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64886 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64886 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64893 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64893 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64901 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64901 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64901 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64905 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64905 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64915 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64915 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64915 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64919 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64919 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64931 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64938 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64938 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64952 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64952 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64952 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64958 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64958 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64967 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64967 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64967 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64971 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64971 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64980 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64980 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64980 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64986 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64986 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64995 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64995 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64995 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65021 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65021 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65031 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65031 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65031 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65062 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65062 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65076 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65087 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65087 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65103 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65103 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65103 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65120 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65120 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65130 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65130 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65130 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65160 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65160 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65169 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65169 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65169 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65193 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65193 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65201 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65201 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65201 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65214 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65214 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65225 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65225 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65230 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65244 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65244 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65269 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65269 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65269 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65283 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65283 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65293 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65295 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65296 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65292 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65294 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65340 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65341 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65361 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65361 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65362 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65369 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65370 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65384 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65384 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65385 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65411 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65412 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65422 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65422 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65423 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65443 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65444 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65451 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65451 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65452 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65473 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65474 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65482 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65482 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65483 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65492 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65492 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65497 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65497 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65498 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65503 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65504 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65511 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65511 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65512 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65531 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65532 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49154 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49154 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49155 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49168 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49169 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49174 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49174 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49175 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49203 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49204 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49223 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49223 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49224 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49232 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49233 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49249 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49249 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49250 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49273 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49274 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49280 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49280 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49281 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49290 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49291 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49302 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49302 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49304 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49325 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49326 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49343 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49343 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49344 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49361 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49361 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49374 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49374 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49376 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49382 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49383 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49392 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49392 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49393 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49404 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49405 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49422 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49422 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49423 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49439 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49440 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49452 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49452 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49453 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49469 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49470 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49478 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49478 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49479 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49519 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49520 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49524 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49524 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49525 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49543 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49544 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49561 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49561 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49562 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49575 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49576 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49594 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49594 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49595 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49603 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49604 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49610 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49610 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49611 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49618 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49619 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49627 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49627 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49628 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49633 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49634 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49650 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49650 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49651 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49655 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49656 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49664 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49664 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49665 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49673 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49682 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49682 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49683 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49705 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49706 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49728 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49728 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49729 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49734 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49735 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49780 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49780 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49781 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49797 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49798 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49806 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49806 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49807 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49819 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49820 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49843 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49843 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49844 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49853 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49854 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49869 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49869 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49871 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49891 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49892 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49906 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49906 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49907 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49913 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49914 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49920 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49921 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49928 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49929 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49946 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49946 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49947 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49960 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49961 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49971 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49971 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49972 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49981 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49982 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50018 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50018 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50019 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50026 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50027 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50055 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50055 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50056 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50078 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50078 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50085 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50085 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50086 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50103 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50103 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50111 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50111 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50112 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50135 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50135 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50166 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50166 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50167 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50183 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50184 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50214 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50214 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50215 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50239 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50240 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50255 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50255 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50256 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50285 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50286 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50291 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50291 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50292 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50321 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50322 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50343 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50343 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50344 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50358 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50359 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50397 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50397 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50398 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50412 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50413 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50461 - "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50462 - "GET /apple-touch-icon.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50463 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50460 - "GET / HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [55687]
+INFO:     Started server process [37559]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+IBKR client unavailable: There is no current event loop in thread 'psd-msb-startup-refresh'.
+MSB Rule B d5 delta clipped for 1 points (limit=3.00)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [37559]
+INFO:     Started server process [37814]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+IBKR client unavailable: There is no current event loop in thread 'psd-msb-startup-refresh'.
+MSB Rule B d5 delta clipped for 1 points (limit=3.00)
+INFO:     127.0.0.1:54015 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54015 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54016 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54018 - "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54016 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54018 - "GET /apple-touch-icon.png HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54015 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54019 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54019 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54020 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54016 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54015 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54021 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54022 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54016 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54018 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [37814]
+INFO:     Started server process [38093]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+IBKR client unavailable: There is no current event loop in thread 'psd-msb-startup-refresh'.
+MSB Rule B d5 delta clipped for 1 points (limit=3.00)
+INFO:     127.0.0.1:54232 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54232 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54233 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54233 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54234 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54237 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54232 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54233 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54236 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54235 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54395 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54396 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54491 - "GET /msb/current HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54496 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54496 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54497 - "GET /state HTTP/1.1" 200 OK
+IBKR client unavailable: There is no current event loop in thread 'ThreadPoolExecutor-3_0'.
+MSB Rule B d5 delta clipped for 1 points (limit=3.00)
+INFO:     127.0.0.1:54498 - "POST /msb/refresh HTTP/1.1" 200 OK
+IBKR client unavailable: There is no current event loop in thread 'ThreadPoolExecutor-3_0'.
+MSB Rule B d5 delta clipped for 1 points (limit=3.00)
+INFO:     127.0.0.1:54516 - "POST /msb/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54548 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54549 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54742 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54742 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54743 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54926 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54927 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55085 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55085 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55086 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55245 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55246 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55403 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55403 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55405 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55513 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55514 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55671 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55671 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55672 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55852 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55853 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56012 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56012 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56013 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56186 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56187 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56317 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56317 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56318 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56459 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56460 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56620 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56620 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56622 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56800 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56801 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56915 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56915 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56918 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57032 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57033 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57070 - "GET /msb/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57072 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57071 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57066 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57073 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57234 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57235 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57437 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57438 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57439 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57603 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57604 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57759 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57759 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57760 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57918 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57919 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58067 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58067 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58068 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58244 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58245 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58407 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58407 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58408 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58424 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58425 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58455 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58455 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58456 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58480 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58481 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58511 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58512 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58522 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58522 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58524 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58523 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58525 - "GET /msb/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58526 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58522 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58524 - "GET /sse HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [42815]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:58542 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58542 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58543 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58543 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58544 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58542 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58547 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58545 - "GET /msb/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58546 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58543 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58544 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58561 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58562 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58591 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58591 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58592 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58627 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58628 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58682 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58682 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58683 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58694 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58695 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58705 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58705 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58706 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58705 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58706 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58705 - "GET /msb/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58706 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58705 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58710 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58710 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58711 - "GET /msb/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58710 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58711 - "GET /sse HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)
+INFO:     Started server process [44200]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:51127 (Press CTRL+C to quit)
+INFO:     127.0.0.1:58722 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58722 - "GET /assets/index-S4QXkYHW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58723 - "GET /assets/index-YTTrZacT.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58724 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58723 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58722 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58725 - "GET /msb/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58724 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58723 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58733 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58733 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58735 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58737 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58736 - "GET /msb/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58734 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58733 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58735 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58759 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58760 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58765 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58790 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58796 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58796 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58797 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58842 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58843 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58845 - "POST /msb/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58852 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58859 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58859 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58860 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58869 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58870 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58898 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58898 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58899 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58907 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58908 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58935 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58935 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58936 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58965 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58966 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59008 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59008 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59009 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59037 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59038 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59051 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59051 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59052 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59068 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59069 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59090 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59090 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59091 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59134 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59135 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59148 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59148 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59149 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59159 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59160 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59171 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59171 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59172 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59177 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59178 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59186 - "GET /psd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59186 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59188 - "GET /session HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59191 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59189 - "GET /msb/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59186 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59188 - "GET /sse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59190 - "GET /msb/history?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59187 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59201 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59201 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59207 - "GET /rules/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59207 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59207 - "GET /state HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59236 - "GET /stats/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59236 - "GET /state HTTP/1.1" 200 OK

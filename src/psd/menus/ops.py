@@ -71,6 +71,8 @@ _PROCESS_COMMANDS: Mapping[str, list[str]] = {
     "ingestor": [sys.executable, "-m", "psd.ingestor.main"],
     "scanner": [sys.executable, "-m", "psd.sentinel.scan"],
     "web": [
+        sys.executable,
+        "-m",
         "uvicorn",
         "--factory",
         "psd.web.server:make_app",
@@ -119,6 +121,8 @@ def _with_defaults(base: Mapping[str, str]) -> dict[str, str]:
     out.setdefault("PSD_SNAPSHOT_FN", "portfolio_exporter.psd_adapter:snapshot_once")
     out.setdefault("PSD_RULES_FN", "portfolio_exporter.psd_rules:evaluate")
     out.setdefault("IB_HOST", "127.0.0.1")
+    # Prefer IBKR + FRED with Yahoo fallbacks for MSB vendor seeding.
+    out.setdefault("MSB_SOURCE", "ibkr")
     # IB_PORT intentionally NOT set to allow Gateway->TWS auto-fallback.
     # For paper, set IB_PORT=4002 or IB_PORT=7497 in .env.
     if not out.get("IB_CLIENT_ID"):
@@ -136,6 +140,23 @@ def _port_from_env() -> int:
 
 
 def _alive(pid: int) -> bool:
+    # Treat zombie/defunct processes as not alive so we can restart cleanly.
+    try:
+        import psutil  # type: ignore
+
+        proc = psutil.Process(pid)
+        if proc.status() == psutil.STATUS_ZOMBIE:
+            return False
+    except Exception:
+        try:
+            output = subprocess.check_output(
+                ["ps", "-o", "stat=", "-p", str(pid)],
+                text=True,
+            ).strip()
+            if "Z" in output:
+                return False
+        except Exception:
+            pass
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -211,6 +232,49 @@ def _spawn(
             env=dict(env) if env else None,
         )
     return process
+
+
+_MSB_VENDOR_REQUIRED = ("hy.csv", "vx1.csv", "vx2.csv")
+
+
+def _missing_vendor_files(vendor_root: Path) -> list[str]:
+    missing: list[str] = []
+    for name in _MSB_VENDOR_REQUIRED:
+        path = vendor_root / name
+        try:
+            if not path.exists() or path.stat().st_size == 0:
+                missing.append(name)
+        except OSError:
+            missing.append(name)
+    return missing
+
+
+def _seed_vendor_data_if_needed(console: Console, env: Mapping[str, str]) -> None:
+    vendor_root = Path("data") / "vendor"
+    missing = _missing_vendor_files(vendor_root)
+    if not missing:
+        return
+    console.print(
+        f"[yellow]MSB vendor data missing ({', '.join(missing)}); seeding now...[/yellow]"
+    )
+    try:
+        from psd.datasources.msb_vendor import refresh_vendor_data
+
+        status = refresh_vendor_data(vendor_root, env=env)
+    except Exception as exc:  # pragma: no cover - depends on runtime IO
+        console.print(f"[red]MSB vendor seed failed: {exc}[/red]")
+        return
+    missing_after = _missing_vendor_files(vendor_root)
+    if missing_after:
+        hint = ""
+        if "hy.csv" in missing_after and not env.get("FRED_API_KEY"):
+            hint = " (set FRED_API_KEY for HY data)"
+        console.print(
+            "[red]MSB vendor seed incomplete; missing "
+            f"{', '.join(missing_after)}{hint}[/red]"
+        )
+        return
+    console.print(f"[green]MSB vendor data ready.[/green] {status}")
 
 
 def show_status(console: Console) -> None:
@@ -313,6 +377,7 @@ def start_psd(console: Console) -> None:
     env_file = os.environ.get("PSD_ENV_FILE", ".env")
     env_loaded = _load_env_file(env_file)
     child_env = _with_defaults({**os.environ, **env_loaded})
+    _seed_vendor_data_if_needed(console, child_env)
     console.print(
         "[dim]Using {snapshot} | IB {host}:{port} clientId={client_id}[/]".format(
             snapshot=child_env["PSD_SNAPSHOT_FN"],

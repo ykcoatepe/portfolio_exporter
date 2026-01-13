@@ -239,3 +239,69 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** apps/web
 **Status:** open
 **Notes:** options grid now relies on internal sorting state; default column filter array is stable per table FAQ guidance
+
+### 2026-01-12 • Task: Normalize MSB refresh + trigger labels • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** default MSB vendor refresh + API/SSE trigger normalization
+**Interfaces:** src/psd, docs
+**Status:** done
+**Notes:** scheduler now always attempts vendor refresh (disabled via PSD_MSB_AUTO_REFRESH=0); MSB API/SSE outputs map A/B/C triggers to RULE_* labels; docs updated
+
+### 2026-01-12 • Task: Auto-seed MSB vendor data on PSD start • Branch: main
+**Owner:** session/ai | **Scope:** seed MSB vendor CSVs before launching PSD services
+**Interfaces:** src/psd/menus/ops.py
+**Status:** done
+**Notes:** PSD start now checks data/vendor for HY/VX1/VX2 and triggers refresh using IBKR/FRED/Yahoo fallbacks; warns when FRED_API_KEY is missing
+
+### 2026-01-12 • Task: Fix msb-run-now Makefile helper • Branch: main
+**Owner:** session/ai | **Scope:** ensure msb-run-now executes in one shell
+**Interfaces:** Makefile
+**Status:** done
+**Notes:** replaced here-doc with python -c to avoid per-line shell execution errors in make
+
+### 2026-01-12 • Task: Run MSB scheduler from make target • Branch: main
+**Owner:** session/ai | **Scope:** compute+store MSB readings and load .env for FRED
+**Interfaces:** Makefile, src/psd/sentinel/sched.py
+**Status:** done
+**Notes:** msb-run-now now loads .env and calls run_msb_scheduler_once; scheduler log payload key fixed to avoid duplicate status arg
+
+### 2026-01-12 • Task: Auto MSB refresh + IBKR/Yahoo fallback update • Branch: main
+**Owner:** session/ai | **Scope:** auto-refresh MSB on PSD start, add MSB refresh button, improve datasource fallbacks
+**Interfaces:** src/psd/datasources/msb_vendor.py, src/psd/sentinel/sched.py, src/psd/web/app.py, apps/web/src/components/MSBActionBox.tsx, apps/web/src/lib/msb.ts
+**Status:** done
+**Notes:** default IBKR VIX futures root set to VIX with VX fallback; Yahoo fallback uses ^VIX/^VIX3M lists; MSB refresh endpoint + UI button added; startup triggers background MSB refresh; scheduler skips gracefully when vendor files missing
+
+### 2026-01-13 • Task: Fix PSD ops process checks + uvicorn spawn • Branch: main
+**Owner:** session/ai | **Scope:** avoid zombie PID false-positives and ensure web starts via python -m uvicorn
+**Interfaces:** src/psd/menus/ops.py
+**Status:** done
+**Notes:** treat zombie/defunct PIDs as dead; spawn uvicorn via sys.executable to avoid exec format errors
+
+### 2026-01-13 • Task: Make MSB refresh accept stale vendor data • Branch: main
+**Owner:** session/ai | **Scope:** ensure MSB populates even when vendor data is behind today
+**Interfaces:** src/psd/sentinel/sched.py, src/psd/web/app.py, apps/web/src/components/MSBActionBox.tsx, apps/web/src/lib/msb.ts, src/psd/datasources/msb_vendor.py, Makefile
+**Status:** done
+**Notes:** refresh endpoint + startup refresh now force vendor refresh and accept latest available date; MSB refresh UI shows skip status; IBKR MSB vendor defaults to useRTH=False
+
+### 2026-01-13 • Task: Add MSB status badge + status API • Branch: main
+**Owner:** session/ai | **Scope:** show MSB refresh status + last date on dashboard
+**Interfaces:** src/psd/web/app.py, apps/web/src/components/MSBCard.tsx, apps/web/src/hooks/useMsbStatus.ts, apps/web/src/lib/msb.ts, apps/web/src/lib/types.ts
+**Status:** done
+**Notes:** new /msb/status endpoint stores last refresh state; UI badge shows status and last MSB date
+
+### 2026-01-13 • Task: Backfill MSB history from vendor data • Branch: main
+**Owner:** session/ai | **Scope:** populate MSB history on first successful refresh
+**Interfaces:** src/psd/sentinel/sched.py, tests/test_msb_scheduler_once.py
+**Status:** done
+**Notes:** when no MSB rows exist, scheduler now stores full vendor history instead of only latest row
+
+### 2026-01-13 • Task: Backfill MSB when only one row exists • Branch: main
+**Owner:** session/ai | **Scope:** backfill MSB history when DB has only a single row
+**Interfaces:** src/psd/sentinel/sched.py
+**Status:** done
+**Notes:** refresh now backfills full vendor history if history has <=1 row and vendor data has more
+
+### 2026-01-13 • Task: Drop null MSB rows before backfill • Branch: main
+**Owner:** session/ai | **Scope:** prevent DB constraint errors during MSB backfill
+**Interfaces:** src/psd/sentinel/sched.py
+**Status:** done
+**Notes:** backfill now drops rows missing hy/vx1/vx2 to avoid NOT NULL violations

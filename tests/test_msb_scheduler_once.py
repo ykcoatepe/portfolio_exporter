@@ -60,7 +60,7 @@ def test_msb_scheduler_once(monkeypatch, tmp_path: Path):
     )
 
     history = store.read_msb_history(days=10)
-    assert len(history) == 1
+    assert len(history) == len(idx)
     assert history[0]["date"] == idx[-1].date().isoformat()
 
     alert_events = [payload for event, payload in events if event == "sentinel.alert"]

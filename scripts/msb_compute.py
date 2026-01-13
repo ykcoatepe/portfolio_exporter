@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from psd.analytics.msb import compute_msb
+from psd.analytics.msb import MSBConfig, compute_msb
 from psd.datasources import resolve_msb_source
 from psd.datasources.fred import refresh_hy_csv
 
@@ -109,6 +109,30 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("LOWER_Q", "UPPER_Q"),
         help="Winsorization quantile bounds",
     )
+    parser.add_argument(
+        "--calendar-mode",
+        choices=["observed_union", "legacy_weekdays"],
+        default="observed_union",
+        help="Index construction mode for MSB",
+    )
+    parser.add_argument(
+        "--rule-b-source",
+        choices=["raw", "winsor"],
+        default="raw",
+        help="HY series source for Rule B deltas",
+    )
+    parser.add_argument(
+        "--rule-b-delta-clip-abs",
+        type=float,
+        default=3.0,
+        help="Absolute clip for Rule B deltas (HY points); <=0 disables",
+    )
+    parser.add_argument(
+        "--ffill-spx-ret-days",
+        type=int,
+        default=0,
+        help="Forward-fill window for SPX returns (0 disables)",
+    )
     return parser
 
 
@@ -133,6 +157,12 @@ def main() -> None:
     spx_series = _load_series(args.spx_csv) if args.spx_csv else None
 
     lower_q, upper_q = args.winsor
+    config = MSBConfig(
+        calendar_mode=args.calendar_mode,
+        rule_b_source=args.rule_b_source,
+        rule_b_delta_clip_abs=args.rule_b_delta_clip_abs,
+        ffill_spx_ret_days=args.ffill_spx_ret_days,
+    )
     df = compute_msb(
         hy=hy_series,
         vx1=vx1_series,
@@ -142,6 +172,7 @@ def main() -> None:
         lq=lower_q,
         uq=upper_q,
         spx_ret=spx_series,
+        config=config,
     )
 
     _ensure_parent(args.out)

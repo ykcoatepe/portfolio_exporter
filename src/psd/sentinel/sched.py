@@ -41,7 +41,7 @@ from fastapi import FastAPI
 from psd.analytics.msb import compute_msb
 from psd.core import store
 from psd.datasources import resolve_msb_source
-from psd.datasources.fred import refresh_hy_csv
+from psd.datasources.msb_vendor import refresh_vendor_data
 from psd.sentinel.msb_actions import evaluate_msb_triggers_and_update_livebar
 from psd.sentinel.msb_metrics import MSB_SCHEDULER_RUNS
 
@@ -196,6 +196,18 @@ def _load_vendor(
     spx_path = root / "spx_ret.csv"
     spx = _load_series(spx_path) if spx_path.exists() else None
     return hy, vx1, vx2, spx
+
+
+def _missing_vendor_files(root: Path) -> list[str]:
+    missing: list[str] = []
+    for name in ("hy.csv", "vx1.csv", "vx2.csv"):
+        path = root / name
+        try:
+            if not path.exists() or path.stat().st_size == 0:
+                missing.append(name)
+        except OSError:
+            missing.append(name)
+    return missing
 
 
 def _compute_streak_ge_60(msb_series: pd.Series) -> int:
@@ -372,6 +384,8 @@ def run_msb_scheduler_once(
     vendor_dir: Path | str | None = None,
     now: datetime | None = None,
     max_retries: int = 3,
+    allow_stale: bool = False,
+    force_refresh: bool = False,
 ) -> bool:
     """Execute the daily MSB scheduler job once."""
     vendor_root = Path(vendor_dir) if vendor_dir is not None else _VENDOR_ROOT
@@ -380,26 +394,48 @@ def run_msb_scheduler_once(
     today_iso = today.isoformat()
 
     current = store.read_msb_current()
-    if current and str(current.get("date")) == today_iso:
+    history_count = len(store.read_msb_history(days=365))
+    if (
+        current
+        and str(current.get("date")) == today_iso
+        and not force_refresh
+        and history_count > 1
+    ):
         _log_scheduler("skipped", reason="already_up_to_date", date=today_iso)
         MSB_SCHEDULER_RUNS.inc()
         return False
 
-    msb_source = resolve_msb_source(os.environ)
-    if msb_source == "fred":
-        hy_path = vendor_root / "hy.csv"
-        try:
-            refreshed = refresh_hy_csv(hy_path, env=os.environ)
-        except Exception as exc:  # pragma: no cover - depends on network/env
-            _SCHED_LOG.warning("FRED HY refresh failed: %s", exc)
-            _log_scheduler(
-                "warn", date=today_iso, reason="fred_refresh_failed", error=str(exc)
-            )
-        else:
-            if refreshed:
-                _log_scheduler(
-                    "refresh", date=today_iso, source="fred", path=str(hy_path)
-                )
+    env_map = dict(os.environ)
+    if force_refresh:
+        env_map["MSB_VENDOR_FORCE_REFRESH"] = "1"
+        env_map["MSB_VENDOR_TTL_HOURS"] = "0"
+
+    msb_source = resolve_msb_source(env_map)
+    try:
+        status = refresh_vendor_data(vendor_root, env=env_map)
+    except Exception as exc:  # pragma: no cover - depends on network/env
+        _SCHED_LOG.warning("MSB vendor refresh failed: %s", exc)
+        _log_scheduler(
+            "warn", date=today_iso, reason="vendor_refresh_failed", error=str(exc)
+        )
+    else:
+        _log_scheduler(
+            "refresh",
+            date=today_iso,
+            source=msb_source,
+            vendor=status,
+        )
+
+    missing = _missing_vendor_files(vendor_root)
+    if missing:
+        _log_scheduler(
+            "skipped",
+            reason="vendor_missing",
+            date=today_iso,
+            missing=missing,
+        )
+        MSB_SCHEDULER_RUNS.inc()
+        return False
 
     attempt = 0
     backoff = 5.0
@@ -408,24 +444,43 @@ def run_msb_scheduler_once(
         try:
             hy, vx1, vx2, spx = _load_vendor(vendor_root)
             df = compute_msb(hy=hy, vx1=vx1, vx2=vx2, spx_ret=spx)
+            df = df.dropna(subset=["hy", "vx1", "vx2"])
             if df.empty:
                 _log_scheduler("skipped", reason="empty_frame", date=today_iso)
                 MSB_SCHEDULER_RUNS.inc()
                 return False
             latest_idx = df.index[-1]
             latest_date = latest_idx.date()
-            if latest_date != today:
-                _log_scheduler(
-                    "skipped",
-                    reason="pending_vendor_data",
-                    date=today_iso,
-                    latest=latest_date.isoformat(),
-                )
+            latest_iso = latest_date.isoformat()
+            history_count = len(store.read_msb_history(days=365))
+            backfill_needed = history_count <= 1 and len(df) > 1
+            if current and str(current.get("date")) == latest_iso and not backfill_needed:
+                _log_scheduler("skipped", reason="already_up_to_date", date=latest_iso)
                 MSB_SCHEDULER_RUNS.inc()
                 return False
+            if latest_date != today:
+                if not allow_stale:
+                    _log_scheduler(
+                        "skipped",
+                        reason="pending_vendor_data",
+                        date=today_iso,
+                        latest=latest_iso,
+                    )
+                    MSB_SCHEDULER_RUNS.inc()
+                    return False
+                _log_scheduler(
+                    "stale",
+                    date=today_iso,
+                    latest=latest_iso,
+                )
 
             row_dict, context = _prepare_context(df, spx)
-            store_frame = df.iloc[[-1]]
+            if current is None or backfill_needed:
+                store_frame = df
+                backfill = True
+            else:
+                store_frame = df.iloc[[-1]]
+                backfill = False
             affected = store.store_msb(store_frame)
 
             from psd.web.app import broadcast_latest_msb
@@ -447,6 +502,7 @@ def run_msb_scheduler_once(
                 rows=affected,
                 alerts=len(alerts),
                 broadcast=broadcast_ok,
+                backfill=backfill,
             )
             MSB_SCHEDULER_RUNS.inc()
             return True

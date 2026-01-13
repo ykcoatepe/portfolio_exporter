@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -30,7 +31,11 @@ from psd.core.store import (
     tail_events,
 )
 from psd.ingestor.normalize import split_positions
-from psd.sentinel.sched import start_msb_scheduler, stop_msb_scheduler
+from psd.sentinel.sched import (
+    run_msb_scheduler_once,
+    start_msb_scheduler,
+    stop_msb_scheduler,
+)
 from psd.ui.exporters import export_snapshot
 from psd.web.config import Settings, get_settings
 from psd.web.ready import router as ready_router
@@ -114,6 +119,60 @@ class MsbDTO(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class MsbRefreshDTO(BaseModel):
+    ok: bool
+    status: str
+    detail: str | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class MsbStatusDTO(BaseModel):
+    status: str
+    refreshed_at: str | None = None
+    last_date: str | None = None
+    detail: str | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+_MSB_TRIGGER_LABELS = {
+    "A": "RULE_A_VIX_BACKWARDATION",
+    "B": "RULE_B_HY_SHOCK",
+    "C": "RULE_C_MSB_60x3D",
+}
+
+
+def _normalize_msb_payload(record: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(record)
+    triggers = payload.get("triggers")
+    if isinstance(triggers, list):
+        mapped: list[str] = []
+        for item in triggers:
+            if not isinstance(item, str):
+                continue
+            key = item.strip().upper()
+            mapped.append(_MSB_TRIGGER_LABELS.get(key, item))
+        payload["triggers"] = mapped
+    return payload
+
+
+def _set_msb_refresh_state(
+    app: FastAPI,
+    *,
+    status: str,
+    detail: str | None = None,
+) -> None:
+    record = read_msb_current()
+    last_date = record.get("date") if record else None
+    app.state.msb_refresh = {
+        "status": status,
+        "detail": detail,
+        "refreshed_at": datetime.now(UTC).isoformat(),
+        "last_date": last_date,
+    }
+
+
 def _create_lifespan(settings: Settings) -> Any:
     if settings.disable_background:
         return None
@@ -122,6 +181,28 @@ def _create_lifespan(settings: Settings) -> Any:
     async def lifespan(_app: FastAPI):
         init()
         start_msb_scheduler(_app)
+        if settings.msb_startup_refresh:
+            def _startup_refresh() -> None:
+                try:
+                    updated = run_msb_scheduler_once(
+                        _app,
+                        allow_stale=True,
+                        force_refresh=True,
+                    )
+                    _set_msb_refresh_state(
+                        _app,
+                        status="updated" if updated else "skipped",
+                        detail=None if updated else "no new data",
+                    )
+                except Exception as exc:  # pragma: no cover - depends on runtime IO
+                    log.warning("msb startup refresh failed", exc_info=True)
+                    _set_msb_refresh_state(_app, status="error", detail=str(exc))
+
+            threading.Thread(
+                target=_startup_refresh,
+                name="psd-msb-startup-refresh",
+                daemon=True,
+            ).start()
         try:
             if broadcast_latest_stats(_app, trigger="startup"):
                 STATS_STARTUP_BROADCASTS.inc()
@@ -438,13 +519,13 @@ def msb_current() -> MsbDTO:
     record = read_msb_current()
     if not record:
         raise HTTPException(status_code=404, detail="MSB reading unavailable")
-    return MsbDTO.model_validate(record)
+    return MsbDTO.model_validate(_normalize_msb_payload(record))
 
 
 @router.get("/msb/history", response_model=list[MsbDTO])
 def msb_history(days: int = 365) -> list[MsbDTO]:
     history = read_msb_history(days)
-    return [MsbDTO.model_validate(entry) for entry in history]
+    return [MsbDTO.model_validate(_normalize_msb_payload(entry)) for entry in history]
 
 
 @router.get("/positions/combos")
@@ -493,7 +574,7 @@ def rules_summary() -> dict:
 
 @router.get("/msb/history.csv")
 def msb_history_csv(days: int = 365) -> Response:
-    history = read_msb_history(days)
+    history = [_normalize_msb_payload(entry) for entry in read_msb_history(days)]
     content, media_type, filename = export_snapshot(history, fmt="csv")
     headers = {"Content-Disposition": f"attachment; filename={filename}"}
     return Response(content=content, media_type=media_type, headers=headers)
@@ -501,10 +582,45 @@ def msb_history_csv(days: int = 365) -> Response:
 
 @router.get("/msb/history.parquet")
 def msb_history_parquet(days: int = 365) -> Response:
-    history = read_msb_history(days)
+    history = [_normalize_msb_payload(entry) for entry in read_msb_history(days)]
     content, media_type, filename = export_snapshot(history, fmt="parquet")
     headers = {"Content-Disposition": f"attachment; filename={filename}"}
     return Response(content=content, media_type=media_type, headers=headers)
+
+
+@router.post("/msb/refresh", response_model=MsbRefreshDTO)
+async def msb_refresh(request: Request) -> MsbRefreshDTO:
+    try:
+        updated = await asyncio.to_thread(
+            run_msb_scheduler_once,
+            request.app,
+            allow_stale=True,
+            force_refresh=True,
+        )
+    except Exception as exc:
+        log.warning("msb refresh failed: %s", exc, exc_info=True)
+        _set_msb_refresh_state(request.app, status="error", detail=str(exc))
+        raise HTTPException(status_code=500, detail="MSB refresh failed") from exc
+    if updated:
+        _set_msb_refresh_state(request.app, status="updated", detail=None)
+        return MsbRefreshDTO(ok=True, status="updated")
+    _set_msb_refresh_state(request.app, status="skipped", detail="no new data")
+    return MsbRefreshDTO(ok=False, status="skipped", detail="no new data")
+
+
+@router.get("/msb/status", response_model=MsbStatusDTO)
+def msb_status(request: Request) -> MsbStatusDTO:
+    state = getattr(request.app.state, "msb_refresh", None)
+    record = read_msb_current()
+    last_date = record.get("date") if record else None
+    if not isinstance(state, dict):
+        return MsbStatusDTO(status="unknown", last_date=last_date)
+    return MsbStatusDTO(
+        status=str(state.get("status") or "unknown"),
+        refreshed_at=state.get("refreshed_at"),
+        last_date=state.get("last_date") or last_date,
+        detail=state.get("detail"),
+    )
 
 
 @router.post("/msb/broadcast", status_code=status.HTTP_200_OK)
@@ -522,7 +638,7 @@ def broadcast_latest_msb(app: FastAPI) -> bool:
     record = read_msb_current()
     if not record:
         return False
-    dto = MsbDTO.model_validate(record).model_dump(mode="json")
+    dto = MsbDTO.model_validate(_normalize_msb_payload(record)).model_dump(mode="json")
     manager.broadcast("msb.update", dto)
     try:
         broadcast_latest_stats(app, trigger="msb")
@@ -566,6 +682,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     manager = SseManager(heartbeat_interval=resolved.sse_heartbeat_sec)
     app.state.sse = manager
     app.state.settings = resolved
+    app.state.msb_refresh = {
+        "status": "unknown",
+        "detail": None,
+        "refreshed_at": None,
+        "last_date": None,
+    }
     app.dependency_overrides[get_settings] = lambda: resolved
 
     @app.get("/sse")

@@ -19,6 +19,7 @@
 - Endpoints: `/msb/current`, `/msb/history?days=365`, `/msb/history.csv`, `/msb/history.parquet`, `/sse` (`event: "msb.update"`).
 - Scheduler: 17:30 TRT business-days, idempotent (skips writes when today already exists).
 - Metrics: `psd_msb_scheduler_runs_total`, `psd_msb_alerts_total{rule}`, `psd_livebar_rows_total`.
+- Triggers are exposed as `RULE_A_VIX_BACKWARDATION`, `RULE_B_HY_SHOCK`, `RULE_C_MSB_60x3D` in API/SSE payloads.
 
 ## API Surfaces
 - `GET /psd` returns the compiled dashboard; other static assets flow from `apps/web/dist`.
@@ -36,9 +37,12 @@
 
 ## MSB Scheduler & Live Bar
 - Vendor inputs are read from `data/vendor/hy.csv`, `vx1.csv`, `vx2.csv`, and optional `spx_ret.csv`; missing SPX input simply skips Rule A evaluations.
+- Vendor refresh runs by default; disable with `PSD_MSB_AUTO_REFRESH=0` to use cached CSVs only.
 - Live hedges are mirrored in `data/live_status_bar.csv` with columns `Hedge, Cost % NAV, Status, Expiry, Trigger, TriggerTimeTRT, Notes`. Rule defaults (A/B staged spreads, C beta reduction) are appended, and existing LIVE rows dedupe with the note “already hedged; maintain size”.
 - Trigger the same workflow manually via `make msb-run-now`, which reuses the evaluation and Live Status Bar update logic without waiting for the 17:30 TRT window.
-- Configure HY source via `MSB_SOURCE`: default `vendor`, optional `fred`, `ibkr`, or `yf`. When set to `fred`, provide `FRED_API_KEY` to refresh `data/vendor/hy.csv` (offline/test modes skip the download).
+- Configure sources via `MSB_SOURCE`: default `vendor`, optional `fred`, `ibkr`, or `yf`.
+  - `ibkr` uses IBKR for VX1/VX2/SPX when available and falls back to Yahoo Finance.
+  - HY-OAS still refreshes from FRED when `FRED_API_KEY` is set; otherwise uses the existing vendor CSV.
 
 ## Testing
 - Use `psd.web.app.create_app(Settings(test_mode=True, disable_background=True))` when exercising the API in tests to avoid background tasks and long-lived loops. The CLI `scripts/msb_emit.py` calls the live server at `/msb/broadcast`, so ensure the API is running locally (default `http://127.0.0.1:51127`).

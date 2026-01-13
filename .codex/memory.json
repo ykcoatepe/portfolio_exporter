@@ -429,6 +429,64 @@
       "details": "Use internal sorting state for options grid and stable empty filter references to align with TanStack Table state memoization guidance.",
       "event": "PSD options sorting state stabilization",
       "timestamp": "2026-01-12T14:05:45Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T14:12:57Z"
+    },
+    {
+      "details": "Scheduler now calls vendor refresh by default (disable via PSD_MSB_AUTO_REFRESH=0); API/SSE map A/B/C triggers to RULE_* labels; docs updated.",
+      "event": "MSB refresh default + trigger normalization",
+      "timestamp": "2026-01-12T14:14:53Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-12T14:17:50Z"
+    },
+    {
+      "details": "PSD start checks data/vendor for HY/VX1/VX2, refreshes via IBKR/FRED/Yahoo fallbacks, and warns if FRED_API_KEY is missing.",
+      "event": "Auto-seed MSB vendor data on PSD start",
+      "timestamp": "2026-01-12T14:26:09Z"
+    },
+    {
+      "details": "msb-run-now now loads .env, sets MSB_SOURCE=ibkr, and runs run_msb_scheduler_once; scheduler log payload uses vendor key to avoid duplicate status arg.",
+      "event": "Fix MSB scheduler logging + msb-run-now",
+      "timestamp": "2026-01-12T14:41:21Z"
+    },
+    {
+      "details": "IBKR default VIX roots and Yahoo ^VIX/^VIX3M fallbacks; MSB refresh endpoint + UI button; startup background refresh; scheduler skips when vendor inputs missing.",
+      "event": "Add MSB refresh flow",
+      "timestamp": "2026-01-12T14:54:41Z"
+    },
+    {
+      "details": "ops now treats zombie PIDs as not alive and spawns web via python -m uvicorn to avoid exec format errors.",
+      "event": "Fix PSD ops process checks",
+      "timestamp": "2026-01-13T07:04:39Z"
+    },
+    {
+      "details": "MSB refresh/startup now force vendor refresh and accept latest available date; msb refresh UI shows skip status; IBKR MSB vendor defaults to useRTH=False.",
+      "event": "Allow stale MSB refresh",
+      "timestamp": "2026-01-13T07:14:27Z"
+    },
+    {
+      "details": "Expose /msb/status with last refresh state/date and render status badge on MSB card.",
+      "event": "Add MSB status badge",
+      "timestamp": "2026-01-13T07:22:16Z"
+    },
+    {
+      "details": "Scheduler now stores full vendor MSB history on first successful refresh; tests updated accordingly.",
+      "event": "Backfill MSB history",
+      "timestamp": "2026-01-13T07:25:57Z"
+    },
+    {
+      "details": "Scheduler now backfills full vendor history if DB has <=1 row and vendor history is longer.",
+      "event": "Backfill MSB when only one row exists",
+      "timestamp": "2026-01-13T07:28:44Z"
+    },
+    {
+      "details": "MSB backfill now drops rows missing hy/vx1/vx2 to avoid NOT NULL constraint failures.",
+      "event": "Drop null MSB rows before backfill",
+      "timestamp": "2026-01-13T07:35:16Z"
     }
   ],
   "decisions": [
@@ -865,6 +923,22 @@
       "rationale": "TanStack Table FAQ warns that unstable data/state references can cause re-render loops; uncontrolled sorting and stable defaults reduce churn.",
       "timestamp": "2026-01-12T14:05:39Z",
       "title": "PSD option grid sorting state"
+    },
+    {
+      "context": null,
+      "decision": "Check data/vendor for HY/VX1/VX2 and refresh via IBKR/FRED/Yahoo before launching PSD; default MSB_SOURCE=ibkr.",
+      "id": 57,
+      "rationale": "Avoid empty MSB history when PSD starts.",
+      "timestamp": "2026-01-12T14:26:05Z",
+      "title": "Auto-seed MSB vendor data on PSD start"
+    },
+    {
+      "context": null,
+      "decision": "Web app now launches a background MSB refresh on startup and exposes /msb/refresh for UI-triggered updates.",
+      "id": 58,
+      "rationale": "Make MSB data available immediately after starting PSD without manual steps.",
+      "timestamp": "2026-01-12T14:54:35Z",
+      "title": "Auto-refresh MSB on PSD startup"
     }
   ],
   "preferences": {

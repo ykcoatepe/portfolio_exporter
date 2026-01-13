@@ -159,14 +159,7 @@ msb-emit:
 
 .PHONY: msb-run-now
 msb-run-now:
-	python - <<'PY'
-	from psd.sentinel.msb_actions import evaluate_msb_triggers_and_update_livebar
-	from psd.web.app import create_app
-	from psd.web.config import Settings
-
-	app = create_app(Settings(disable_background=True))
-	evaluate_msb_triggers_and_update_livebar(app)
-	PY
+	@set -a; [ -f .env ] && . ./.env; set +a; MSB_SOURCE=ibkr python -c "from psd.sentinel.sched import run_msb_scheduler_once; from psd.web.app import create_app; from psd.web.config import Settings; app = create_app(Settings(disable_background=True)); run_msb_scheduler_once(app, allow_stale=True, force_refresh=True)"
 
 # ------------------------------------------------------------------
 # Sanity helpers

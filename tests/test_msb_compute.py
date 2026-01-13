@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from psd.analytics.msb import compute_msb
+from psd.analytics.msb import MSBConfig, compute_msb
 
 
 def _baseline_series(
@@ -169,3 +169,79 @@ def test_cli_logs_winsor_anomalies(tmp_path: Path):
     assert anomalies_path.exists()
     entries = [json.loads(line) for line in anomalies_path.read_text().splitlines() if line.strip()]
     assert any(entry.get("kind") == "winsor_clip" for entry in entries)
+
+
+def test_rule_b_uses_raw_deltas_by_default():
+    idx = pd.bdate_range("2024-01-02", periods=6)
+    hy = pd.Series([4.0, 4.0, 4.0, 4.0, 4.0, 10.0], index=idx)
+    vx1 = pd.Series(18.0, index=idx)
+    vx2 = pd.Series(20.0, index=idx)
+
+    df_raw = compute_msb(
+        hy=hy,
+        vx1=vx1,
+        vx2=vx2,
+        window=5,
+        fallback=3,
+        lq=0.5,
+        uq=0.5,
+    )
+    assert "B" in df_raw.iloc[-1]["triggers"]
+
+    df_winsor = compute_msb(
+        hy=hy,
+        vx1=vx1,
+        vx2=vx2,
+        window=5,
+        fallback=3,
+        lq=0.5,
+        uq=0.5,
+        config=MSBConfig(rule_b_source="winsor"),
+    )
+    assert "B" not in df_winsor.iloc[-1]["triggers"]
+
+
+def test_spx_ret_not_forward_filled_prevents_false_rule_a():
+    idx = pd.bdate_range("2024-01-02", periods=3)
+    hy = pd.Series(4.0, index=idx)
+    vx1 = pd.Series(22.0, index=idx)
+    vx2 = pd.Series(20.0, index=idx)
+    spx = pd.Series(
+        [-0.01, 0.01], index=pd.DatetimeIndex([idx[0], idx[2]])
+    )
+
+    df = compute_msb(hy=hy, vx1=vx1, vx2=vx2, spx_ret=spx, window=5, fallback=3)
+
+    assert "A" in df.loc[idx[0], "triggers"]
+    assert "A" not in df.loc[idx[1], "triggers"]
+    assert "A" not in df.loc[idx[2], "triggers"]
+
+
+def test_observed_union_calendar_does_not_fabricate_days():
+    idx = pd.DatetimeIndex(["2024-01-02", "2024-01-04"])
+    hy = pd.Series([4.0, 4.1], index=idx)
+    vx1 = pd.Series([18.0, 18.2], index=idx)
+    vx2 = pd.Series([20.0, 20.1], index=idx)
+
+    df = compute_msb(hy=hy, vx1=vx1, vx2=vx2, window=5, fallback=3)
+    assert list(df.index) == list(pd.to_datetime(idx).normalize())
+    assert "2024-01-03" not in df.index.astype(str)
+
+
+def test_rule_c_cooldown_boundary_behavior():
+    idx = pd.bdate_range("2024-01-02", periods=40)
+    hy = pd.Series(8.0, index=idx)
+    vx1 = pd.Series(45.0, index=idx)
+    vx2 = pd.Series(30.0, index=idx)
+    spx = pd.Series(-0.002, index=idx)
+
+    df = compute_msb(
+        hy=hy, vx1=vx1, vx2=vx2, spx_ret=spx, window=20, fallback=5
+    )
+    trigger_dates = [i for i, flags in df["triggers"].items() if "C" in flags]
+    assert trigger_dates
+    first_trigger = trigger_dates[0]
+    cooldown_until = (pd.Timestamp(first_trigger) + pd.tseries.offsets.BDay(5)).normalize()
+    assert "C" not in df.loc[cooldown_until, "triggers"]
+    later_triggers = [d for d in trigger_dates if d > cooldown_until]
+    assert later_triggers
