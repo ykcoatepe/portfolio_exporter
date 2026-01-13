@@ -136,6 +136,32 @@ def test_powerlaw_snapshot_missing(monkeypatch, tmp_path):
     assert snapshot["stale_reason"] == "missing_snapshot"
 
 
+def test_powerlaw_snapshot_allows_absolute_output_dir(monkeypatch, tmp_path):
+    output_dir = tmp_path / "powerlaw-output"
+    output_dir.mkdir(parents=True)
+    _write_snapshot(
+        output_dir / "trader_v5_daily_2025-01-03.json",
+        {"as_of": "2025-01-03", "plke": 41.0},
+    )
+
+    monkeypatch.setenv("PSD_POWERLAW_REPO", "/tmp/psd-powerlaw-missing")
+    monkeypatch.setenv("PSD_POWERLAW_OUTPUT_DIR", str(output_dir))
+    monkeypatch.setenv("PSD_POWERLAW_REFRESH", "0")
+    monkeypatch.setattr(
+        psd_powerlaw,
+        "_calendar_trading_days",
+        lambda reference, lookback: [date(2025, 1, 3)],
+    )
+
+    snapshot = psd_powerlaw.load_powerlaw_snapshot(
+        now=datetime(2025, 1, 3, 12, tzinfo=psd_powerlaw.TZ_NY)
+    )
+
+    assert snapshot is not None
+    assert snapshot["stale"] is False
+    assert snapshot["as_of"] == "2025-01-03"
+
+
 def test_request_refresh_disabled_when_missing_repo(monkeypatch):
     monkeypatch.setenv("PSD_POWERLAW_REPO", "/tmp/psd-powerlaw-missing")
     monkeypatch.setenv("PSD_POWERLAW_OUTPUT_DIR", "output")

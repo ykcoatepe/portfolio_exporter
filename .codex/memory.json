@@ -658,6 +658,11 @@
       "details": "Require an actual mark before using previous_close for intraday P&L and prefer previous_close over pnl_leg when both are present.",
       "event": "Guard day P&L without mark",
       "timestamp": "2026-01-13T12:49:24Z"
+    },
+    {
+      "details": "Read powerlaw snapshots from absolute PSD_POWERLAW_OUTPUT_DIR even when repo root is missing; add coverage.",
+      "event": "Allow absolute powerlaw output dir",
+      "timestamp": "2026-01-13T13:07:02Z"
     }
   ],
   "decisions": [
@@ -1150,6 +1155,14 @@
       "rationale": "Avoids non-zero intraday P&L when marks are missing and preserves expected intraday precedence.",
       "timestamp": "2026-01-13T12:49:19Z",
       "title": "Day P&L requires real mark"
+    },
+    {
+      "context": null,
+      "decision": "Permit load_powerlaw_snapshot to read from an absolute PSD_POWERLAW_OUTPUT_DIR even when PSD_POWERLAW_REPO is missing; keep refresh disabled without repo.",
+      "id": 64,
+      "rationale": "Deployments can ship snapshots without the repo while still exposing powerlaw data.",
+      "timestamp": "2026-01-13T13:06:58Z",
+      "title": "Allow repo-less powerlaw snapshots"
     }
   ],
   "preferences": {

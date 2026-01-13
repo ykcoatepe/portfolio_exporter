@@ -46,7 +46,7 @@ _TRADING_DAYS_LOCK = threading.Lock()
 
 def load_powerlaw_snapshot(now: datetime | None = None) -> dict[str, Any] | None:
     cfg = _load_config()
-    if cfg.repo_root is None or cfg.output_dir is None:
+    if cfg.output_dir is None:
         return {
             "stale": True,
             "stale_reason": "config_missing",
@@ -104,9 +104,12 @@ def _load_config() -> PowerlawConfig:
 
     output_env = os.getenv("PSD_POWERLAW_OUTPUT_DIR", "output").strip()
     output_dir = None
-    if repo_root:
+    if output_env:
         candidate = Path(output_env).expanduser()
-        output_dir = candidate if candidate.is_absolute() else repo_root / candidate
+        if candidate.is_absolute():
+            output_dir = candidate
+        elif repo_root:
+            output_dir = repo_root / candidate
 
     refresh_enabled = _parse_bool(os.getenv("PSD_POWERLAW_REFRESH", "1"))
     stale_days = _parse_int(os.getenv("PSD_POWERLAW_STALE_TRADING_DAYS", "1"), 1)
