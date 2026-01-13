@@ -70,6 +70,8 @@ def load_powerlaw_snapshot(now: datetime | None = None) -> dict[str, Any] | None
     refresh_meta = _refresh_payload(cfg)
 
     payload = dict(normalized)
+    if not payload.get("data_quality"):
+        payload["data_quality"] = "WARN" if stale else "OK"
     payload.update(
         {
             "stale": stale,
@@ -205,6 +207,10 @@ def _normalize_snapshot(raw: dict[str, Any] | None) -> dict[str, Any]:
     if plke_band is None:
         plke_band = _coerce_str(raw.get("plke_band_aplh"))
 
+    data_quality_detail = _coerce_str_list(raw.get("data_quality_detail"))
+    if not data_quality_detail:
+        data_quality_detail = _coerce_str_list(raw.get("data_warnings"))
+
     return {
         "as_of": _coerce_str(raw.get("as_of")),
         "plke": _coerce_float(raw.get("plke")),
@@ -220,6 +226,7 @@ def _normalize_snapshot(raw: dict[str, Any] | None) -> dict[str, Any]:
         "hedge_notional": hedge_notional,
         "small_cap": small_cap,
         "data_quality": _coerce_str(raw.get("data_quality")),
+        "data_quality_detail": data_quality_detail,
     }
 
 
@@ -262,6 +269,18 @@ def _coerce_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _coerce_str_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        out = []
+        for item in value:
+            text = _coerce_str(item)
+            if text:
+                out.append(text)
+        return out
+    text = _coerce_str(value)
+    return [text] if text else []
 
 
 def _parse_date(value: Any) -> date | None:

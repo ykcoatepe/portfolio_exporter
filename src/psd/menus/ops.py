@@ -50,6 +50,7 @@ import json
 import os
 import random
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -62,10 +63,21 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
 RUN_DIR = Path(os.getenv("PSD_RUN_DIR", "run"))
+if not RUN_DIR.is_absolute():
+    RUN_DIR = (REPO_ROOT / RUN_DIR).resolve()
 PID_FILE = RUN_DIR / "psd-pids.json"
 SERVICES = ("ingestor", "scanner", "web")
+UI_SERVICE = "ui"
 DEFAULT_PORT = 51127
+WEB_ROOT = REPO_ROOT / "apps" / "web"
+DIST_INDEX = WEB_ROOT / "dist" / "index.html"
+DEV_HOST = "localhost"
+try:
+    DEV_PORT = int(os.getenv("PSD_DEV_PORT", "5173"))
+except ValueError:
+    DEV_PORT = 5173
 
 _PROCESS_COMMANDS: Mapping[str, list[str]] = {
     "ingestor": [sys.executable, "-m", "psd.ingestor.main"],
@@ -88,6 +100,7 @@ _LOG_NAMES = {
     "ingestor": "ingestor.log",
     "scanner": "scanner.log",
     "web": "web.log",
+    UI_SERVICE: "ui.log",
 }
 
 LOG_TAIL_LINES = int(os.getenv("PSD_LOG_TAIL_LINES", "40"))
@@ -99,6 +112,140 @@ ENV_SUMMARY_KEYS: tuple[str, ...] = (
     "IB_PORT",
     "IB_CLIENT_ID",
 )
+
+
+def _port_open(host: str, port: int, timeout: float = 0.5) -> bool:
+    """Check if a port is open, trying both IPv4 and IPv6."""
+    for family in (socket.AF_INET, socket.AF_INET6):
+        try:
+            with socket.socket(family, socket.SOCK_STREAM) as sock:
+                sock.settimeout(timeout)
+                addr = (
+                    "::1"
+                    if family == socket.AF_INET6 and host in ("localhost", "127.0.0.1")
+                    else host
+                )
+                sock.connect((addr, port))
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _ensure_uvicorn_runtime(console: Console) -> bool:
+    """Install uvicorn runtime deps if they are missing."""
+    missing: list[str] = []
+    for module_name, package_name in ("uvicorn", "uvicorn"), ("click", "click"):
+        try:
+            __import__(module_name)
+        except ModuleNotFoundError:
+            missing.append(package_name)
+    if not missing:
+        return True
+    console.print(
+        f"[yellow]Missing runtime deps ({', '.join(missing)}); installing...[/yellow]"
+    )
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", *missing],
+            cwd=str(REPO_ROOT),
+        )
+    except subprocess.CalledProcessError as exc:
+        console.print(f"[red]Failed to install runtime deps (exit {exc.returncode}).[/red]")
+        return False
+    return True
+
+
+def _dev_mode_requested(env: Mapping[str, str] | None = None) -> bool:
+    """Return True when PSD_DEV_MODE explicitly enables dev server."""
+    source = env if env is not None else os.environ
+    env_val = str(source.get("PSD_DEV_MODE", "")).lower()
+    return env_val in ("1", "true", "yes")
+
+
+def _is_dev_mode() -> bool:
+    """Return True when PSD_DEV_MODE is set or a Vite dev server is active."""
+    if _dev_mode_requested():
+        return True
+    env_val = os.getenv("PSD_DEV_MODE", "").lower()
+    if env_val in ("0", "false", "no"):
+        return False
+    return _port_open(DEV_HOST, _dev_port_from_env())
+
+
+def _dev_port_from_env(env: Mapping[str, str] | None = None) -> int:
+    source = env if env is not None else os.environ
+    raw = source.get("PSD_DEV_PORT", str(DEV_PORT))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEV_PORT
+
+
+def _wait_for_port(host: str, port: int, timeout: float = 5.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _port_open(host, port):
+            return True
+        time.sleep(0.1)
+    return _port_open(host, port)
+
+
+def _start_ui_dev_server(console: Console, env: Mapping[str, str]) -> int | None:
+    """Start the Vite dev server when PSD_DEV_MODE=1."""
+    dev_port = _dev_port_from_env(env)
+    if _port_open(DEV_HOST, dev_port):
+        return None
+    console.print(
+        f"[cyan]Starting PSD UI dev server on {DEV_HOST}:{dev_port} (bun).[/cyan]"
+    )
+    try:
+        process = _spawn(
+            [
+                "bun",
+                "run",
+                "dev",
+                "--",
+                "--host",
+                DEV_HOST,
+                "--port",
+                str(dev_port),
+            ],
+            RUN_DIR / _LOG_NAMES[UI_SERVICE],
+            env=env,
+            cwd=WEB_ROOT,
+        )
+    except FileNotFoundError:
+        console.print(
+            "[red]bun not found. Run `cd apps/web && bun install && bun run dev`.[/red]"
+        )
+        return None
+    if not _wait_for_port(DEV_HOST, dev_port):
+        console.print(
+            f"[yellow]PSD UI dev server did not respond on {DEV_HOST}:{dev_port} yet.[/yellow]"
+        )
+    return process.pid
+
+
+def _ensure_frontend_build(console: Console) -> bool:
+    """Ensure the React bundle exists for /psd."""
+    if DIST_INDEX.exists():
+        return True
+    console.print(
+        "[yellow]PSD UI bundle missing; building via bun (apps/web).[/yellow]"
+    )
+    try:
+        subprocess.check_call(["bun", "install"], cwd=str(WEB_ROOT))
+        subprocess.check_call(["bun", "run", "build"], cwd=str(WEB_ROOT))
+    except FileNotFoundError:
+        console.print(
+            "[red]bun not found. Run `cd apps/web && bun install && bun run build`.[/red]"
+        )
+        return False
+    except subprocess.CalledProcessError as exc:
+        console.print(f"[red]PSD UI build failed (exit {exc.returncode}).[/red]")
+        return False
+    return DIST_INDEX.exists()
 
 
 def _load_env_file(path: str = ".env") -> dict[str, str]:
@@ -197,7 +344,7 @@ def _load_pid_file(console: Console | None = None) -> dict[str, object]:
                 result[key] = int(value)
             except (TypeError, ValueError):
                 continue
-        elif key in SERVICES:
+        elif key in SERVICES or key == UI_SERVICE:
             try:
                 result[key] = int(value)
             except (TypeError, ValueError):
@@ -220,6 +367,7 @@ def _spawn(
     command: Iterable[str],
     log_path: Path,
     env: Mapping[str, str] | None = None,
+    cwd: Path | None = None,
 ) -> subprocess.Popen[bytes]:
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -230,6 +378,8 @@ def _spawn(
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             env=dict(env) if env else None,
+            cwd=str(cwd) if cwd else None,
+            start_new_session=True,
         )
     return process
 
@@ -250,7 +400,7 @@ def _missing_vendor_files(vendor_root: Path) -> list[str]:
 
 
 def _seed_vendor_data_if_needed(console: Console, env: Mapping[str, str]) -> None:
-    vendor_root = Path("data") / "vendor"
+    vendor_root = REPO_ROOT / "data" / "vendor"
     missing = _missing_vendor_files(vendor_root)
     if not missing:
         return
@@ -287,6 +437,11 @@ def show_status(console: Console) -> None:
         else:
             alive = _alive(pid)
             statuses.append((service, str(pid), "alive" if alive else "stopped"))
+    ui_pid = data.get(UI_SERVICE)
+    if isinstance(ui_pid, int):
+        statuses.append((UI_SERVICE, str(ui_pid), "alive" if _alive(ui_pid) else "stopped"))
+    elif _is_dev_mode():
+        statuses.append((UI_SERVICE, "n/a", "external"))
     if all(state != "alive" for _, _, state in statuses):
         console.print("[yellow]PSD is not running.[/yellow]")
     else:
@@ -312,7 +467,9 @@ def show_status(console: Console) -> None:
             env_table.add_row(key, str(value))
         console.print(env_table)
     port = data.get("port", _port_from_env())
-    console.print(f"Dashboard: http://127.0.0.1:{port}")
+    console.print(f"Dashboard: http://127.0.0.1:{port}/psd")
+    if _is_dev_mode():
+        console.print(f"UI (dev): http://{DEV_HOST}:{_dev_port_from_env()}/psd")
 
 
 def show_logs(console: Console, lines: int = LOG_TAIL_LINES) -> None:
@@ -354,13 +511,13 @@ def show_logs(console: Console, lines: int = LOG_TAIL_LINES) -> None:
 
 
 def open_dashboard(console: Console) -> None:
-    # Check if dev mode is enabled (use Vite dev server instead of FastAPI)
-    dev_mode = os.getenv("PSD_DEV_MODE", "").lower() in ("1", "true", "yes")
-    if dev_mode:
-        dev_port = int(os.getenv("PSD_DEV_PORT", "5173"))
-        url = f"http://localhost:{dev_port}/psd"
-        console.print("[cyan]Opening Vite dev server (PSD_DEV_MODE=1)[/cyan]")
+    # Prefer Vite dev server when available, otherwise serve the built bundle via FastAPI.
+    if _is_dev_mode():
+        dev_port = _dev_port_from_env()
+        url = f"http://{DEV_HOST}:{dev_port}/psd"
+        console.print("[cyan]Opening Vite dev server (PSD_DEV_MODE=1 or detected).[/cyan]")
     else:
+        _ensure_frontend_build(console)
         data = _load_pid_file()
         port = data.get("port", _port_from_env())
         url = f"http://127.0.0.1:{port}/psd"
@@ -371,12 +528,47 @@ def open_dashboard(console: Console) -> None:
         console.print(f"[yellow]Attempted to open dashboard:[/yellow] {url}")
 
 
-def start_psd(console: Console) -> None:
+def open_dashboard_when_ready(console: Console, timeout: float = 15.0) -> None:
+    """Wait for the PSD web server (user mode) before opening the dashboard."""
+    if _is_dev_mode():
+        open_dashboard(console)
+        return
+    port = _port_from_env()
+    if _wait_for_port("127.0.0.1", port, timeout=timeout):
+        open_dashboard(console)
+        return
+    console.print(
+        f"[yellow]PSD web server still not responding on 127.0.0.1:{port}.[/yellow]"
+    )
+    console.print(f"[cyan]Open manually: http://127.0.0.1:{port}/psd[/cyan]")
+
+
+def start_psd(
+    console: Console,
+    mode: str | None = None,
+    *,
+    open_browser: bool = True,
+) -> None:
     state = _load_pid_file(console)
     port = _port_from_env()
-    env_file = os.environ.get("PSD_ENV_FILE", ".env")
+    env_file = os.environ.get("PSD_ENV_FILE")
+    if not env_file:
+        env_file = ".psd.env" if Path(".psd.env").exists() else ".env"
     env_loaded = _load_env_file(env_file)
     child_env = _with_defaults({**os.environ, **env_loaded})
+    src_path = str(REPO_ROOT / "src")
+    pythonpath = child_env.get("PYTHONPATH", "")
+    if src_path not in pythonpath.split(os.pathsep):
+        child_env["PYTHONPATH"] = (
+            os.pathsep.join([src_path, pythonpath]) if pythonpath else src_path
+        )
+    if mode == "dev":
+        child_env["PSD_DEV_MODE"] = "1"
+    elif mode == "user":
+        child_env["PSD_DEV_MODE"] = "0"
+    for key in ("PSD_DEV_MODE", "PSD_DEV_PORT"):
+        if key in child_env:
+            os.environ[key] = str(child_env[key])
     _seed_vendor_data_if_needed(console, child_env)
     console.print(
         "[dim]Using {snapshot} | IB {host}:{port} clientId={client_id}[/]".format(
@@ -386,14 +578,31 @@ def start_psd(console: Console) -> None:
             client_id=child_env["IB_CLIENT_ID"],
         )
     )
+    if not _ensure_uvicorn_runtime(console):
+        console.print("[red]PSD web server prerequisites missing. Aborting start.[/red]")
+        return
     running: dict[str, int] = {}
+    if _dev_mode_requested(child_env):
+        ui_pid = state.get(UI_SERVICE)
+        if isinstance(ui_pid, int) and _alive(ui_pid):
+            running[UI_SERVICE] = ui_pid
+        else:
+            ui_pid = _start_ui_dev_server(console, child_env)
+            if ui_pid:
+                running[UI_SERVICE] = ui_pid
     for service in SERVICES:
         pid = state.get(service)
         if isinstance(pid, int) and _alive(pid):
-            console.print(
-                f"[yellow]{service.title()} already running (PID {pid}).[/yellow]"
-            )
-            running[service] = pid
+            if service == "web" and not _port_open("127.0.0.1", port):
+                console.print(
+                    "[yellow]Web process alive but port is closed; restarting web.[/yellow]"
+                )
+            else:
+                console.print(
+                    f"[yellow]{service.title()} already running (PID {pid}).[/yellow]"
+                )
+                running[service] = pid
+                continue
     commands = {
         name: ([arg.format(port=port) for arg in cmd] if name == "web" else cmd)
         for name, cmd in _PROCESS_COMMANDS.items()
@@ -403,7 +612,7 @@ def start_psd(console: Console) -> None:
             continue
         log_path = RUN_DIR / _LOG_NAMES[service]
         console.print(f"[cyan]Starting {service} -> {' '.join(cmd)}[/cyan]")
-        process = _spawn(cmd, log_path, env=child_env)
+        process = _spawn(cmd, log_path, env=child_env, cwd=REPO_ROOT)
         running[service] = process.pid
         console.print(f"[green]{service.title()} PID {process.pid}[/green]")
     env_summary = {
@@ -413,7 +622,12 @@ def start_psd(console: Console) -> None:
     }
     data: dict[str, object] = {**running, "port": port, "env": env_summary}
     _save_pid_file(data)
-    open_dashboard(console)
+    if not _wait_for_port("127.0.0.1", port, timeout=6.0):
+        console.print(
+            f"[yellow]PSD web server not responding on 127.0.0.1:{port} yet.[/yellow]"
+        )
+    if open_browser:
+        open_dashboard(console)
     time.sleep(0.2)
     show_status(console)
 
@@ -497,7 +711,7 @@ def stop_psd(console: Console, force_port_kill: bool = False) -> None:
         if force_port_kill:
             _kill_port_listeners(_port_from_env(), console)
         return
-    if not any(key in data for key in SERVICES):
+    if not any(key in data for key in SERVICES) and UI_SERVICE not in data:
         console.print("[yellow]No PSD processes tracked.[/yellow]")
         if PID_FILE.exists():
             PID_FILE.unlink()
@@ -516,6 +730,13 @@ def stop_psd(console: Console, force_port_kill: bool = False) -> None:
             continue
         stopped = _kill_with_sequence(pid, console)
         results.append((service, "stopped" if stopped else "still running"))
+    ui_pid = data.get(UI_SERVICE)
+    if isinstance(ui_pid, int):
+        if not _alive(ui_pid):
+            results.append((UI_SERVICE, "already stopped"))
+        else:
+            stopped = _kill_with_sequence(ui_pid, console)
+            results.append((UI_SERVICE, "stopped" if stopped else "still running"))
     console.print("[bold]Stop results:[/bold]")
     for service, status in results:
         console.print(f"  - {service.title()}: {status}")
@@ -524,6 +745,8 @@ def stop_psd(console: Console, force_port_kill: bool = False) -> None:
         for svc in SERVICES
         if isinstance(data.get(svc), int) and _alive(int(data.get(svc)))
     }
+    if isinstance(ui_pid, int) and _alive(ui_pid):
+        remaining[UI_SERVICE] = ui_pid
     if force_port_kill:
         port_value = data.get("port", _port_from_env())
         _kill_port_listeners(int(port_value), console)
@@ -532,6 +755,8 @@ def stop_psd(console: Console, force_port_kill: bool = False) -> None:
             for svc in SERVICES
             if isinstance(data.get(svc), int) and _alive(int(data.get(svc)))
         }
+        if isinstance(ui_pid, int) and _alive(ui_pid):
+            remaining[UI_SERVICE] = ui_pid
     if remaining:
         port_value = data.get("port", _port_from_env())
         updated: dict[str, object] = {**remaining, "port": port_value}
@@ -552,8 +777,9 @@ def _menu_panel() -> Panel:
         "[1] Status",
         "[2] Stop PSD",
         "[3] Open Dashboard",
-        "[4] Start PSD",
-        "[5] Tail Logs",
+        "[4] Start PSD (User mode)",
+        "[5] Start PSD (Dev mode)",
+        "[6] Tail Logs",
         "[q] Quit",
     ]
     lines = [escape(label) for label in labels]
@@ -574,11 +800,13 @@ def main() -> None:
         elif choice == "3":
             open_dashboard(console)
         elif choice == "4":
-            start_psd(console)
+            start_psd(console, mode="user")
         elif choice == "5":
+            start_psd(console, mode="dev")
+        elif choice == "6":
             show_logs(console)
         else:
-            console.print("[red]Invalid selection. Choose 1-5 or q to quit.[/red]")
+            console.print("[red]Invalid selection. Choose 1-6 or q to quit.[/red]")
 
 
 if __name__ == "__main__":

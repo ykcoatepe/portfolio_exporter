@@ -305,3 +305,117 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** src/psd/sentinel/sched.py
 **Status:** done
 **Notes:** backfill now drops rows missing hy/vx1/vx2 to avoid NOT NULL violations
+
+### 2026-01-13 • Task: Fix MSB help loading • Branch: main
+**Owner:** session/ai | **Scope:** ensure MSB help tooltip can load server-side
+**Interfaces:** src/psd/web/app.py
+**Status:** done
+**Notes:** add missing os import so /msb/help no longer 500s
+
+### 2026-01-13 • Task: Extend MSB help definitions • Branch: main
+**Owner:** session/ai | **Scope:** expand MSB tooltip to cover barometer terms and surface it on MSB card
+**Interfaces:** apps/web/src/components/MSBCard.tsx, config/msb_signals_help.json, src/psd/web/app.py
+**Status:** done
+**Notes:** added help tooltip in MSB card header and new help section for HY/VIX scores, term ratio, cal spread, and stress bands
+
+### 2026-01-13 • Task: Add tooltips for MSB stat cards • Branch: main
+**Owner:** session/ai | **Scope:** add per-stat help for HY/VIX score, term ratio, and cal spread
+**Interfaces:** apps/web/src/components/MSBCard.tsx, apps/web/src/lib/msb.ts, apps/web/src/lib/types.ts, config/msb_signals_help.json, src/psd/web/app.py
+**Status:** done
+**Notes:** added optional terms metadata for MSB help and rendered hover tooltips on each stat label
+
+### 2026-01-13 • Task: Resolve MSB help config path • Branch: main
+**Owner:** session/ai | **Scope:** ensure MSB help terms load regardless of PSD working directory
+**Interfaces:** src/psd/web/app.py
+**Status:** done
+**Notes:** resolve msb_signals_help.json relative to repo root when relative path not found
+
+### 2026-01-13 • Task: Add MSB chart style alternates • Branch: main
+**Owner:** session/ai | **Scope:** improve MSB mini chart readability with focus vs range views
+**Interfaces:** apps/web/src/components/MSBMiniCharts.tsx
+**Status:** done
+**Notes:** added style toggle, latest/1D/range labels, median and baseline reference lines, and last-point markers
+
+### 2026-01-13 • Task: Add main flow diagrams • Branch: main
+**Owner:** session/ai | **Scope:** document main.py menu + task flows with Mermaid + SVG renders
+**Interfaces:** docs/diagrams/main_menu_flow.mmd, docs/diagrams/main_menu_flow.svg, docs/diagrams/main_tasks_flow.mmd, docs/diagrams/main_tasks_flow.svg
+**Status:** done
+**Notes:** added two flowcharts (menu + tasks) and generated SVG renders
+
+### 2026-01-13 • Task: Create MSB chart mockups • Branch: main
+**Owner:** session/ai | **Scope:** static PSD-themed mockups for MSB chart readability options
+**Interfaces:** docs/mockups/index.html, docs/mockups/msb_option_a.html, docs/mockups/msb_option_b.html, docs/mockups/msb_option_f.html
+**Status:** done
+**Notes:** generated static HTML previews for options A, B, and F without touching PSD code
+
+### 2026-01-13 • Task: Embed flow diagrams in README • Branch: main
+**Owner:** session/ai | **Scope:** document main.py flows in README
+**Interfaces:** README.md
+**Status:** done
+**Notes:** embedded menu and task flow SVGs in README
+
+### 2026-01-13 • Task: Implement MSB mini charts (Option A) • Branch: main
+**Owner:** session/ai | **Scope:** add key value + delta + range layout for MSB mini charts and remove mockups
+**Interfaces:** apps/web/src/components/MSBMiniCharts.tsx
+**Status:** done
+**Notes:** shows last value, 1D delta, range, and last-point marker for HY-OAS and VX1/VX2; removed docs/mockups
+
+### 2026-01-13 • Task: Powerlaw info bundles + data quality fixes • Branch: main
+**Owner:** session/ai | **Scope:** add Powerlaw help bundles in PSD UI, load help from powerlaw repo, and populate data_quality details
+**Interfaces:** apps/web/src/components/PowerlawPanel.tsx, apps/web/src/lib/powerlaw.ts, apps/web/src/hooks/usePowerlawSignalsHelp.ts, src/psd/web/app.py, portfolio_exporter/psd_powerlaw.py, ../codeforge-powerlaw-trader/scripts/run_trader_v5_daily.py, ../codeforge-powerlaw-trader/docs/powerlaw_signals_help.json
+**Status:** done
+**Notes:** added /powerlaw/help endpoint + UI tooltips; data_quality now emits OK/WARN with detail list; tests updated
+
+### 2026-01-13 • Task: Stabilize PSD unit tests • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** align PSD tests with data grid structure and MSB actions focus order
+**Interfaces:** apps/web/src/pages/PSD.test.tsx
+**Status:** done
+**Notes:** reset psd ui state in tests, updated grid row assertions, and accounted for Refresh MSB in tab order
+
+### 2026-01-13 • Task: Fix PSD menu dashboard launch • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** ensure PSD menu opens the React UI by detecting dev server and building dist when missing
+**Interfaces:** src/psd/menus/ops.py
+**Status:** done
+**Notes:** auto-detect Vite dev server, build apps/web bundle with bun if needed, then open /psd
+
+### 2026-01-13 • Task: PSD menu starts UI + backend • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** start UI dev server (optional) and ensure uvicorn deps when launching PSD from menu 4
+**Interfaces:** src/psd/menus/ops.py
+**Status:** done
+**Notes:** menu 4 now installs uvicorn deps if missing, starts UI dev server when PSD_DEV_MODE=1, waits for web port before opening
+
+### 2026-01-13 • Task: PSD menu dev/user modes • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** add explicit dev/user mode choices for PSD startup
+**Interfaces:** portfolio_exporter/menus/psd.py, src/psd/menus/ops.py
+**Status:** done
+**Notes:** menu 4 now prompts for dev vs user mode; ops menu shows separate start options
+
+### 2026-01-13 • Task: Keep PSD services alive • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** detach PSD child processes to prevent SIGINT shutdowns
+**Interfaces:** src/psd/menus/ops.py
+**Status:** done
+**Notes:** start PSD services in a new session so uvicorn doesn't exit on parent terminal interrupts
+
+### 2026-01-13 • Task: Restart PSD web when port closed • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** ensure menu start restarts web if PID is stale but port is closed
+**Interfaces:** src/psd/menus/ops.py
+**Status:** done
+**Notes:** detect alive-but-closed web process and respawn before opening dashboard
+
+### 2026-01-13 • Task: Wait before opening PSD dashboard • Branch: main
+**Owner:** session/ai | **Scope:** avoid opening browser until PSD web is responsive in user mode
+**Interfaces:** portfolio_exporter/menus/psd.py, src/psd/menus/ops.py
+**Status:** done
+**Notes:** start PSD without auto-opening, then wait for port and open or print manual URL
+
+### 2026-01-13 • Task: Anchor PSD runtime paths to repo root • Branch: main
+**Owner:** session/ai | **Scope:** make PSD menu resilient to non-repo CWD when launching services
+**Interfaces:** src/psd/menus/ops.py
+**Status:** done
+**Notes:** resolve run dir and vendor data from repo root, set PYTHONPATH to include src, and spawn services from repo root
+
+### 2026-01-13 • Task: Powerlaw info bundles + data quality fallback • Branch: feature/psd-powerlaw
+**Owner:** session/ai | **Scope:** surface Powerlaw help tooltips and avoid N/A data quality labels
+**Interfaces:** apps/web/src/lib/queryPersistence.ts, portfolio_exporter/psd_powerlaw.py, ../codeforge-powerlaw-trader/docs/powerlaw_signals_help.json
+**Status:** done
+**Notes:** added powerlaw help JSON in powerlaw repo, default data_quality based on staleness, cast QueryClient for persistence typing, rebuilt apps/web bundle

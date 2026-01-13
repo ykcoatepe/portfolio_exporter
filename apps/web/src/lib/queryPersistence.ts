@@ -82,9 +82,11 @@ export function setupQueryPersistence(queryClient: QueryClient): void {
       storage: compressedStorage,
       key: STORAGE_KEY,
     });
+    type PersistOptions = Parameters<typeof persistQueryClient>[0];
 
     persistQueryClient({
-      queryClient,
+      // TanStack packages can resolve to duplicate query-core types; align to expected type.
+      queryClient: queryClient as unknown as PersistOptions["queryClient"],
       persister,
       maxAge: MAX_AGE,
       dehydrateOptions: {

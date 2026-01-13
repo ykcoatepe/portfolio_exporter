@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
@@ -136,6 +138,70 @@ class MsbStatusDTO(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class MsbHelpSectionDTO(BaseModel):
+    """MSB help section payload."""
+
+    title: str
+    bullets: list[str]
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class MsbHelpTermDTO(BaseModel):
+    """MSB help term definition for stat tooltips."""
+
+    key: str
+    title: str
+    body: str | None = None
+    bullets: list[str] | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class MsbHelpDTO(BaseModel):
+    """MSB help payload for the dashboard tooltip."""
+
+    title: str
+    subtitle: str | None = None
+    sections: list[MsbHelpSectionDTO]
+    terms: list[MsbHelpTermDTO] | None = None
+    footnotes: list[str] | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PowerlawHelpSectionDTO(BaseModel):
+    """Powerlaw help section definition."""
+
+    title: str
+    bullets: list[str]
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PowerlawHelpTermDTO(BaseModel):
+    """Powerlaw help term definition for stat tooltips."""
+
+    key: str
+    title: str
+    body: str | None = None
+    bullets: list[str] | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PowerlawHelpDTO(BaseModel):
+    """Powerlaw help payload for the dashboard tooltip."""
+
+    title: str
+    subtitle: str | None = None
+    sections: list[PowerlawHelpSectionDTO]
+    terms: list[PowerlawHelpTermDTO] | None = None
+    footnotes: list[str] | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
 _MSB_TRIGGER_LABELS = {
     "A": "RULE_A_VIX_BACKWARDATION",
     "B": "RULE_B_HY_SHOCK",
@@ -155,6 +221,302 @@ def _normalize_msb_payload(record: dict[str, Any]) -> dict[str, Any]:
             mapped.append(_MSB_TRIGGER_LABELS.get(key, item))
         payload["triggers"] = mapped
     return payload
+
+
+_DEFAULT_MSB_HELP: dict[str, Any] = {
+    "title": "MSB Signals Guide",
+    "subtitle": "How to read HY-OAS and VX1/VX2 charts",
+    "sections": [
+        {
+            "title": "HY-OAS (credit stress)",
+            "bullets": [
+                "Represents the option-adjusted spread for high yield credit.",
+                "Rising HY-OAS signals widening credit spreads and stress.",
+                "Watch for sharp 1D and 5D jumps (Rule B thresholds: +0.25 / +0.60).",
+                "Falling or stable HY-OAS suggests easing credit conditions.",
+            ],
+        },
+        {
+            "title": "VX1/VX2 ratio (vol term structure)",
+            "bullets": [
+                "VX1 is front month VIX (or VIX index) and VX2 is next month or VIX3M.",
+                "Ratio > 1.0 implies backwardation (near-term stress).",
+                "Sustained > 1.05 or rising slope often precedes equity drawdowns.",
+                "Rule A: backwardation plus negative SPX return triggers escalation.",
+            ],
+        },
+        {
+            "title": "Market Stress Barometer terms",
+            "bullets": [
+                "Stress = HY Score + VIX Score (0–100). Color bands: <30 green, 30–49 yellow, 50–69 orange, ≥70 red.",
+                "HY Score (0–50) scales the HY-OAS level vs history; higher means wider credit spreads.",
+                "VIX Score (0–50) tracks VIX term structure and calendar spread magnitude; higher means near-term vol stress.",
+                "Term Ratio = (VX1 / VX2) − 1. Positive = backwardation, negative = contango.",
+                "Cal Spread % = (VX1 − VX2) / VX2, same idea as term ratio but shown as a percent.",
+            ],
+        },
+    ],
+    "terms": [
+        {
+            "key": "hy",
+            "title": "HY Score",
+            "body": "Scaled measure of HY-OAS stress (0–50). Higher = wider credit spreads.",
+            "bullets": [
+                "Uses HY-OAS levels vs historical bands.",
+                "Sharp daily/weekly widening lifts the score quickly.",
+            ],
+        },
+        {
+            "key": "vix",
+            "title": "VIX Score",
+            "body": "Scaled measure of volatility stress (0–50). Higher = near-term vol pressure.",
+            "bullets": [
+                "Combines calendar spread and term structure signals.",
+                "Saturation adds extra points when VX1 is elevated.",
+            ],
+        },
+        {
+            "key": "term",
+            "title": "Term Ratio",
+            "body": "Defined as (VX1 / VX2) − 1. Positive means backwardation.",
+            "bullets": [
+                "Positive = short-term vol higher than longer-term (stress).",
+                "Negative = contango (calmer conditions).",
+            ],
+        },
+        {
+            "key": "cal",
+            "title": "Cal Spread %",
+            "body": "Defined as (VX1 − VX2) / VX2. A percent view of the term spread.",
+            "bullets": [
+                "Large positive values suggest near-term stress.",
+                "Negative values indicate contango.",
+            ],
+        },
+    ],
+    "footnotes": [
+        "Rule B uses HY-OAS delta in index points (approx 25 bps in 1D or 60 bps in 5D).",
+        "Rule A requires VX1 > VX2 and SPX return < 0 on the same day.",
+    ],
+}
+
+
+_DEFAULT_POWERLAW_HELP: dict[str, Any] = {
+    "title": "Powerlaw Signals Guide",
+    "subtitle": "How to read PLKE, risk state, and sleeve controls",
+    "sections": [
+        {
+            "title": "What this panel summarizes",
+            "bullets": [
+                "Daily snapshot after market close from the TRADER v5 pipeline.",
+                "PLKE shows market criticality and its regime band.",
+                "Risk State gates equity exposure and hedge sizing.",
+                "Equity weights and hedge notional are target sleeve settings.",
+                "Small-cap overlay shows theta target and whether new trades are allowed.",
+            ],
+        },
+        {
+            "title": "PLKE bands (Extremistan)",
+            "bullets": [
+                "PLKE is a 0-100 criticality index built from tail, clustering, and acceleration signals.",
+                "Operational bands: Calm <30, Heating 30-60, Critical 60-80, Dragon >=80.",
+                "Higher bands scale down equity exposure and tighten vega caps.",
+            ],
+        },
+        {
+            "title": "Risk State + V/VIX",
+            "bullets": [
+                "Risk State is ON, NEUTRAL, or OFF using VIX, VX term structure, and PLKE overlay.",
+                "OFF is a hard risk-off gate; equity weights are reduced and small-cap theta goes to zero.",
+                "Backwardation (VX1 > VX2) can be required for OFF depending on config.",
+            ],
+        },
+        {
+            "title": "Small-cap income overlay",
+            "bullets": [
+                "Theta target is the small-cap income budget as percent of NAV.",
+                "New trades are blocked in Critical/Dragon or when Risk State is OFF.",
+                "Heating band can block new trades if V/VIX utilization is above the cap.",
+            ],
+        },
+        {
+            "title": "Data quality",
+            "bullets": [
+                "OK means inputs are fresh; WARN means stale or missing inputs.",
+                "Details list which symbols or data series are stale.",
+                "Treat WARN snapshots as informational until data is refreshed.",
+            ],
+        },
+    ],
+    "terms": [
+        {
+            "key": "plke",
+            "title": "PLKE (market criticality)",
+            "body": "PLKE is a 0-100 measure of market stress; higher values mean higher tail risk.",
+            "bullets": [
+                "Bands: Calm <30, Heating 30-60, Critical 60-80, Dragon >=80.",
+                "Band scales equity exposure and vega caps.",
+            ],
+        },
+        {
+            "key": "risk_state",
+            "title": "Risk State",
+            "body": "ON, NEUTRAL, or OFF regime derived from VIX, VX1/VX2, and PLKE overlay.",
+            "bullets": [
+                "OFF is a hard risk-off state; equity exposure is reduced.",
+                "PLKE Critical/Dragon prevents upgrades to ON.",
+            ],
+        },
+        {
+            "key": "vutil_used",
+            "title": "V/VIX Utilization",
+            "body": "Active utilization used for gating and hedge sizing (real if available, else budget).",
+            "bullets": [
+                "Bucketed into LOW / MED / HIGH for quick read.",
+                "Higher utilization tightens small-cap gating in Heating band.",
+            ],
+        },
+        {
+            "key": "vix_vvix",
+            "title": "VIX / VVIX",
+            "body": "Spot VIX and VVIX values used by the risk state and vega caps.",
+            "bullets": [
+                "Backwardation = VX1 > VX2 when VX futures are available.",
+                "High VVIX can reduce vega caps.",
+            ],
+        },
+        {
+            "key": "equity_weights",
+            "title": "Equity Weights",
+            "body": "Target sleeve weights for SPY/QQQ/IWM after PLKE and risk overlays.",
+            "bullets": [
+                "Used to size core equity exposure.",
+                "Scaled down further in OFF state.",
+            ],
+        },
+        {
+            "key": "hedge_notional",
+            "title": "Hedge Notional",
+            "body": "Target hedge sizing (notional fractions) for tail risk protection.",
+            "bullets": [
+                "Examples include SPX put spreads or VIX hedges.",
+                "Sized from PLKE band and risk state.",
+            ],
+        },
+        {
+            "key": "small_cap_theta",
+            "title": "Small-cap Theta",
+            "body": "Target theta budget for the income overlay as percent of NAV.",
+            "bullets": [
+                "Calm: ~0.30% NAV; Heating: ~0.24%; Critical: ~0.18%; Dragon: ~0.12% or 0.",
+                "Risk State OFF sets theta to 0.",
+            ],
+        },
+        {
+            "key": "small_cap_gate",
+            "title": "Small-cap Gate",
+            "body": "Whether new small-cap trades are allowed today.",
+            "bullets": [
+                "Blocked in Risk State OFF and in Critical/Dragon bands.",
+                "Heating can block when V/VIX utilization exceeds the cap.",
+            ],
+        },
+        {
+            "key": "data_quality",
+            "title": "Data Quality",
+            "body": "Snapshot quality status based on freshness of inputs.",
+            "bullets": [
+                "OK: all required inputs are current.",
+                "WARN: one or more inputs are stale or missing (see details).",
+            ],
+        },
+    ],
+    "footnotes": [
+        "TRADER v5 snapshot is intended to run after market close using latest EOD data.",
+        "PLKE band thresholds are calibrated in notebooks and used operationally in production.",
+    ],
+}
+
+
+def _resolve_msb_help_path(path: str) -> Path:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    if candidate.exists():
+        return candidate
+    repo_root = Path(__file__).resolve().parents[3]
+    return repo_root / candidate
+
+
+def _resolve_powerlaw_repo_root() -> Path | None:
+    repo_env = os.getenv("PSD_POWERLAW_REPO", "").strip()
+    if repo_env:
+        candidate = Path(repo_env).expanduser()
+        return candidate if candidate.exists() else None
+    repo_root = Path(__file__).resolve().parents[3]
+    candidate = repo_root.parent / "codeforge-powerlaw-trader"
+    return candidate if candidate.exists() else None
+
+
+def _resolve_powerlaw_help_path(path: str) -> Path:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    if candidate.exists():
+        return candidate
+    repo_root = _resolve_powerlaw_repo_root()
+    if repo_root is not None:
+        return repo_root / path
+    repo_root = Path(__file__).resolve().parents[3]
+    return repo_root / candidate
+
+
+def _load_msb_help() -> dict[str, Any]:
+    env = os.environ
+    raw_json = env.get("PSD_MSB_SIGNALS_HELP_JSON")
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            log.warning("invalid PSD_MSB_SIGNALS_HELP_JSON; using defaults")
+    path = env.get("PSD_MSB_SIGNALS_HELP_PATH", "config/msb_signals_help.json")
+    try:
+        resolved = _resolve_msb_help_path(path)
+        data = resolved.read_text(encoding="utf-8")
+        parsed = json.loads(data)
+        if isinstance(parsed, dict):
+            return parsed
+    except FileNotFoundError:
+        return _DEFAULT_MSB_HELP
+    except Exception as exc:
+        log.warning("failed to load msb help config: %s", exc)
+    return _DEFAULT_MSB_HELP
+
+
+def _load_powerlaw_help() -> dict[str, Any]:
+    env = os.environ
+    raw_json = env.get("PSD_POWERLAW_HELP_JSON")
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            log.warning("invalid PSD_POWERLAW_HELP_JSON; using defaults")
+    path = env.get("PSD_POWERLAW_HELP_PATH", "docs/powerlaw_signals_help.json")
+    try:
+        resolved = _resolve_powerlaw_help_path(path)
+        data = resolved.read_text(encoding="utf-8")
+        parsed = json.loads(data)
+        if isinstance(parsed, dict):
+            return parsed
+    except FileNotFoundError:
+        return _DEFAULT_POWERLAW_HELP
+    except Exception as exc:
+        log.warning("failed to load powerlaw help config: %s", exc)
+    return _DEFAULT_POWERLAW_HELP
 
 
 def _set_msb_refresh_state(
@@ -621,6 +983,18 @@ def msb_status(request: Request) -> MsbStatusDTO:
         last_date=state.get("last_date") or last_date,
         detail=state.get("detail"),
     )
+
+
+@router.get("/msb/help", response_model=MsbHelpDTO)
+def msb_help() -> MsbHelpDTO:
+    payload = _load_msb_help()
+    return MsbHelpDTO.model_validate(payload)
+
+
+@router.get("/powerlaw/help", response_model=PowerlawHelpDTO)
+def powerlaw_help() -> PowerlawHelpDTO:
+    payload = _load_powerlaw_help()
+    return PowerlawHelpDTO.model_validate(payload)
 
 
 @router.post("/msb/broadcast", status_code=status.HTTP_200_OK)

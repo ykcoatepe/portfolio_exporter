@@ -48,15 +48,53 @@ function toCents(dollars: number | null | undefined): number {
     return Math.round(dollars * 100);
 }
 
+function toNullableNumber(value: unknown): number | null {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function computePercent(amount: number | null, basis: number | null): number | null {
+    if (amount === null || basis === null) {
+        return null;
+    }
+    if (!Number.isFinite(amount) || !Number.isFinite(basis)) {
+        return null;
+    }
+    const denominator = Math.abs(basis);
+    if (denominator === 0) {
+        return null;
+    }
+    const ratio = amount / denominator;
+    return Number.isFinite(ratio) ? ratio * 100 : null;
+}
+
 /**
  * Map PSDLeg array to StockRow array
  */
 export function mapLegsToStockRows(legs: PSDLeg[]): StockRow[] {
     return legs.map((leg, index) => {
         const markPrice = leg.mark ?? null;
-        const quantity = leg.qty;
-        const dayPnl = leg.pnl_intraday ?? null;
-        const totalPnl = leg.pnl_unrealized ?? leg.total_pnl ?? null;
+        const quantity = toNullableNumber(leg.qty) ?? 0;
+        const dayPnl = toNullableNumber(leg.day_pnl ?? leg.pnl_intraday);
+        const totalPnl = toNullableNumber(leg.pnl_unrealized ?? leg.total_pnl);
+        const previousClose = toNullableNumber(leg.previous_close);
+        const avgCost = toNullableNumber(leg.avg_cost);
+        const dayBasis =
+            previousClose !== null ? Math.abs(quantity) * previousClose : null;
+        const totalBasis =
+            avgCost !== null ? Math.abs(quantity) * avgCost : null;
+        const dayPercentFromApi = toNullableNumber(
+            leg.day_pnl_percent ?? leg.day_pnl_pct,
+        );
+        const totalPercentFromApi = toNullableNumber(
+            leg.pnl_unrealized_percent ?? leg.pnl_unrealized_pct ?? leg.total_pnl_percent,
+        );
+        const dayPnlPercent = dayPercentFromApi ?? computePercent(dayPnl, dayBasis);
+        const totalPnlPercent =
+            totalPercentFromApi ?? computePercent(totalPnl, totalBasis);
         const exposure = markPrice != null ? markPrice * Math.abs(quantity) : null;
 
         return {
@@ -67,9 +105,9 @@ export function mapLegsToStockRows(legs: PSDLeg[]): StockRow[] {
             markPrice: markPrice,
             dayPnlAmount: dayPnl,
             dayPnlCents: toCents(dayPnl),
-            dayPnlPercent: leg.day_pnl_percent ?? leg.day_pnl_pct ?? null,
+            dayPnlPercent: dayPnlPercent,
             totalPnlAmount: totalPnl,
-            totalPnlPercent: leg.pnl_unrealized_percent ?? leg.pnl_unrealized_pct ?? leg.total_pnl_percent ?? null,
+            totalPnlPercent: totalPnlPercent,
             exposure: exposure,
             priceSource: leg.price_source ?? null,
             stalenessSeconds: leg.stale_s ?? null,

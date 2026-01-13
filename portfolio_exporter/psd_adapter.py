@@ -8,7 +8,7 @@ import os
 import threading
 import time
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
@@ -150,6 +150,31 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
                 return value
         return None
 
+    def _compute_percent(amount: float | None, basis: float | None) -> float | None:
+        if amount is None or basis is None:
+            return None
+        if not math.isfinite(amount) or not math.isfinite(basis):
+            return None
+        denominator = abs(basis)
+        if denominator == 0:
+            return None
+        return (amount / denominator) * 100
+
+    def _position_multiplier(record: dict[str, Any]) -> float:
+        mult = _first_float(record, "multiplier", "contract_multiplier", "mult")
+        if mult is not None and math.isfinite(mult) and mult != 0:
+            return abs(mult)
+        sec = (
+            record.get("secType")
+            or record.get("asset_class")
+            or record.get("instrument_type")
+            or ""
+        )
+        sec_norm = str(sec).strip().upper()
+        if sec_norm in {"OPT", "FOP"}:
+            return 100.0
+        return 1.0
+
     try:
         stocks_iter = state.stocks()  # type: ignore[attr-defined]
     except AttributeError:
@@ -176,13 +201,27 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
             record, "previous_close", "prev_close", "prior_close", "previousClose"
         )
         day_pnl = _first_float(record, "day_pnl", "pnl_intraday", "day_pnl_amount")
+        mult = _position_multiplier(record)
         if day_pnl is None and mark is not None and previous_close is not None:
-            day_pnl = (mark - previous_close) * qty
+            day_pnl = (mark - previous_close) * qty * mult
         pnl_unrealized = _first_float(
             record, "total_pnl", "pnl_unrealized", "total_pnl_amount"
         )
         if pnl_unrealized is None and mark is not None and avg_cost is not None:
-            pnl_unrealized = (mark - avg_cost) * qty
+            pnl_unrealized = (mark - avg_cost) * qty * mult
+        day_pnl_percent = _first_float(record, "day_pnl_percent", "day_pnl_pct")
+        if day_pnl_percent is None and previous_close is not None:
+            day_basis = abs(qty) * previous_close * mult
+            day_pnl_percent = _compute_percent(day_pnl, day_basis)
+        total_pnl_percent = _first_float(
+            record,
+            "total_pnl_percent",
+            "pnl_unrealized_percent",
+            "pnl_unrealized_pct",
+        )
+        if total_pnl_percent is None and avg_cost is not None:
+            total_basis = abs(qty) * avg_cost * mult
+            total_pnl_percent = _compute_percent(pnl_unrealized, total_basis)
         stocks_view.append(
             {
                 "symbol": symbol,
@@ -192,17 +231,13 @@ def _build_positions_view_from_engine(pe_state: Any | None = None) -> dict[str, 
                 "previous_close": previous_close,
                 "day_pnl": day_pnl,
                 "pnl_intraday": day_pnl,
-                "day_pnl_percent": _first_float(
-                    record, "day_pnl_percent", "day_pnl_pct"
-                ),
+                "day_pnl_percent": day_pnl_percent,
+                "day_pnl_pct": day_pnl_percent,
                 "pnl_unrealized": pnl_unrealized,
                 "total_pnl": pnl_unrealized,
-                "total_pnl_percent": _first_float(
-                    record,
-                    "total_pnl_percent",
-                    "pnl_unrealized_percent",
-                    "pnl_unrealized_pct",
-                ),
+                "total_pnl_percent": total_pnl_percent,
+                "pnl_unrealized_percent": total_pnl_percent,
+                "pnl_unrealized_pct": total_pnl_percent,
                 "greeks": {"delta": 0.0, "gamma": 0.0, "theta": 0.0},
                 "mark_source": record.get("mark_source"),
                 "stale_seconds": _coerce_int(record.get("stale_seconds")),
@@ -352,6 +387,33 @@ def _resolve_session() -> Session:
     if override in _ALLOWED_SESSIONS:
         return cast(Session, override)
     return _infer_session_from_clock()
+
+
+def _build_session_info(session_state: Session) -> dict[str, Any]:
+    """Build a full session info dict for the snapshot payload."""
+    now = datetime.now(UTC)
+    tz_str = "America/New_York"
+    tz = ZoneInfo(tz_str)
+    local_now = now.astimezone(tz)
+    
+    # Calculate RTH window for today
+    rth_open = local_now.replace(hour=9, minute=30, second=0, microsecond=0)
+    rth_close = local_now.replace(hour=16, minute=0, second=0, microsecond=0)
+    
+    source = "env" if os.getenv("PSD_SESSION", "").strip() else "clock"
+    
+    # Frontend expects ETH (Extended Trading Hours), not EXT
+    state_for_frontend = "ETH" if session_state == "EXT" else session_state
+    
+    return {
+        "exchange": "NYSE",
+        "tz": tz_str,
+        "state": state_for_frontend,
+        "as_of": now.isoformat(),
+        "rth_open": rth_open.isoformat() if session_state != "CLOSED" else None,
+        "rth_close": rth_close.isoformat() if session_state != "CLOSED" else None,
+        "source": source,
+    }
 
 
 async def load_positions() -> list[dict[str, Any]]:
@@ -577,6 +639,8 @@ async def snapshot_once() -> dict[str, Any]:
     payload = {
         "ts": ts,
         "session": session,
+        "session_info": _build_session_info(session),
+        "data_source": "ibkr",
         "positions": positions,
         "positions_view": positions_view,
         "quotes": marks,

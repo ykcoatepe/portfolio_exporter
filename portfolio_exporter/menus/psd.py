@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from rich.panel import Panel
 
 # Primary: Vite dev server (modern dashboard)
 DEV_HOST, DEV_PORT = "localhost", 5173
@@ -38,10 +39,16 @@ def _api_port() -> int:
         return _DEFAULT_API_PORT
 
 
-_DEV_DASH_URL = f"http://{DEV_HOST}:{DEV_PORT}/psd"
-
 _AUTO_STARTED = False
 _DEFAULT_STARTUP_TIMEOUT_S = 20.0
+
+
+def _dev_port() -> int:
+    raw = os.getenv("PSD_DEV_PORT", str(DEV_PORT))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEV_PORT
 
 
 def _is_dev_mode() -> bool:
@@ -55,7 +62,7 @@ def _is_dev_mode() -> bool:
     if os.getenv("PYTEST_CURRENT_TEST"):
         return False
     # Auto-detect: check if Vite is running
-    return _port_open(DEV_HOST, DEV_PORT)
+    return _port_open(DEV_HOST, _dev_port())
 
 
 def _build_uvicorn_command() -> list[str]:
@@ -178,8 +185,8 @@ def start_psd_dashboard() -> None:
     """Build the PSD web bundle if needed, ensure the API is live, and open /psd."""
 
     if not DIST_INDEX.exists():
-        subprocess.check_call(["npm", "ci"], cwd=str(WEB_ROOT))
-        subprocess.check_call(["npm", "run", "build"], cwd=str(WEB_ROOT))
+        subprocess.check_call(["bun", "install"], cwd=str(WEB_ROOT))
+        subprocess.check_call(["bun", "run", "build"], cwd=str(WEB_ROOT))
 
     port = _api_port()
     if _port_open(API_HOST, port):
@@ -224,7 +231,10 @@ def start_psd_dashboard() -> None:
 
 
 def _open_dash_tab() -> None:
-    url = _DEV_DASH_URL if _is_dev_mode() else f"http://{API_HOST}:{_api_port()}/psd"
+    if _is_dev_mode():
+        url = f"http://{DEV_HOST}:{_dev_port()}/psd"
+    else:
+        url = f"http://{API_HOST}:{_api_port()}/psd"
     webbrowser.open_new_tab(url)
 
 
@@ -235,12 +245,13 @@ def _console_from_status(status: Any) -> Console:
     return Console()
 
 
-def start_psd_fresh(status: Any) -> None:
+def start_psd_fresh(status: Any, mode: str | None = None) -> None:
     from psd.menus import ops as psd_ops
 
     console = _console_from_status(status)
     psd_ops.stop_psd(console, force_port_kill=True)
-    psd_ops.start_psd(console)
+    psd_ops.start_psd(console, mode=mode, open_browser=False)
+    psd_ops.open_dashboard_when_ready(console, timeout=_startup_timeout_s())
 
 
 def stop_psd_fresh(status: Any) -> None:
@@ -248,6 +259,27 @@ def stop_psd_fresh(status: Any) -> None:
 
     console = _console_from_status(status)
     psd_ops.stop_psd(console, force_port_kill=True)
+
+
+def _prompt_psd_mode(console: Console) -> str | None:
+    options = [
+        "[1] User mode (built UI on backend)",
+        "[2] Dev mode (Vite UI server)",
+        "[3] Open Dashboard",
+        "[0] Back",
+    ]
+    console.print(Panel("\n".join(options), title="Portfolio Sentinel Mode"))
+    choice = console.input("Select mode: ").strip().lower()
+    if choice in {"", "1", "user"}:
+        return "user"
+    if choice in {"2", "dev", "development"}:
+        return "dev"
+    if choice in {"3", "open"}:
+        return "open"
+    if choice in {"0", "back", "exit"}:
+        return None
+    console.print("[red]Invalid selection. Choose 0-3.[/red]")
+    return None
 
 
 def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for future
@@ -267,14 +299,23 @@ def launch(status: Any, fmt: str) -> None:  # noqa: ARG001 - fmt reserved for fu
                 _open_dash_tab()
             return
 
+        console = _console_from_status(status)
+        mode = _prompt_psd_mode(console)
+        if mode is None:
+            return
+        if mode == "open":
+            _open_dash_tab()
+            return
+        if mode == "dev":
+            os.environ["PSD_DEV_MODE"] = "1"
+        elif mode == "user":
+            os.environ["PSD_DEV_MODE"] = "0"
         if status:
             try:
                 status.update("Starting Portfolio Sentinel (fresh)", "cyan")
-            except (
-                Exception
-            ):  # pragma: no cover - defensive: status may not support update
+            except Exception:  # pragma: no cover - defensive
                 pass
-        start_psd_fresh(status)
+        start_psd_fresh(status, mode=mode)
     except Exception as exc:  # pragma: no cover - surfaced to the user below
         _AUTO_STARTED = False
         _notify_psd_error(status, str(exc))

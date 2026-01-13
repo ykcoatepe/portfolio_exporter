@@ -1,8 +1,29 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import PowerlawPanel from "./PowerlawPanel";
 import type { PowerlawSnapshot } from "../lib/types";
+import { usePowerlawSignalsHelp } from "../hooks/usePowerlawSignalsHelp";
+
+vi.mock("../hooks/usePowerlawSignalsHelp", () => ({
+  usePowerlawSignalsHelp: vi.fn(),
+}));
+
+const mockedUsePowerlawSignalsHelp = vi.mocked(usePowerlawSignalsHelp);
+
+beforeEach(() => {
+  mockedUsePowerlawSignalsHelp.mockReturnValue({
+    data: {
+      title: "Powerlaw Signals Guide",
+      subtitle: "How to read PLKE and risk state",
+      sections: [{ title: "Overview", bullets: ["Sample bullet."] }],
+      terms: [],
+      footnotes: [],
+    },
+    isLoading: false,
+    error: null,
+  } as never);
+});
 
 describe("PowerlawPanel", () => {
   test("renders stale snapshot details", () => {
@@ -30,6 +51,7 @@ describe("PowerlawPanel", () => {
 
     expect(screen.getByText("Powerlaw Signals")).toBeInTheDocument();
     expect(screen.getByText("STALE")).toBeInTheDocument();
+    expect(screen.getByText("DATA: WARN")).toBeInTheDocument();
     expect(screen.getByText(/refresh failed/i)).toBeInTheDocument();
     expect(screen.getByText("PLKE")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /refresh powerlaw/i })).toBeInTheDocument();

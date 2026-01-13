@@ -26,6 +26,46 @@ export interface MsbStatus {
   detail?: string | null;
 }
 
+export interface MsbHelpSection {
+  title: string;
+  bullets: string[];
+}
+
+export interface MsbHelpTerm {
+  key: string;
+  title: string;
+  body?: string | null;
+  bullets?: string[] | null;
+}
+
+export interface MsbSignalsHelp {
+  title: string;
+  subtitle?: string | null;
+  sections: MsbHelpSection[];
+  terms?: MsbHelpTerm[] | null;
+  footnotes?: string[] | null;
+}
+
+export interface PowerlawHelpSection {
+  title: string;
+  bullets: string[];
+}
+
+export interface PowerlawHelpTerm {
+  key: string;
+  title: string;
+  body?: string | null;
+  bullets?: string[] | null;
+}
+
+export interface PowerlawSignalsHelp {
+  title: string;
+  subtitle?: string | null;
+  sections: PowerlawHelpSection[];
+  terms?: PowerlawHelpTerm[] | null;
+  footnotes?: string[] | null;
+}
+
 export interface StockPositionApi {
   symbol: string;
   quantity: number;
@@ -609,6 +649,7 @@ export type PowerlawSnapshot = {
     last_error?: string | null;
   };
   data_quality?: string | null;
+  data_quality_detail?: string[] | null;
   plke?: number | null;
   plke_band_alpha?: string | null;
   risk_state?: string | null;

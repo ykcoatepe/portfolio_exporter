@@ -23,7 +23,12 @@ def test_powerlaw_snapshot_fresh(monkeypatch, tmp_path):
     output_dir.mkdir(parents=True)
     _write_snapshot(
         output_dir / "trader_v5_daily_2025-01-03.json",
-        {"as_of": "2025-01-03", "plke": 42.0, "equity_weights": {"SPY": 0.5}},
+        {
+            "as_of": "2025-01-03",
+            "plke": 42.0,
+            "equity_weights": {"SPY": 0.5},
+            "data_quality_detail": ["SPY stale by 2d"],
+        },
     )
 
     _configure_env(monkeypatch, repo)
@@ -41,6 +46,7 @@ def test_powerlaw_snapshot_fresh(monkeypatch, tmp_path):
     assert snapshot["stale"] is False
     assert snapshot["as_of"] == "2025-01-03"
     assert snapshot["equity_weights"]["SPY"] == 0.5
+    assert snapshot["data_quality_detail"] == ["SPY stale by 2d"]
 
 
 def test_powerlaw_snapshot_allows_one_day_lag(monkeypatch, tmp_path):

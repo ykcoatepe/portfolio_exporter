@@ -487,6 +487,158 @@
       "details": "MSB backfill now drops rows missing hy/vx1/vx2 to avoid NOT NULL constraint failures.",
       "event": "Drop null MSB rows before backfill",
       "timestamp": "2026-01-13T07:35:16Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T08:02:01Z"
+    },
+    {
+      "details": "Added missing os import so /msb/help can load tooltip config without 500.",
+      "event": "Fix MSB help endpoint",
+      "timestamp": "2026-01-13T08:11:04Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T08:18:37Z"
+    },
+    {
+      "details": "Added MSB card help tooltip and expanded help content to define HY/VIX scores, term ratio, cal spread, and stress bands.",
+      "event": "Extend MSB help terms",
+      "timestamp": "2026-01-13T08:19:04Z"
+    },
+    {
+      "details": "Added per-stat tooltip support via MSB help terms and wired tooltips into the barometer stat cards.",
+      "event": "Add MSB stat tooltips",
+      "timestamp": "2026-01-13T08:26:54Z"
+    },
+    {
+      "details": "Resolve PSD_MSB_SIGNALS_HELP_PATH relative to repo root when needed so term tooltips load.",
+      "event": "Fix MSB help config resolution",
+      "timestamp": "2026-01-13T08:31:13Z"
+    },
+    {
+      "details": "Added Focus vs Range styles with latest/delta/range labels and reference lines for readability.",
+      "event": "Add MSB chart alternates",
+      "timestamp": "2026-01-13T08:42:25Z"
+    },
+    {
+      "details": "Added Mermaid menu/task flow charts and SVG renders in docs/diagrams.",
+      "event": "Add main flow diagrams",
+      "timestamp": "2026-01-13T08:45:54Z"
+    },
+    {
+      "details": "Added main menu/task flow SVG embeds to README.",
+      "event": "Embed flow diagrams in README",
+      "timestamp": "2026-01-13T08:49:54Z"
+    },
+    {
+      "details": "Added static PSD-themed HTML mockups for chart readability options A, B, and F.",
+      "event": "Create MSB chart mockups",
+      "timestamp": "2026-01-13T08:50:13Z"
+    },
+    {
+      "details": "Applied Option A layout to MSB mini charts and removed mockup files.",
+      "event": "Implement MSB Option A",
+      "timestamp": "2026-01-13T08:58:41Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:00:41Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:01:55Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:06:11Z"
+    },
+    {
+      "details": "Compute fallback day/total percent in PSD grid mapper and normalize positions view percents in PSD ingestor/adapter.",
+      "event": "Fix PSD single stocks % columns",
+      "timestamp": "2026-01-13T09:14:13Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:23:30Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:28:10Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T09:30:32Z"
+    },
+    {
+      "details": "Load Powerlaw help JSON from powerlaw repo, expose /powerlaw/help, add PSD tooltips, and emit data_quality/detail in Powerlaw snapshots.",
+      "event": "Add Powerlaw help bundles + data quality detail",
+      "timestamp": "2026-01-13T09:55:46Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T10:10:27Z"
+    },
+    {
+      "details": "Adjusted PSD page tests for grid rows, combo expansion state, and MSB action tab order.",
+      "event": "Update PSD unit tests",
+      "timestamp": "2026-01-13T10:19:51Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T10:24:18Z"
+    },
+    {
+      "details": "Menu 4 now detects Vite dev server, builds frontend bundle if missing, and opens /psd reliably.",
+      "event": "Fix PSD menu launch",
+      "timestamp": "2026-01-13T10:31:20Z"
+    },
+    {
+      "details": "Menu 4 now installs uvicorn deps if missing, starts UI dev server when PSD_DEV_MODE=1, and waits for the web port before opening.",
+      "event": "PSD menu starts UI + backend",
+      "timestamp": "2026-01-13T10:42:24Z"
+    },
+    {
+      "details": "Menu 4 now prompts for user vs dev mode; ops menu exposes separate start options.",
+      "event": "Add PSD dev/user modes",
+      "timestamp": "2026-01-13T10:45:55Z"
+    },
+    {
+      "details": "Spawn PSD services in a new session to avoid SIGINT shutting down uvicorn when the menu exits.",
+      "event": "Keep PSD services alive",
+      "timestamp": "2026-01-13T10:54:30Z"
+    },
+    {
+      "details": "Menu start now restarts the web service if PID is alive but 127.0.0.1:51127 is not listening.",
+      "event": "Restart PSD web when port closed",
+      "timestamp": "2026-01-13T10:59:11Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T11:01:26Z"
+    },
+    {
+      "details": "Start PSD without opening the browser immediately; wait for web port before opening and print manual URL if still down.",
+      "event": "Delay PSD dashboard open until web responds",
+      "timestamp": "2026-01-13T11:09:52Z"
+    },
+    {
+      "details": "Use repo-root run dir and vendor data path; ensure PYTHONPATH includes src and spawn services from repo root so menu 4 works even when CWD differs.",
+      "event": "Anchor PSD runtime paths to repo root",
+      "timestamp": "2026-01-13T11:16:29Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T11:18:37Z"
+    },
+    {
+      "details": "Added docs/powerlaw_signals_help.json in codeforge-powerlaw-trader, defaulted PSD powerlaw data_quality when missing, and cast QueryClient in query persistence to avoid TanStack type mismatch during web builds.",
+      "event": "Powerlaw help bundles + web build fix",
+      "timestamp": "2026-01-13T11:35:01Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T11:37:46Z"
     }
   ],
   "decisions": [
@@ -939,6 +1091,22 @@
       "rationale": "Make MSB data available immediately after starting PSD without manual steps.",
       "timestamp": "2026-01-12T14:54:35Z",
       "title": "Auto-refresh MSB on PSD startup"
+    },
+    {
+      "context": null,
+      "decision": "Load Powerlaw help content from docs/powerlaw_signals_help.json in the powerlaw repo with PSD fallback defaults.",
+      "id": 59,
+      "rationale": "Keeps PSD tooltips aligned with Powerlaw definitions while preserving offline fallback.",
+      "timestamp": "2026-01-13T09:55:54Z",
+      "title": "Powerlaw help source"
+    },
+    {
+      "context": "Powerlaw info bundles not visible because dist build failed due to TanStack type mismatch; help content needs to be discoverable from powerlaw repo.",
+      "decision": "Use powerlaw repo JSON for help tooltips when available; default data_quality to OK/WARN based on staleness; cast QueryClient to align TanStack types for persistence.",
+      "id": 60,
+      "rationale": "Keeps PSD UI parity with MSB, avoids DATA: N/A, and unblocks web build.",
+      "timestamp": "2026-01-13T11:34:54Z",
+      "title": "Powerlaw help + data quality fallback"
     }
   ],
   "preferences": {

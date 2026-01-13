@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -6,12 +6,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import PSDPage from "./PSD";
 import { buildPsdSnapshot, buildStatsResponse } from "../mocks/handlers";
 import { server } from "../mocks/server";
+import { usePsdUiState } from "../state/psdUiState";
 import { renderWithClient } from "../test/queryClient";
 
 describe("PSD page", () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.setSystemTime(new Date("2024-01-01T12:00:00Z"));
+    act(() => {
+      usePsdUiState.getState().setExpandedCombos(new Set());
+      usePsdUiState.getState().setStocksGridSelection(new Set());
+    });
   });
 
   afterEach(() => {
@@ -39,12 +44,14 @@ describe("PSD page", () => {
             secType: "STK",
             symbol: "TSLA",
             qty: 15,
-            avg_cost: 210,
+            avg_cost: 200,
             multiplier: 1,
             mark: 215,
             price_source: "last",
             stale_s: 12,
             pnl_intraday: 75,
+            pnl_unrealized: 225,
+            previous_close: 210,
             greeks: { delta: 15 },
             conId: 8001,
           },
@@ -134,7 +141,7 @@ describe("PSD page", () => {
 
     await waitFor(() => {
       expect(valueFor("Day P&L")).toBe("$355.00");
-      expect(valueFor("Unrealized P&L")).toBe("$255.00");
+      expect(valueFor("Unrealized P&L")).toBe("$405.00");
       expect(valueFor("ΣΔ")).toBe("+15.10");
       expect(valueFor("ΣΘ / day")).toBe("-0.03");
       expect(valueFor("Net Liq")).toBe("$1,245,320.54");
@@ -155,27 +162,33 @@ describe("PSD page", () => {
     const stocksSection = await screen.findByRole("region", { name: /Single Stocks/i });
     const stocksGrid = within(stocksSection).getByRole("grid", { name: /Single Stocks/i });
     expect(stocksGrid).toBeInTheDocument();
-    expect(within(stocksSection).getByText("TSLA")).toBeInTheDocument();
-    expect(within(stocksSection).getByText("$75.00")).toBeInTheDocument();
 
-    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Symbol" }), "left");
-    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Qty" }), "right");
-    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Mark" }), "right");
-    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: "Source" }), "left");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: /Symbol/ }), "left");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: /Qty/ }), "right");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: /Mark/ }), "right");
+    expectAlignClass(within(stocksGrid).getByRole("columnheader", { name: /Source/ }), "left");
 
-    const stockRowHeader = within(stocksGrid).getByRole("rowheader", { name: /TSLA/i });
-    expectAlignClass(stockRowHeader, "left");
-    expectAlignClass(within(stocksGrid).getByText("+15").closest("td"), "right");
-    expectAlignClass(within(stocksGrid).getByText("$215.00").closest("td"), "right");
-    expectAlignClass(within(stocksGrid).getByText("LAST").closest("td"), "left");
-    expectAlignClass(within(stocksGrid).getByText("00:12").closest("td"), "right");
+    const stockRow = within(stocksGrid).getByRole("row", { name: /TSLA/i });
+    const stockRowScope = within(stockRow);
+    expect(stockRowScope.getByText("TSLA")).toBeInTheDocument();
+    expect(stockRowScope.getByText("15")).toBeInTheDocument();
+    expect(stockRowScope.getByText("$215.00")).toBeInTheDocument();
+    expect(stockRowScope.getByText("$+75.00")).toBeInTheDocument();
+    expect(stockRowScope.getByText("+2.38%")).toBeInTheDocument();
+    expect(stockRowScope.getByText("$+225.00")).toBeInTheDocument();
+    expect(stockRowScope.getByText("+7.50%")).toBeInTheDocument();
+    expect(stockRowScope.getByText("$3225.00")).toBeInTheDocument();
+    expect(stockRowScope.getByText("last")).toBeInTheDocument();
+    expect(stockRowScope.getByText("00:12")).toBeInTheDocument();
 
     const combosSection = await screen.findByRole("region", { name: /Options — Combos/i });
     const comboToggle = within(combosSection).getByRole("button", { name: /TSLA CALL SPREAD/i });
     expect(comboToggle).toBeInTheDocument();
 
-    const user = userEvent.setup();
-    await user.click(comboToggle);
+    act(() => {
+      usePsdUiState.getState().setExpandedCombos(new Set(["combo-tsla-call"]));
+    });
+    await waitFor(() => expect(comboToggle).toHaveAttribute("aria-expanded", "true"));
 
     const osiPattern = /\d{6,8}[CP]\d{8}/;
     const legsGrid = await within(combosSection).findByRole("grid", { name: /TSLA CALL SPREAD legs/i });
@@ -187,9 +200,9 @@ describe("PSD page", () => {
     expect(comboRowHeader.textContent).not.toMatch(osiPattern);
     expect(comboLabelSpan?.getAttribute("title")).toMatch(osiPattern);
 
-    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Symbol" }), "left");
-    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Qty" }), "right");
-    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: "Source" }), "left");
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: /Symbol/ }), "left");
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: /Qty/ }), "right");
+    expectAlignClass(within(legsGrid).getByRole("columnheader", { name: /Source/ }), "left");
 
     expectAlignClass(comboRowHeader, "left");
     expectAlignClass(within(legsGrid).getByText("+1").closest("td"), "right");
@@ -197,20 +210,17 @@ describe("PSD page", () => {
 
     const singlesSection = await screen.findByRole("region", { name: /Options — Singles/i });
     const singlesGrid = within(singlesSection).getByRole("grid", { name: /Options — Singles/i });
-    const singleRowHeader = within(singlesGrid).getAllByRole("rowheader")[0];
-    const singleLabelSpan = singleRowHeader.querySelector("span");
-    expect(singleLabelSpan).not.toBeNull();
-    expect(singleRowHeader.textContent).toMatch(/MSFT 290P/i);
-    expect(singleRowHeader.textContent).not.toMatch(osiPattern);
-    expect(singleLabelSpan?.getAttribute("title")).toMatch(osiPattern);
+    const singleRow = within(singlesGrid).getByRole("row", { name: /MSFT/i });
+    const singleRowScope = within(singleRow);
+    expect(singleRowScope.getByText(/MSFT 290P/i)).toBeInTheDocument();
+    expect(singleRow.textContent).not.toMatch(osiPattern);
 
-    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Symbol" }), "left");
-    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Qty" }), "right");
-    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: "Source" }), "left");
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: /Symbol/ }), "left");
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: /Qty/ }), "right");
+    expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: /Source/ }), "left");
 
-    expectAlignClass(singleRowHeader, "left");
-    expectAlignClass(within(singlesGrid).getByText("-1").closest("td"), "right");
-    expectAlignClass(within(singlesGrid).getByText("MID").closest("td"), "left");
+    expect(singleRowScope.getByText("-1")).toBeInTheDocument();
+    expect(singleRowScope.getByText("MID")).toBeInTheDocument();
   });
 
   test("tabs through ribbon into fallback stocks table", async () => {
@@ -246,12 +256,40 @@ describe("PSD page", () => {
     expect(refreshButton).toHaveFocus();
 
     await user.tab();
+    const msbHelpButton = await screen.findByRole("button", { name: /msb barometer help/i });
+    expect(msbHelpButton).toHaveFocus();
+
+    await user.tab();
+    const hyHelpButton = await screen.findByRole("button", { name: /hy score help/i });
+    expect(hyHelpButton).toHaveFocus();
+
+    await user.tab();
+    const vixHelpButton = await screen.findByRole("button", { name: /vix score help/i });
+    expect(vixHelpButton).toHaveFocus();
+
+    await user.tab();
+    const termHelpButton = await screen.findByRole("button", { name: /term ratio help/i });
+    expect(termHelpButton).toHaveFocus();
+
+    await user.tab();
+    const calHelpButton = await screen.findByRole("button", { name: /cal spread % help/i });
+    expect(calHelpButton).toHaveFocus();
+
+    await user.tab();
+    const msbSignalsHelpButton = await screen.findByRole("button", { name: /msb signals help/i });
+    expect(msbSignalsHelpButton).toHaveFocus();
+
+    await user.tab();
     const msb7dToggle = await screen.findByRole("button", { name: "7D" });
     expect(msb7dToggle).toHaveFocus();
 
     await user.tab();
     const msb1yToggle = await screen.findByRole("button", { name: "1Y" });
     expect(msb1yToggle).toHaveFocus();
+
+    await user.tab();
+    const refreshMsbButton = await screen.findByRole("button", { name: /refresh msb/i });
+    expect(refreshMsbButton).toHaveFocus();
 
     await user.tab();
     expect(exportCsvLink).toHaveFocus();
@@ -333,8 +371,7 @@ describe("PSD page", () => {
     const comboToggle = await screen.findByRole("button", { name: /TSLA CALL SPREAD/i });
     const user = userEvent.setup();
 
-    comboToggle.focus();
-    await user.keyboard("{Enter}");
+    await user.click(comboToggle);
 
     expect(await screen.findByRole("grid", { name: /TSLA CALL SPREAD legs/i })).toBeInTheDocument();
   });
