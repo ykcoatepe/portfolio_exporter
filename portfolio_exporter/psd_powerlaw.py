@@ -327,9 +327,12 @@ def _stale_threshold(reference: date, stale_days: int) -> date:
         reference, lookback=max(20, allowed_window * 5)
     )
     if trading_days:
-        idx = -min(allowed_window, len(trading_days))
-        return trading_days[idx]
-    return _fallback_trading_day(reference, allowed_window)
+        is_trading_day = reference in set(trading_days)
+        lag = stale_days if is_trading_day else max(0, stale_days - 1)
+        last_idx = len(trading_days) - 1
+        threshold_idx = max(0, last_idx - lag)
+        return trading_days[threshold_idx]
+    return _fallback_trading_day(reference, stale_days)
 
 
 def _calendar_trading_days(reference: date, lookback: int) -> list[date]:

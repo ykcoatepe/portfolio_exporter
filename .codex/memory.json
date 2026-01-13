@@ -673,6 +673,11 @@
       "details": "Session info now reports source=env only for valid PSD_SESSION values; add regression test.",
       "event": "Fix session source labeling",
       "timestamp": "2026-01-13T13:24:38Z"
+    },
+    {
+      "details": "Reduce stale window by one trading day on non-trading dates and add weekend regression coverage.",
+      "event": "Tighten powerlaw stale threshold",
+      "timestamp": "2026-01-13T13:39:53Z"
     }
   ],
   "decisions": [
@@ -1189,6 +1194,14 @@
       "rationale": "Avoid mislabeling invalid overrides in UI/logs.",
       "timestamp": "2026-01-13T13:24:25Z",
       "title": "Session source reflects valid override"
+    },
+    {
+      "context": null,
+      "decision": "When today is not a trading day, reduce the allowed trading-day lag by one so stale thresholds anchor to the last trading day.",
+      "id": 67,
+      "rationale": "Avoids weekend/holiday extra slack that can keep two-day-old snapshots marked fresh.",
+      "timestamp": "2026-01-13T13:39:46Z",
+      "title": "Tighten stale threshold on non-trading days"
     }
   ],
   "preferences": {
