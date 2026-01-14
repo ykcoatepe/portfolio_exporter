@@ -316,7 +316,8 @@ def _leg_basis(leg: dict[str, Any], price_key: str) -> float | None:
     multiplier = _coerce_float(leg.get("multiplier"))
     if multiplier is None:
         multiplier = 100.0 if leg.get("secType") in {"OPT", "FOP"} else 1.0
-    basis = abs(qty) * price * multiplier
+    # Use abs(price) so credit/short legs with negative avg_cost contribute basis
+    basis = abs(qty) * abs(price) * multiplier
     return basis if basis > 0 else None
 
 
