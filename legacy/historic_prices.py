@@ -26,6 +26,7 @@ except Exception:  # pragma: no cover - optional
 from datetime import datetime
 
 from portfolio_exporter.core.date_utils import utcnow
+from legacy.output_dir import resolve_output_dir
 
 # ---------- IBKR optional integration ----------
 try:
@@ -67,11 +68,7 @@ PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]  # first existing file win
 DATE_TAG = utcnow().strftime("%Y%m%d")
 TIME_TAG = utcnow().strftime("%H%M")
 # Save to iCloud Drive ▸ Downloads (override with OUTPUT_DIR env var)
-OUTPUT_DIR = os.environ.get(
-    "OUTPUT_DIR",
-    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads",
-)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR = str(resolve_output_dir())
 OUTPUT_CSV = os.path.join(OUTPUT_DIR, f"historic_prices_{DATE_TAG}_{TIME_TAG}.csv")
 
 

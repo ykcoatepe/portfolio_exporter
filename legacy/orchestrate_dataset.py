@@ -18,11 +18,10 @@ from rich.progress import (
 )
 from rich.console import Console
 
+from legacy.output_dir import resolve_output_dir
+
 # Directory where orchestrated dataset and script outputs are stored.
-OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/com~apple~CloudDocs/Downloads"
-)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR = str(resolve_output_dir())
 
 
 def run_script(cmd: list[str]) -> List[str]:

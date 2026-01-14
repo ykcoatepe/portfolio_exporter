@@ -32,6 +32,7 @@ import io
 import pandas as pd  #  pandas ≥1.2
 import requests  #  pip install requests
 from portfolio_exporter.core.date_utils import utcnow
+from legacy.output_dir import resolve_output_dir
 
 try:  # optional dependencies
     import xlsxwriter  # type: ignore
@@ -46,10 +47,7 @@ except Exception:  # pragma: no cover - optional
     SimpleDocTemplate = Table = TableStyle = colors = letter = landscape = None
 
 # ───────────────────────── CONFIG ──────────────────────────
-OUTPUT_DIR = Path(
-    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
-)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR = resolve_output_dir()
 TIME_TAG = utcnow().strftime("%H%M")
 
 # ---  1️⃣  where TWS writes dailyNetLiq.csv -----------------
