@@ -13,6 +13,8 @@ except (RuntimeError, ModuleNotFoundError) as exc:  # pragma: no cover - optiona
 from psd.web.app import create_app
 from psd.web.config import Settings
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture(name="sample_snapshot")
 def fixture_sample_snapshot() -> dict[str, object]:

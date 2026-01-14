@@ -18,6 +18,8 @@ import psd.web.app as web_app
 import psd.web.ready as ready
 from psd.web.config import Settings
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture()
 def api_app() -> FastAPI:

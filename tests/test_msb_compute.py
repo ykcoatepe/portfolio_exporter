@@ -8,6 +8,9 @@ import numpy as np
 import pandas as pd
 
 from psd.analytics.msb import MSBConfig, compute_msb
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def _baseline_series(

@@ -2,6 +2,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def _write_fixture(tmp_path: Path) -> None:

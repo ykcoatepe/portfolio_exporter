@@ -7,6 +7,9 @@ from httpx import ASGITransport, AsyncClient
 
 import psd.web.app as web_app
 from psd.web.config import Settings
+import pytest
+
+pytestmark = pytest.mark.integration
 
 
 def test_broadcast_latest_msb_emits_event(monkeypatch):

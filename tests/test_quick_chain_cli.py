@@ -5,6 +5,9 @@ import sys
 import importlib
 import os
 import json
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def test_json_summary_no_files(tmp_path):

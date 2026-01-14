@@ -11,7 +11,7 @@ THRESH ?= 3
 # Prepend venv/bin so console entry points (daily-report, netliq-export, etc.) resolve
 export PATH := $(VENV_BIN):$(PATH)
 
-.PHONY: setup dev fmt test lint build ci-home run run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate agent-digest agent-rotate msb-compute msb-emit serve-api web-build web-test web-e2e psd-ci release-tag
+.PHONY: setup dev fmt test test-fast test-full test-cli test-integration test-slow test-parallel lint build ci-home run run-menu sse-check ib-port-guard memory-validate memory-view memory-tasks memory-questions memory-context memory-bootstrap memory-digest memory-rotate agent-digest agent-rotate msb-compute msb-emit serve-api web-build web-test web-e2e psd-ci release-tag
 .PHONY: sanity-cli sanity-daily sanity-netliq sanity-trades sanity-trades-dash sanity-all menus-sanity sanity-order-builder sanity-trades-report-excel sanity-menus-quick
 
 setup:
@@ -54,6 +54,23 @@ release-tag:
 
 test:
 	$(PYTEST) -q
+
+test-full: test
+
+test-fast:
+	$(PYTEST) -q -m "not slow and not integration and not cli"
+
+test-cli:
+	$(PYTEST) -q -m "cli"
+
+test-integration:
+	$(PYTEST) -q -m "integration"
+
+test-slow:
+	$(PYTEST) -q -m "slow"
+
+test-parallel:
+	$(PYTEST) -q -n auto
 
 build:
 	python -m build

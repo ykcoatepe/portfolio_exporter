@@ -8,6 +8,8 @@ except (RuntimeError, ModuleNotFoundError) as exc:  # pragma: no cover - env gua
 from psd.web.app import create_app
 from psd.web.config import Settings
 
+pytestmark = pytest.mark.integration
+
 
 def test_metrics_smoke() -> None:
     # Using context manager ensures FastAPI lifespan hooks run.

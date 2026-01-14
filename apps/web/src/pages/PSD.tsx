@@ -303,6 +303,25 @@ const PSDPage = () => {
   const positionsView = snapshot?.positions_view;
   const optionLegs = positionsView?.single_options ?? EMPTY_PSD_LEGS;
   const optionLegRows = useMemo(() => mapLegsToOptionLegRows(optionLegs), [optionLegs]);
+  const missingGreeksCount = useMemo(
+    () =>
+      optionLegRows.reduce(
+        (count, row) =>
+          row.delta == null || row.gamma == null || row.theta == null ? count + 1 : count,
+        0,
+      ),
+    [optionLegRows],
+  );
+  const comboMissingGreeksCount = useMemo(() => {
+    const combos = positionsView?.option_combos ?? [];
+    return combos.reduce((count, combo) => {
+      const greeks = combo.greeks_agg ?? {};
+      const hasDelta = finiteOrNull(greeks.delta) !== null;
+      const hasGamma = finiteOrNull(greeks.gamma) !== null;
+      const hasTheta = finiteOrNull(greeks.theta) !== null;
+      return hasDelta && hasGamma && hasTheta ? count : count + 1;
+    }, 0);
+  }, [positionsView]);
   const hasView = useMemo(() => {
     if (!positionsView) {
       return false;
@@ -389,12 +408,34 @@ const PSDPage = () => {
             />
 
             <section aria-label="Options — Combos" className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
-              <h2 className="text-xl font-semibold text-slate-100">Options — Combos</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-xl font-semibold text-slate-100">Options — Combos</h2>
+                {comboMissingGreeksCount > 0 ? (
+                  <span
+                    data-testid="combo-greeks-missing-chip"
+                    className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-200"
+                    title={`Missing delta/gamma/theta for ${comboMissingGreeksCount} combo${comboMissingGreeksCount === 1 ? "" : "s"}`}
+                  >
+                    Greeks missing • {comboMissingGreeksCount}
+                  </span>
+                ) : null}
+              </div>
               <CombosSection view={positionsView as PSDPositionsView} />
             </section>
 
             <section aria-label="Options — Singles" className="rounded-3xl border border-slate-900/60 bg-slate-950/50 p-5">
-              <h2 className="text-xl font-semibold text-slate-100">Options — Singles</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-xl font-semibold text-slate-100">Options — Singles</h2>
+                {missingGreeksCount > 0 ? (
+                  <span
+                    data-testid="greeks-missing-chip"
+                    className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-200"
+                    title={`Missing delta/gamma/theta for ${missingGreeksCount} leg${missingGreeksCount === 1 ? "" : "s"}`}
+                  >
+                    Greeks missing • {missingGreeksCount}
+                  </span>
+                ) : null}
+              </div>
               <PsdOptionLegsGrid
                 data={optionLegRows}
                 height="350px"

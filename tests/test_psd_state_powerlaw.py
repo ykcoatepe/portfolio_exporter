@@ -7,6 +7,8 @@ import psd.web.app as web_app
 from psd.core import store
 from psd.web.config import Settings
 
+pytestmark = pytest.mark.integration
+
 
 def test_state_overlays_powerlaw_snapshot(
     monkeypatch: pytest.MonkeyPatch, tmp_path

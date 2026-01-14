@@ -20,6 +20,8 @@ if str(SRC_SRC) not in sys.path:
 import psd.web.app as web_app
 from psd.web.config import Settings
 
+pytestmark = pytest.mark.integration
+
 
 def _read_events(
     resp: Any,

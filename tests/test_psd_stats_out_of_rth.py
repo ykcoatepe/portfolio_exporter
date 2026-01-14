@@ -9,6 +9,8 @@ from psd.core import store
 from psd.web.app import broadcast_latest_stats, create_app
 from psd.web.config import Settings
 
+pytestmark = pytest.mark.integration
+
 try:
     from starlette.testclient import TestClient
 except (

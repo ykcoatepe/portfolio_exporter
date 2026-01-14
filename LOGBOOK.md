@@ -419,3 +419,27 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** apps/web/src/lib/queryPersistence.ts, portfolio_exporter/psd_powerlaw.py, ../codeforge-powerlaw-trader/docs/powerlaw_signals_help.json
 **Status:** done
 **Notes:** added powerlaw help JSON in powerlaw repo, default data_quality based on staleness, cast QueryClient for persistence typing, rebuilt apps/web bundle
+
+### 2026-01-13 • Task: Populate PSD single option greeks from flat fields • Branch: fix/psd-single-greeks
+**Owner:** session/ai | **Scope:** ensure PSD single option greeks show when upstream data uses flat delta/gamma/theta/vega fields
+**Interfaces:** src/psd/ingestor/normalize.py, tests/tests_positions_norm.py
+**Status:** done
+**Notes:** fill greeks from flat fields during normalization and add coverage
+
+### 2026-01-13 • Task: Flag missing greeks in Options — Singles • Branch: fix/psd-single-greeks
+**Owner:** session/ai | **Scope:** surface a PSD data-quality chip when delta/gamma/theta are missing for option legs
+**Interfaces:** apps/web/src/pages/PSD.tsx, apps/web/src/pages/PSD.test.tsx
+**Status:** done
+**Notes:** added greeks-missing chip and test assertion
+
+### 2026-01-13 • Task: Aggregate combos greeks and P&L from legs • Branch: fix/psd-single-greeks
+**Owner:** session/ai | **Scope:** compute combo greeks and P&L summaries from component legs when portfolio has no combo aggregates
+**Interfaces:** src/psd/ingestor/normalize.py, apps/web/src/pages/PSD.tsx, tests/tests_positions_norm.py
+**Status:** done
+**Notes:** aggregate leg greeks (delta/gamma/theta/vega), sum day/total P&L with percent bases; add missing-greeks chip for combos
+
+### 2026-01-13 • Task: Speed up local test loop with tiers • Branch: fix/psd-single-greeks
+**Owner:** session/codex | **Scope:** add pytest markers for cli/integration/slow, add test-fast/test-parallel targets, add pytest-xdist
+**Interfaces:** Makefile, pytest.ini, tests/*, requirements-dev.*, README.md
+**Status:** done
+**Notes:** fast suite skips cli/integration/slow; full suite unchanged

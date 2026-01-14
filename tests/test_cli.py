@@ -2,6 +2,9 @@ import os
 import pathlib
 import subprocess
 import sys
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def test_cli_exit_zero(tmp_path: pathlib.Path) -> None:

@@ -69,6 +69,23 @@ def _extract_stale_hint(raw: dict[str, Any]) -> float | None:
     return None
 
 
+def _extract_greeks(raw: dict[str, Any]) -> dict[str, float]:
+    payload = raw.get("greeks")
+    greeks: dict[str, float] = {}
+    if isinstance(payload, dict):
+        for key in ("delta", "gamma", "theta", "vega"):
+            value = _coerce_float(payload.get(key))
+            if value is not None:
+                greeks[key] = value
+    for key in ("delta", "gamma", "theta", "vega"):
+        if key in greeks:
+            continue
+        value = _coerce_float(raw.get(key))
+        if value is not None:
+            greeks[key] = value
+    return greeks
+
+
 def _extract_explicit_mark(raw: dict[str, Any]) -> tuple[float, str] | None:
     for key, label in (
         ("mark", "mark"),
@@ -205,7 +222,7 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         "price_source": price_source,
         "stale_s": stale_s,
         "pnl_intraday": pnl_intraday,
-        "greeks": raw.get("greeks") or {},
+        "greeks": _extract_greeks(raw),
     }
 
     if previous_close is not None:
@@ -228,11 +245,15 @@ def _norm_one(raw: dict[str, Any], session: str | Session) -> dict[str, Any]:
         day_basis = abs(qty) * previous_close * multiplier
     total_basis = abs(qty) * avg_cost * multiplier
 
-    day_pct = raw_day_pct if raw_day_pct is not None else _compute_percent(
-        pnl_intraday, day_basis
+    day_pct = (
+        raw_day_pct
+        if raw_day_pct is not None
+        else _compute_percent(pnl_intraday, day_basis)
     )
-    total_pct = raw_total_pct if raw_total_pct is not None else _compute_percent(
-        fallback_unrealized, total_basis
+    total_pct = (
+        raw_total_pct
+        if raw_total_pct is not None
+        else _compute_percent(fallback_unrealized, total_basis)
     )
 
     if day_pct is not None:
@@ -271,13 +292,79 @@ def _stable_combo_id(parts: object, prefix: str) -> str:
 
 
 def _aggregate_greeks(legs: Iterable[dict[str, Any]]) -> dict[str, float]:
-    totals = {"delta": 0.0, "gamma": 0.0, "theta": 0.0}
-    for leg in legs:
-        greeks = leg.get("greeks") or {}
-        totals["delta"] += float(greeks.get("delta", 0.0) or 0.0)
-        totals["gamma"] += float(greeks.get("gamma", 0.0) or 0.0)
-        totals["theta"] += float(greeks.get("theta", 0.0) or 0.0)
+    totals: dict[str, float] = {}
+    for key in ("delta", "gamma", "theta", "vega"):
+        total = 0.0
+        has_value = False
+        for leg in legs:
+            greeks = leg.get("greeks") or {}
+            value = _coerce_float(greeks.get(key))
+            if value is None:
+                continue
+            total += value
+            has_value = True
+        if has_value:
+            totals[key] = total
     return totals
+
+
+def _leg_basis(leg: dict[str, Any], price_key: str) -> float | None:
+    price = _coerce_float(leg.get(price_key))
+    if price is None:
+        return None
+    qty = _coerce_float(leg.get("qty")) or 0.0
+    multiplier = _coerce_float(leg.get("multiplier"))
+    if multiplier is None:
+        multiplier = 100.0 if leg.get("secType") in {"OPT", "FOP"} else 1.0
+    basis = abs(qty) * price * multiplier
+    return basis if basis > 0 else None
+
+
+def _aggregate_combo_pnls(legs: Iterable[dict[str, Any]]) -> dict[str, float | None]:
+    day_total = 0.0
+    total_total = 0.0
+    has_day = False
+    has_total = False
+    day_basis_total = 0.0
+    total_basis_total = 0.0
+    has_day_basis = False
+    has_total_basis = False
+
+    for leg in legs:
+        day_value = _coerce_float(leg.get("pnl_intraday"))
+        if day_value is not None:
+            day_total += day_value
+            has_day = True
+        total_value = _coerce_float(leg.get("pnl_unrealized"))
+        if total_value is not None:
+            total_total += total_value
+            has_total = True
+        day_basis = _leg_basis(leg, "previous_close")
+        if day_basis is not None:
+            day_basis_total += day_basis
+            has_day_basis = True
+        total_basis = _leg_basis(leg, "avg_cost")
+        if total_basis is not None:
+            total_basis_total += total_basis
+            has_total_basis = True
+
+    day_pnl = day_total if has_day else 0.0
+    total_pnl = total_total if has_total else 0.0
+    day_pnl_percent = _compute_percent(
+        day_total if has_day else None,
+        day_basis_total if has_day_basis else None,
+    )
+    total_pnl_percent = _compute_percent(
+        total_total if has_total else None,
+        total_basis_total if has_total_basis else None,
+    )
+
+    return {
+        "day_pnl": day_pnl,
+        "total_pnl": total_pnl,
+        "day_pnl_percent": day_pnl_percent,
+        "total_pnl_percent": total_pnl_percent,
+    }
 
 
 def split_positions(
@@ -343,14 +430,24 @@ def split_positions(
             sorted((leg.get("conId"), leg.get("qty")) for leg in legs),
             "combo",
         )
+        combo_pnls = _aggregate_combo_pnls(legs)
+        greeks_agg = _aggregate_greeks(legs)
         combos.append(
             {
                 "combo_id": combo_id,
                 "name": raw.get("description") or raw.get("symbol") or "Combo",
                 "underlier": raw.get("symbol") or raw.get("underlier"),
                 "legs": legs,
-                "pnl_intraday": sum(leg.get("pnl_intraday", 0.0) for leg in legs),
-                "greeks_agg": _aggregate_greeks(legs),
+                "pnl_intraday": combo_pnls["day_pnl"],
+                "day_pnl": combo_pnls["day_pnl"],
+                "pnl_unrealized": combo_pnls["total_pnl"],
+                "total_pnl": combo_pnls["total_pnl"],
+                "day_pnl_percent": combo_pnls["day_pnl_percent"],
+                "day_pnl_pct": combo_pnls["day_pnl_percent"],
+                "total_pnl_percent": combo_pnls["total_pnl_percent"],
+                "pnl_unrealized_percent": combo_pnls["total_pnl_percent"],
+                "pnl_unrealized_pct": combo_pnls["total_pnl_percent"],
+                "greeks_agg": greeks_agg,
             }
         )
 
@@ -387,16 +484,24 @@ def split_positions(
                 "vertical",
             )
             combo_legs = [long_leg, short_leg]
+            combo_pnls = _aggregate_combo_pnls(combo_legs)
+            greeks_agg = _aggregate_greeks(combo_legs)
             combos.append(
                 {
                     "combo_id": combo_id,
                     "name": combo_name,
                     "underlier": key[0],
                     "legs": combo_legs,
-                    "pnl_intraday": sum(
-                        leg.get("pnl_intraday", 0.0) for leg in combo_legs
-                    ),
-                    "greeks_agg": _aggregate_greeks(combo_legs),
+                    "pnl_intraday": combo_pnls["day_pnl"],
+                    "day_pnl": combo_pnls["day_pnl"],
+                    "pnl_unrealized": combo_pnls["total_pnl"],
+                    "total_pnl": combo_pnls["total_pnl"],
+                    "day_pnl_percent": combo_pnls["day_pnl_percent"],
+                    "day_pnl_pct": combo_pnls["day_pnl_percent"],
+                    "total_pnl_percent": combo_pnls["total_pnl_percent"],
+                    "pnl_unrealized_percent": combo_pnls["total_pnl_percent"],
+                    "pnl_unrealized_pct": combo_pnls["total_pnl_percent"],
+                    "greeks_agg": greeks_agg,
                 }
             )
 

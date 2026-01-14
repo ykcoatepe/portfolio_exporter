@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import os
 import sys
+import pytest
+
+pytestmark = pytest.mark.slow
 
 
 def _ensure_repo_root_on_path() -> None:

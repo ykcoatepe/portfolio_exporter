@@ -3,6 +3,9 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def test_manifest_written_quick_chain(tmp_path):
