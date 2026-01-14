@@ -7,6 +7,8 @@ import pytest
 
 from portfolio_exporter.scripts.portfolio_greeks import list_positions_sync
 
+pytestmark = pytest.mark.cli
+
 
 def test_list_positions_fill_exchange_and_currency():
     class DummyIB:

@@ -4,6 +4,9 @@ import importlib
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+import pytest
+
+pytestmark = pytest.mark.integration
 
 
 def _reload_api_module() -> None:

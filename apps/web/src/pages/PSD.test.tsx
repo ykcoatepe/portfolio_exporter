@@ -210,10 +210,12 @@ describe("PSD page", () => {
 
     const singlesSection = await screen.findByRole("region", { name: /Options — Singles/i });
     const singlesGrid = within(singlesSection).getByRole("grid", { name: /Options — Singles/i });
+    const missingGreeksChip = within(singlesSection).getByTestId("greeks-missing-chip");
     const singleRow = within(singlesGrid).getByRole("row", { name: /MSFT/i });
     const singleRowScope = within(singleRow);
     expect(singleRowScope.getByText(/MSFT 290P/i)).toBeInTheDocument();
     expect(singleRow.textContent).not.toMatch(osiPattern);
+    expect(missingGreeksChip).toHaveTextContent(/Greeks missing/i);
 
     expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: /Symbol/ }), "left");
     expectAlignClass(within(singlesGrid).getByRole("columnheader", { name: /Qty/ }), "right");

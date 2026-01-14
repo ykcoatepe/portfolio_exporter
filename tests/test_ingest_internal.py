@@ -8,6 +8,8 @@ from positions_engine.ingest.csv import CsvLoadResult
 
 import apps.api.main as api
 
+pytestmark = pytest.mark.integration
+
 
 def test_internal_provider_precedence(monkeypatch):
     """Internal provider should populate PSD endpoints without CSV uploads."""

@@ -2,6 +2,9 @@ import json
 import os
 import subprocess
 import sys
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def test_json_only_outputs_empty(tmp_path):

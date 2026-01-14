@@ -23,11 +23,13 @@ import argparse
 import csv
 import logging
 import math
-from typing import Any
 import os
 import sys
 import time
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
+from typing import Any
+
+from legacy.output_dir import resolve_output_dir
 
 from portfolio_exporter.core.date_utils import parse_month_day_no_year, utcnow
 from typing import List, Sequence
@@ -120,10 +122,7 @@ def _resolve_contract(ib: IB, template: Option):
 
 
 # ───────────────────────── CONFIG ──────────────────────────
-OUTPUT_DIR = (
-    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
-)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR = str(resolve_output_dir())
 
 PORTFOLIO_FILES = ["tickers_live.txt", "tickers.txt"]
 

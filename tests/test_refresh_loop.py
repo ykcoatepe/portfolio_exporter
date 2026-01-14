@@ -14,6 +14,8 @@ from positions_engine.core.models import Instrument, InstrumentType, Position, Q
 from positions_engine.core.session import SessionInfo
 from positions_engine.service import PositionsState, RefreshLoop
 
+pytestmark = pytest.mark.integration
+
 
 def test_refresh_loop_executes_tick() -> None:
     calls: list[float] = []

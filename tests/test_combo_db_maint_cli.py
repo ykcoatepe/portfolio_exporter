@@ -3,6 +3,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+import pytest
+
+pytestmark = pytest.mark.cli
 
 DB_PATH = Path("tmp_test_run/combos.db")
 

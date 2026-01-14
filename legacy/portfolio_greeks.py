@@ -32,6 +32,7 @@ from pathlib import Path
 
 from utils.bs import bs_greeks
 from legacy.option_chain_snapshot import fetch_yf_open_interest
+from legacy.output_dir import resolve_output_dir
 
 import numpy as np
 import pandas as pd
@@ -176,11 +177,7 @@ def eddr(
 
 # ───────────────────────── CONFIG ──────────────────────────
 
-OUTPUT_DIR = os.environ.get(
-    "OUTPUT_DIR",
-    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads",
-)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR = str(resolve_output_dir())
 
 NAV_LOG = Path(os.path.join(OUTPUT_DIR, "nav_history.csv"))
 

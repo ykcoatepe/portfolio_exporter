@@ -1,6 +1,9 @@
 import json
 import subprocess
 import sys
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def test_clusters_json_only(tmp_path):

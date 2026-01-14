@@ -16,6 +16,8 @@ from typing import Optional
 
 import pandas as pd
 
+from legacy.output_dir import resolve_output_dir
+
 try:  # optional dependencies
     import xlsxwriter  # type: ignore
 except Exception:  # pragma: no cover - optional
@@ -133,10 +135,7 @@ class OpenOrder:
 # ───────────────────────── CONFIG ──────────────────────────
 # Use Türkiye local time (Europe/Istanbul) for timestamp tags
 TIME_TAG = datetime.now(ZoneInfo("Europe/Istanbul")).strftime("%H%M")
-OUTPUT_DIR = Path(
-    "/Users/yordamkocatepe/Library/Mobile Documents/" "com~apple~CloudDocs/Downloads"
-)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR = resolve_output_dir()
 IB_HOST, IB_PORT, IB_CID = "127.0.0.1", 7496, 5  # dedicated clientId (set 7497 for paper)
 
 

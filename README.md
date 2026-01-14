@@ -126,6 +126,8 @@ make setup
 Quick start (recommended flow)
 - make lint: run Ruff with project rules
 - make test: run pytest locally
+- make test-fast: skip slow/CLI/integration tests for a quick local loop
+- make test-parallel: run pytest with xdist (`-n auto`) for faster full runs
 - make build: validate packaging
 - Quiet CI runs: export `PE_QUIET=1` to suppress Rich output
 

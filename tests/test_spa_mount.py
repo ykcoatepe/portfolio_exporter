@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from starlette.testclient import TestClient
+import pytest
+
+pytestmark = pytest.mark.integration
 
 
 def test_spa_mount_serves_psd_and_preserves_api():

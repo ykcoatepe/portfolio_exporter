@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 
 from positions_engine.core.session import SessionInfo, detect_session
 
+pytestmark = pytest.mark.integration
+
 NY_TZ = ZoneInfo("America/New_York")
 
 

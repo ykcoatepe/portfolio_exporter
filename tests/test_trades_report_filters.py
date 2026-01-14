@@ -3,6 +3,9 @@ import subprocess
 import json
 import subprocess
 import sys
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def _make_condor_exec_csv(tmp_path):

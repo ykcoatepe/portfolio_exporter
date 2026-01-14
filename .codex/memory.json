@@ -683,6 +683,42 @@
       "details": "Engine fallback no longer derives day_pnl from avg_cost when marks are missing; add regression test.",
       "event": "Skip day PnL when engine mark missing",
       "timestamp": "2026-01-13T13:50:06Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T14:16:50Z"
+    },
+    {
+      "details": "Normalize flat greek fields into greeks dict during positions ingestion; add unit test coverage.",
+      "event": "Fix PSD single option greeks display",
+      "timestamp": "2026-01-13T14:22:32Z"
+    },
+    {
+      "details": "Render a warning chip in Options \u2014 Singles when delta/gamma/theta are missing; add PSD page test coverage.",
+      "event": "Add PSD greeks missing chip",
+      "timestamp": "2026-01-13T14:31:02Z"
+    },
+    {
+      "details": "Sum leg greeks and P&L (with percent bases) for option combos; add missing-greeks chip in combos header.",
+      "event": "Aggregate PSD combo greeks and P&L",
+      "timestamp": "2026-01-13T16:52:24Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T16:56:25Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T16:56:45Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-13T17:11:35Z"
+    },
+    {
+      "details": "Registered pytest markers, added Make targets for fast/cli/integration/slow/parallel runs, and added pytest-xdist to dev deps.",
+      "event": "Add fast/parallel test targets and mark cli/integration/slow tests",
+      "timestamp": "2026-01-13T17:24:21Z"
     }
   ],
   "decisions": [
@@ -1215,6 +1251,38 @@
       "rationale": "Prevents bogus intraday PnL during feed outages or stale marks.",
       "timestamp": "2026-01-13T13:50:00Z",
       "title": "Avoid day PnL from avg_cost in engine fallback"
+    },
+    {
+      "context": "PSD positions_view single_options",
+      "decision": "Fill greeks from top-level delta/gamma/theta/vega when greeks dict is absent or incomplete.",
+      "id": 69,
+      "rationale": "Positions CSV ingestion provides flat greek columns; normalizing them keeps PSD single option greeks visible.",
+      "timestamp": "2026-01-13T14:22:26Z",
+      "title": "PSD normalize flat greeks"
+    },
+    {
+      "context": "PSD Options \u2014 Singles",
+      "decision": "Show a chip in the Options \u2014 Singles header when any leg lacks delta/gamma/theta.",
+      "id": 70,
+      "rationale": "Users want a data-quality signal when greeks are absent.",
+      "timestamp": "2026-01-13T14:30:56Z",
+      "title": "PSD greeks missing indicator"
+    },
+    {
+      "context": "PSD positions_view option_combos",
+      "decision": "Compute combo greeks and P&L summaries by aggregating underlying legs when upstream combos lack totals.",
+      "id": 71,
+      "rationale": "Keeps Options \u2014 Combos meaningful even without precomputed combo aggregates.",
+      "timestamp": "2026-01-13T16:52:17Z",
+      "title": "Aggregate combo greeks and P&L from legs"
+    },
+    {
+      "context": "Makefile, pytest.ini, tests markers, pytest-xdist dev dep",
+      "decision": "Added pytest markers (cli/integration/slow) plus Make targets (test-fast/test-parallel) to speed local feedback while keeping full suite for CI.",
+      "id": 72,
+      "rationale": "Local pytest runs were slow; tiered runs improve iteration without changing CI.",
+      "timestamp": "2026-01-13T17:24:17Z",
+      "title": "Test suite tiering"
     }
   ],
   "preferences": {

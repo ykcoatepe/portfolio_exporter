@@ -78,6 +78,25 @@ def _single_option():
     }
 
 
+def _single_option_flat_greeks():
+    return {
+        "secType": "OPT",
+        "symbol": "NVDA",
+        "conId": 4001,
+        "qty": 2,
+        "avg_cost": 3.5,
+        "multiplier": 100,
+        "right": "CALL",
+        "strike": 600.0,
+        "expiry": "20240216",
+        "tick": {"mid": 4.1, "ts": 1_700_000_000},
+        "delta": 0.25,
+        "gamma": 0.03,
+        "theta": -0.01,
+        "vega": 0.12,
+    }
+
+
 def test_split_positions_groups_stock_combo_and_single_option():
     raw_positions = [
         _stock_fixture(),
@@ -102,6 +121,9 @@ def test_split_positions_groups_stock_combo_and_single_option():
     assert combo["combo_id"]
     assert combo["name"] == "AAPL CALL SPREAD"
     assert round(combo["pnl_intraday"], 2) == 150.0
+    assert combo["day_pnl"] == pytest.approx(combo["pnl_intraday"])
+    assert combo["pnl_unrealized"] == pytest.approx(150.0)
+    assert combo["total_pnl"] == pytest.approx(150.0)
     assert len(combo["legs"]) == 2
 
     greeks_agg = combo["greeks_agg"]
@@ -112,6 +134,21 @@ def test_split_positions_groups_stock_combo_and_single_option():
     assert len(singles_opts) == 1
     assert singles_opts[0]["symbol"] == "MSFT"
     assert round(singles_opts[0]["pnl_intraday"], 2) == 60.0
+
+
+def test_split_positions_fills_greeks_from_flat_fields():
+    raw_positions = [_single_option_flat_greeks()]
+
+    result = split_positions(raw_positions, "RTH")
+
+    singles_opts = result["single_options"]
+    assert len(singles_opts) == 1
+
+    greeks = singles_opts[0].get("greeks") or {}
+    assert greeks["delta"] == pytest.approx(0.25)
+    assert greeks["gamma"] == pytest.approx(0.03)
+    assert greeks["theta"] == pytest.approx(-0.01)
+    assert greeks["vega"] == pytest.approx(0.12)
 
 
 def test_split_positions_prefers_explicit_mark_without_tick():

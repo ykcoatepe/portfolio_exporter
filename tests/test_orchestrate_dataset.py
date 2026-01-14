@@ -4,6 +4,9 @@ from pathlib import Path
 import tempfile
 
 import legacy.orchestrate_dataset as od
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 class OrchestrateTests(unittest.TestCase):

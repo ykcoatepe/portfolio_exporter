@@ -1,6 +1,9 @@
 import json
 import subprocess
 import sys
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def _make_exec_csv(tmp_path):

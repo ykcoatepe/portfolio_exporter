@@ -1,6 +1,9 @@
 import json
 import subprocess
 import sys
+import pytest
+
+pytestmark = pytest.mark.cli
 
 
 def test_cli_vertical_leg_signs(monkeypatch, tmp_path):

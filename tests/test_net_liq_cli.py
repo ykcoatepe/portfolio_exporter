@@ -7,6 +7,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+pytestmark = pytest.mark.cli
+
 
 def _run_cli(args, env):
     result = subprocess.run(

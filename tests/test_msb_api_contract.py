@@ -11,6 +11,8 @@ import psd.web.app as web_app
 from psd.core import store
 from psd.web.config import Settings
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture()
 def seeded_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

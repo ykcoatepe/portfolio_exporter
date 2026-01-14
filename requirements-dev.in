@@ -1,8 +1,11 @@
 pytest
 pytest-timeout
+pytest-xdist
 pandas
 numpy
 requests
+jsonschema
+pandera
 pip-tools
 black
 ruff
