@@ -322,16 +322,23 @@ def _leg_basis(leg: dict[str, Any], price_key: str) -> float | None:
 
 
 def _aggregate_combo_pnls(legs: Iterable[dict[str, Any]]) -> dict[str, float | None]:
+    # Materialize iterator to allow multiple passes
+    legs_list = list(legs)
+
     day_total = 0.0
     total_total = 0.0
     has_day = False
     has_total = False
+
+    # For percent calculations, only include P&L from legs that have basis
+    day_pnl_with_basis = 0.0
+    total_pnl_with_basis = 0.0
     day_basis_total = 0.0
     total_basis_total = 0.0
     has_day_basis = False
     has_total_basis = False
 
-    for leg in legs:
+    for leg in legs_list:
         day_value = _coerce_float(leg.get("pnl_intraday"))
         if day_value is not None:
             day_total += day_value
@@ -344,19 +351,26 @@ def _aggregate_combo_pnls(legs: Iterable[dict[str, Any]]) -> dict[str, float | N
         if day_basis is not None:
             day_basis_total += day_basis
             has_day_basis = True
+            # Only include P&L in percent calc if leg has basis
+            if day_value is not None:
+                day_pnl_with_basis += day_value
         total_basis = _leg_basis(leg, "avg_cost")
         if total_basis is not None:
             total_basis_total += total_basis
             has_total_basis = True
+            # Only include P&L in percent calc if leg has basis
+            if total_value is not None:
+                total_pnl_with_basis += total_value
 
     day_pnl = day_total if has_day else 0.0
     total_pnl = total_total if has_total else 0.0
+    # Use only P&L from legs with basis for percent calculations
     day_pnl_percent = _compute_percent(
-        day_total if has_day else None,
+        day_pnl_with_basis if has_day_basis else None,
         day_basis_total if has_day_basis else None,
     )
     total_pnl_percent = _compute_percent(
-        total_total if has_total else None,
+        total_pnl_with_basis if has_total_basis else None,
         total_basis_total if has_total_basis else None,
     )
 
