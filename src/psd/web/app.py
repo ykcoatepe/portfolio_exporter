@@ -1032,25 +1032,45 @@ def rules_summary() -> dict:
         log.debug("msb snapshot load failed for rules", exc_info=True)
     powerlaw = _merge_powerlaw_msb(powerlaw, msb)
     
-    # Create minimal positions state from latest snapshot
+    # Create positions state from latest snapshot
     snap = latest_snapshot()
-    positions = snap.get("positions", []) if snap else []
-    
-    # Build a lightweight adapter for RulesState
-    class _SnapAdapter:
-        def equities_payload(self, _now):
-            return [p for p in positions if p.get("secType") in ("STK", "CASH")]
-        
-        def options_detection(self, _now):
-            from positions_engine.combos.detector import ComboDetection
-            return ComboDetection(combos=tuple(), orphans=tuple(), detection_ms=0.0)
-        
-        def quotes_snapshot(self):
-            return snap.get("quotes", {}) if snap else {}
+    positions_raw = snap.get("positions", []) if snap else []
+    positions = positions_raw if isinstance(positions_raw, list) else []
+    quotes_payload = snap.get("quotes", {}) if snap else {}
+
+    positions_state = PositionsState()
+    try:
+        from positions_engine.service.normalize import positions_from_records, quotes_from_records
+    except Exception as exc:
+        log.warning("positions_engine normalize unavailable: %s", exc)
+    else:
+        quote_records: list[dict[str, Any]] = []
+        if isinstance(quotes_payload, dict):
+            for symbol, payload in quotes_payload.items():
+                if not isinstance(payload, dict):
+                    continue
+                record = dict(payload)
+                record.setdefault("symbol", symbol)
+                if "last" not in record and "price" in record:
+                    record["last"] = record.get("price")
+                if "previous_close" not in record and "previousClose" in record:
+                    record["previous_close"] = record.get("previousClose")
+                quote_records.append(record)
+
+        try:
+            positions_state.refresh(
+                positions=positions_from_records(positions),
+                quotes=quotes_from_records(quote_records),
+                snapshot_at=now,
+                data_source=str(snap.get("data_source") or "snapshot") if snap else None,
+            )
+        except Exception as exc:
+            log.warning("rules snapshot normalization failed: %s", exc)
+            positions_state = PositionsState()
     
     try:
         catalog = load_catalog()
-        rules_state = RulesState(_SnapAdapter(), rules=catalog.rules)
+        rules_state = RulesState(positions_state, rules=catalog.rules)
         summary, evaluation = rules_state.summary(now, powerlaw_snapshot=powerlaw)
 
         # Extract metrics from summary
