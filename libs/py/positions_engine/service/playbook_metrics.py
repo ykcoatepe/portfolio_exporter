@@ -4,9 +4,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 # V/VIX cap table per VIX band (USD per point per $1M NAV)
 _VVIX_CAPS_PER_1M: dict[tuple[float, float], float] = {
@@ -15,6 +16,8 @@ _VVIX_CAPS_PER_1M: dict[tuple[float, float], float] = {
     (20.0, 30.0): 600.0,
     (30.0, float("inf")): 300.0,
 }
+
+_SESSION_TZ = ZoneInfo("America/New_York")
 
 
 @dataclass
@@ -25,12 +28,18 @@ class HysteresisState:
     sessions_in_state: int = 0
     pending_transition: str | None = None
     pending_sessions: int = 0
-    last_updated: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
+    last_updated: datetime | None = None
 
 
 # Module-level singleton (resets on restart)
 _HYSTERESIS_STATE = HysteresisState()
 _HYSTERESIS_THRESHOLD = 3  # sessions required for transition
+
+
+def _session_key(as_of: datetime) -> date:
+    if as_of.tzinfo is None:
+        as_of = as_of.replace(tzinfo=UTC)
+    return as_of.astimezone(_SESSION_TZ).date()
 
 
 def _evaluate_risk_transition(
@@ -66,9 +75,20 @@ def evaluate_hysteresis(
     vx1_gt_vx2: bool,
     spx_return_pct: float,
     pulse: float = 3.0,
+    as_of: datetime | None = None,
 ) -> str:
-    """Apply state machine with 3-session hysteresis. Returns current risk_state."""
+    """Apply state machine with 3-session hysteresis. Returns current risk_state.
+
+    Session counting advances once per NY trading date. Use ``as_of`` to pass an
+    explicit timestamp when evaluating historical snapshots or tests.
+    """
     global _HYSTERESIS_STATE
+
+    now = as_of or datetime.now(tz=UTC)
+    last_updated = _HYSTERESIS_STATE.last_updated
+    is_new_session = last_updated is None or _session_key(now) != _session_key(
+        last_updated
+    )
 
     target = _evaluate_risk_transition(
         _HYSTERESIS_STATE.risk_state, vix, vx1_gt_vx2, spx_return_pct, pulse
@@ -79,20 +99,22 @@ def evaluate_hysteresis(
         _HYSTERESIS_STATE.pending_transition = None
         _HYSTERESIS_STATE.pending_sessions = 0
     elif target == _HYSTERESIS_STATE.pending_transition:
-        # Same target; increment counter
-        _HYSTERESIS_STATE.pending_sessions += 1
+        # Same target; increment counter once per session
+        if is_new_session:
+            _HYSTERESIS_STATE.pending_sessions += 1
         if _HYSTERESIS_STATE.pending_sessions >= _HYSTERESIS_THRESHOLD:
             _HYSTERESIS_STATE.risk_state = target
             _HYSTERESIS_STATE.sessions_in_state = 0
             _HYSTERESIS_STATE.pending_transition = None
             _HYSTERESIS_STATE.pending_sessions = 0
     else:
-        # New target; start pending
+        # New target; start pending (count only if session advanced)
         _HYSTERESIS_STATE.pending_transition = target
-        _HYSTERESIS_STATE.pending_sessions = 1
+        _HYSTERESIS_STATE.pending_sessions = 1 if is_new_session else 0
 
-    _HYSTERESIS_STATE.sessions_in_state += 1
-    _HYSTERESIS_STATE.last_updated = datetime.now(tz=UTC)
+    if is_new_session:
+        _HYSTERESIS_STATE.sessions_in_state += 1
+    _HYSTERESIS_STATE.last_updated = now
     return _HYSTERESIS_STATE.risk_state
 
 

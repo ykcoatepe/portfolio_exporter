@@ -746,6 +746,15 @@
     {
       "event": "session_start",
       "timestamp": "2026-01-15T09:35:11Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-15T11:46:25Z"
+    },
+    {
+      "details": "Advance pending/session counters once per NY trading date; tests pass explicit as_of timestamps.",
+      "event": "Gate hysteresis session counting",
+      "timestamp": "2026-01-15T11:55:05Z"
     }
   ],
   "decisions": [
@@ -1318,6 +1327,14 @@
       "rationale": null,
       "timestamp": "2026-01-15T09:26:12Z",
       "title": "Rules metrics data merge"
+    },
+    {
+      "context": "PR #182 review comment on playbook_metrics hysteresis.",
+      "decision": "Advance hysteresis counters once per NY trading date; add as_of timestamp for deterministic evaluation.",
+      "id": 74,
+      "rationale": "Prevent repeated API calls from counting as multiple sessions.",
+      "timestamp": "2026-01-15T11:55:05Z",
+      "title": "Gate hysteresis by session date"
     }
   ],
   "preferences": {
