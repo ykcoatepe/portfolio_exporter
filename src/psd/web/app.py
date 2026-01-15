@@ -1040,7 +1040,10 @@ def rules_summary() -> dict:
 
     positions_state = PositionsState()
     try:
-        from positions_engine.service.normalize import positions_from_records, quotes_from_records
+        from positions_engine.service.normalize import (
+            positions_from_records,
+            quotes_from_records,
+        )
     except Exception as exc:
         log.warning("positions_engine normalize unavailable: %s", exc)
     else:
