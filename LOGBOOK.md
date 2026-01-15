@@ -443,3 +443,21 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** Makefile, pytest.ini, tests/*, requirements-dev.*, README.md
 **Status:** done
 **Notes:** fast suite skips cli/integration/slow; full suite unchanged
+
+### 2026-01-14 • Task: Count combo missing greeks per leg • Branch: fix/psd-single-greeks
+**Owner:** session/ai | **Scope:** surface PSD combo greeks missing chip when any leg lacks delta/gamma/theta
+**Interfaces:** apps/web/src/pages/PSD.tsx
+**Status:** done
+**Notes:** compute missing-greeks count from combo legs instead of aggregate greeks
+
+### 2026-01-15 • Task: Wire MSB signals into rules summary + fix PSD breaches display • Branch: local
+**Owner:** session/codex | **Scope:** ensure rules summary uses MSB term structure fields and PSD UI shows breach rows
+**Interfaces:** apps/api/main.py, src/psd/web/app.py, libs/py/positions_engine/service/playbook_metrics.py, portfolio_exporter/psd_powerlaw.py, apps/web/openapi.json, apps/web/src/components/RulesPanel.tsx
+**Status:** done
+**Notes:** merged MSB vx1/vx2/spx_ret into rules metrics; normalized powerlaw keys; mapped PSD rules summary to UI contract; ran pytest -q and RulesPanel unit tests
+
+### 2026-01-15 • Task: Wire “Open Detail” action to fundamentals focus • Branch: local
+**Owner:** session/codex | **Scope:** make RulesPanel “Open Detail” buttons actually focus a breach and show its fundamentals
+**Interfaces:** apps/web/src/components/RulesPanel.tsx
+**Status:** done
+**Notes:** selects breach symbol for fundamentals and scrolls to fundamentals section; RulesPanel tests pass

@@ -132,6 +132,27 @@ _DEFAULT_IDENTIFIER_VALUES: dict[str, Any] = {
     "ul_nav_pct": 999.0,
     "var95_1d_pct": 1.0,
     "vix": 999.0,
+    # --- Playbook v4 identifiers ---
+    "nav_ref": 206000.0,
+    "vvix": 15.0,
+    "vx1": 15.0,
+    "vx2": 16.0,
+    "vx1_gt_vx2": False,
+    "net_vega": 0.0,
+    "v_vix_ratio": 0.0,
+    "v_vix_cap": 1000.0,
+    "v_vix_utilization_pct": 0.0,
+    "risk_state": "ON",
+    "theta_nav_pct": 0.0,
+    "theta_cap_nav_pct": 0.10,
+    "spx_return_pct": 0.0,
+    "theta_adds_blocked": False,
+    "ptcs_score": 90,
+    "journal_pct": 95.0,
+    # Data availability flags
+    "vix_available": False,
+    "vvix_available": False,
+    "vx_term_available": False,
 }
 
 

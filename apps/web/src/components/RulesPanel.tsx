@@ -15,6 +15,7 @@ import {
   usePreviewRules,
   usePublishRules,
   useRuleCatalog,
+  useRawRulesCatalog,
   useReloadRules,
   useValidateRules,
 } from "../hooks/useRuleCatalog";
@@ -133,6 +134,8 @@ export function RulesPanel(): JSX.Element {
   const validateMutation = useValidateRules();
   const previewMutation = usePreviewRules();
   const publishMutation = usePublishRules();
+  const [shouldFetchRaw, setShouldFetchRaw] = useState(false);
+  const rawCatalogQuery = useRawRulesCatalog(shouldFetchRaw);
 
   const [isCatalogPanelOpen, setCatalogPanelOpen] = useState(false);
   const [catalogText, setCatalogText] = useState("");
@@ -151,13 +154,34 @@ export function RulesPanel(): JSX.Element {
     return uniqueSymbolsFromBreaches(summary?.top ?? []);
   }, [summary?.focus_symbols, summary?.top]);
 
-  const fundamentals = useFundamentals(focusSymbols);
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [selectedBreach, setSelectedBreach] = useState<RuleBreachSummary | null>(null);
+  const fundamentalsSymbols = useMemo(
+    () => (selectedSymbol ? [selectedSymbol] : focusSymbols),
+    [selectedSymbol, focusSymbols],
+  );
+  const fundamentals = useFundamentals(fundamentalsSymbols);
   const [activeIndex, setActiveIndex] = useState(0);
   const itemRefs = useRef<Array<HTMLLIElement | null>>([]);
+  const fundamentalsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setActiveIndex(0);
+    setSelectedSymbol(null);
+    setSelectedBreach(null);
   }, [topBreaches.length]);
+
+  useEffect(() => {
+    if (isCatalogPanelOpen && !catalogText && !shouldFetchRaw) {
+      setShouldFetchRaw(true);
+    }
+  }, [isCatalogPanelOpen, catalogText, shouldFetchRaw]);
+
+  useEffect(() => {
+    if (rawCatalogQuery.data && !catalogText && isCatalogPanelOpen) {
+      setCatalogText(rawCatalogQuery.data);
+    }
+  }, [rawCatalogQuery.data, catalogText, isCatalogPanelOpen]);
 
   const focusItem = (index: number) => {
     const node = itemRefs.current[index];
@@ -202,6 +226,25 @@ export function RulesPanel(): JSX.Element {
         break;
       default:
         break;
+    }
+  };
+
+  const openDetail = (breach: RuleBreachSummary, index: number) => {
+    setActiveIndex(index);
+    setSelectedBreach(breach);
+    if (breach.symbol) {
+      setSelectedSymbol(breach.symbol.toUpperCase());
+    } else {
+      setSelectedSymbol(null);
+    }
+    focusItem(index);
+    if (fundamentalsRef.current) {
+      const node = fundamentalsRef.current;
+      if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(() => node.scrollIntoView({ behavior: "smooth", block: "start" }));
+      } else {
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
   };
 
@@ -575,6 +618,85 @@ export function RulesPanel(): JSX.Element {
           <p className="mt-6 text-xs text-slate-500">
             Updated {formatRelativeTime(summary.as_of)}
           </p>
+
+          <div className="mt-8 border-t border-slate-800/60 pt-6">
+            <h3 className="mb-4 text-xs uppercase tracking-[0.2em] text-slate-500">
+              Market Context
+            </h3>
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-slate-400">Risk State</span>
+              <span
+                className={clsx(
+                  "rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide border",
+                  (summary.risk_state === "ON" || !summary.risk_state)
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    : summary.risk_state === "NEUTRAL"
+                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                      : "bg-rose-500/10 text-rose-400 border-rose-500/20",
+                )}
+              >
+                {summary.risk_state ?? "ON"}
+              </span>
+            </div>
+
+            <div className="mb-4 space-y-2">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-slate-400">V/VIX Utilization</span>
+                <span
+                  className={clsx(
+                    "text-sm font-mono",
+                    (summary.v_vix_utilization_pct ?? 0) >= 100
+                      ? "text-rose-400"
+                      : (summary.v_vix_utilization_pct ?? 0) >= 85
+                        ? "text-amber-400"
+                        : "text-slate-200",
+                  )}
+                >
+                  {summary.v_vix_utilization_pct?.toFixed(0) ?? "—"}%
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className={clsx(
+                    "h-full rounded-full transition-all duration-500",
+                    (summary.v_vix_utilization_pct ?? 0) >= 100
+                      ? "bg-rose-500"
+                      : (summary.v_vix_utilization_pct ?? 0) >= 85
+                        ? "bg-amber-500"
+                        : "bg-emerald-500",
+                  )}
+                  style={{
+                    width: `${Math.min(100, Math.max(0, summary.v_vix_utilization_pct ?? 0))}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-center">
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
+                  VIX
+                </div>
+                <div className="font-mono text-lg text-slate-200">
+                  {summary.vix?.toFixed(1) ?? "—"}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-center">
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
+                  VVIX
+                </div>
+                <div className="font-mono text-lg text-slate-200">
+                  {summary.vvix?.toFixed(1) ?? "—"}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 flex justify-between text-[10px] text-slate-600">
+              <span>NAV Ref</span>
+              <span className="font-mono">
+                {summary.nav_ref == null ? "—" : `$${summary.nav_ref.toLocaleString()}`}
+              </span>
+            </div>
+          </div>
         </div>
 
         <div className="flex-1">
@@ -604,6 +726,7 @@ export function RulesPanel(): JSX.Element {
                   className={clsx(
                     "flex items-start justify-between gap-4 rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2",
                     severityStyles[breach.severity],
+                    selectedBreach?.id === breach.id ? "ring-2 ring-sky-400/70" : null,
                   )}
                 >
                   <div className="flex flex-1 items-start gap-4">
@@ -627,6 +750,7 @@ export function RulesPanel(): JSX.Element {
                   </div>
                   <button
                     type="button"
+                    onClick={() => openDetail(breach, index)}
                     className="mt-0.5 inline-flex items-center rounded-lg border border-slate-700/70 bg-slate-900/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-200 transition hover:border-sky-400/50 hover:text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                     aria-label={`Open detail for ${breach.rule}`}
                   >
@@ -636,10 +760,44 @@ export function RulesPanel(): JSX.Element {
               ))}
             </ul>
           )}
+          <div className="mt-6 rounded-2xl border border-slate-900/70 bg-slate-950/40 p-4 text-sm text-slate-200">
+            <div className="text-xs uppercase tracking-wide text-slate-400">Selected breach</div>
+            {selectedBreach ? (
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-100">{selectedBreach.rule}</span>
+                  <span className="rounded-full border border-slate-700/70 bg-slate-900/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                    {severityLabel[selectedBreach.severity]}
+                  </span>
+                  {selectedBreach.symbol ? (
+                    <span className="rounded-full bg-slate-900/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-400">
+                      {selectedBreach.symbol}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="text-xs text-slate-400">{selectedBreach.subject}</div>
+                {selectedBreach.description ? (
+                  <div className="text-xs text-slate-400">{selectedBreach.description}</div>
+                ) : null}
+                <div className="text-xs text-slate-500">
+                  {formatRelativeTime(selectedBreach.occurred_at)}
+                </div>
+                {!selectedBreach.symbol ? (
+                  <div className="text-xs text-slate-500">
+                    No symbol linked to this breach; fundamentals are unavailable.
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-2 text-xs text-slate-500">
+                Click “Open Detail” on a breach to see details and related fundamentals.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="px-6 py-6">
+      <div ref={fundamentalsRef} className="px-6 py-6">
         <header className="flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
             Fundamentals Snapshot

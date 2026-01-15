@@ -719,6 +719,33 @@
       "details": "Registered pytest markers, added Make targets for fast/cli/integration/slow/parallel runs, and added pytest-xdist to dev deps.",
       "event": "Add fast/parallel test targets and mark cli/integration/slow tests",
       "timestamp": "2026-01-13T17:24:21Z"
+    },
+    {
+      "details": "Count combos as missing when any option leg lacks delta/gamma/theta.",
+      "event": "PSD combo missing greeks chip uses leg-level greeks",
+      "timestamp": "2026-01-14T13:06:35Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-14T13:33:01Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-14T14:38:41Z"
+    },
+    {
+      "details": "Merged MSB vx1/vx2/spx_ret into powerlaw snapshot for rules; updated PSD rules summary mapping; added powerlaw key fallbacks; openapi update; ran pytest -q and web RulesPanel tests.",
+      "event": "Wire MSB signals into rules summary metrics",
+      "timestamp": "2026-01-15T09:26:06Z"
+    },
+    {
+      "details": "Hooked Open Detail to select the breach symbol, focus list item, and scroll to fundamentals section; ran RulesPanel tests.",
+      "event": "Enable RulesPanel Open Detail",
+      "timestamp": "2026-01-15T09:31:21Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-15T09:35:11Z"
     }
   ],
   "decisions": [
@@ -1283,6 +1310,14 @@
       "rationale": "Local pytest runs were slow; tiered runs improve iteration without changing CI.",
       "timestamp": "2026-01-13T17:24:17Z",
       "title": "Test suite tiering"
+    },
+    {
+      "context": null,
+      "decision": "Merge MSB vx1/vx2/spx_ret into the powerlaw snapshot consumed by rules evaluation to keep rules context filled even when powerlaw lacks term structure fields.",
+      "id": 73,
+      "rationale": null,
+      "timestamp": "2026-01-15T09:26:12Z",
+      "title": "Rules metrics data merge"
     }
   ],
   "preferences": {

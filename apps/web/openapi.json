@@ -142,6 +142,28 @@
         }
       }
     },
+    "/rules/catalog/raw": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Rules Catalog Raw",
+        "operationId": "rules_catalog_raw_rules_catalog_raw_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/yaml": {
+                "schema": {
+                  "type": "string",
+                  "title": "Response Rules Catalog Raw"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/rules/validate": {
       "post": {
         "tags": [
@@ -583,6 +605,61 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Fundamentals"
+          },
+          "v_vix_utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "V Vix Utilization Pct"
+          },
+          "risk_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk State"
+          },
+          "nav_ref": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nav Ref"
+          },
+          "vix": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vix"
+          },
+          "vvix": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vvix"
           }
         },
         "type": "object",

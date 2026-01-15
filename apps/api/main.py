@@ -56,6 +56,14 @@ except ImportError:
     load_powerlaw_snapshot = None
     request_powerlaw_refresh = None
 
+try:
+    SRC_PATH = REPO_ROOT / "src"
+    if str(SRC_PATH) not in sys.path:
+        sys.path.append(str(SRC_PATH))
+    from psd.core.store import read_msb_current  # noqa: E402
+except ImportError:
+    read_msb_current = None
+
 logger = logging.getLogger(__name__)
 
 _state = PositionsState()
@@ -196,6 +204,12 @@ class RulesSummaryResponseModel(BaseModel):
     focus_symbols: list[str] = Field(default_factory=list)
     evaluation_ms: float
     fundamentals: dict[str, Any] = Field(default_factory=dict)
+    # Playbook v4 metadata
+    v_vix_utilization_pct: float | None = None
+    risk_state: str | None = None
+    nav_ref: float | None = None
+    vix: float | None = None
+    vvix: float | None = None
 
 
 class CatalogTextRequest(BaseModel):
@@ -329,6 +343,50 @@ def powerlaw_refresh() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="powerlaw refresh failed") from exc
 
 
+def _try_load_powerlaw() -> dict[str, Any] | None:
+    if load_powerlaw_snapshot is None:
+        return None
+    try:
+        return load_powerlaw_snapshot()
+    except Exception:
+        logger.debug("powerlaw snapshot load failed", exc_info=True)
+        return None
+
+
+def _try_load_msb() -> dict[str, Any] | None:
+    if read_msb_current is None:
+        return None
+    try:
+        return read_msb_current()
+    except Exception:
+        logger.debug("msb snapshot load failed", exc_info=True)
+        return None
+
+
+def _merge_powerlaw_msb(
+    powerlaw: dict[str, Any] | None, msb: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    if not isinstance(powerlaw, dict) and not isinstance(msb, dict):
+        return None
+    merged: dict[str, Any] = dict(powerlaw) if isinstance(powerlaw, dict) else {}
+    msb_signals: dict[str, Any] = {}
+    if isinstance(msb, dict):
+        for key in ("vx1", "vx2", "spx_ret", "spx_return", "spx_return_pct"):
+            value = msb.get(key)
+            if value is not None:
+                msb_signals[key] = value
+    if not msb_signals:
+        return merged or None
+    signals = merged.get("signals")
+    if isinstance(signals, dict):
+        updated_signals = dict(signals)
+        updated_signals.update(msb_signals)
+        merged["signals"] = updated_signals
+        return merged
+    merged.update(msb_signals)
+    return merged
+
+
 @app.get(
     "/stats",
     tags=["positions"],
@@ -339,7 +397,10 @@ def stats() -> StatsResponse:
     if _AUTO_REFRESH:
         _refresh_from_providers()
     payload: dict[str, Any] = dict(_state.stats())
-    evaluation = _rules_state.evaluate()
+    powerlaw = _try_load_powerlaw()
+    msb = _try_load_msb()
+    metrics_snapshot = _merge_powerlaw_msb(powerlaw, msb)
+    evaluation = _rules_state.evaluate(powerlaw_snapshot=metrics_snapshot)
     payload["rules_count"] = len(_rules_state.rules)
     payload["breaches_count"] = len(evaluation.breaches)
     payload["rules_eval_ms"] = round(evaluation.duration_ms, 3)
@@ -568,7 +629,10 @@ def disable_demo() -> dict[str, bool]:
 def rules_summary() -> RulesSummaryResponseModel:
     if _AUTO_REFRESH:
         _refresh_from_providers()
-    summary, evaluation = _rules_state.summary()
+    powerlaw = _try_load_powerlaw()
+    msb = _try_load_msb()
+    metrics_snapshot = _merge_powerlaw_msb(powerlaw, msb)
+    summary, evaluation = _rules_state.summary(powerlaw_snapshot=metrics_snapshot)
     breaches_raw = summary.get("breaches", {}) if isinstance(summary, dict) else {}
     breaches_model = BreachCountsModel(
         critical=int(breaches_raw.get("critical", 0) or 0),
@@ -623,6 +687,7 @@ def rules_summary() -> RulesSummaryResponseModel:
         summary.get("fundamentals", {}) if isinstance(summary, dict) else {}
     )
     fundamentals_map = fundamentals_raw if isinstance(fundamentals_raw, dict) else {}
+    metrics = summary.get("playbook_metrics") or {}
     return RulesSummaryResponseModel(
         as_of=(
             str(summary.get("as_of"))
@@ -639,6 +704,11 @@ def rules_summary() -> RulesSummaryResponseModel:
         focus_symbols=focus_symbols_list,
         evaluation_ms=float(evaluation.duration_ms),
         fundamentals=fundamentals_map,
+        v_vix_utilization_pct=metrics.get("v_vix_utilization_pct"),
+        risk_state=metrics.get("risk_state"),
+        nav_ref=metrics.get("nav_ref"),
+        vix=metrics.get("vix"),
+        vvix=metrics.get("vvix"),
     )
 
 
@@ -700,6 +770,18 @@ def rules_publish(payload: CatalogPublishRequest) -> RulesCatalogPublishResponse
 def rules_reload() -> RulesCatalogResponseModel:
     _catalog_state.reload()
     return RulesCatalogResponseModel(**_catalog_state.as_dict())
+
+
+@app.get("/rules/catalog/raw", tags=["rules"])
+def rules_catalog_raw() -> PlainTextResponse:
+    """Return raw catalog YAML for editor preload; fall back to serialized catalog."""
+    from positions_engine.rules.catalog import CATALOG_PATH, dump_catalog
+
+    try:
+        text = CATALOG_PATH.read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        text = dump_catalog(_catalog_state.catalog)
+    return PlainTextResponse(text, media_type="text/yaml")
 
 
 if WEB_DIST.is_dir() and INDEX_HTML.exists():

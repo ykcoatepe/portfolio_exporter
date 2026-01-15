@@ -106,6 +106,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/rules/catalog/raw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rules Catalog Raw */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successful Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/yaml": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/rules/validate": {
         parameters: {
             query?: never;
@@ -298,6 +334,16 @@ export interface components {
             fundamentals?: {
                 [key: string]: unknown;
             };
+            /** V/VIX Utilization Pct */
+            v_vix_utilization_pct?: number | null;
+            /** Risk State */
+            risk_state?: string | null;
+            /** NAV Ref */
+            nav_ref?: number | null;
+            /** VIX */
+            vix?: number | null;
+            /** VVIX */
+            vvix?: number | null;
         };
         /** RulesSummaryTopModel */
         RulesSummaryTopModel: {

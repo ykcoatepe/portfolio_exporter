@@ -118,18 +118,18 @@ const sanitizeDiff = (diff: RawDiff): CatalogDiff => {
   const record = diff as Record<string, unknown>;
   const added = Array.isArray(record.added)
     ? record.added
-        .map(sanitizeRuleRecord)
-        .filter((item): item is Record<string, unknown> => item !== null)
+      .map(sanitizeRuleRecord)
+      .filter((item): item is Record<string, unknown> => item !== null)
     : [];
   const removed = Array.isArray(record.removed)
     ? record.removed
-        .map(sanitizeRuleRecord)
-        .filter((item): item is Record<string, unknown> => item !== null)
+      .map(sanitizeRuleRecord)
+      .filter((item): item is Record<string, unknown> => item !== null)
     : [];
   const changed = Array.isArray(record.changed)
     ? record.changed
-        .map(sanitizeRuleRecord)
-        .filter((item): item is Record<string, unknown> => item !== null)
+      .map(sanitizeRuleRecord)
+      .filter((item): item is Record<string, unknown> => item !== null)
     : [];
   return { added, removed, changed };
 };
@@ -357,5 +357,29 @@ export function usePublishRules(): UseMutationResult<RuleCatalogPublishResult, E
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: RULE_CATALOG_QUERY_KEY });
     },
+  });
+}
+
+async function fetchRawRuleCatalog(baseUrl = ""): Promise<string> {
+  if (!RULES_CATALOG_ENABLED) {
+    return "";
+  }
+  const origin = resolveOrigin(baseUrl);
+  const response = await fetch(`${origin}/rules/catalog/raw`, {
+    headers: { Accept: "text/yaml" },
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load raw catalog (${response.status})`);
+  }
+  return response.text();
+}
+
+export function useRawRulesCatalog(enabled: boolean): UseQueryResult<string, Error> {
+  return useQuery<string, Error>({
+    queryKey: ["rules", "catalog", "raw"],
+    queryFn: () => fetchRawRuleCatalog(),
+    enabled: RULES_CATALOG_ENABLED && enabled,
+    staleTime: 5 * 60_000,
   });
 }

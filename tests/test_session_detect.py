@@ -42,7 +42,7 @@ def api_main(monkeypatch):
         def __init__(self) -> None:
             self.rules = []
 
-        def evaluate(self) -> SimpleNamespace:
+        def evaluate(self, powerlaw_snapshot: dict | None = None) -> SimpleNamespace:
             return SimpleNamespace(breaches=[], duration_ms=0.123)
 
     monkeypatch.setattr(module, "_rules_state", _FakeRulesState())

@@ -17,12 +17,11 @@ describe("contracts: /rules/summary", () => {
     provider: "psd-rules-service",
     dir: pactDir,
     logLevel: "warn",
-    pactFileWriteMode: "overwrite",
   });
 
   it("generates a pact for fetching the rules summary", async () => {
     provider.addInteraction({
-      state: "rules summary exists",
+      states: [{ description: "rules summary exists" }],
       uponReceiving: "a request for the rules summary",
       withRequest: {
         method: "GET",
@@ -45,6 +44,11 @@ describe("contracts: /rules/summary", () => {
             info: like(1),
           }),
           focus_symbols: eachLike(like("TSLA"), 1),
+          v_vix_utilization_pct: like(85.0),
+          risk_state: regex("ON|NEUTRAL|OFF", "ON"),
+          nav_ref: like(1_000_000.0),
+          vix: like(18.0),
+          vvix: like(95.0),
           top: eachLike(
             {
               id: like("breach-portfolio-var"),
@@ -75,7 +79,7 @@ describe("contracts: /rules/summary", () => {
 
   it("generates a pact for fetching the rules catalog", async () => {
     provider.addInteraction({
-      state: "rules catalog exists",
+      states: [{ description: "rules catalog exists" }],
       uponReceiving: "a request for the rules catalog",
       withRequest: {
         method: "GET",
@@ -120,7 +124,7 @@ describe("contracts: /rules/summary", () => {
 
   it("generates a pact for validating catalog YAML", async () => {
     provider.addInteraction({
-      state: "catalog validation succeeds",
+      states: [{ description: "catalog validation succeeds" }],
       uponReceiving: "a request to validate catalog text",
       withRequest: {
         method: "POST",
@@ -174,7 +178,7 @@ describe("contracts: /rules/summary", () => {
 
   it("generates a pact for previewing catalog changes", async () => {
     provider.addInteraction({
-      state: "catalog preview succeeds",
+      states: [{ description: "catalog preview succeeds" }],
       uponReceiving: "a request to preview catalog changes",
       withRequest: {
         method: "POST",
@@ -253,7 +257,7 @@ describe("contracts: /rules/summary", () => {
 
   it("generates a pact for publishing catalog changes", async () => {
     provider.addInteraction({
-      state: "catalog publication succeeds",
+      states: [{ description: "catalog publication succeeds" }],
       uponReceiving: "a request to publish catalog changes",
       withRequest: {
         method: "POST",
@@ -294,7 +298,7 @@ describe("contracts: /rules/summary", () => {
 
   it("generates a pact for reloading the catalog", async () => {
     provider.addInteraction({
-      state: "catalog reload succeeds",
+      states: [{ description: "catalog reload succeeds" }],
       uponReceiving: "a request to reload the catalog",
       withRequest: {
         method: "POST",

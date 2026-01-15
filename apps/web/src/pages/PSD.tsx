@@ -315,11 +315,18 @@ const PSDPage = () => {
   const comboMissingGreeksCount = useMemo(() => {
     const combos = positionsView?.option_combos ?? [];
     return combos.reduce((count, combo) => {
-      const greeks = combo.greeks_agg ?? {};
-      const hasDelta = finiteOrNull(greeks.delta) !== null;
-      const hasGamma = finiteOrNull(greeks.gamma) !== null;
-      const hasTheta = finiteOrNull(greeks.theta) !== null;
-      return hasDelta && hasGamma && hasTheta ? count : count + 1;
+      const hasMissingGreeks = (combo.legs ?? []).some((leg) => {
+        if (leg.secType !== "OPT" && leg.secType !== "FOP") {
+          return false;
+        }
+        const greeks = leg.greeks ?? {};
+        return (
+          finiteOrNull(greeks.delta) === null ||
+          finiteOrNull(greeks.gamma) === null ||
+          finiteOrNull(greeks.theta) === null
+        );
+      });
+      return hasMissingGreeks ? count + 1 : count;
     }, 0);
   }, [positionsView]);
   const hasView = useMemo(() => {
