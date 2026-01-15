@@ -43,7 +43,7 @@ from psd.core import store
 from psd.datasources import resolve_msb_source
 from psd.datasources.msb_vendor import refresh_vendor_data
 from psd.sentinel.msb_actions import evaluate_msb_triggers_and_update_livebar
-from psd.sentinel.msb_metrics import MSB_SCHEDULER_RUNS
+from psd.sentinel.msb_metrics import MSB_DATA_AGE_SECONDS, MSB_SCHEDULER_RUNS
 
 # Lazy import to keep CLI startup fast and allow test monkeypatching
 try:  # pragma: no cover - exercised via scripts
@@ -482,6 +482,13 @@ def run_msb_scheduler_once(
                 store_frame = df.iloc[[-1]]
                 backfill = False
             affected = store.store_msb(store_frame)
+            try:
+                latest = store_frame.index[-1]
+                MSB_DATA_AGE_SECONDS.set(
+                    max(0.0, (datetime.now(tz=_TRT) - latest).total_seconds())
+                )
+            except Exception:
+                pass
 
             from psd.web.app import broadcast_latest_msb
 
@@ -525,6 +532,12 @@ def run_msb_scheduler_once(
 def _scheduler_loop(
     app: FastAPI, stop_event: threading.Event, vendor_root: Path
 ) -> None:
+    try:
+        import asyncio
+
+        asyncio.set_event_loop(asyncio.new_event_loop())
+    except Exception:
+        pass
     while not stop_event.is_set():
         now = datetime.now(tz=_TRT)
         run_at = _next_business_run(now)

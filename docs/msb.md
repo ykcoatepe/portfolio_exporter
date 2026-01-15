@@ -83,3 +83,13 @@ signals on missing or non-trading days. Therefore the default is no fill.
 ## Notes
 - Rule B deltas use the raw aligned HY series by default with a guard
   against bad prints (absolute clip). This is logged if clipping occurs.
+
+## Monitoring & Alerting
+- Prometheus gauge: `psd_msb_data_age_seconds` (age of latest `msb_readings` row).
+- Suggested staleness alert (1 trading day ≈ 32h to allow for holidays):
+  ```
+  psd_msb_data_age_seconds > 115200
+  ```
+  Route as warning; escalate to critical if > 48h.
+- Scheduler counter: `psd_msb_scheduler_runs_total`; use rate to confirm daily runs.
+- Surface errors via `/msb/status` (`status`, `detail`, `source`, `data_age_seconds`).
