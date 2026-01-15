@@ -719,6 +719,75 @@
       "details": "Registered pytest markers, added Make targets for fast/cli/integration/slow/parallel runs, and added pytest-xdist to dev deps.",
       "event": "Add fast/parallel test targets and mark cli/integration/slow tests",
       "timestamp": "2026-01-13T17:24:21Z"
+    },
+    {
+      "details": "Count combos as missing when any option leg lacks delta/gamma/theta.",
+      "event": "PSD combo missing greeks chip uses leg-level greeks",
+      "timestamp": "2026-01-14T13:06:35Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-14T13:33:01Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-14T14:38:41Z"
+    },
+    {
+      "details": "Merged MSB vx1/vx2/spx_ret into powerlaw snapshot for rules; updated PSD rules summary mapping; added powerlaw key fallbacks; openapi update; ran pytest -q and web RulesPanel tests.",
+      "event": "Wire MSB signals into rules summary metrics",
+      "timestamp": "2026-01-15T09:26:06Z"
+    },
+    {
+      "details": "Hooked Open Detail to select the breach symbol, focus list item, and scroll to fundamentals section; ran RulesPanel tests.",
+      "event": "Enable RulesPanel Open Detail",
+      "timestamp": "2026-01-15T09:31:21Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-15T09:35:11Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-15T11:46:25Z"
+    },
+    {
+      "details": "Advance pending/session counters once per NY trading date; tests pass explicit as_of timestamps.",
+      "event": "Gate hysteresis session counting",
+      "timestamp": "2026-01-15T11:55:05Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-15T12:32:24Z"
+    },
+    {
+      "details": "Pass RulesState evaluation timestamp into PlaybookMetrics so hysteresis stays deterministic.",
+      "event": "Thread hysteresis as_of through rules",
+      "timestamp": "2026-01-15T12:33:58Z"
+    },
+    {
+      "details": "Unset VIX/VVIX when signals missing and guard V/VIX + hysteresis computations; updated tests.",
+      "event": "Avoid default VIX on missing powerlaw",
+      "timestamp": "2026-01-15T13:48:28Z"
+    },
+    {
+      "details": "Stop hardcoding liquidity_nav_pct in PORT rows; default missing liquidity/options theta to None and map sleeve-theta rule to theta_nav_pct.",
+      "event": "Fix liquidity/theta rule defaults",
+      "timestamp": "2026-01-15T14:04:52Z"
+    },
+    {
+      "details": "Track pending_session_key so the first signal day counts once even with earlier same-day evals; add test.",
+      "event": "Count first hysteresis signal session",
+      "timestamp": "2026-01-15T14:36:39Z"
+    },
+    {
+      "details": "Ensure coerceNullableNumber preserves null/empty values and reset RulesPanel selection when breach IDs change.",
+      "event": "Preserve null metrics and reset breach selection",
+      "timestamp": "2026-01-15T14:51:32Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-15T14:55:27Z"
     }
   ],
   "decisions": [
@@ -1283,6 +1352,22 @@
       "rationale": "Local pytest runs were slow; tiered runs improve iteration without changing CI.",
       "timestamp": "2026-01-13T17:24:17Z",
       "title": "Test suite tiering"
+    },
+    {
+      "context": null,
+      "decision": "Merge MSB vx1/vx2/spx_ret into the powerlaw snapshot consumed by rules evaluation to keep rules context filled even when powerlaw lacks term structure fields.",
+      "id": 73,
+      "rationale": null,
+      "timestamp": "2026-01-15T09:26:12Z",
+      "title": "Rules metrics data merge"
+    },
+    {
+      "context": "PR #182 review comment on playbook_metrics hysteresis.",
+      "decision": "Advance hysteresis counters once per NY trading date; add as_of timestamp for deterministic evaluation.",
+      "id": 74,
+      "rationale": "Prevent repeated API calls from counting as multiple sessions.",
+      "timestamp": "2026-01-15T11:55:05Z",
+      "title": "Gate hysteresis by session date"
     }
   ],
   "preferences": {

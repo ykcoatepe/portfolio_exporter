@@ -221,6 +221,12 @@ def _normalize_snapshot(raw: dict[str, Any] | None) -> dict[str, Any]:
     if not data_quality_detail:
         data_quality_detail = _coerce_str_list(raw.get("data_warnings"))
 
+    vx1 = _coerce_float(raw.get("vx1"))
+    vx2 = _coerce_float(raw.get("vx2"))
+    spx_ret = _coerce_float(
+        raw.get("spx_ret") or raw.get("spx_return") or raw.get("spx_return_pct")
+    )
+
     return {
         "as_of": _coerce_str(raw.get("as_of")),
         "plke": _coerce_float(raw.get("plke")),
@@ -232,6 +238,9 @@ def _normalize_snapshot(raw: dict[str, Any] | None) -> dict[str, Any]:
         "vix_spot": _coerce_float(raw.get("vix_spot")),
         "vvix_spot": _coerce_float(raw.get("vvix_spot")),
         "vx_backwardation": _coerce_bool(raw.get("vx_backwardation")),
+        "vx1": vx1,
+        "vx2": vx2,
+        "spx_ret": spx_ret,
         "equity_weights": equity_weights,
         "hedge_notional": hedge_notional,
         "small_cap": small_cap,

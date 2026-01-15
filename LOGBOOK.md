@@ -443,3 +443,57 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** Makefile, pytest.ini, tests/*, requirements-dev.*, README.md
 **Status:** done
 **Notes:** fast suite skips cli/integration/slow; full suite unchanged
+
+### 2026-01-14 • Task: Count combo missing greeks per leg • Branch: fix/psd-single-greeks
+**Owner:** session/ai | **Scope:** surface PSD combo greeks missing chip when any leg lacks delta/gamma/theta
+**Interfaces:** apps/web/src/pages/PSD.tsx
+**Status:** done
+**Notes:** compute missing-greeks count from combo legs instead of aggregate greeks
+
+### 2026-01-15 • Task: Wire MSB signals into rules summary + fix PSD breaches display • Branch: local
+**Owner:** session/codex | **Scope:** ensure rules summary uses MSB term structure fields and PSD UI shows breach rows
+**Interfaces:** apps/api/main.py, src/psd/web/app.py, libs/py/positions_engine/service/playbook_metrics.py, portfolio_exporter/psd_powerlaw.py, apps/web/openapi.json, apps/web/src/components/RulesPanel.tsx
+**Status:** done
+**Notes:** merged MSB vx1/vx2/spx_ret into rules metrics; normalized powerlaw keys; mapped PSD rules summary to UI contract; ran pytest -q and RulesPanel unit tests
+
+### 2026-01-15 • Task: Wire “Open Detail” action to fundamentals focus • Branch: local
+**Owner:** session/codex | **Scope:** make RulesPanel “Open Detail” buttons actually focus a breach and show its fundamentals
+**Interfaces:** apps/web/src/components/RulesPanel.tsx
+**Status:** done
+**Notes:** selects breach symbol for fundamentals and scrolls to fundamentals section; RulesPanel tests pass
+
+### 2026-01-15 • Task: Thread rules hysteresis as_of into playbook metrics • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** pass RulesState evaluation timestamp into PlaybookMetrics hysteresis
+**Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/service/rules_state.py
+**Status:** done
+**Notes:** keep risk_state deterministic for historical snapshots and summaries
+
+### 2026-01-15 • Task: Avoid default VIX when powerlaw missing • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** keep playbook metrics VIX/VVIX unset when powerlaw has no signals
+**Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/tests/service/test_playbook_metrics.py
+**Status:** done
+**Notes:** treat missing signals as None and guard V/VIX + hysteresis computations
+
+### 2026-01-15 • Task: Fix liquidity/theta rule defaults • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** stop hardcoding liquidity_nav_pct and map sleeve-theta rule to theta_nav_pct
+**Interfaces:** libs/py/positions_engine/service/rules_state.py, libs/py/positions_engine/rules/eval.py, libs/py/positions_engine/rules/catalog.yaml
+**Status:** done
+**Notes:** default missing liquidity/options theta metrics to None to avoid false breaches
+
+### 2026-01-15 • Task: Count first hysteresis signal session • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** ensure hysteresis counts the first signal day even if earlier evals ran
+**Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/tests/service/test_playbook_metrics.py
+**Status:** done
+**Notes:** track pending_session_key to count once per session
+
+### 2026-01-15 • Task: Preserve null metrics + reset breach selection • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** keep null playbook metrics in UI and reset RulesPanel selection when breach IDs change
+**Interfaces:** apps/web/src/hooks/useRules.ts, apps/web/src/components/RulesPanel.tsx
+**Status:** done
+**Notes:** coerceNullableNumber preserves null/empty; selection reset depends on breach IDs
+
+### 2026-01-15 • Task: Align hysteresis same-day test with NY session date • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** keep same-day hysteresis test within the same NY session
+**Interfaces:** libs/py/positions_engine/tests/service/test_playbook_metrics.py
+**Status:** done
+**Notes:** shift test start time to 14:00 UTC so +6h stays on the same NY trading date

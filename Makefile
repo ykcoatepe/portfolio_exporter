@@ -174,6 +174,10 @@ msb-compute:
 msb-emit:
 	python scripts/msb_emit.py
 
+.PHONY: msb-refresh-now
+msb-refresh-now:
+	@set -a; [ -f .env ] && . ./.env; set +a; MSB_SOURCE=$${MSB_SOURCE:-ibkr} python -c "from psd.sentinel.sched import run_msb_scheduler_once; from psd.web.app import create_app; from psd.web.config import Settings; app = create_app(Settings(disable_background=True)); run_msb_scheduler_once(app, allow_stale=True, force_refresh=True)"
+
 .PHONY: msb-run-now
 msb-run-now:
 	@set -a; [ -f .env ] && . ./.env; set +a; MSB_SOURCE=ibkr python -c "from psd.sentinel.sched import run_msb_scheduler_once; from psd.web.app import create_app; from psd.web.config import Settings; app = create_app(Settings(disable_background=True)); run_msb_scheduler_once(app, allow_stale=True, force_refresh=True)"

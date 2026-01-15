@@ -4,6 +4,9 @@ import asyncio
 import json
 import logging
 import os
+
+# Add libs/py to path for positions_engine
+import sys
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -32,7 +35,11 @@ from psd.core.store import (
     read_msb_history,
     tail_events,
 )
+from psd.datasources import resolve_msb_source
 from psd.ingestor.normalize import split_positions
+from psd.sentinel.msb_metrics import (
+    MSB_DATA_AGE_SECONDS,
+)
 from psd.sentinel.sched import (
     run_msb_scheduler_once,
     start_msb_scheduler,
@@ -43,6 +50,23 @@ from psd.web.config import Settings, get_settings
 from psd.web.ready import router as ready_router
 from psd.web.sse import SseManager, sse_endpoint
 
+log = logging.getLogger("psd.web.stats")
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_LIBS_PATH = _REPO_ROOT / "libs" / "py"
+if str(_LIBS_PATH) not in sys.path:
+    sys.path.insert(0, str(_LIBS_PATH))
+
+try:
+    from positions_engine.rules.catalog import load_catalog
+    from positions_engine.service import PositionsState, RulesState
+    _RULES_ENGINE_AVAILABLE = True
+except ImportError as _import_err:
+    log.debug("positions_engine import failed: %s", _import_err)
+    _RULES_ENGINE_AVAILABLE = False
+    PositionsState = None  # type: ignore
+    RulesState = None  # type: ignore
+
 # Importing the ingestor module registers the psd_events_total counter so that
 # /metrics exposes it even before ingestion writes events.
 try:  # pragma: no cover - defensive in case optional deps change
@@ -50,7 +74,6 @@ try:  # pragma: no cover - defensive in case optional deps change
 except Exception:  # pragma: no cover - metrics should still render
     _psd_ingestor_main = None
 
-log = logging.getLogger("psd.web.stats")
 STALE_ALERT_THRESHOLD = 10
 _DEFAULT_STATS_EMPTY = compute_stats(None)
 
@@ -134,6 +157,8 @@ class MsbStatusDTO(BaseModel):
     refreshed_at: str | None = None
     last_date: str | None = None
     detail: str | None = None
+    source: str | None = None
+    data_age_seconds: float | None = None
 
     model_config = ConfigDict(extra="ignore")
 
@@ -524,14 +549,34 @@ def _set_msb_refresh_state(
     *,
     status: str,
     detail: str | None = None,
+    source: str | None = None,
 ) -> None:
+    def _record_ts(record: dict[str, Any] | None) -> datetime | None:
+        if not record or "date" not in record:
+            return None
+        raw = record.get("date")
+        if raw is None:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(raw))
+        except Exception:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
     record = read_msb_current()
     last_date = record.get("date") if record else None
+    ts = _record_ts(record)
+    age = max(0.0, (datetime.now(UTC) - ts).total_seconds()) if ts else None
+    if age is not None:
+        MSB_DATA_AGE_SECONDS.set(age)
     app.state.msb_refresh = {
         "status": status,
         "detail": detail,
         "refreshed_at": datetime.now(UTC).isoformat(),
         "last_date": last_date,
+        "source": source,
+        "data_age_seconds": age,
     }
 
 
@@ -545,6 +590,12 @@ def _create_lifespan(settings: Settings) -> Any:
         start_msb_scheduler(_app)
         if settings.msb_startup_refresh:
             def _startup_refresh() -> None:
+                try:  # ensure ib_insync has an event loop inside thread
+                    import asyncio
+
+                    asyncio.set_event_loop(asyncio.new_event_loop())
+                except Exception:
+                    pass
                 try:
                     updated = run_msb_scheduler_once(
                         _app,
@@ -555,10 +606,16 @@ def _create_lifespan(settings: Settings) -> Any:
                         _app,
                         status="updated" if updated else "skipped",
                         detail=None if updated else "no new data",
+                        source=resolve_msb_source(),
                     )
                 except Exception as exc:  # pragma: no cover - depends on runtime IO
                     log.warning("msb startup refresh failed", exc_info=True)
-                    _set_msb_refresh_state(_app, status="error", detail=str(exc))
+                    _set_msb_refresh_state(
+                        _app,
+                        status="error",
+                        detail=str(exc),
+                        source=resolve_msb_source(),
+                    )
 
             threading.Thread(
                 target=_startup_refresh,
@@ -923,15 +980,157 @@ def positions_legs() -> list:
     return []
 
 
+def _merge_powerlaw_msb(
+    powerlaw: dict[str, Any] | None, msb: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    if not isinstance(powerlaw, dict) and not isinstance(msb, dict):
+        return None
+    merged: dict[str, Any] = dict(powerlaw) if isinstance(powerlaw, dict) else {}
+    msb_signals: dict[str, Any] = {}
+    if isinstance(msb, dict):
+        for key in ("vx1", "vx2", "spx_ret", "spx_return", "spx_return_pct"):
+            value = msb.get(key)
+            if value is not None:
+                msb_signals[key] = value
+    if not msb_signals:
+        return merged or None
+    signals = merged.get("signals")
+    if isinstance(signals, dict):
+        updated_signals = dict(signals)
+        updated_signals.update(msb_signals)
+        merged["signals"] = updated_signals
+        return merged
+    merged.update(msb_signals)
+    return merged
+
+
 @router.get("/rules/summary")
 def rules_summary() -> dict:
-    """Return rules summary (stub)."""
-    return {
-        "rules_total": 0,
-        "breaches": {"critical": 0, "warning": 0, "info": 0},
-        "top": [],
-        "as_of": datetime.now(UTC).isoformat(),
-    }
+    """Return rules summary with real evaluation if engine available."""
+    now = datetime.now(UTC)
+    
+    if not _RULES_ENGINE_AVAILABLE:
+        return {
+            "rules_total": 0,
+            "breaches": {"critical": 0, "warning": 0, "info": 0},
+            "top": [],
+            "as_of": now.isoformat(),
+            "focus_symbols": [],
+        }
+    
+    # Load powerlaw snapshot for metrics
+    powerlaw = None
+    try:
+        powerlaw = load_powerlaw_snapshot()
+    except Exception:
+        log.debug("powerlaw snapshot load failed for rules", exc_info=True)
+
+    msb = None
+    try:
+        msb = read_msb_current()
+    except Exception:
+        log.debug("msb snapshot load failed for rules", exc_info=True)
+    powerlaw = _merge_powerlaw_msb(powerlaw, msb)
+    
+    # Create positions state from latest snapshot
+    snap = latest_snapshot()
+    positions_raw = snap.get("positions", []) if snap else []
+    positions = positions_raw if isinstance(positions_raw, list) else []
+    quotes_payload = snap.get("quotes", {}) if snap else {}
+
+    positions_state = PositionsState()
+    try:
+        from positions_engine.service.normalize import (
+            positions_from_records,
+            quotes_from_records,
+        )
+    except Exception as exc:
+        log.warning("positions_engine normalize unavailable: %s", exc)
+    else:
+        quote_records: list[dict[str, Any]] = []
+        if isinstance(quotes_payload, dict):
+            for symbol, payload in quotes_payload.items():
+                if not isinstance(payload, dict):
+                    continue
+                record = dict(payload)
+                record.setdefault("symbol", symbol)
+                if "last" not in record and "price" in record:
+                    record["last"] = record.get("price")
+                if "previous_close" not in record and "previousClose" in record:
+                    record["previous_close"] = record.get("previousClose")
+                quote_records.append(record)
+
+        try:
+            positions_state.refresh(
+                positions=positions_from_records(positions),
+                quotes=quotes_from_records(quote_records),
+                snapshot_at=now,
+                data_source=str(snap.get("data_source") or "snapshot") if snap else None,
+            )
+        except Exception as exc:
+            log.warning("rules snapshot normalization failed: %s", exc)
+            positions_state = PositionsState()
+    
+    try:
+        catalog = load_catalog()
+        rules_state = RulesState(positions_state, rules=catalog.rules)
+        summary, evaluation = rules_state.summary(now, powerlaw_snapshot=powerlaw)
+
+        # Extract metrics from summary
+        metrics = summary.get("playbook_metrics") or {}
+
+        rules_index = {rule.rule_id: rule for rule in catalog.rules}
+        focus_symbols: set[str] = set()
+        top_payload: list[dict[str, Any]] = []
+        for breach in summary.get("top", []) if isinstance(summary, dict) else []:
+            if not isinstance(breach, dict):
+                continue
+            rule_id = breach.get("rule_id")
+            rule = rules_index.get(rule_id)
+            severity = (rule.severity if rule else "INFO").lower()
+            symbol = breach.get("symbol")
+            if isinstance(symbol, str) and symbol:
+                focus_symbols.add(symbol)
+            subject = breach.get("subject_id") or symbol or rule_id or "n/a"
+            occurred_at = breach.get("triggered_at")
+            top_payload.append(
+                {
+                    "id": str(breach.get("breach_id") or f"{rule_id}-{subject}"),
+                    "rule": rule.name if rule else str(rule_id),
+                    "severity": severity,
+                    "subject": str(subject),
+                    "symbol": symbol if isinstance(symbol, str) else None,
+                    "occurred_at": (
+                        str(occurred_at) if occurred_at is not None else now.isoformat()
+                    ),
+                    "description": breach.get("notes"),
+                    "status": breach.get("status"),
+                }
+            )
+
+        return {
+            "rules_total": summary.get("rules_total", len(catalog.rules)),
+            "breaches": summary.get("breaches", {"critical": 0, "warning": 0, "info": 0}),
+            "top": top_payload,
+            "focus_symbols": sorted(focus_symbols),
+            "as_of": now.isoformat(),
+            "evaluation_ms": float(evaluation.duration_ms),
+            "v_vix_utilization_pct": metrics.get("v_vix_utilization_pct"),
+            "risk_state": metrics.get("risk_state"),
+            "nav_ref": metrics.get("nav_ref"),
+            "vix": metrics.get("vix"),
+            "vvix": metrics.get("vvix"),
+        }
+    except Exception as exc:
+        log.warning("rules evaluation failed: %s", exc, exc_info=True)
+        return {
+            "rules_total": 0,
+            "breaches": {"critical": 0, "warning": 0, "info": 0},
+            "top": [],
+            "as_of": now.isoformat(),
+            "focus_symbols": [],
+            "error": str(exc),
+        }
 
 
 @router.get("/msb/history.csv")
@@ -961,12 +1160,27 @@ async def msb_refresh(request: Request) -> MsbRefreshDTO:
         )
     except Exception as exc:
         log.warning("msb refresh failed: %s", exc, exc_info=True)
-        _set_msb_refresh_state(request.app, status="error", detail=str(exc))
+        _set_msb_refresh_state(
+            request.app,
+            status="error",
+            detail=str(exc),
+            source=resolve_msb_source(),
+        )
         raise HTTPException(status_code=500, detail="MSB refresh failed") from exc
     if updated:
-        _set_msb_refresh_state(request.app, status="updated", detail=None)
+        _set_msb_refresh_state(
+            request.app,
+            status="updated",
+            detail=None,
+            source=resolve_msb_source(),
+        )
         return MsbRefreshDTO(ok=True, status="updated")
-    _set_msb_refresh_state(request.app, status="skipped", detail="no new data")
+    _set_msb_refresh_state(
+        request.app,
+        status="skipped",
+        detail="no new data",
+        source=resolve_msb_source(),
+    )
     return MsbRefreshDTO(ok=False, status="skipped", detail="no new data")
 
 
@@ -975,13 +1189,31 @@ def msb_status(request: Request) -> MsbStatusDTO:
     state = getattr(request.app.state, "msb_refresh", None)
     record = read_msb_current()
     last_date = record.get("date") if record else None
+    age = None
+    if last_date is not None:
+        try:
+            ts = datetime.fromisoformat(str(last_date))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=UTC)
+            age = max(0.0, (datetime.now(UTC) - ts).total_seconds())
+        except Exception:
+            age = None
+    if age is not None:
+        MSB_DATA_AGE_SECONDS.set(age)
     if not isinstance(state, dict):
-        return MsbStatusDTO(status="unknown", last_date=last_date)
+        return MsbStatusDTO(
+            status="unknown",
+            last_date=last_date,
+            source=resolve_msb_source(),
+            data_age_seconds=age,
+        )
     return MsbStatusDTO(
         status=str(state.get("status") or "unknown"),
         refreshed_at=state.get("refreshed_at"),
         last_date=state.get("last_date") or last_date,
         detail=state.get("detail"),
+        source=state.get("source") or resolve_msb_source(),
+        data_age_seconds=age if age is not None else state.get("data_age_seconds"),
     )
 
 

@@ -34,6 +34,11 @@ export interface RulesSummaryResponse {
   rules_total?: number;
   evaluation_ms?: number;
   fundamentals?: FundamentalsMap | null;
+  v_vix_utilization_pct?: number | null;
+  risk_state?: string | null;
+  nav_ref?: number | null;
+  vix?: number | null;
+  vvix?: number | null;
 }
 
 const RULES_SUMMARY_QUERY_KEY = ["rules", "summary"] as const;
@@ -90,6 +95,12 @@ const coerceNumber = (value: unknown, fallback = 0): number => {
 };
 
 const coerceNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "string" && value.trim() === "") {
+    return null;
+  }
   const next = Number(value);
   if (Number.isFinite(next)) {
     return next;
@@ -211,6 +222,11 @@ export async function fetchRulesSummary(baseUrl = ""): Promise<RulesSummaryRespo
     evaluation_ms:
       typeof record.evaluation_ms === "number" ? record.evaluation_ms : undefined,
     fundamentals: fundamentalsPayload ?? fundamentalsCache,
+    v_vix_utilization_pct: coerceNullableNumber(record.v_vix_utilization_pct),
+    risk_state: coerceNullableString(record.risk_state),
+    nav_ref: coerceNullableNumber(record.nav_ref),
+    vix: coerceNullableNumber(record.vix),
+    vvix: coerceNullableNumber(record.vvix),
   };
 }
 

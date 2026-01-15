@@ -66,7 +66,7 @@ rules:
   severity: WARNING
   scope: PORT
   filter: 'true'
-  expr: options_theta_nav_pct > 20
+  expr: theta_nav_pct > 20
   enabled: true
 - rule_id: condor-guard-vix-low
   name: 'Condors: 45-60 DTE when VIX<15'
@@ -174,4 +174,73 @@ rules:
   scope: COMBO
   filter: opened_within_days <= 1
   expr: (has_stop != true) or (has_target != true)
+  enabled: true
+# --- Playbook v4: V/VIX Dynamic Throttle ---
+- rule_id: v-vix-throttle-warn
+  name: "V/VIX at warning threshold (85%)"
+  severity: WARNING
+  scope: PORT
+  filter: "true"
+  expr: v_vix_utilization_pct >= 85 and v_vix_utilization_pct < 100
+  enabled: true
+- rule_id: v-vix-throttle-cut
+  name: "V/VIX at cut threshold (100%)"
+  severity: CRITICAL
+  scope: PORT
+  filter: "true"
+  expr: v_vix_utilization_pct >= 100
+  enabled: true
+# --- Playbook v4: Backwardation ---
+- rule_id: backwardation-armed
+  name: "Backwardation: VX1 > VX2 & SPX down"
+  severity: WARNING
+  scope: PORT
+  filter: vx1_gt_vx2 == true and spx_return_pct < 0
+  expr: "true"
+  enabled: true
+# --- Playbook v4: Risk State ---
+- rule_id: risk-state-off
+  name: "Risk state: OFF mode active"
+  severity: INFO
+  scope: PORT
+  filter: risk_state == "OFF"
+  expr: "true"
+  enabled: true
+# --- Playbook v4: θ Cap ---
+- rule_id: theta-cap-weekly
+  name: "θ cap exceeded (0.10% NAV/wk)"
+  severity: WARNING
+  scope: PORT
+  filter: "true"
+  expr: theta_nav_pct > theta_cap_nav_pct
+  enabled: true
+- rule_id: no-theta-vix-high
+  name: "θ additions blocked (VIX ≥30)"
+  severity: WARNING
+  scope: PORT
+  filter: vix >= 30
+  expr: theta_adds_blocked != true
+  enabled: true
+# --- Playbook v4: Data Availability ---
+- rule_id: data-vix-missing
+  name: "VIX data unavailable"
+  severity: INFO
+  scope: PORT
+  filter: vix_available == false
+  expr: "true"
+  enabled: true
+# --- Playbook v4: Process Discipline ---
+- rule_id: process-ptcs
+  name: "PTCS score (target ≥90)"
+  severity: INFO
+  scope: PORT
+  filter: "true"
+  expr: ptcs_score < 90
+  enabled: true
+- rule_id: process-journal
+  name: "Journal compliance (target ≥95%)"
+  severity: INFO
+  scope: PORT
+  filter: "true"
+  expr: journal_pct < 95
   enabled: true

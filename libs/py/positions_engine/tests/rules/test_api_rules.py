@@ -6,6 +6,7 @@ import sys
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 from starlette.testclient import TestClient
@@ -119,7 +120,9 @@ def test_rules_summary_returns_counters_and_top(
     api_main._rules_state.set_rules(rules)
 
     def fake_build_rows(
-        self: RulesState, _timestamp: datetime
+        self: RulesState, 
+        _timestamp: datetime,
+        powerlaw_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, list[dict[str, object]]]:
         return {
             "COMBO": [
