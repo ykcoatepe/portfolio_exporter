@@ -86,4 +86,6 @@ def test_metrics_from_powerlaw():
     # Missing data case
     m_empty = PlaybookMetrics.from_powerlaw(None)
     assert m_empty.vix_available is False
+    assert m_empty.vix is None
+    assert m_empty.v_vix_cap == 0.0
     assert m_empty.risk_state == "ON"  # Default

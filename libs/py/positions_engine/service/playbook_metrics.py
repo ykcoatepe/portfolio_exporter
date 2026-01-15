@@ -129,10 +129,10 @@ class PlaybookMetrics:
     """Computed Playbook v4 metrics for rule evaluation context."""
 
     nav_ref: float = 206000.0
-    vix: float = 15.0
-    vvix: float = 15.0
-    vx1: float = 15.0
-    vx2: float = 16.0
+    vix: float | None = None
+    vvix: float | None = None
+    vx1: float | None = None
+    vx2: float | None = None
     vx1_gt_vx2: bool = False
     net_vega: float = 0.0
     v_vix_ratio: float = 0.0
@@ -178,12 +178,11 @@ class PlaybookMetrics:
         """
         metrics = cls(nav_ref=nav_ref, net_vega=net_vega)
 
-        if powerlaw is None:
-            return metrics
-
-        signals = powerlaw.get("signals") or powerlaw
-        if not isinstance(signals, dict):
-            return metrics
+        signals: dict[str, Any] = {}
+        if isinstance(powerlaw, dict):
+            candidate = powerlaw.get("signals") or powerlaw
+            if isinstance(candidate, dict):
+                signals = candidate
 
         # Extract VIX data (support multiple key names)
         vix_raw = signals.get("vix")
@@ -235,32 +234,42 @@ class PlaybookMetrics:
             except (TypeError, ValueError):
                 pass
 
-        # Compute V/VIX metrics
-        metrics.v_vix_ratio = abs(net_vega) / metrics.vix if metrics.vix > 0 else 0.0
-        metrics.v_vix_cap = _compute_v_vix_cap(
-            metrics.vix, nav_ref, metrics.vx1_gt_vx2, metrics.vvix
-        )
-        if metrics.v_vix_cap > 0:
-            metrics.v_vix_utilization_pct = (
-                metrics.v_vix_ratio / metrics.v_vix_cap
-            ) * 100.0
+        # Compute V/VIX metrics (only when VIX is available)
+        if metrics.vix is not None and metrics.vix > 0:
+            metrics.v_vix_ratio = abs(net_vega) / metrics.vix
+            vvix_for_cap = metrics.vvix if metrics.vvix is not None else 0.0
+            metrics.v_vix_cap = _compute_v_vix_cap(
+                metrics.vix, nav_ref, metrics.vx1_gt_vx2, vvix_for_cap
+            )
+            if metrics.v_vix_cap > 0:
+                metrics.v_vix_utilization_pct = (
+                    metrics.v_vix_ratio / metrics.v_vix_cap
+                ) * 100.0
+            else:
+                metrics.v_vix_utilization_pct = 0.0
         else:
+            metrics.v_vix_ratio = 0.0
+            metrics.v_vix_cap = 0.0
             metrics.v_vix_utilization_pct = 0.0
 
-        # Compute risk state with hysteresis
-        metrics.risk_state = evaluate_hysteresis(
-            metrics.vix,
-            metrics.vx1_gt_vx2,
-            metrics.spx_return_pct,
-            as_of=as_of,
-        )
+        # Compute risk state with hysteresis when VIX is available
+        if metrics.vix is not None:
+            metrics.risk_state = evaluate_hysteresis(
+                metrics.vix,
+                metrics.vx1_gt_vx2,
+                metrics.spx_return_pct,
+                as_of=as_of,
+            )
 
         # θ metrics
         if nav_ref > 0:
             metrics.theta_nav_pct = (net_theta / nav_ref) * 100.0
 
         # θ adds blocked if VIX >= 30 or risk_state OFF
-        metrics.theta_adds_blocked = metrics.vix >= 30 or metrics.risk_state == "OFF"
+        if metrics.vix is not None:
+            metrics.theta_adds_blocked = metrics.vix >= 30 or metrics.risk_state == "OFF"
+        else:
+            metrics.theta_adds_blocked = metrics.risk_state == "OFF"
 
         return metrics
 

@@ -467,3 +467,9 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/service/rules_state.py
 **Status:** done
 **Notes:** keep risk_state deterministic for historical snapshots and summaries
+
+### 2026-01-15 • Task: Avoid default VIX when powerlaw missing • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** keep playbook metrics VIX/VVIX unset when powerlaw has no signals
+**Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/tests/service/test_playbook_metrics.py
+**Status:** done
+**Notes:** treat missing signals as None and guard V/VIX + hysteresis computations
