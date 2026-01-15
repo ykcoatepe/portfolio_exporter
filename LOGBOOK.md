@@ -461,3 +461,9 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** apps/web/src/components/RulesPanel.tsx
 **Status:** done
 **Notes:** selects breach symbol for fundamentals and scrolls to fundamentals section; RulesPanel tests pass
+
+### 2026-01-15 • Task: Thread rules hysteresis as_of into playbook metrics • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** pass RulesState evaluation timestamp into PlaybookMetrics hysteresis
+**Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/service/rules_state.py
+**Status:** done
+**Notes:** keep risk_state deterministic for historical snapshots and summaries

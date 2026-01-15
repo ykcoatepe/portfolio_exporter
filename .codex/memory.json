@@ -755,6 +755,15 @@
       "details": "Advance pending/session counters once per NY trading date; tests pass explicit as_of timestamps.",
       "event": "Gate hysteresis session counting",
       "timestamp": "2026-01-15T11:55:05Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-15T12:32:24Z"
+    },
+    {
+      "details": "Pass RulesState evaluation timestamp into PlaybookMetrics so hysteresis stays deterministic.",
+      "event": "Thread hysteresis as_of through rules",
+      "timestamp": "2026-01-15T12:33:58Z"
     }
   ],
   "decisions": [

@@ -367,7 +367,10 @@ class RulesState:
         # Spec says "NAV_ref recalibrated weekly". So static/config value is preferred over live fluctuating NAV.
 
         metrics = PlaybookMetrics.from_powerlaw(
-            powerlaw_snapshot, net_vega=vega_total, net_theta=theta_total
+            powerlaw_snapshot,
+            net_vega=vega_total,
+            net_theta=theta_total,
+            as_of=now,
         )
 
         has_signal_data = (

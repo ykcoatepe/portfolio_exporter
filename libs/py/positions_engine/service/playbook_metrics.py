@@ -157,6 +157,7 @@ class PlaybookMetrics:
         net_vega: float = 0.0,
         nav_ref: float = 206000.0,
         net_theta: float = 0.0,
+        as_of: datetime | None = None,
     ) -> PlaybookMetrics:
         """Build metrics from powerlaw snapshot signals.
 
@@ -171,6 +172,9 @@ class PlaybookMetrics:
                 ...
             }
         }
+
+        Use ``as_of`` to keep hysteresis evaluation aligned with the caller's
+        evaluation timestamp (e.g., deterministic rule summaries).
         """
         metrics = cls(nav_ref=nav_ref, net_vega=net_vega)
 
@@ -245,7 +249,10 @@ class PlaybookMetrics:
 
         # Compute risk state with hysteresis
         metrics.risk_state = evaluate_hysteresis(
-            metrics.vix, metrics.vx1_gt_vx2, metrics.spx_return_pct
+            metrics.vix,
+            metrics.vx1_gt_vx2,
+            metrics.spx_return_pct,
+            as_of=as_of,
         )
 
         # θ metrics
