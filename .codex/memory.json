@@ -784,6 +784,10 @@
       "details": "Ensure coerceNullableNumber preserves null/empty values and reset RulesPanel selection when breach IDs change.",
       "event": "Preserve null metrics and reset breach selection",
       "timestamp": "2026-01-15T14:51:32Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-15T14:55:27Z"
     }
   ],
   "decisions": [

@@ -74,7 +74,7 @@ def test_hysteresis_state_machine():
 def test_hysteresis_counts_first_signal_session():
     """Ensure first signal day counts even after earlier same-day eval."""
     reset_hysteresis("ON")
-    start = datetime(2026, 1, 2, tzinfo=UTC)
+    start = datetime(2026, 1, 2, 14, tzinfo=UTC)
 
     # Morning eval: no signal
     assert evaluate_hysteresis(15, False, 0.0, as_of=start) == "ON"

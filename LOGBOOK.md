@@ -491,3 +491,9 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** apps/web/src/hooks/useRules.ts, apps/web/src/components/RulesPanel.tsx
 **Status:** done
 **Notes:** coerceNullableNumber preserves null/empty; selection reset depends on breach IDs
+
+### 2026-01-15 • Task: Align hysteresis same-day test with NY session date • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** keep same-day hysteresis test within the same NY session
+**Interfaces:** libs/py/positions_engine/tests/service/test_playbook_metrics.py
+**Status:** done
+**Notes:** shift test start time to 14:00 UTC so +6h stays on the same NY trading date
