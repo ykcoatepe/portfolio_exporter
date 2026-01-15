@@ -95,6 +95,12 @@ const coerceNumber = (value: unknown, fallback = 0): number => {
 };
 
 const coerceNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "string" && value.trim() === "") {
+    return null;
+  }
   const next = Number(value);
   if (Number.isFinite(next)) {
     return next;

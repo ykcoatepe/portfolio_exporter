@@ -144,6 +144,10 @@ export function RulesPanel(): JSX.Element {
   const [validationTimestamp, setValidationTimestamp] = useState<string | null>(null);
 
   const topBreaches = useMemo(() => (summary?.top ?? []).slice(0, 5), [summary?.top]);
+  const topBreachesKey = useMemo(
+    () => topBreaches.map((breach) => breach.id).join("|"),
+    [topBreaches],
+  );
   const focusSymbols = useMemo(() => {
     const fromSummary = Array.isArray(summary?.focus_symbols)
       ? summary?.focus_symbols.filter((symbol): symbol is string => typeof symbol === "string")
@@ -169,7 +173,7 @@ export function RulesPanel(): JSX.Element {
     setActiveIndex(0);
     setSelectedSymbol(null);
     setSelectedBreach(null);
-  }, [topBreaches.length]);
+  }, [topBreachesKey]);
 
   useEffect(() => {
     if (isCatalogPanelOpen && !catalogText && !shouldFetchRaw) {

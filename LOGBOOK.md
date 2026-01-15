@@ -485,3 +485,9 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/tests/service/test_playbook_metrics.py
 **Status:** done
 **Notes:** track pending_session_key to count once per session
+
+### 2026-01-15 • Task: Preserve null metrics + reset breach selection • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** keep null playbook metrics in UI and reset RulesPanel selection when breach IDs change
+**Interfaces:** apps/web/src/hooks/useRules.ts, apps/web/src/components/RulesPanel.tsx
+**Status:** done
+**Notes:** coerceNullableNumber preserves null/empty; selection reset depends on breach IDs

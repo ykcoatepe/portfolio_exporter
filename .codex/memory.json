@@ -779,6 +779,11 @@
       "details": "Track pending_session_key so the first signal day counts once even with earlier same-day evals; add test.",
       "event": "Count first hysteresis signal session",
       "timestamp": "2026-01-15T14:36:39Z"
+    },
+    {
+      "details": "Ensure coerceNullableNumber preserves null/empty values and reset RulesPanel selection when breach IDs change.",
+      "event": "Preserve null metrics and reset breach selection",
+      "timestamp": "2026-01-15T14:51:32Z"
     }
   ],
   "decisions": [
