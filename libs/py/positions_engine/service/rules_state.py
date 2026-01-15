@@ -390,12 +390,6 @@ class RulesState:
                 "value": theta_total,
                 "triggered_at": now,
                 "notes": f"net θ {theta_total:.1f} | State {metrics.risk_state}",
-                # Re-add computed basics if needed
-                "liquidity_nav_pct": row.get("liquidity_nav_pct", 0.0), # metrics doesn't calc this yet, use external?
-                # Wait, PlaybookMetrics doesn't do liquidity/cash yet unless we add it.
-                # Existing rule check: liquidity_nav_pct < 12.
-                # We should preserve any existing calculations or add to PlaybookMetrics if we want them handled there.
-                # For now, just ensuring basics.
             }
         )
 

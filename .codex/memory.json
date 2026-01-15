@@ -769,6 +769,11 @@
       "details": "Unset VIX/VVIX when signals missing and guard V/VIX + hysteresis computations; updated tests.",
       "event": "Avoid default VIX on missing powerlaw",
       "timestamp": "2026-01-15T13:48:28Z"
+    },
+    {
+      "details": "Stop hardcoding liquidity_nav_pct in PORT rows; default missing liquidity/options theta to None and map sleeve-theta rule to theta_nav_pct.",
+      "event": "Fix liquidity/theta rule defaults",
+      "timestamp": "2026-01-15T14:04:52Z"
     }
   ],
   "decisions": [

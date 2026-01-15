@@ -473,3 +473,9 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/tests/service/test_playbook_metrics.py
 **Status:** done
 **Notes:** treat missing signals as None and guard V/VIX + hysteresis computations
+
+### 2026-01-15 • Task: Fix liquidity/theta rule defaults • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** stop hardcoding liquidity_nav_pct and map sleeve-theta rule to theta_nav_pct
+**Interfaces:** libs/py/positions_engine/service/rules_state.py, libs/py/positions_engine/rules/eval.py, libs/py/positions_engine/rules/catalog.yaml
+**Status:** done
+**Notes:** default missing liquidity/options theta metrics to None to avoid false breaches
