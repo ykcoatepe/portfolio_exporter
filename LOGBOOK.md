@@ -479,3 +479,9 @@ Risks/Notes: keep files ≤150 LOC; no orphan-leg logic yet
 **Interfaces:** libs/py/positions_engine/service/rules_state.py, libs/py/positions_engine/rules/eval.py, libs/py/positions_engine/rules/catalog.yaml
 **Status:** done
 **Notes:** default missing liquidity/options theta metrics to None to avoid false breaches
+
+### 2026-01-15 • Task: Count first hysteresis signal session • Branch: feature/playbook-v4-rules-wiring
+**Owner:** session/codex | **Scope:** ensure hysteresis counts the first signal day even if earlier evals ran
+**Interfaces:** libs/py/positions_engine/service/playbook_metrics.py, libs/py/positions_engine/tests/service/test_playbook_metrics.py
+**Status:** done
+**Notes:** track pending_session_key to count once per session

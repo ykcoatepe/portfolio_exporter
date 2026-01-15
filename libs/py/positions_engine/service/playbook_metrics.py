@@ -28,6 +28,7 @@ class HysteresisState:
     sessions_in_state: int = 0
     pending_transition: str | None = None
     pending_sessions: int = 0
+    pending_session_key: date | None = None
     last_updated: datetime | None = None
 
 
@@ -86,6 +87,7 @@ def evaluate_hysteresis(
 
     now = as_of or datetime.now(tz=UTC)
     last_updated = _HYSTERESIS_STATE.last_updated
+    session_key = _session_key(now)
     is_new_session = last_updated is None or _session_key(now) != _session_key(
         last_updated
     )
@@ -98,19 +100,23 @@ def evaluate_hysteresis(
         # No transition signal; reset pending
         _HYSTERESIS_STATE.pending_transition = None
         _HYSTERESIS_STATE.pending_sessions = 0
+        _HYSTERESIS_STATE.pending_session_key = None
     elif target == _HYSTERESIS_STATE.pending_transition:
         # Same target; increment counter once per session
-        if is_new_session:
+        if _HYSTERESIS_STATE.pending_session_key != session_key:
             _HYSTERESIS_STATE.pending_sessions += 1
+            _HYSTERESIS_STATE.pending_session_key = session_key
         if _HYSTERESIS_STATE.pending_sessions >= _HYSTERESIS_THRESHOLD:
             _HYSTERESIS_STATE.risk_state = target
             _HYSTERESIS_STATE.sessions_in_state = 0
             _HYSTERESIS_STATE.pending_transition = None
             _HYSTERESIS_STATE.pending_sessions = 0
+            _HYSTERESIS_STATE.pending_session_key = None
     else:
-        # New target; start pending (count only if session advanced)
+        # New target; start pending and count this session once
         _HYSTERESIS_STATE.pending_transition = target
-        _HYSTERESIS_STATE.pending_sessions = 1 if is_new_session else 0
+        _HYSTERESIS_STATE.pending_sessions = 1
+        _HYSTERESIS_STATE.pending_session_key = session_key
 
     if is_new_session:
         _HYSTERESIS_STATE.sessions_in_state += 1

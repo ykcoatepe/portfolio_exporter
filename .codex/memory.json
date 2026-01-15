@@ -774,6 +774,11 @@
       "details": "Stop hardcoding liquidity_nav_pct in PORT rows; default missing liquidity/options theta to None and map sleeve-theta rule to theta_nav_pct.",
       "event": "Fix liquidity/theta rule defaults",
       "timestamp": "2026-01-15T14:04:52Z"
+    },
+    {
+      "details": "Track pending_session_key so the first signal day counts once even with earlier same-day evals; add test.",
+      "event": "Count first hysteresis signal session",
+      "timestamp": "2026-01-15T14:36:39Z"
     }
   ],
   "decisions": [

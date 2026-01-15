@@ -71,6 +71,24 @@ def test_hysteresis_state_machine():
     assert evaluate_hysteresis(31, False, 0.0, as_of=start + timedelta(days=6)) == "OFF"
 
 
+def test_hysteresis_counts_first_signal_session():
+    """Ensure first signal day counts even after earlier same-day eval."""
+    reset_hysteresis("ON")
+    start = datetime(2026, 1, 2, tzinfo=UTC)
+
+    # Morning eval: no signal
+    assert evaluate_hysteresis(15, False, 0.0, as_of=start) == "ON"
+    # Later same session: signal appears and should count as session 1
+    assert evaluate_hysteresis(31, False, 0.0, as_of=start + timedelta(hours=6)) == "ON"
+    # Session 2
+    assert evaluate_hysteresis(31, False, 0.0, as_of=start + timedelta(days=1)) == "ON"
+    # Session 3 -> transition to NEUTRAL
+    assert (
+        evaluate_hysteresis(31, False, 0.0, as_of=start + timedelta(days=2))
+        == "NEUTRAL"
+    )
+
+
 def test_metrics_from_powerlaw():
     """Verify metrics extraction from powerlaw dict."""
     reset_hysteresis("ON")
