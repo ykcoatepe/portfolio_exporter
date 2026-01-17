@@ -13,6 +13,7 @@ def test_rollup_and_eod_digest(tmp_path: Path):
         "memo_path": str(memo_path),
         "rollup_digest": True,
         "eod_digest": True,
+        "data": {"offline": True},
         "kpi_memos": [
             {"sleeve": "theta", "R": 0.5, "win": True, "theta_roc": 0.01, "nav": 1000}
         ],

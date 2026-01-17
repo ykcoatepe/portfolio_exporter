@@ -15,7 +15,7 @@ def test_internal_provider_precedence(monkeypatch):
     """Internal provider should populate PSD endpoints without CSV uploads."""
 
     if os.getenv("PE_TEST_MODE") == "1":
-        pytest.skip("Internal provider precedence requires PE_TEST_MODE unset")
+        monkeypatch.delenv("PE_TEST_MODE", raising=False)
 
     positions_view = {
         "single_stocks": [

@@ -41,6 +41,8 @@ def get_closes(
     monkeypatch this to return a synthetic series.
     """
     try:
+        if cfg and cfg.get("data", {}).get("offline"):
+            return []
         import yfinance as yf  # type: ignore
 
         period = f"{max(days, 30)}d"

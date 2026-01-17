@@ -788,6 +788,24 @@
     {
       "event": "session_start",
       "timestamp": "2026-01-15T14:55:27Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-17T03:40:41Z"
+    },
+    {
+      "event": "session_start",
+      "timestamp": "2026-01-17T04:03:36Z"
+    },
+    {
+      "details": "Honor offline in yfin.get_closes; mark digest scan offline; avoid engine cache lock deadlock; stub yfinance history in quote option fallback; reran full test suite with PE_TEST_MODE=0.",
+      "event": "Fix PSD test hangs and yfinance rate limits",
+      "timestamp": "2026-01-17T05:24:16Z"
+    },
+    {
+      "details": "Create awaitables inside the worker thread when a running loop exists so snapshot_once is always awaited, eliminating RuntimeWarning.",
+      "event": "Avoid unawaited coroutine in internal ingest",
+      "timestamp": "2026-01-17T05:30:15Z"
     }
   ],
   "decisions": [
@@ -1368,6 +1386,14 @@
       "rationale": "Prevent repeated API calls from counting as multiple sessions.",
       "timestamp": "2026-01-15T11:55:05Z",
       "title": "Gate hysteresis by session date"
+    },
+    {
+      "context": "Test suite with gateway online",
+      "decision": "Honor offline config for Yahoo closes and patch option fallback history to keep tests hermetic; reduce engine state lock scope to avoid deadlocks when API refresh threads run.",
+      "id": 75,
+      "rationale": "PE_TEST_MODE=0 runs were timing out on yfinance rate limits and _ENGINE_STATE_LOCK contention.",
+      "timestamp": "2026-01-17T05:24:10Z",
+      "title": "Avoid network calls in PSD tests"
     }
   ],
   "preferences": {

@@ -53,6 +53,11 @@ def test_sentinel_posts_thread_ts(monkeypatch, tmp_path: Path):
         fake_emit,
         raising=True,
     )
+    monkeypatch.setattr(
+        "portfolio_exporter.scripts.micro_momo_sentinel.is_after",
+        lambda *_args, **_kwargs: False,
+        raising=True,
+    )
 
     # Stop the loop after first iteration
     def stop_sleep(_):  # noqa: ANN001

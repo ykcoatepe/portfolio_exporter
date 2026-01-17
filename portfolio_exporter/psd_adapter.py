@@ -111,28 +111,28 @@ def _apply_marks_to_positions(
 
 def _get_positions_engine_state() -> Any | None:
     global _ENGINE_STATE_CACHE
-    if _ENGINE_STATE_CACHE is not _UNSET:
-        return cast(Any | None, _ENGINE_STATE_CACHE)
-    with _ENGINE_STATE_LOCK:
-        if _ENGINE_STATE_CACHE is not _UNSET:
-            return cast(Any | None, _ENGINE_STATE_CACHE)
+    cached = _ENGINE_STATE_CACHE
+    if cached is not _UNSET:
+        return cast(Any | None, cached)
+    try:
+        module = importlib.import_module("apps.api.main")
+    except Exception as exc:  # pragma: no cover - optional dependency
+        logger.debug("positions engine state unavailable: %s", exc)
+        return None
+    state = getattr(module, "_state", None)
+    refresh = getattr(module, "_refresh_from_disk", None)
+    if callable(refresh):
         try:
-            module = importlib.import_module("apps.api.main")
-        except Exception as exc:  # pragma: no cover - optional dependency
-            logger.debug("positions engine state unavailable: %s", exc)
-            return None
-        state = getattr(module, "_state", None)
-        refresh = getattr(module, "_refresh_from_disk", None)
-        if callable(refresh):
-            try:
-                refresh()
-            except Exception as exc:  # pragma: no cover - defensive logging
-                logger.debug("positions engine refresh failed: %s", exc)
-            else:
-                state = getattr(module, "_state", state)
-        if state is None:
-            return None
-        _ENGINE_STATE_CACHE = state
+            refresh()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug("positions engine refresh failed: %s", exc)
+        else:
+            state = getattr(module, "_state", state)
+    if state is None:
+        return None
+    with _ENGINE_STATE_LOCK:
+        if _ENGINE_STATE_CACHE is _UNSET:
+            _ENGINE_STATE_CACHE = state
         return cast(Any | None, _ENGINE_STATE_CACHE)
 
 

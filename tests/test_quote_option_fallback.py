@@ -30,5 +30,9 @@ def test_quote_option_fallback(monkeypatch):
         )
 
     monkeypatch.setattr("yfinance.Ticker.option_chain", fake_chain)
+    monkeypatch.setattr(
+        "yfinance.Ticker.history",
+        lambda *_args, **_kwargs: pd.DataFrame({"Close": [100.0]}),
+    )
     q = core_ib.quote_option("FAKE", "2099-01-01", 100, "C")
     assert math.isclose(q["mid"], 1.1, rel_tol=1e-8)

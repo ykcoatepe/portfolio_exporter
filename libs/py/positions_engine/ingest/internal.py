@@ -551,28 +551,33 @@ class InternalScriptsProvider:
             return None
 
     def _invoke_callable(self, fn: Any) -> Any:
-        result = fn()
-        if isawaitable(result):
-            try:
-                asyncio.get_running_loop()
-            except RuntimeError:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            result = fn()
+            if isawaitable(result):
                 return asyncio.run(result)
-            container: dict[str, Any] = {}
-            error: list[BaseException] = []
+            return result
 
-            def _runner() -> None:
-                try:
+        container: dict[str, Any] = {}
+        error: list[BaseException] = []
+
+        def _runner() -> None:
+            try:
+                result = fn()
+                if isawaitable(result):
                     container["value"] = asyncio.run(result)
-                except BaseException as exc:  # pragma: no cover - defensive propagation
-                    error.append(exc)
+                else:
+                    container["value"] = result
+            except BaseException as exc:  # pragma: no cover - defensive propagation
+                error.append(exc)
 
-            thread = threading.Thread(target=_runner, daemon=True)
-            thread.start()
-            thread.join()
-            if error:
-                raise error[0]
-            return container.get("value")
-        return result
+        thread = threading.Thread(target=_runner, daemon=True)
+        thread.start()
+        thread.join()
+        if error:
+            raise error[0]
+        return container.get("value")
 
     def _load_via_cli(self, module_name: str) -> dict[str, Any] | None:
         try:
