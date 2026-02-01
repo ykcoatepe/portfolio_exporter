@@ -221,7 +221,7 @@ test.describe("PSD Stocks Grid", () => {
         await filterInput.fill("AAPL");
 
         await expect(page.locator('[role="row"][data-rowid="stock:1002"]')).toHaveCount(0);
-        await expect(page.locator('[role="row"][aria-selected=\"true\"]')).toHaveCount(0);
+        await expect(grid.locator('[role="row"][aria-selected=\"true\"]')).toHaveCount(0);
     });
 
     test("filter preserves selection for visible rows and context menu targets correctly", async ({ page }) => {
