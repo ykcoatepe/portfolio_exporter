@@ -74,7 +74,7 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Click first cell to focus
-        const firstRow = page.locator('[data-rowid="stock:1001"]').first();
+        const firstRow = page.locator('[role="row"][data-rowid="stock:1001"]').first();
         await expect(firstRow).toBeVisible();
         await firstRow.click();
 
@@ -100,7 +100,7 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Focus first row
-        const firstRow = page.locator('[data-rowid="stock:1001"]').first();
+        const firstRow = page.locator('[role="row"][data-rowid="stock:1001"]').first();
         await firstRow.click();
 
         // PageDown
@@ -131,7 +131,7 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Focus a specific row
-        const targetRow = page.locator('[data-rowid="stock:1002"]').first();
+        const targetRow = page.locator('[role="row"][data-rowid="stock:1002"]').first();
         await targetRow.click();
 
         // Record the focused rowId before refetch
@@ -165,7 +165,7 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Click a row
-        const targetRow = page.locator('[data-rowid="stock:1002"]').first();
+        const targetRow = page.locator('[role="row"][data-rowid="stock:1002"]').first();
         await targetRow.click();
 
         // Check aria-selected
@@ -189,16 +189,16 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Click first row (anchor)
-        const row1 = page.locator('[data-rowid="stock:1001"]').first();
+        const row1 = page.locator('[role="row"][data-rowid="stock:1001"]').first();
         await row1.click();
 
         // Shift+click third row (extend range)
-        const row3 = page.locator('[data-rowid="stock:1003"]').first();
+        const row3 = page.locator('[role="row"][data-rowid="stock:1003"]').first();
         await row3.click({ modifiers: ["Shift"] });
 
         // All three rows should be selected
         await expect(row1).toHaveAttribute("aria-selected", "true");
-        const row2 = page.locator('[data-rowid="stock:1002"]').first();
+        const row2 = page.locator('[role="row"][data-rowid="stock:1002"]').first();
         await expect(row2).toHaveAttribute("aria-selected", "true");
         await expect(row3).toHaveAttribute("aria-selected", "true");
     });
@@ -213,14 +213,14 @@ test.describe("PSD Stocks Grid", () => {
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
-        const targetRow = page.locator('[data-rowid="stock:1002"]').first();
+        const targetRow = page.locator('[role="row"][data-rowid="stock:1002"]').first();
         await targetRow.click();
         await expect(targetRow).toHaveAttribute("aria-selected", "true");
 
         const filterInput = page.getByLabel("Filter symbols");
         await filterInput.fill("AAPL");
 
-        await expect(page.locator('[data-rowid="stock:1002"]')).toHaveCount(0);
+        await expect(page.locator('[role="row"][data-rowid="stock:1002"]')).toHaveCount(0);
         await expect(page.locator('[role="row"][aria-selected=\"true\"]')).toHaveCount(0);
     });
 
@@ -234,14 +234,14 @@ test.describe("PSD Stocks Grid", () => {
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
-        const aaplRow = page.locator('[data-rowid="stock:1001"]').first();
+        const aaplRow = page.locator('[role="row"][data-rowid="stock:1001"]').first();
         await aaplRow.click();
         await expect(aaplRow).toHaveAttribute("aria-selected", "true");
 
         const filterInput = page.getByLabel("Filter symbols");
         await filterInput.fill("AAPL");
 
-        await expect(page.locator('[data-rowid="stock:1001"]')).toHaveCount(1);
+        await expect(page.locator('[role="row"][data-rowid="stock:1001"]')).toHaveCount(1);
         await expect(aaplRow).toHaveAttribute("aria-selected", "true");
 
         await aaplRow.click({ button: "right" });
@@ -261,7 +261,7 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Select a row
-        const targetRow = page.locator('[data-rowid="stock:1002"]').first();
+        const targetRow = page.locator('[role="row"][data-rowid="stock:1002"]').first();
         await targetRow.click();
         await expect(targetRow).toHaveAttribute("aria-selected", "true");
 
@@ -286,7 +286,7 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Right-click a row
-        const targetRow = page.locator('[data-rowid="stock:1002"]').first();
+        const targetRow = page.locator('[role="row"][data-rowid="stock:1002"]').first();
         await targetRow.click({ button: "right" });
 
         // Menu should appear
@@ -309,11 +309,11 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Select first row
-        const row1 = page.locator('[data-rowid="stock:1001"]').first();
+        const row1 = page.locator('[role="row"][data-rowid="stock:1001"]').first();
         await row1.click();
 
         // Shift+click third row for range
-        const row3 = page.locator('[data-rowid="stock:1003"]').first();
+        const row3 = page.locator('[role="row"][data-rowid="stock:1003"]').first();
         await row3.click({ modifiers: ["Shift"] });
 
         // Right-click selected row
@@ -335,7 +335,7 @@ test.describe("PSD Stocks Grid", () => {
         await expect(grid).toBeVisible({ timeout: 10_000 });
 
         // Right-click a row
-        const targetRow = page.locator('[data-rowid="stock:1002"]').first();
+        const targetRow = page.locator('[role="row"][data-rowid="stock:1002"]').first();
         await targetRow.click({ button: "right" });
 
         const menu = page.locator('[data-testid="grid-context-menu"]');
