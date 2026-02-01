@@ -287,6 +287,8 @@ test.describe("PSD Stocks Grid", () => {
 
         // Right-click a row
         const targetRow = page.locator('[role="row"][data-rowid="stock:1002"]').first();
+        await targetRow.click();
+        await expect(targetRow).toHaveAttribute("aria-selected", "true");
         await targetRow.click({ button: "right" });
 
         // Menu should appear
@@ -336,6 +338,8 @@ test.describe("PSD Stocks Grid", () => {
 
         // Right-click a row
         const targetRow = page.locator('[role="row"][data-rowid="stock:1002"]').first();
+        await targetRow.click();
+        await expect(targetRow).toHaveAttribute("aria-selected", "true");
         await targetRow.click({ button: "right" });
 
         const menu = page.locator('[data-testid="grid-context-menu"]');
