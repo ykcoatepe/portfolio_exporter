@@ -279,7 +279,9 @@ def _download_close_series_ibkr_future(
     today_trading_day = _latest_trading_day()
     contracts = []
     for detail in details:
-        expiry = _parse_future_expiry(detail.contract.lastTradeDateOrContractMonth).date()
+        expiry = _parse_future_expiry(
+            detail.contract.lastTradeDateOrContractMonth
+        ).date()
         if expiry >= today_trading_day:
             contracts.append((expiry, detail.contract))
     contracts.sort(key=lambda item: item[0])
@@ -397,11 +399,15 @@ def refresh_vendor_data(
 
     vx1_override = str(env_map.get("MSB_VX1_TICKER", "")).strip()
     vx2_override = str(env_map.get("MSB_VX2_TICKER", "")).strip()
-    vx1_tickers = [vx1_override] if vx1_override else _env_list(
-        env_map, "MSB_VX1_TICKERS", _DEFAULT_VX1_TICKERS
+    vx1_tickers = (
+        [vx1_override]
+        if vx1_override
+        else _env_list(env_map, "MSB_VX1_TICKERS", _DEFAULT_VX1_TICKERS)
     )
-    vx2_tickers = [vx2_override] if vx2_override else _env_list(
-        env_map, "MSB_VX2_TICKERS", _DEFAULT_VX2_TICKERS
+    vx2_tickers = (
+        [vx2_override]
+        if vx2_override
+        else _env_list(env_map, "MSB_VX2_TICKERS", _DEFAULT_VX2_TICKERS)
     )
 
     ib_client = _connect_ibkr(env_map) if msb_source == "ibkr" else None
@@ -411,8 +417,10 @@ def refresh_vendor_data(
     ib_use_rth = _env_flag(env_map, "MSB_IBKR_USE_RTH", _DEFAULT_IBKR_USE_RTH)
 
     vx_root_override = str(env_map.get("MSB_IBKR_VX_ROOT", "")).strip()
-    vx_roots = [vx_root_override] if vx_root_override else _env_list(
-        env_map, "MSB_IBKR_VX_ROOTS", _DEFAULT_IBKR_VX_ROOTS
+    vx_roots = (
+        [vx_root_override]
+        if vx_root_override
+        else _env_list(env_map, "MSB_IBKR_VX_ROOTS", _DEFAULT_IBKR_VX_ROOTS)
     )
     vx_exchange = str(
         env_map.get("MSB_IBKR_VX_EXCHANGE", _DEFAULT_IBKR_VX_EXCHANGE)
@@ -487,7 +495,9 @@ def refresh_vendor_data(
                         continue
                     try:
                         series = _download_close_series_yf(ticker, period)
-                    except Exception as exc:  # pragma: no cover - depends on network/env
+                    except (
+                        Exception
+                    ) as exc:  # pragma: no cover - depends on network/env
                         _LOG.warning("VX1 refresh failed: %s", exc)
                         status["vx1"] = "error"
                         series = pd.Series(dtype=float)
@@ -550,7 +560,9 @@ def refresh_vendor_data(
                         continue
                     try:
                         series = _download_close_series_yf(ticker, period)
-                    except Exception as exc:  # pragma: no cover - depends on network/env
+                    except (
+                        Exception
+                    ) as exc:  # pragma: no cover - depends on network/env
                         _LOG.warning("VX2 refresh failed: %s", exc)
                         status["vx2"] = "error"
                         series = pd.Series(dtype=float)
@@ -567,8 +579,10 @@ def refresh_vendor_data(
         status["vx2"] = "disabled"
 
     spx_override = str(env_map.get("MSB_SPX_TICKER", "")).strip()
-    spx_tickers = [spx_override] if spx_override else _env_list(
-        env_map, "MSB_SPX_TICKERS", _DEFAULT_SPX_TICKERS
+    spx_tickers = (
+        [spx_override]
+        if spx_override
+        else _env_list(env_map, "MSB_SPX_TICKERS", _DEFAULT_SPX_TICKERS)
     )
     spx_path = vendor_dir / "spx_ret.csv"
     if spx_tickers:
@@ -594,7 +608,9 @@ def refresh_vendor_data(
                         continue
                     try:
                         series = _download_close_series_yf(ticker, period)
-                    except Exception as exc:  # pragma: no cover - depends on network/env
+                    except (
+                        Exception
+                    ) as exc:  # pragma: no cover - depends on network/env
                         _LOG.warning("SPX return refresh failed: %s", exc)
                         status["spx_ret"] = "error"
                         series = pd.Series(dtype=float)

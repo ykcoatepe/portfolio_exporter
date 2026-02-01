@@ -397,17 +397,17 @@ def _build_session_info(session_state: Session) -> dict[str, Any]:
     tz_str = "America/New_York"
     tz = ZoneInfo(tz_str)
     local_now = now.astimezone(tz)
-    
+
     # Calculate RTH window for today
     rth_open = local_now.replace(hour=9, minute=30, second=0, microsecond=0)
     rth_close = local_now.replace(hour=16, minute=0, second=0, microsecond=0)
-    
+
     override = os.getenv("PSD_SESSION", "").strip().upper()
     source = "env" if override in _ALLOWED_SESSIONS else "clock"
-    
+
     # Frontend expects ETH (Extended Trading Hours), not EXT
     state_for_frontend = "ETH" if session_state == "EXT" else session_state
-    
+
     return {
         "exchange": "NYSE",
         "tz": tz_str,

@@ -120,7 +120,7 @@ def test_rules_summary_returns_counters_and_top(
     api_main._rules_state.set_rules(rules)
 
     def fake_build_rows(
-        self: RulesState, 
+        self: RulesState,
         _timestamp: datetime,
         powerlaw_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, list[dict[str, object]]]:

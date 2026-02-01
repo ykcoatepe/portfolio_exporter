@@ -151,7 +151,9 @@ def _ensure_uvicorn_runtime(console: Console) -> bool:
             cwd=str(REPO_ROOT),
         )
     except subprocess.CalledProcessError as exc:
-        console.print(f"[red]Failed to install runtime deps (exit {exc.returncode}).[/red]")
+        console.print(
+            f"[red]Failed to install runtime deps (exit {exc.returncode}).[/red]"
+        )
         return False
     return True
 
@@ -439,7 +441,9 @@ def show_status(console: Console) -> None:
             statuses.append((service, str(pid), "alive" if alive else "stopped"))
     ui_pid = data.get(UI_SERVICE)
     if isinstance(ui_pid, int):
-        statuses.append((UI_SERVICE, str(ui_pid), "alive" if _alive(ui_pid) else "stopped"))
+        statuses.append(
+            (UI_SERVICE, str(ui_pid), "alive" if _alive(ui_pid) else "stopped")
+        )
     elif _is_dev_mode():
         statuses.append((UI_SERVICE, "n/a", "external"))
     if all(state != "alive" for _, _, state in statuses):
@@ -515,7 +519,9 @@ def open_dashboard(console: Console) -> None:
     if _is_dev_mode():
         dev_port = _dev_port_from_env()
         url = f"http://{DEV_HOST}:{dev_port}/psd"
-        console.print("[cyan]Opening Vite dev server (PSD_DEV_MODE=1 or detected).[/cyan]")
+        console.print(
+            "[cyan]Opening Vite dev server (PSD_DEV_MODE=1 or detected).[/cyan]"
+        )
     else:
         _ensure_frontend_build(console)
         data = _load_pid_file()
@@ -579,7 +585,9 @@ def start_psd(
         )
     )
     if not _ensure_uvicorn_runtime(console):
-        console.print("[red]PSD web server prerequisites missing. Aborting start.[/red]")
+        console.print(
+            "[red]PSD web server prerequisites missing. Aborting start.[/red]"
+        )
         return
     running: dict[str, int] = {}
     if _dev_mode_requested(child_env):

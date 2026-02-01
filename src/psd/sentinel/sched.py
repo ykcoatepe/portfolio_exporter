@@ -454,7 +454,11 @@ def run_msb_scheduler_once(
             latest_iso = latest_date.isoformat()
             history_count = len(store.read_msb_history(days=365))
             backfill_needed = history_count <= 1 and len(df) > 1
-            if current and str(current.get("date")) == latest_iso and not backfill_needed:
+            if (
+                current
+                and str(current.get("date")) == latest_iso
+                and not backfill_needed
+            ):
                 _log_scheduler("skipped", reason="already_up_to_date", date=latest_iso)
                 MSB_SCHEDULER_RUNS.inc()
                 return False

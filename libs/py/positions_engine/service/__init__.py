@@ -19,4 +19,3 @@ __all__ = [
     "quotes_from_records",
     "reset_hysteresis",
 ]
-

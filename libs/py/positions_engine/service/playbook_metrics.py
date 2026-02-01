@@ -273,7 +273,9 @@ class PlaybookMetrics:
 
         # θ adds blocked if VIX >= 30 or risk_state OFF
         if metrics.vix is not None:
-            metrics.theta_adds_blocked = metrics.vix >= 30 or metrics.risk_state == "OFF"
+            metrics.theta_adds_blocked = (
+                metrics.vix >= 30 or metrics.risk_state == "OFF"
+            )
         else:
             metrics.theta_adds_blocked = metrics.risk_state == "OFF"
 

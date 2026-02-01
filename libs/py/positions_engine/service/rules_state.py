@@ -335,7 +335,9 @@ class RulesState:
             for leg in orphan_legs:
                 if leg.theta is None:
                     continue
-                theta_total += _decimal_to_float(leg.theta * leg.quantity * leg.multiplier)
+                theta_total += _decimal_to_float(
+                    leg.theta * leg.quantity * leg.multiplier
+                )
 
         # Calculate Net Vega for V/VIX ratio
         # Sum of vega from all legs (combos + orphans)
@@ -355,7 +357,9 @@ class RulesState:
                 # Let's assume leg.vega available is per-unit.
                 # Actually sum_vega in combo is pre-calculated.
                 # For orphan legs:
-                vega_total += _decimal_to_float(leg.vega * leg.quantity * leg.multiplier)
+                vega_total += _decimal_to_float(
+                    leg.vega * leg.quantity * leg.multiplier
+                )
 
         # Compute Playbook metrics
         # Use default NAV_ref (206k) if finding net liq is complex, or pass it in?

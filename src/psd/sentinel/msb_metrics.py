@@ -10,6 +10,7 @@ MSB_ALERTS = Counter("psd_msb_alerts_total", "MSB alerts emitted", ["rule"])
 
 LIVEBAR_ROWS = Counter("psd_livebar_rows_total", "Live Status Bar rows written")
 
+
 def _gauge(name: str, help_text: str) -> Gauge:
     existing = REGISTRY._names_to_collectors.get(name)  # type: ignore[attr-defined]
     if existing is not None:

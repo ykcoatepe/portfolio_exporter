@@ -60,6 +60,7 @@ if str(_LIBS_PATH) not in sys.path:
 try:
     from positions_engine.rules.catalog import load_catalog
     from positions_engine.service import PositionsState, RulesState
+
     _RULES_ENGINE_AVAILABLE = True
 except ImportError as _import_err:
     log.debug("positions_engine import failed: %s", _import_err)
@@ -564,6 +565,7 @@ def _set_msb_refresh_state(
         if dt.tzinfo is None:
             return dt.replace(tzinfo=UTC)
         return dt.astimezone(UTC)
+
     record = read_msb_current()
     last_date = record.get("date") if record else None
     ts = _record_ts(record)
@@ -589,6 +591,7 @@ def _create_lifespan(settings: Settings) -> Any:
         init()
         start_msb_scheduler(_app)
         if settings.msb_startup_refresh:
+
             def _startup_refresh() -> None:
                 try:  # ensure ib_insync has an event loop inside thread
                     import asyncio
@@ -1008,7 +1011,7 @@ def _merge_powerlaw_msb(
 def rules_summary() -> dict:
     """Return rules summary with real evaluation if engine available."""
     now = datetime.now(UTC)
-    
+
     if not _RULES_ENGINE_AVAILABLE:
         return {
             "rules_total": 0,
@@ -1017,7 +1020,7 @@ def rules_summary() -> dict:
             "as_of": now.isoformat(),
             "focus_symbols": [],
         }
-    
+
     # Load powerlaw snapshot for metrics
     powerlaw = None
     try:
@@ -1031,7 +1034,7 @@ def rules_summary() -> dict:
     except Exception:
         log.debug("msb snapshot load failed for rules", exc_info=True)
     powerlaw = _merge_powerlaw_msb(powerlaw, msb)
-    
+
     # Create positions state from latest snapshot
     snap = latest_snapshot()
     positions_raw = snap.get("positions", []) if snap else []
@@ -1065,12 +1068,14 @@ def rules_summary() -> dict:
                 positions=positions_from_records(positions),
                 quotes=quotes_from_records(quote_records),
                 snapshot_at=now,
-                data_source=str(snap.get("data_source") or "snapshot") if snap else None,
+                data_source=str(snap.get("data_source") or "snapshot")
+                if snap
+                else None,
             )
         except Exception as exc:
             log.warning("rules snapshot normalization failed: %s", exc)
             positions_state = PositionsState()
-    
+
     try:
         catalog = load_catalog()
         rules_state = RulesState(positions_state, rules=catalog.rules)
@@ -1110,7 +1115,9 @@ def rules_summary() -> dict:
 
         return {
             "rules_total": summary.get("rules_total", len(catalog.rules)),
-            "breaches": summary.get("breaches", {"critical": 0, "warning": 0, "info": 0}),
+            "breaches": summary.get(
+                "breaches", {"critical": 0, "warning": 0, "info": 0}
+            ),
             "top": top_payload,
             "focus_symbols": sorted(focus_symbols),
             "as_of": now.isoformat(),
