@@ -33,6 +33,8 @@ jobs:
         run: make web-build
       - name: Web unit tests
         run: make web-test
+      - name: Web e2e tests
+        run: make web-e2e
       - name: Lint
         run: ruff check .
       - name: Tests
