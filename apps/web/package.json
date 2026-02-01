@@ -9,11 +9,11 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "bun run test:all",
-    "test:watch": "NODE_OPTIONS=--localstorage-file=/tmp/portfolio-exporter-localstorage.json vitest",
-    "test:unit": "NODE_OPTIONS=--localstorage-file=/tmp/portfolio-exporter-localstorage.json vitest run --project unit",
+    "test:watch": "node --localstorage-file=/tmp/portfolio-exporter-localstorage.json ./node_modules/vitest/dist/cli.js",
+    "test:unit": "node --localstorage-file=/tmp/portfolio-exporter-localstorage.json ./node_modules/vitest/dist/cli.js run --project unit",
     "test:e2e": "playwright test --config=playwright.config.ts",
-    "test:contracts": "NODE_OPTIONS=--localstorage-file=/tmp/portfolio-exporter-localstorage.json vitest run --project contracts",
-    "test:all": "NODE_OPTIONS=--localstorage-file=/tmp/portfolio-exporter-localstorage.json vitest run"
+    "test:contracts": "node --localstorage-file=/tmp/portfolio-exporter-localstorage.json ./node_modules/vitest/dist/cli.js run --project contracts",
+    "test:all": "node --localstorage-file=/tmp/portfolio-exporter-localstorage.json ./node_modules/vitest/dist/cli.js run"
   },
   "engines": {
     "node": ">=20 <26",
