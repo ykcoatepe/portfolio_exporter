@@ -6,6 +6,7 @@ const BASE_URL = `http://${HOST}:${PORT}`;
 
 export default defineConfig({
   testDir: "tests",
+  testMatch: "**/*.e2e.spec.ts",
   timeout: 60_000,
   expect: {
     timeout: 5_000,
@@ -15,6 +16,7 @@ export default defineConfig({
     trace: "on-first-retry",
     video: "retain-on-failure",
   },
+  testMatch: ["**/*.e2e.spec.ts"],
   webServer: {
     command: `bun run dev -- --host ${HOST} --port ${PORT}`,
     url: BASE_URL,
