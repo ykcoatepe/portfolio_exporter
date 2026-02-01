@@ -7,6 +7,7 @@ import type {
   OptionComboLegApi,
   OptionGreekSummary,
   PortfolioStatsApiResponse,
+  PSDPositionsView,
   PSDSnapshot,
   StocksApiResponse,
 } from "../lib/types";
@@ -1335,7 +1336,7 @@ export const buildPsdSnapshot = (overrides: Partial<PSDSnapshot> = {}): PSDSnaps
   };
 };
 
-const e2eStockRows: PSDSnapshot["positions_view"]["single_stocks"] = [
+const e2eStockRows: PSDPositionsView["single_stocks"] = [
   {
     secType: "STK" as const,
     symbol: "AAPL",
@@ -1425,10 +1426,16 @@ const e2eStockRows: PSDSnapshot["positions_view"]["single_stocks"] = [
 
 const buildE2ePsdSnapshot = (): PSDSnapshot => {
   const base = buildPsdSnapshot();
+  const positionsView: PSDPositionsView =
+    base.positions_view ?? {
+      single_stocks: [],
+      option_combos: [],
+      single_options: [],
+    };
   return {
     ...base,
     positions_view: {
-      ...base.positions_view,
+      ...positionsView,
       single_stocks: e2eStockRows,
     },
   };
