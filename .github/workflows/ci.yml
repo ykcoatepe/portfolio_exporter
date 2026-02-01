@@ -31,6 +31,8 @@ jobs:
           pip install -r requirements-dev.txt
       - name: Build SPA assets
         run: make web-build
+      - name: Web unit tests
+        run: make web-test
       - name: Lint
         run: ruff check .
       - name: Tests

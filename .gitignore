@@ -9,6 +9,11 @@ logs/
 __pycache__/
 *.pyc
 .venv/
+ibkr_env/
+
+# Local env/IDE
+.env
+.idea/
 
 # Ignore Python package metadata
 *.egg-info/
